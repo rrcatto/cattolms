@@ -90,4 +90,18 @@ final class ContactMessagesController extends BaseController
             $this->redirect('/admin/messages/' . $id);
         }, '/admin/messages/' . $id);
     }
+
+    /** Undo of Mark as answered (2026-10-26 audit). */
+    #[Route('/admin/messages/{id}/unanswered', name: 'admin_contact_message_unanswered', requirements: ['id' => '[0-9]+'], methods: ['POST'])]
+    public function unanswered(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
+        $id = (int) $this->request()->attributes->get('id');
+        return $this->handle(function () use ($id, $user): void {
+            $this->contact->markUnanswered($id, $user->id);
+            $this->flash('success', 'The message is open again: not answered.');
+            $this->redirect('/admin/messages/' . $id);
+        }, '/admin/messages/' . $id);
+    }
 }

@@ -5,8 +5,12 @@
 
 		{% include '@platform/partials/admin/company-modals.html.twig' with {cm_rows: companies} %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'companies', pagination: companies_pagination, search: {ds_name: 'companies', ds_label: 'Search course consumers', ds_value: companies_search, ds_action: '/admin/companies'}})} %}
+{% block toolbar %}{% if companies_view_switch is defined and companies_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: companies_view_switch} %}{% if companies_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'companies', gs_headers: companies_sort_headers, gs_pager: companies_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
+					{% if companies_view|default('list') == 'grid' and companies_pagination|default(null) %}
+						{% include '@platform/partials/admin/company-cards.html.twig' with {cc_rows: companies, cc_creators: false} %}
+					{% else %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 
@@ -22,7 +26,8 @@
 							{% for company in companies %}
 								<tr>
 									<td title="{{ company.name }} · {{ company.domain }}">
-										<strong>{{ company.name }}</strong>
+										{# The name opens the company's page (owner, 2026-10-26). #}
+										<strong><a href="/admin/companies/{{ company.id }}">{{ company.name }}</a></strong>
 									</td>
 									<td>
 										{{ company.people_count }}
@@ -56,6 +61,7 @@
 
 {% endblock %}
 {% endembed %}
+					{% endif %}
 
 {% endblock %}
 {% block preview %}

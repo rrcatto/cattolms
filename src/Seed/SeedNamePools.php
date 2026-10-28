@@ -12,7 +12,7 @@ Loads the word lists the Seed Database builds generated names from.
 
 Architectural boundary: filesystem only. This class reads text files and hands back arrays of
 words. It draws nothing, combines nothing and knows nothing about people, companies or courses;
-{@see SeedNameFactory} does all of that.
+{@see SeedNames} does all of that.
 
 Where the files live, and why in two places.
 
@@ -32,6 +32,9 @@ because a hand-edited file gaining the same name twice is an ordinary slip and n
 to seed over.
 
 Changelog:
+2026/10/27 SAST
+- Real names only (owner, 2026-10-27: "I need better names, not this garbage"): the made-up company and course word lists
+  are gone; a company is a South African place or familiar word and a trade (company-words, company-trades).
 2026/09/05 11:00 SAST
 - Created for the v0.6 seed name pools.
 */
@@ -57,13 +60,8 @@ final class SeedNamePools
         'first-names' => 100,
         'middle-names' => 100,
         'surnames' => 100,
-        'company-places' => 50,
-        'company-qualities' => 50,
-        'company-sectors' => 10,
-        'course-subjects' => 25,
-        'course-topics' => 50,
-        'course-levels' => 5,
-        'course-categories' => 5,
+        'company-words' => 50,
+        'company-trades' => 20,
     ];
 
     /** @var array<string,list<string>> */

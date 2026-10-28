@@ -19,6 +19,7 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Support\ListView;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\Slug;
 
@@ -42,7 +43,8 @@ final class CourseController extends BaseController
         private readonly AnalyticsEventRecorder $analytics,
         private readonly CourseReviewService $reviews,
         private readonly \CattoLearning\Bundle\BundleRepository $bundles,
-        private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases
+        private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases,
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -77,6 +79,10 @@ final class CourseController extends BaseController
         $courses = $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset);
         $navigation = $this->courses->categoryNavigation($category);
         $scope = $category === null ? '' : (string) $category['name'] . ($navigation['subcategories'] === [] ? '' : ' and all its subcategories');
+        // Cards or a list, as the reader chose, remembered (owner, 2026-10-26).
+        $query = $this->request()->query->all();
+        $view = ListView::chosen(self::DATASET, $query, $this->request()->cookies->all());
+        ListView::rememberAsked(self::DATASET, $query);
 
         return $this->render('courses', [
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
@@ -92,6 +98,9 @@ final class CourseController extends BaseController
                     ? ($category === null ? 'Searching every course.' : 'Searching ' . $scope . '.')
                     : ($category === null ? 'Every course in the catalogue. Choose a category to narrow the list.' : 'Every course in ' . $scope . '.'),
                 'navigation' => $navigation,
+                'view' => $view,
+                'follow' => $category === null ? null : $this->followView('category', (int) $category['id'], (string) $category['name'], $base . '#follow'),
+                'view_switch' => ListView::switcher(self::DATASET, $view, $base, [PlatformAdministrationService::searchParam(self::DATASET) => $search]),
                 'paginated' => true,
                 'empty_heading' => $search !== '' ? 'No courses match your search' : 'No courses to show here yet',
                 'empty_summary' => $search !== '' ? 'Try another term or clear the search.' : 'Choose another category to find a course.',
@@ -254,6 +263,7 @@ final class CourseController extends BaseController
         $canReview = $user !== null && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, $courseId);
 
         return $this->render('course-detail', [
+            'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow'),
             'title' => (string) $course['title'],
             'course' => $course,
             'has_access' => $enrolment !== null,
@@ -280,4 +290,17 @@ final class CourseController extends BaseController
 
 
 
+
+    /**
+     * A Follow button's state for the reader (mailing, step 1; owner, 2026-10-26).
+     *
+     * @return array{kind:string,id:int,name:string,following:bool,signed_in:bool,return:string,choose_how:bool,how:array<string,mixed>}
+     */
+    private function followView(string $kind, int $id, string $name, string $return): array
+    {
+        $user = $this->currentUser();
+
+        return ['kind' => $kind, 'id' => $id, 'name' => $name, 'following' => $user !== null && $this->mailing->isSubscribed($user->id, $kind, $id), 'signed_in' => $user !== null, 'return' => $return]
+            + $this->mailing->followChoice($user === null ? 0 : $user->id);
+    }
 }

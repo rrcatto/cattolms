@@ -1,0 +1,26 @@
+{#
+	A list's join link, signed in (owner, 2026-10-28, decision 7A: people join the lists ADMIN makes themselves, on My
+	Subscriptions or through the list's join link): what the list is, and Join. Opening the link changes nothing.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Join a list' %}
+	{% set ph_title = list.name %}
+	{% set ph_lead = list.description ?: 'Join it to get what is sent to it by email.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% if joined %}
+			{{ ui('layout.section-head', {heading: 'You are on this list', summary: 'You can leave it at any time on My Subscriptions.'}) }}
+			{{ ui('action.link', {label: 'Open My Subscriptions', variant: 'secondary', size: 'normal', href: '/account/subscriptions#lists', icon: 'action-open'}) }}
+		{% else %}
+			{{ ui('layout.section-head', {heading: 'Join ' ~ list.name, summary: 'You can leave it at any time on My Subscriptions.'}) }}
+			<form action="/join/{{ list.join_token }}" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<div class="cl-mailing-choices">
+					{{ ui('action.button', {label: 'Join this list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+					{{ ui('action.link', {label: 'No, thank you', variant: 'secondary', size: 'normal', href: '/', icon: 'action-cancel'}) }}
+				</div>
+			</form>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

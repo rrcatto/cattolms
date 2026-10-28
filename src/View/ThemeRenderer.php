@@ -12,6 +12,8 @@ Renders platform-owned Catto Learning page bodies independently of themes, then 
 Changelog:
 2026/10/23 SAST
 - Administration -> Courses -> Import & Export Catalogue, after Course Tags (owner, 2026-10-23).
+2026/10/28 SAST (v1.0.0)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.0.
 2026/10/24 SAST (v0.9.11)
 - Advanced PLATFORM_ASSET_VERSION to 0.9.11.
 2026/10/24 SAST (v0.9.10)
@@ -126,7 +128,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.11';
+    private const PLATFORM_ASSET_VERSION = '1.0.0';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -296,7 +298,7 @@ final class ThemeRenderer
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
             'is_authenticated' => false, 'is_platform_admin' => false, 'is_company_admin' => false,
             'is_course_editor' => false, 'is_course_owner' => false, 'user_email' => '', 'authenticated_email' => '', 'user_name' => '',
-            'load_ckeditor' => false, 'load_question_editor' => false, 'load_assessment_timer' => false,
+            'load_ckeditor' => false, 'load_question_editor' => false, 'load_assessment_timer' => false, 'load_mailing_editor' => false,
             'course_content_mode' => false, 'flash_messages' => [], 'permissions' => [],
         ] as $key => $value) {
             $model[$key] = $value;
@@ -331,7 +333,7 @@ final class ThemeRenderer
             $this->platformAsset('/css/bootstrap-utilities.min.css'),
             $this->platformAsset('/css/catto-platform.css'),
         ];
-        if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
+        if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false) || (bool) ($data['load_mailing_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
         // htmx is a platform-owned progressive enhancement: every surface that uses it renders
         // and works server-side first, so the page degrades to plain navigation if the script
         // is absent. Supplied with the other vendor browser assets under the public root. There is
@@ -348,6 +350,11 @@ final class ThemeRenderer
             // italic, alignment and fields, so the stored wording is exactly what a certificate can show.
             $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
             $platformScripts[] = $this->platformAsset('/js/ck-certificate.js');
+        }
+        // A message's text blocks (owner, 2026-10-28, decision 6A): CKEditor with only bold, italics, links and lists.
+        if ((bool) ($data['load_mailing_editor'] ?? false) && !(bool) ($data['load_ckeditor'] ?? false) && !(bool) ($data['load_certificate_editor'] ?? false)) {
+            $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
+            $platformScripts[] = $this->platformAsset('/js/ck-mailing.js');
         }
         if ((bool) ($data['load_question_editor'] ?? false)) $platformScripts[] = $this->platformAsset('/js/question-editor.js');
         if ((bool) ($data['load_assessment_timer'] ?? false)) $platformScripts[] = $this->platformAsset('/js/assessment-timer.js');
@@ -511,11 +518,13 @@ final class ThemeRenderer
         if ($this->can($data, 'COMPANY.DASHBOARD.VIEW')) {
             $companyPermissionBySection = [
                 'dashboard' => 'COMPANY.DASHBOARD.VIEW',
+                'profile' => 'COMPANY.DASHBOARD.VIEW',
                 'people' => 'COMPANY.PERSON.VIEW',
                 'requests' => 'COMPANY.REQUEST.VIEW',
                 'enrolments' => 'COMPANY.ENROLMENT.VIEW',
                 'performance' => 'COMPANY.ENROLMENT.VIEW',
                 'credits' => 'COMPANY.CREDIT.VIEW',
+                'orders' => 'COMPANY.ORDER.VIEW',
                 'courses' => 'COMPANY.COURSE.VIEW',
                 'training' => 'COMPANY.COURSE.VIEW',
                 'favourites' => 'COMPANY.COURSE.VIEW',
@@ -529,7 +538,7 @@ final class ThemeRenderer
             // overview of the whole workspace.
             $companyGroups = [
                 'people' => ['label' => 'People', 'icon' => 'people', 'sections' => ['people', 'requests', 'enrolments', 'performance']],
-                'courses' => ['label' => 'Courses', 'icon' => 'courses', 'sections' => ['courses', 'favourites', 'training', 'credits']],
+                'courses' => ['label' => 'Courses', 'icon' => 'courses', 'sections' => ['courses', 'favourites', 'training', 'credits', 'orders']],
             ];
 
             $visibleCompanySections = [];
@@ -547,6 +556,11 @@ final class ThemeRenderer
             if (isset($visibleCompanySections['dashboard'])) {
                 $dashboard = $visibleCompanySections['dashboard'];
                 $companyChildren[] = $child('company-dashboard',$dashboard['label'],$dashboard['route'],$dashboard['icon']);
+            }
+            // The company itself, its logo first, at the top (owner, 2026-10-26).
+            if (isset($visibleCompanySections['profile'])) {
+                $profile = $visibleCompanySections['profile'];
+                $companyChildren[] = $child('company-profile',$profile['label'],$profile['route'],$profile['icon']);
             }
             foreach ($companyGroups as $groupKey => $group) {
                 $grandchildren = [];
@@ -682,6 +696,8 @@ final class ThemeRenderer
                 if ($sectionKey === 'companies' && $this->can($data, 'PLATFORM.PERSON.VIEW')) {
                     $unanswered = isset($this->contactMessages) ? $this->contactMessages->unansweredCount() : 0;
                     $grandchildren[] = $child('admin-contact-messages', 'Contact Messages' . ($unanswered > 0 ? ' (' . $unanswered . ' new)' : ''), '/admin/messages', 'people');
+                    // Every registration attempt with its risk (owner, 2026-10-26).
+                    $grandchildren[] = $child('admin-signup-attempts', 'Sign-up Attempts', '/admin/people/signup-attempts', 'people');
                 }
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
@@ -724,12 +740,41 @@ final class ThemeRenderer
             $items[] = $item('administration', 'Administration', '/admin', 'administration', $active === 'admin', children: $adminChildren);
         }
 
+        // Mailing is a system of its own, with its own menu (owner, 2026-10-27: "I want a separate Mailing List main navbar
+        // item with it's own drop down list, not buried under Administration>People & Companies"), grouped as the approved
+        // mockup groups it. Each entry appears once its page exists.
+        if ($this->can($data, 'PLATFORM.MAILING.VIEW')) {
+            $mailingChildren = [
+                $child('mailing-overview', 'Overview', '/mailing', 'reports'),
+                $child('mailing-group-send', 'Send', '/mailing/digest', 'contact', [
+                    $child('mailing-digest', 'Digest', '/mailing/digest', 'contact'),
+                    $child('mailing-messages', 'Messages', '/mailing/messages', 'contact'),
+                ]),
+                $child('mailing-group-design', 'Design', '/mailing/templates', 'themes', [
+                    $child('mailing-templates', 'Templates', '/mailing/templates', 'themes'),
+                ]),
+                $child('mailing-group-people', 'People', '/mailing/lists', 'people', [
+                    $child('mailing-lists', 'Lists', '/mailing/lists', 'people'),
+                    $child('mailing-subscribers', 'Subscribers', '/mailing/subscribers', 'people'),
+                    $child('mailing-never-emailed', 'Addresses never emailed', '/mailing/never-emailed', 'people'),
+                ]),
+                $child('mailing-group-setup', 'Setup', '/mailing/automatic', 'settings', [
+                    $child('mailing-automatic', 'Automatic emails', '/mailing/automatic', 'settings'),
+                    $child('mailing-settings', 'Sending settings', '/mailing/settings', 'settings'),
+                    $child('mailing-cattomail', 'catto-mail', '/mailing/cattomail', 'settings'),
+                ]),
+                $child('mailing-reports', 'Reports', '/mailing/reports', 'reports'),
+            ];
+            $items[] = $item('mailing', 'Mailing', '/mailing', 'contact', $active === 'mailing', children: $mailingChildren);
+        }
+
         if ((bool) ($data['is_authenticated'] ?? false)) {
             $accountPermissionBySection = [
                 'dashboard' => 'ACCOUNT.VIEW',
                 'profile' => 'ACCOUNT.PROFILE.VIEW',
                 'billing' => 'ACCOUNT.PROFILE.VIEW',
                 'emails' => 'ACCOUNT.PROFILE.VIEW',
+                'subscriptions' => 'ACCOUNT.PROFILE.VIEW',
                 'social' => 'ACCOUNT.PROFILE.VIEW',
                 'learning' => 'LEARNING.LIBRARY.VIEW',
                 'certificates' => 'LEARNING.CERTIFICATE.VIEW',
@@ -741,7 +786,7 @@ final class ThemeRenderer
             // Profile pop-out. Listed flat they would be three of six items in the Account menu,
             // and nothing in it would say the three belong together. Billing Address joined them
             // after Personal Particulars on 2026/10/06, in the registry's order.
-            $profileSectionKeys = ['profile', 'billing', 'emails', 'social'];
+            $profileSectionKeys = ['profile', 'billing', 'emails', 'subscriptions', 'social'];
 
             // All sections, the dashboard, Profile, then the rest - the shape Company and
             // Administration already open with. Owner's instruction, 2026/09/11.

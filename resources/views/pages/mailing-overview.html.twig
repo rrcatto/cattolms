@@ -1,0 +1,109 @@
+{#
+	Mailing › Overview (owner, 2026-10-27: "I want a separate Mailing List main navbar item with it's own drop down list
+	... The mailing list is a major thing, not some side note"; the approved mockup "Mailing system plan", page 1): what
+	waits for the administrator, how the parts fit together, the figures, what went out most recently, the next digest
+	and the lists growing fastest. MailingOverview gathers it.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Overview' %}
+	{% set ph_lead = 'Everything that goes by email to the people who asked for it: what is waiting for you, what went out and how it did, and how your lists are growing.' %}
+	{% if can_manage %}
+	{% set ph_actions %}
+		{{ ui('action.link', {label: 'Write a message', variant: 'primary', size: 'normal', href: '/mailing/messages#new', icon: 'action-email'}) }}
+	{% endset %}
+	{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set ov = overview %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'waiting'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Waiting for you', summary: ov.attention ? (ov.attention|length == 1 ? '1 thing waits' : ov.attention|length ~ ' things wait') ~ ' for you, each with what to do.' : 'Nothing waits for you.'}) }}
+		{% if ov.attention %}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+			{% for entry in ov.attention %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+			{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: 'info'}) }} <strong>{{ entry.title }}</strong><p class="small cl-text-secondary">{{ entry.summary }}</p>{% endblock %}
+			{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'secondary', size: 'small', icon: entry.icon, href: entry.href}) }}{% endblock %}
+			{% endembed %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+		{% else %}
+			{{ ui('feedback.empty', {summary: 'Nothing waits for you. Updates to release, a message to approve, or one that paused itself, appear here.'}) }}
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'how'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'How mailing works', summary: 'Nothing is sent unless someone said yes, and nothing goes out until you send it or your schedule does.'}) }}
+		{% set how = [
+			{name: 'Lists', kicker: 'Who', text: 'People who said yes: to News and Updates, or to a category, course or tag they follow.', href: '/mailing/lists'},
+			{name: 'Digest', kicker: 'Kept, then sent', text: 'News about what people follow, held until you release it, then sent as each person chose.', href: '/mailing/digest'},
+			{name: 'Messages', kicker: 'From you', text: 'Emails you write to chosen lists, sent now or at a time you set.', href: '/mailing/messages'},
+			{name: 'Addresses never emailed', kicker: 'Protected', text: 'Hard bounces, spam complaints and addresses you added: nothing is ever sent to them.', href: '/mailing/never-emailed'},
+			{name: 'Sending settings', kicker: 'How it leaves', text: 'Who it is from, how fast it goes, and what pauses a sending.', href: '/mailing/settings'}
+		] %}
+		{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'How mailing works'})} %}{% block body %}
+			{% for part in how %}
+			{% embed ui_template('data.card') with {props: ui_props('data.card', {title: part.name, href: part.href, picture: 'wide'})} %}
+			{% block details %}<p class="cl-ui-card-line cl-ui-card-quiet">{{ part.kicker }}</p><p class="cl-ui-card-line">{{ part.text }}</p>{% endblock %}
+			{% endembed %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'figures'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'At a glance', summary: 'Each figure opens what it counts.'}) }}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}{% block body %}
+			{% for f in ov.figures %}{{ ui('data.stat-card', {value: f.value, label: f.label, note: f.note, icon: f.icon, href: f.href}) }}{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side', section_spacing: false})} %}{% block body %}
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'recent'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Recently sent', summary: 'Each digest and message, newest first. Open one for who got it, who opened it and every link clicked.'}) }}
+			{% if ov.recent %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'What'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'People'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Clicked'}} %}</tr>{% endblock %}
+			{% block body %}{% for r in ov.recent %}<tr>
+				<td>{{ r.started_at|date('j M, H:i') }}</td>
+				<td class="cell-text"><a href="/mailing/messages/{{ r.id }}">{{ r.name }}</a><br><span class="small cl-text-secondary">{{ r.kind_label }} · {{ r.to }}</span></td>
+				<td>{{ r.sent }}</td>
+				<td>{{ r.opened_label }}</td>
+				<td>{{ r.clicked_label }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {summary: 'Nothing has been sent yet.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		</div>
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'next-digest'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'The next digests', summary: 'Released updates go in them. Email goes ' ~ ov.digest.hours ~ '.'}) }}
+			{% set ov_next = [] %}
+			{% for key, label in {daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'} %}{% set ov_next = ov_next|merge([{label: label, value: ov.digest.next[key] ?? 'Not due in the next two months'}]) %}{% endfor %}
+			{{ ui('data.key-value-list', {items: ov_next}) }}
+			<p>{{ ov.digest.held == 1 ? '1 update is held until you release it.' : ov.digest.held ~ ' updates are held until you release them.' }}</p>
+			{{ ui('action.link', {label: 'Open the digest', variant: 'secondary', size: 'small', href: '/mailing/digest', icon: 'action-open'}) }}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'growing'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Lists growing fastest', summary: 'People who joined in the past 30 days and are still on the list.'}) }}
+			{% if ov.growing %}
+			{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+				{% for g in ov.growing %}
+				{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+				{% block body %}<a href="/mailing/lists/{{ g.list_id }}">{{ g.name }}</a>{% if g.kind %} <span class="small cl-text-secondary">{{ g.kind }}</span>{% endif %}{% endblock %}
+				{% block actions %}<strong>+{{ g.joined }}</strong>{% endblock %}
+				{% endembed %}
+				{% endfor %}
+			{% endblock %}{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {summary: 'Nobody joined a list in the past 30 days.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		</div>
+	{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

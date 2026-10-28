@@ -6,11 +6,55 @@
 {% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'courses', pagination: courses_pagination, search: {ds_name: 'courses', ds_label: 'Search courses', ds_value: courses_search, ds_action: '/admin/courses'}})} %}
+{% block toolbar %}{% if courses_view_switch is defined and courses_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: courses_view_switch} %}{% if courses_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'courses', gs_headers: courses_sort_headers, gs_pager: courses_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 				{% if courses %}
 		{# The canonical data table owns its wrapper and shared column controls. In the catalogue's order a course is
 		   dragged by its handle, or moved with the arrow keys on it, or with the ⋯ menu (owner, 2026-10-20). #}
+					{% if courses_view|default('list') == 'grid' and courses_pagination|default(null) %}
+					{# The courses as cards, 4 to a row (owner, 2026-10-26): the cover, code, title, price, status, category and
+					   learners; Manage, and the rest in the menu. Courses are put in the catalogue's order in the list. #}
+					{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Courses'})} %}
+{% block body %}
+						{% for course in courses %}
+							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: '/admin/courses/' ~ course.id, picture: 'wide'})} %}
+{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
+{% block details %}
+								<p class="cl-ui-card-line"><code class="cl-course-code">{{ course.code }}</code></p>
+								{% if course.price %}<p class="cl-ui-card-line"><strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %} <span class="cl-ui-card-quiet">· {{ course.price.period_label }}</span></p>{% endif %}
+								<div class="role-list">
+									{{ ui('feedback.badge', {label: course.status|ucfirst, tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}
+									{{ ui('feedback.badge', {label: course.category_name ?: 'Uncategorised', tone: 'neutral'}) }}
+								</div>
+								<p class="cl-ui-card-line cl-ui-card-quiet">{{ course.learner_count }} {{ course.learner_count == 1 ? 'learner' : 'learners' }} · Updated {{ course.updated_at }}</p>
+{% endblock %}
+{% block actions %}
+								{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id, icon: 'action-manage'}) }}
+								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'More for ' ~ course.title})} %}
+{% block body %}
+									{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview', icon: 'action-preview'}) }}
+									{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
+									{% if can_delete_courses %}
+										<form action="/admin/courses/{{ course.id }}/reset" method="post">
+											<input type="hidden" name="csrf" value="{{ csrf }}">
+											{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'submit', confirm: 'Reset ' ~ (course.title) ~ '? This removes all course content and learner test data but keeps the empty course shell for re-import.', icon: 'action-reset'}) }}
+										</form>
+										{% if not course.bought_lines %}
+										<form action="/admin/courses/{{ course.id }}/delete" method="post">
+											<input type="hidden" name="csrf" value="{{ csrf }}">
+											{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Permanently delete ' ~ (course.title) ~ ' and all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}
+										</form>
+										{% endif %}
+									{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+						{% endfor %}
+{% endblock %}
+{% endembed %}
+					{% else %}
 					{% set arrange = courses_can_arrange|default(false) %}
 					{% if arrange %}<div class="cl-course-order" data-controller="course-order" data-course-order-csrf-value="{{ csrf }}" data-course-order-before-value="{{ courses_before_page|default(0) }}" data-action="dragstart->course-order#start dragover->course-order#over drop->course-order#drop dragend->course-order#end">
 						<p class="visually-hidden" id="course-order-keys">Drag the handle, or press the up or down arrow, Home or End on it, to move the course in the catalogue.</p>
@@ -37,7 +81,7 @@
 										<td><code class="cl-course-code">{{ course.code }}</code></td>
 										{# The whole title wraps (owner, 2026-10-20): two courses that differ only at the end, such as the parts of a series, stay told apart. #}
 										<td class="cell-text">
-											<strong>{{ course.title }}</strong>
+											<strong><a href="/admin/courses/{{ course.id }}">{{ course.title }}</a></strong>
 										</td>
 										<td>
 											{# What the course is sold at now, first, then its was price struck through and its period; blank when no price is set (owner, 2026-10-20). #}
@@ -99,6 +143,7 @@
 {% endblock %}
 {% endembed %}
 					{% if arrange %}</div>{% endif %}
+					{% endif %}
 
 {% else %}
 					{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'No courses exist yet', summary: 'Import one of the existing self-study HTML files or create a course manually.'})} %}

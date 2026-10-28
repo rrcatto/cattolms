@@ -1,0 +1,267 @@
+{#
+	One campaign (mailing, step 2; owner, 2026-10-26: designed emails with "an HTML block too", and "I want Admin to retain
+	control of the sending process"). Its summary and figures first; then its details and blocks beside sending and the
+	preview of what a reader sees; then each copy and each link. Every form works without JavaScript.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/mailing/messages' %}{% set ph_back_label = 'Messages' %}
+	{% set ph_kicker = kind_labels[campaign.kind] %}
+	{% set ph_title = campaign.name %}
+	{% if can_manage %}
+	{% set ph_actions %}
+		{% if campaign.kind == 'message' %}<form action="/mailing/messages/{{ campaign.id }}/duplicate" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make a copy', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-copy'}) }}</form>{% endif %}
+		{% if campaign.status in ['draft', 'cancelled'] and figures.total == 0 %}<form action="/mailing/messages/{{ campaign.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove', confirm: 'Delete ' ~ campaign.name ~ '? It cannot be undone.'}) }}</form>{% endif %}
+	{% endset %}
+	{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{# A list's welcome email can be changed at any time: each copy is drawn when it is sent. #}
+	{% set mc_open = campaign.status in ['draft', 'awaiting_approval', 'paused'] or campaign.kind == 'welcome' %}
+
+	<section class="cl-page-section">
+	{% if campaign.status_note %}
+		{{ ui('feedback.notice', {tone: campaign.status == 'paused' ? 'warning' : 'info', heading: campaign.status_note}) }}
+	{% endif %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'summary'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Summary', heading_level: 2}) }}
+		<div class="cl-mailing-badges">
+			{{ ui('feedback.badge', {label: status_labels[campaign.status], tone: status_tones[campaign.status]}) }}
+			{{ ui('feedback.badge', {label: kind_labels[campaign.kind], tone: 'neutral'}) }}
+			{% for name in list_names %}{{ ui('feedback.badge', {label: name, tone: 'info'}) }}{% endfor %}
+		</div>
+		{% set mc_facts = [{label: 'Subject', value: campaign.subject ?: 'Not written yet'}] %}
+		{% if campaign.kind == 'message' and campaign.status in ['draft', 'scheduled'] %}{% set mc_facts = mc_facts|merge([{label: 'It reaches', value: audience == 1 ? '1 person now' : audience ~ ' people now'}]) %}{% endif %}
+		{% if campaign.send_at %}{% set mc_facts = mc_facts|merge([{label: 'Sends at', value: campaign.send_at|date('j M Y \\a\\t H:i', site_zone)}]) %}{% endif %}
+		{% if campaign.started_at %}{% set mc_facts = mc_facts|merge([{label: 'Started', value: campaign.started_at|date('j M Y \\a\\t H:i', site_zone)}]) %}{% endif %}
+		{% if campaign.finished_at %}{% set mc_facts = mc_facts|merge([{label: campaign.status == 'cancelled' ? 'Cancelled' : 'Finished', value: campaign.finished_at|date('j M Y \\a\\t H:i', site_zone)}]) %}{% endif %}
+		{{ ui('data.key-value-list', {items: mc_facts}) }}
+		{% if figures.total > 0 %}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{{ ui('data.stat-card', {value: figures.sent ~ (figures.total > figures.sent ? ' of ' ~ figures.total : ''), label: 'Sent', icon: 'figure-orders', href: '#copies'}) }}
+			{# Only cattomail reports delivery: through a mail server, Sent is as far as it is known. #}
+			{% if figures.via_cattomail > 0 %}{{ ui('data.stat-card', {value: figures.delivered, label: 'Delivered' ~ rates.delivered, icon: 'figure-fulfilled', href: '?copies_status=delivered#copies'}) }}{% endif %}
+			{{ ui('data.stat-card', {value: figures.opened, label: 'Opened' ~ rates.opened, icon: 'figure-progress', href: '#copies'}) }}
+			{{ ui('data.stat-card', {value: figures.clicked, label: 'Clicked' ~ rates.clicked, icon: 'figure-completion', href: '#links'}) }}
+			{{ ui('data.stat-card', {value: figures.bounced, label: 'Bounced' ~ rates.bounced, icon: 'figure-risk-medium', href: '?copies_status=bounced#copies'}) }}
+			{{ ui('data.stat-card', {value: figures.complained, label: 'Marked as spam' ~ rates.complained, icon: 'figure-risk-high', href: '?copies_status=complained#copies'}) }}
+			{{ ui('data.stat-card', {value: figures.unsubscribed, label: 'Unsubscribed' ~ rates.unsubscribed, icon: 'figure-cancelled', href: '#copies'}) }}
+			{{ ui('data.stat-card', {value: figures.not_sent, label: 'Not sent', icon: 'figure-awaiting', href: '?copies_status=skipped#copies'}) }}
+			{{ ui('data.stat-card', {value: forwarded, label: 'Forwarded to a friend', icon: 'figure-people', href: '#copies'}) }}
+		{% endblock %}{% endembed %}
+		{% endif %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side', section_spacing: false})} %}
+{% block body %}
+		<div>
+		{# Its details: the name for Administration, the subject and preview line readers see, and who it goes to. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'details'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Details', summary: mc_open and can_manage ? placeholder ~ ' in the subject is each reader\'s first name.' : ''}) }}
+			{% if mc_open and can_manage %}
+			<form action="/mailing/messages/{{ campaign.id }}/details" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'mc-name', full_width: true, help: 'For Administration only.'})} %}{% block control %}<input class="cl-input" id="mc-name" name="name" maxlength="160" required value="{{ campaign.name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subject', for: 'mc-subject', full_width: true, help: 'What the inbox shows. Short and plain works best, such as "Three new finance courses".'})} %}{% block control %}<input class="cl-input" id="mc-subject" name="subject" maxlength="200" value="{{ campaign.subject }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Preview line', for: 'mc-preheader', full_width: true, help: 'The grey line many inboxes show after the subject.'})} %}{% block control %}<input class="cl-input" id="mc-preheader" name="preheader" maxlength="200" value="{{ campaign.preheader }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% if campaign.kind == 'message' and campaign.status == 'draft' %}
+				<input type="hidden" name="lists_shown" value="1">
+				<fieldset class="cl-mailing-lists">
+					<legend class="h6">Who it goes to</legend>
+					{% for list in lists %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name ~ ' (' ~ (list.followers == 1 ? '1 person' : list.followers ~ ' people') ~ ')'})} %}{% block control %}<input type="checkbox" name="list_ids[]" value="{{ list.id }}"{{ list.id in campaign.list_ids ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% else %}
+						<p class="help">Nobody follows anything yet.</p>
+					{% endfor %}
+				</fieldset>
+				{% if lists %}
+				<fieldset class="cl-mailing-lists">
+					<legend class="h6">Leave out the people on</legend>
+					<p class="help">Someone on a list ticked here does not get it, even when they are on a list it goes to.</p>
+					{% for list in lists %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name})} %}{% block control %}<input type="checkbox" name="exclude_list_ids[]" value="{{ list.id }}"{{ list.id in campaign.exclude_list_ids|default([]) ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% endfor %}
+				</fieldset>
+				{% endif %}
+				{% endif %}
+				{# Its template, sender, most to send and own plain-text copy (owner, 2026-10-28: decisions 5B and 9A). #}
+				<input type="hidden" name="more_shown" value="1">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Template', for: 'mc-template', help: 'Its look. Templates are under Mailing, Design.'})} %}{% block control %}<select class="cl-input" id="mc-template" name="template_id" {{ ui_field_attrs(props) }}><option value="0"{{ not campaign.template_id ? ' selected' : '' }}>The default for {{ campaign.kind in ['digest', 'updates'] ? 'the digest' : 'messages' }}{{ default_template_name ? ' (' ~ default_template_name ~ ')' : '' }}</option>{% for t in templates %}<option value="{{ t.id }}"{{ campaign.template_id == t.id ? ' selected' : '' }}>{{ t.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send to at most', for: 'mc-most', help: 'Empty sends it to everyone it reaches.'})} %}{% block control %}<input class="cl-input" id="mc-most" name="max_recipients" inputmode="numeric" value="{{ campaign.max_recipients|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sender\'s name', for: 'mc-from-name', help: 'Empty uses Sending settings\' (' ~ sender_name ~ ').'})} %}{% block control %}<input class="cl-input" id="mc-from-name" name="from_name" maxlength="120" value="{{ campaign.from_name|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replies go to', for: 'mc-reply-to', help: 'Empty sends replies to the address it comes from.'})} %}{% block control %}<input class="cl-input" type="email" id="mc-reply-to" name="reply_to" value="{{ campaign.reply_to|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% endblock %}{% endembed %}
+				<fieldset class="cl-mailing-lists">
+					<legend class="h6">The plain-text copy</legend>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Made from the message'})} %}{% block control %}<input type="radio" name="plain_mode" value="made"{{ not campaign.plain_text ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Written by me'})} %}{% block control %}<input type="radio" name="plain_mode" value="own"{{ campaign.plain_text ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'My plain-text copy', for: 'mc-plain', full_width: true, help: 'Used when written by you, for email apps that show no pictures or colours. ' ~ placeholder ~ ' is the reader\'s first name.'})} %}{% block control %}<textarea class="cl-input" id="mc-plain" name="plain_text" rows="5" maxlength="20000" {{ ui_field_attrs(props) }}>{{ campaign.plain_text|default('') }}</textarea>{% endblock %}{% endembed %}
+				</fieldset>
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% else %}
+				{{ ui('data.key-value-list', {items: [{label: 'Subject', value: campaign.subject}, {label: 'Preview line', value: campaign.preheader ?: 'None'}, {label: 'Who it goes to', value: list_names ? list_names|join(', ') : (campaign.kind in ['digest', 'updates'] ? 'Everyone the updates in it reach' : 'News and Updates')}]}) }}
+			{% endif %}
+{% endblock %}
+{% endembed %}
+
+		{# The blocks, in order. One opens at a time with its own form; the frame around them cannot be removed. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'content'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Content', summary: 'The blocks of the email, top to bottom. The header with the site\'s name, why the reader gets it, the unsubscribe links and the business\'s name and address are added around them and cannot be removed.' ~ (campaign.kind in ['digest', 'updates'] ? ' Each reader\'s updates follow the blocks.' : '')}) }}
+			{% for block in blocks %}
+				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'block-' ~ block.id, heading: block.summary, eyebrow: loop.index ~ '. ' ~ block.label, open: open_block == block.id})} %}
+{% block body %}
+				{% if mc_open and can_manage %}
+					{% if block.type == 'divider' %}
+						<p class="small">A thin line between parts of the email. There is nothing to fill in.</p>
+					{% else %}
+					<form action="/mailing/messages/{{ campaign.id }}/blocks/{{ block.id }}" method="post"{{ block.type == 'image' ? ' enctype="multipart/form-data"' : '' }}>
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{% if block.type == 'heading' %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Heading', for: 'h-' ~ block.id, full_width: true, help: placeholder ~ ' is the reader\'s first name.'})} %}{% block control %}<input class="cl-input" id="h-{{ block.id }}" name="text" maxlength="150" required value="{{ block.text }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% elseif block.type == 'text' %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Text', for: 't-' ~ block.id, full_width: true, help: 'A blank line starts a new paragraph. A web address such as https://example.test becomes a link. ' ~ placeholder ~ ' is the reader\'s first name.'})} %}{% block control %}<textarea class="cl-input" id="t-{{ block.id }}" name="text" rows="8" maxlength="20000" required data-mailing-rich {{ ui_field_attrs(props) }}>{{ block.text }}</textarea>{% endblock %}{% endembed %}
+						{% elseif block.type == 'image' %}
+							{% if block.asset %}<p><img class="cl-mailing-picture" src="/m/i/{{ block.asset }}.png" alt="{{ block.alt }}" width="276"></p>{% endif %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: block.asset ? 'Choose another picture' : 'Picture', for: 'p-' ~ block.id, full_width: true, help: 'A PNG, JPEG or GIF up to 5 MB. Email apps do not show SVG. A wide picture is made 1200 pixels wide.'})} %}{% block control %}<input class="cl-input" type="file" id="p-{{ block.id }}" name="picture" accept="image/png,image/jpeg,image/gif" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it shows', for: 'a-' ~ block.id, full_width: true, help: 'Read out to people who cannot see it, and shown when pictures are blocked.'})} %}{% block control %}<input class="cl-input" id="a-{{ block.id }}" name="alt" maxlength="200" value="{{ block.alt }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Opens this web address (optional)', for: 'l-' ~ block.id, full_width: true})} %}{% block control %}<input class="cl-input" type="url" id="l-{{ block.id }}" name="href" value="{{ block.href }}" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% elseif block.type == 'button' %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Words on the button', for: 'b-' ~ block.id, full_width: true})} %}{% block control %}<input class="cl-input" id="b-{{ block.id }}" name="label" maxlength="60" required value="{{ block.label }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Opens this web address', for: 'u-' ~ block.id, full_width: true})} %}{% block control %}<input class="cl-input" type="url" id="u-{{ block.id }}" name="href" required value="{{ block.href }}" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% elseif block.type == 'course' %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'c-' ~ block.id, full_width: true, help: 'Its title, summary and price are taken from the catalogue on the day the email is sent.'})} %}{% block control %}<select class="cl-input" id="c-{{ block.id }}" name="course_id" required {{ ui_field_attrs(props) }}><option value="">Choose a published course</option>{% for course in courses %}<option value="{{ course.id }}"{{ course.id == block.course_id ? ' selected' : '' }}>{{ course.title }}{{ course.code ? ' (' ~ course.code ~ ')' : '' }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% elseif block.type == 'html' %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML', for: 'x-' ~ block.id, full_width: true, help: 'Put inline styles on each element: many email apps drop style blocks. It sits inside the email\'s frame, between the other blocks.'})} %}{% block control %}<textarea class="cl-input mono" id="x-{{ block.id }}" name="html" rows="12" maxlength="100000" required spellcheck="false" {{ ui_field_attrs(props) }}>{{ block.html }}</textarea>{% endblock %}{% endembed %}
+						{% endif %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save this block', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+					</form>
+					{% endif %}
+					<div class="cl-mailing-block-moves">
+						{% if not loop.first %}<form action="/mailing/messages/{{ campaign.id }}/blocks/{{ block.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Move up', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-move-up'}) }}</form>{% endif %}
+						{% if not loop.last %}<form action="/mailing/messages/{{ campaign.id }}/blocks/{{ block.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Move down', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-move-down'}) }}</form>{% endif %}
+						<form action="/mailing/messages/{{ campaign.id }}/blocks/{{ block.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'danger', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Remove this block?'}) }}</form>
+					</div>
+				{% else %}
+					<p class="small">{{ block.summary }}</p>
+				{% endif %}
+{% endblock %}
+{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'Nothing in it yet', summary: 'Add a block below.'}) }}
+			{% endfor %}
+			{% if mc_open and can_manage %}
+			<form class="cl-mailing-add" action="/mailing/messages/{{ campaign.id }}/blocks" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {name: 'type', legend: 'Add a block', id: 'mc-add-type', size: 'small', columns: 4, selected: 'text', items: block_types}) }}
+				{% if blocks %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where', for: 'mc-add-after'})} %}{% block control %}<select class="cl-input" id="mc-add-after" name="after" {{ ui_field_attrs(props) }}><option value="">At the end</option>{% for block in blocks %}<option value="{{ block.id }}">After {{ loop.index }}. {{ block.summary }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add the block', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+		</div>
+
+		<div>
+		{# Sending: what can be done now, by its status. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'send'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Sending'}) }}
+			{% if can_manage %}
+			{% if (campaign.status in ['draft', 'awaiting_approval', 'paused'] or campaign.kind == 'welcome') and campaign.subject %}
+				<form action="/mailing/messages/{{ campaign.id }}/test" method="post" class="cl-mailing-proof"><input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send a proof to', for: 'mc-proof-to', help: 'Any address. Its links go straight to their pages and nothing is recorded.'})} %}{% block control %}<input class="cl-input" type="email" id="mc-proof-to" name="email" value="{{ proof_to }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{{ ui('action.button', {label: 'Send the proof', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-email'}) }}
+				</form>
+			{% endif %}
+			{% if campaign.kind == 'welcome' %}
+				<p>{{ campaign.status == 'sending' ? 'It goes to each person the moment they join ' ~ (list_names|first ?: 'its list') ~ ', once.' : 'It is off: nobody gets it when they join.' }} Switch it on or off on the list's page.</p>
+				{% if campaign.list_ids %}{{ ui('action.link', {label: 'Open the list', variant: 'secondary', size: 'small', href: '/mailing/lists/' ~ campaign.list_ids|first ~ '#welcome', icon: 'action-open'}) }}{% endif %}
+			{% elseif campaign.status == 'draft' %}
+				<form class="cl-mailing-send" action="/mailing/messages/{{ campaign.id }}/schedule" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					<p>{{ audience == 1 ? 'It reaches 1 person now.' : 'It reaches ' ~ audience ~ ' people now.' }} Copies go out at the pace Settings allow.</p>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send it now'})} %}{% block control %}<input type="radio" name="when" value="now" checked>{% endblock %}{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send it at a time'})} %}{% block control %}<input type="radio" name="when" value="later">{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date and time', for: 'mc-send-at', help: 'In the site\'s time (' ~ site_zone ~ ').'})} %}{% block control %}<input class="cl-input" type="datetime-local" id="mc-send-at" name="send_at" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send', confirm: 'Send ' ~ campaign.name ~ ' to the people on its lists?'}) }}{% endblock %}{% endembed %}
+				</form>
+			{% elseif campaign.status == 'awaiting_approval' %}
+				<p>It waits for your approval. Look at the preview, then approve it or cancel it.</p>
+				<form action="/mailing/messages/{{ campaign.id }}/approve" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Approve and send', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve', confirm: 'Send ' ~ campaign.name ~ ' now?'}) }}</form>
+			{% elseif campaign.status == 'scheduled' %}
+				<p>{{ campaign.send_at ? 'It goes out on ' ~ campaign.send_at|date('j M Y \\a\\t H:i', site_zone) ~ '.' : 'It starts within a minute.' }}</p>
+				<form action="/mailing/messages/{{ campaign.id }}/{{ campaign.kind == 'message' ? 'unschedule' : 'pause' }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: campaign.kind == 'message' ? 'Take it back' : 'Pause', variant: 'secondary', size: 'normal', type: 'submit', icon: campaign.kind == 'message' ? 'action-back' : 'action-pause'}) }}</form>
+			{% elseif campaign.status == 'sending' %}
+				<p>{{ figures.queued == 1 ? '1 copy is waiting to go.' : figures.queued ~ ' copies are waiting to go.' }}</p>
+				<form action="/mailing/messages/{{ campaign.id }}/pause" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Pause', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-pause'}) }}</form>
+			{% elseif campaign.status == 'paused' %}
+				<p>{{ figures.queued == 1 ? '1 copy is waiting to go.' : figures.queued ~ ' copies are waiting to go.' }} You can correct its words before it goes on.</p>
+				<form action="/mailing/messages/{{ campaign.id }}/resume" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Resume', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-play'}) }}</form>
+			{% else %}
+				<p>{{ campaign.status == 'sent' ? 'It has been sent. What became of each copy is below.' : 'It was cancelled.' }}</p>
+			{% endif %}
+			{% if campaign.kind != 'welcome' and campaign.status in ['awaiting_approval', 'scheduled', 'sending', 'paused'] %}
+				<form action="/mailing/messages/{{ campaign.id }}/cancel" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Cancel it', variant: 'danger', size: 'small', type: 'submit', icon: 'action-cancel', confirm: 'Cancel ' ~ campaign.name ~ '? Nothing more of it will be sent.'}) }}</form>
+			{% endif %}
+			{% endif %}
+{% endblock %}
+{% endembed %}
+
+		{# What a reader sees, with the writer's first name. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'preview'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Preview', summary: 'What a reader sees, with your first name.'}) }}
+			<iframe class="cl-mailing-preview" src="/mailing/messages/{{ campaign.id }}/preview" title="Preview of {{ campaign.name }}" loading="lazy"></iframe>
+			<p class="small"><a href="/mailing/messages/{{ campaign.id }}/preview" target="_blank" rel="noopener">Open it full size</a> · <a href="/mailing/messages/{{ campaign.id }}/preview?as=text" target="_blank" rel="noopener">The plain-text copy</a></p>
+{% endblock %}
+{% endembed %}
+		</div>
+{% endblock %}
+{% endembed %}
+	</section>
+
+	{% if figures.total > 0 %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'copies'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Copies', summary: 'Each person\'s copy and what became of it.'}) }}
+		<form class="cl-mailing-filter" method="get" action="/mailing/messages/{{ campaign.id }}#copies">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', for: 'mc-copies-status'})} %}{% block control %}<select class="cl-input" id="mc-copies-status" name="copies_status" onchange="this.form.submit()" {{ ui_field_attrs(props) }}><option value="">Every copy</option>{% for key, status in delivery_statuses %}<option value="{{ key }}"{{ key == copies_status ? ' selected' : '' }}>{{ status[0] }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'copies', pagination: copies_pagination})} %}{% block results %}
+			{% if copies %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'What became of it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Clicked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Detail'}} %}</tr>{% endblock %}
+			{% block body %}{% for copy in copies %}<tr>
+				<td class="cell-text">{% if copy.user_id %}{{ ui('data.person', {name: copy.name, href: '/admin/people/' ~ copy.user_id}) }}{% else %}{{ copy.email }}{% endif %}</td>
+				<td>{{ ui('feedback.badge', {label: delivery_statuses[copy.status][0], tone: delivery_statuses[copy.status][1]}) }}{% if copy.unsubscribed_at %} {{ ui('feedback.badge', {label: 'Unsubscribed', tone: 'neutral'}) }}{% endif %}</td>
+				<td>{{ copy.first_opened_at ? copy.first_opened_at|date('j M H:i', site_zone) : '' }}</td>
+				<td>{{ copy.first_clicked_at ? copy.click_count ~ (copy.click_count == 1 ? ' click' : ' clicks') : '' }}</td>
+				<td class="cell-text small">{{ copy.status_detail }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'No copy is like that', summary: 'Choose Every copy to see them all.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	{% if links %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'links'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Links', summary: 'Each link in the email and how often it was clicked, most first.'}) }}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Link'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Clicks'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'People'}} %}</tr>{% endblock %}
+		{% block body %}{% for link in links %}<tr><td class="cell-text"><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.url }}</a></td><td>{{ link.clicks }}</td><td>{{ link.people }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

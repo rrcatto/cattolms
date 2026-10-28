@@ -55,7 +55,6 @@ final class LandingPageViewBuilder
         private readonly LandingPageRepository $pages,
         private readonly CourseReviewService $reviews,
         private readonly CoursePurchaseOptions $purchases,
-        private readonly ?\CattoLearning\Configuration\SiteOwner $owner = null,
     ) {
     }
 
@@ -179,12 +178,6 @@ final class LandingPageViewBuilder
             LandingSectionType::Benefits => $common + ['items' => array_map(static fn(array $item): array => ['title' => $item['title'], 'paragraphs' => LandingCopy::paragraphs($item['text'])], $data['items'])],
             LandingSectionType::Faq => $common + ['items' => array_map(static fn(array $item): array => ['question' => $item['question'], 'paragraphs' => LandingCopy::paragraphs($item['answer'])], $data['items'])],
             LandingSectionType::Contents => $this->contents($common, $data, $outline ?? []),
-            LandingSectionType::Instructor => $common + [
-                // The owning company, or the Site Owner for a course no company owns (owner, 2026-10-18).
-                'provider' => (string) ($course['provider_name'] ?? '') !== '' ? (string) $course['provider_name'] : (string) ($this->owner?->value('trading_name') ?? ''),
-                'accreditation' => (string) ($course['certificate_accreditation'] ?? ''),
-                'certificate' => (bool) $course['certificate_enabled'],
-            ],
             LandingSectionType::Reviews => $this->reviewsSection($common, $data, $course, $rating ?? ['count' => 0]),
             LandingSectionType::Pricing => $common + ['rating' => $rating, 'purchase' => $purchase],
             LandingSectionType::Cta => $common + ['purchase' => $purchase],

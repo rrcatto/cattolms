@@ -15,6 +15,11 @@ dashboard warns when the commerce job is, because without it no buyer is emailed
 is cancelled.
 
 Changelog:
+2026/10/27 SAST
+- The log archive (owner, 2026-10-27): the application log archived just after midnight every day. A job may run
+  at a time of day (runsAt) instead of at its interval from its last run.
+2026/10/26 SAST
+- Sign-up check lists (owner, 2026-10-26): the published lists the sign-up check reads, fetched daily.
 2026/10/19 SAST
 - Created.
 */
@@ -28,6 +33,9 @@ enum ScheduledJob: string
     case Commerce = 'commerce';
     case Popularity = 'popularity';
     case Cleanup = 'cleanup';
+    case SignupLists = 'signup_lists';
+    case Mailing = 'mailing';
+    case LogArchive = 'log_archive';
 
     /** How often the job runs, in seconds. */
     public function interval(): int
@@ -36,7 +44,34 @@ enum ScheduledJob: string
             self::Commerce => 60,
             self::Popularity => 3600,
             self::Cleanup => 86400,
+            self::SignupLists => 86400,
+            self::Mailing => 60,
+            self::LogArchive => 86400,
         };
+    }
+
+    /** The time of day (H:i, the site's time zone) a daily job runs at, or null for a job run at its interval from its last run. */
+    public function runsAt(): ?string
+    {
+        return $this === self::LogArchive ? '00:00' : null;
+    }
+
+    /**
+     * Whether the job is due now. A job with a time of day is due once that time has passed since it last started (a
+     * scheduler that was stopped at midnight runs it when it starts again); any other when its interval has passed,
+     * with five seconds of slack, so a job started a moment late last time is not skipped this time.
+     */
+    public function isDue(\DateTimeImmutable $now, ?\DateTimeImmutable $lastStarted): bool
+    {
+        if ($lastStarted === null) return true;
+        $at = $this->runsAt();
+        if ($at === null) return $now->getTimestamp() - $lastStarted->getTimestamp() >= $this->interval() - 5;
+        [$hour, $minute] = array_map('intval', explode(':', $at));
+        $local = $now->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        $mark = $local->setTime($hour, $minute);
+        if ($mark > $local) $mark = $mark->modify('-1 day');
+
+        return $lastStarted < $mark;
     }
 
     /** How long without a successful run before the job counts as stopped, in seconds. */
@@ -46,6 +81,9 @@ enum ScheduledJob: string
             self::Commerce => 300,
             self::Popularity => 3 * 3600,
             self::Cleanup => 2 * 86400,
+            self::SignupLists => 3 * 86400,
+            self::Mailing => 300,
+            self::LogArchive => 2 * 86400,
         };
     }
 
@@ -55,6 +93,9 @@ enum ScheduledJob: string
             self::Commerce => 'Orders and emails',
             self::Popularity => 'Course popularity',
             self::Cleanup => 'Clean-up',
+            self::SignupLists => 'Sign-up check lists',
+            self::Mailing => 'News emails',
+            self::LogArchive => 'Log archive',
         };
     }
 
@@ -64,7 +105,10 @@ enum ScheduledJob: string
         return match ($this) {
             self::Commerce => 'Every minute: sends order and payment emails, cancels unpaid orders at their deadline, ends expired access and expires wallet credit.',
             self::Popularity => 'Every hour: recalculates the course popularity ranking that the home page and the popularity report show.',
-            self::Cleanup => 'Every day: deletes activity log entries, analytics events and contact messages older than 5 years, and expired sign-in links and sessions.',
+            self::Cleanup => 'Every day: deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, and expired sign-in links and sessions.',
+            self::SignupLists => 'Every day: fetches the Tor exit addresses, and every week the VPN and hosting networks and the throwaway email domains, for the sign-up check.',
+            self::Mailing => 'Every minute: sends the news campaigns at the pace Settings allow, pauses one whose bounces or complaints are too high, reads back what became of each email, makes the new-course digest on its day, and once a day asks the sleeping addresses whether they still want news.',
+            self::LogArchive => 'Every day just after midnight: moves the application log, and any other log beside it, into a compressed archive, starts each afresh and deletes the archives older than Settings keep them.',
         };
     }
 }

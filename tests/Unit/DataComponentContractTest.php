@@ -54,6 +54,29 @@ final class DataComponentContractTest extends TestCase
         self::assertStringNotContainsString('<a', $plain, 'No account to open: the name alone.');
     }
 
+    /**
+     * A list shown as cards (owner, 2026-10-26): whole rows of 4 or 5, each card its picture, its title (linked when it has
+     * a page), details and actions, the picture's shape named; nothing else is accepted.
+     */
+    public function testACardGridHoldsCardsWithAPictureTitleDetailsAndActions(): void
+    {
+        $grid = ComponentHarness::render('data.card-grid', ['columns' => 5, 'label' => '<People>']);
+        self::assertStringContainsString('<ul class="cl-ui-card-grid" data-columns="5" aria-label="&lt;People&gt;">', $grid);
+        self::assertStringContainsString('data-columns="4"', ComponentHarness::render('data.card-grid', []), 'Four to a row unless five are asked for.');
+        $card = ComponentHarness::render('data.card', ['title' => '<Thandi>', 'href' => '/admin/people/7', 'picture' => 'round']);
+        self::assertStringContainsString('<li class="cl-ui-card" data-picture="round">', $card);
+        self::assertStringContainsString('<h3 class="cl-ui-card-title"><a href="/admin/people/7">&lt;Thandi&gt;</a></h3>', $card);
+        self::assertStringContainsString('<h3 class="cl-ui-card-title">Gauteng Logistics</h3>', ComponentHarness::render('data.card', ['title' => 'Gauteng Logistics', 'picture' => 'square']), 'No page: the name alone.');
+        foreach ([['data.card-grid', ['columns' => 6], 'columns'], ['data.card-grid', ['columns' => 'auto'], 'columns'], ['data.card', ['title' => 'x', 'picture' => 'oval'], 'picture']] as [$component, $properties, $key]) {
+            try {
+                ComponentHarness::render($component, $properties);
+                self::fail($component . ' accepted ' . json_encode($properties));
+            } catch (\Throwable $refused) {
+                self::assertStringContainsString($key, $refused->getMessage());
+            }
+        }
+    }
+
     public function testDatasetRetainsTwoSharedPagersAndDurableRegion(): void
     {
         $pg = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('example', \CattoLearning\Support\Pagination::create(2, 25, 100), '/example', 'Examples');

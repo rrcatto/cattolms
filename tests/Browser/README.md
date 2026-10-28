@@ -9,6 +9,21 @@ Every fixture person has a date of birth (set by `DevelopmentFixture::createUser
 it), so no check stops at the first-sign-in date of birth step (adults only, owner, 2026-10-20). Nothing
 about identity is asked before a purchase, so the checks that place orders need no setting changed.
 
+What the checks make, and what they leave (owner, 2026-10-27: "for your own tests, you can remove that crap. but I
+still need data which adheres to the business rules"). The development database holds the owner's own test data (from
+Seed Database), so a check must neither break the rules nor leave anything behind:
+
+- Every name is a real one nobody on the site has, never a string of digits (`tests/Support/CheckNames.php`): people
+  (Lerato Dlamini), companies (Karoo Ridge Accounting, at karooridgeaccounting.test), courses (Payroll Basics),
+  bundles, promo codes and categories.
+- Every company is made with its founding Company Administrator (`DevelopmentFixture::company()`; the database refuses
+  a company without one), and its staff are at its domain (`staff()`).
+- Every `cleanup` removes everything the check made, its orders, payments, ledger, documents, refunds, wallets,
+  reviews and activity included (`tests/Support/CheckScrub.php`): it follows the database's own links from the
+  check's people, companies and courses, never through who last touched a row, puts back a design the check
+  republished, and removes nothing at all if it would reach a row the check did not make. After every check, every
+  table holds what it held before.
+
 Run from the code repository on the host (adjust the instance/container paths if necessary). In the
 development pod (`docs/OPERATIONS.md`, "Local development environment") Playwright is
 installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
@@ -103,9 +118,68 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 `CATTO_BROWSERS` narrows the browsers; results and failure screenshots go to
 `/tmp/catto-bootstrap-safety-net` (`CATTO_BROWSER_OUTPUT`).
 
+## Sign-up checks
+
+`signup-checks.cjs` follows the sign-up check from the outside on the demo site (owner, 2026-10-26; UX rule 2.6h):
+the Register page says the account will be held, carries its signed opening time and the hidden field (off the page)
+and fills in the time zone; a person registers through it at 1440 and 390px and without JavaScript, sees the notice
+again after sending, gets "Finish your registration" in Mailpit with the notice, and the link leads to the waiting page,
+which promises nothing; then an administrator finds each attempt at Sign-up Attempts with its risk and "Registered,
+held", opens one with its signals in words, sees the account on Needs your attention with its badge, its Sign-up check
+and Recent sign-ins, People sorted by risk and the Sign-up checks settings. It registers as people with real names nobody on the site has (`signup-checks-fixture.php names`), at a domain that receives no mail,
+and uses `section-pages.cjs`'s fixture to look as ADMIN:
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/signup-checks.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/signup-checks-fixture.php cleanup'
+```
+
+## Mailing
+
+`mailing.cjs` follows news from following to stopping (mailing, step 2; owner, 2026-10-26): a learner asks for News
+and Updates on My Subscriptions; an administrator writes an email in blocks (text, a button, a course, HTML), sees it in
+the preview, sends a test to their own address and sends it (the check runs the `mailing` job rather than waiting for
+the worker's minute); the learner's copy reaches Mailpit with `List-Unsubscribe`, `List-Unsubscribe-Post` and `List-Id`,
+tracked links and the opening pixel; opening, clicking and the email app's one-click button are recorded and News stops at
+once; the campaign's figures say so; Settings > Mailing saves and resets its sending discipline; without JavaScript a new
+email and a block are made; and the mailing pages answer at 1440 and 390px in Chromium and Firefox. Its fixture makes an
+administrator and a learner and removes them, their campaigns and their email answers afterwards:
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/mailing.cjs
+```
+
+## Dashboard amounts
+
+`figure-fit.cjs` gives every small money amount on the ADMIN dashboard longer figures in turn (a million, a negative
+million, a hundred million, a trillion, nothing) in every bundled theme at 1440 and 390px, with reduced motion and
+without, and requires each to fit its card again within a moment (UX rule 2.6f, `fitFigures`). The amounts the
+dashboard shows depend on the day's data, so the menu pages found a spill only by chance (Gilded Noir, whose transition
+on every property made the refit read an amount's old size, 2026-10-26); this finds one on purpose. It changes text in
+the browser only and uses `section-pages.cjs`'s fixture; `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run:
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/figure-fit.cjs
+```
+
+## Card grids
+
+`card-grids.cjs` checks the lists that can be shown as cards (owner, 2026-10-26; UX rule 2.6g) in every bundled theme at
+1440 and 390px through the theme preview, each theme and width in a fresh browser: Administration's People, Companies,
+Course Creators and Courses open as tables and the catalogue as cards; each grid shows whole rows (5 people or
+companies, 4 courses at 1440px, at most 2 at 390px), its own page sizes and its Sort, and every picture it asks for
+arrives; the choice is remembered without the address and the list comes back when chosen; the catalogue's list holds on
+a tag's page; every view passes the shared page checks (`page-construction.cjs`); and, in the first theme, the switch and
+the Sort work without JavaScript. It uses `section-pages.cjs`'s fixture (below) and writes screenshots and
+`results.json` to `/tmp/catto-card-grids` (`CATTO_BROWSER_OUTPUT`); `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run:
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/card-grids.cjs
+```
+
 ## Section pages
 
-`section-pages.cjs` opens every Account, Company and Administration menu page (53, the five wallet, refund and settings pages added 2026-10-17) in every bundled
+`section-pages.cjs` opens every Account, Company and Administration menu page (60, Sign-up Attempts and Company Profile added 2026-10-26, and the fixture company's page) in every bundled
 theme at 1440 and 390px through the theme preview, so nothing is activated. It checks the one
 construction every page shares (UX rule 1.7, `PageStructureContractTest`): exactly one `h1`; only page
 rows directly in main (flash stack, page head, identity band, page sections, a theme's page-family
@@ -163,8 +237,8 @@ renders the tree open at 1440 and 390px without sideways scrolling. The shared s
 is the Course Content tree's too, so run both checks after changing it.
 
 The fixture builds `A > A1 > A1x, A > A2 · B > B1 · G · D > D1 > D1x` after the shipped taxonomy
-(named "Tree Alpha <suffix>" and so on); `reset` deletes every category the run made, renumbers
-the shipped ones and rebuilds it before each scenario, and `cleanup` also removes the identity.
+(each a real category name no category on the site has, such as Workplace Skills); `reset` deletes every category
+the run made, renumbers the shipped ones and rebuilds it before each scenario, and `cleanup` removes everything the run made.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php create'
@@ -246,8 +320,7 @@ profile, a correction there is saved to it, and the placed order shows the billi
 with, still after the profile changes, with its invoice PDF opening; the company credit checkout is
 filled from the company's details and its order is billed to the company; both forms save as
 ordinary forms without JavaScript and fit a 390px phone; and an ADMIN sees both forms in every
-bundled theme at 1440 and 390px without overflow. Orders are immutable, so each run leaves its two orders,
-their purchasers and the retired fixture course in the disposable development database.
+bundled theme at 1440 and 390px without overflow. `cleanup` removes everything the run made, its orders included.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/billing-profiles-fixture.php create'
@@ -267,8 +340,8 @@ kept for correction, edits, deactivates it (checkout then refuses it), reactivat
 and status, and deletes it while unused. The checkout promo section, the promotions list and the
 editor render in every bundled theme at 1440 and 390px without sideways scrolling.
 `promotions-fixture.php create` makes two paid courses, an ADMIN and two promotions; the script asks
-it for a fresh learner per purchase and runs `create` and `cleanup` itself. Orders are immutable, so
-each run leaves its orders, their learners, the retired courses and the promotion they used.
+it for a fresh learner per purchase and runs `create` and `cleanup` itself; `cleanup` removes everything the run
+made, its orders, the promotions the administrator made on the pages and the automatic one included.
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/promotions.cjs
@@ -286,8 +359,7 @@ of the courses is told so on the bundle page, and a company account (owner, 2026
 cannot buy and is offered no buttons. Without JavaScript a bundle is bought and an ADMIN
 reorders its courses. The bundle catalogue and page, the cart and the ADMIN list and editor render in
 every bundled theme at 1440 and 390px without sideways scrolling. The script creates and cleans up
-`bundles-fixture.php` itself; orders are immutable, so each run leaves its orders, their learners, the
-bundle they bought, its retired courses and the promotion used.
+`bundles-fixture.php` itself; `cleanup` removes everything the run made, its orders, bundle and promotion included.
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
@@ -316,7 +388,7 @@ after 4.5 seconds.
 - **Themes.** The list, an editor, the course page and the certificate page fit every bundled theme at 1440 and 390px; at 1440 the editor's and the course page's preview is above the form at nearly the full width (UX rule 6.12).
 - **Firefox.** CKEditor's Insert field fills the preview, and the certificate page shows and serves the same PDF.
 
-`cleanup` removes the course, its enrolments and certificates and the identities, makes the recorded default design the default again, and deletes the run's designs as the list does (archived and renamed). Published versions and stored pictures are immutable and stay.
+`cleanup` removes the course, its enrolments and certificates and the identities, makes the recorded default design the default again, and removes the run's designs with their versions.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/certificates-fixture.php create'
@@ -340,7 +412,7 @@ requests are routed so their bodies can be read, as in `certificates.cjs`.
 - **Themes.** The design page and an ADMIN order page fit every bundled theme at 1440 and 390px, with the preview an A4 portrait page above the form (UX rule 6.13).
 - **Firefox.** The preview follows the sample order choice and a receipt downloads as in Chromium.
 
-The fixture places its orders through the real commerce services (a card payment, a 100% promotion, an EFT confirmed by ADMIN, a company credit purchase and a refund), so their documents are issued as a checkout issues them. `cleanup` saves the recorded design again as the current one and signs everyone out; orders are immutable, so each run leaves its orders, their purchasers and the retired courses.
+The fixture places its orders through the real commerce services (a card payment, a 100% promotion, an EFT confirmed by ADMIN, a company credit purchase and a refund), so their documents are issued as a checkout issues them. `cleanup` removes everything the run made, its orders, documents and refund included, and the design goes back to the version from before the run.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/financial-documents-fixture.php create'
@@ -390,7 +462,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Firefox (1).** The notice and the checkout statement.
 - **Every theme at 1440, 820 and 390px.** The home page, catalogue, a course and the order show the notice, with one `h1` and no sideways scrolling. Each theme is activated in turn and the one that was active is put back.
 
-The script creates and cleans up its own fixture (two paid courses, an ADMIN and a learner); cleanup removes sessions, carts and any saved site mode and retires the courses. Orders and their documents stay. Phone screenshots go to `/tmp/catto-demo-site` (`CATTO_BROWSER_OUTPUT`).
+The script creates and cleans up its own fixture (two paid courses, an ADMIN and a learner); cleanup puts back the site mode and removes everything the run made, its orders and their documents included. Phone screenshots go to `/tmp/catto-demo-site` (`CATTO_BROWSER_OUTPUT`).
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/demo-site.cjs
@@ -406,7 +478,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Unmatched money (1).** A deposit whose reference names nobody is put on Unmatched Money from Record EFT Payment; its page says what arrived; the dashboard and the list show it until ADMIN records that it was paid back.
 - **Every theme at 1440, 820 and 390px (288).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail, Payment Events, Record EFT Payment and Unmatched Money answer in that theme with one `h1` and no sideways scrolling. Learners cannot preview a theme, so each theme is activated in turn (`commerce-wallets-fixture.php theme <key>`) and the theme that was active is put back even when a check fails; do not run it beside another check that switches themes.
 
-The script creates and cleans up its own fixture (three paid courses, an ADMIN, a learner per scenario with wallet credit from a real overpaid EFT order and a course ADMIN assigned, and a member of a client company); no fixture writes a record a person could not have produced (owner, 2026-10-19); cleanup removes sessions, carts and every commerce setting override, and retires the courses. Orders, the ledger and what they refer to are immutable and stay. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
+The script creates and cleans up its own fixture (three paid courses, an ADMIN, a learner per scenario with wallet credit from a real overpaid EFT order and a course ADMIN assigned, and a member of a client company); no fixture writes a record a person could not have produced (owner, 2026-10-19); cleanup puts back every commerce setting and removes everything the run made, its orders, ledger and wallets included. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/commerce-wallets.cjs

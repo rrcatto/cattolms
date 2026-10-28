@@ -47,7 +47,11 @@ final class SiteOwnerCompaniesIntegrationTest extends TestCase
         $_COOKIE = $this->cookies;
         foreach ($this->domains as $domain) {
             $this->db->executeStatement('DELETE FROM audit_log WHERE event_key = :e AND metadata->>\'company_id\' IN (SELECT id::text FROM companies WHERE domain = :d)', ['e' => 'company.created', 'd' => $domain]);
+            // The company with its people: a company never stands without its administrator, even for a moment.
+            $this->db->beginTransaction();
+            $this->db->executeStatement('DELETE FROM users WHERE id IN (SELECT user_id FROM user_emails WHERE email LIKE :e)', ['e' => '%@' . $domain]);
             $this->db->executeStatement('DELETE FROM companies WHERE domain = :d', ['d' => $domain]);
+            $this->db->commit();
         }
         $this->fixture->cleanup();
     }
@@ -113,7 +117,9 @@ final class SiteOwnerCompaniesIntegrationTest extends TestCase
         $_COOKIE[Env::string('AUTH_SESSION_COOKIE', 'catto_learning_session')] = $token;
         $domain = 'page-created-' . $this->suffix . '.example.test';
         $this->domains[] = $domain;
-        $_POST = ['csrf' => Csrf::token(), 'name' => 'Page Created ' . $this->suffix, 'domain' => $domain];
+        // A company is added with its Company Administrator (owner, 2026-10-27).
+        $_POST = ['csrf' => Csrf::token(), 'name' => 'Page Created ' . $this->suffix, 'domain' => $domain,
+            'admin_first_name' => 'Nandi', 'admin_last_name' => 'Mahlangu', 'admin_email' => 'nandi.mahlangu@' . $domain];
         $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
         try {
             $response = $kernel->handle(Request::create('/admin/companies', 'POST', $_POST));
@@ -126,5 +132,27 @@ final class SiteOwnerCompaniesIntegrationTest extends TestCase
         $row = $this->db->fetchAssociative('SELECT name, status, created_by_user_id FROM companies WHERE domain = :d', ['d' => $domain]);
         self::assertSame(['Page Created ' . $this->suffix, 'active', $admin], [$row['name'] ?? null, $row['status'] ?? null, (int) ($row['created_by_user_id'] ?? 0)]);
         self::assertContains('The company was created.', array_column((array) ($_SESSION['flash'] ?? []), 'message'));
+        $founder = $this->db->fetchAssociative(
+            "SELECT cu.company_role, u.first_name, u.last_name FROM company_users cu JOIN users u ON u.id = cu.user_id JOIN companies c ON c.id = cu.company_id
+             JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary WHERE c.domain = :d AND ue.email = :e",
+            ['d' => $domain, 'e' => 'nandi.mahlangu@' . $domain]
+        );
+        self::assertSame(['administrator', 'Nandi', 'Mahlangu'], [$founder['company_role'] ?? null, $founder['first_name'] ?? null, $founder['last_name'] ?? null], 'made with its Company Administrator');
+    }
+
+    /** A company is never added without its Company Administrator (owner, 2026-10-27). */
+    public function testAddCompanyRefusesACompanyWithoutItsAdministrator(): void
+    {
+        $admin = $this->fixture->createUser('Create company admin ' . $this->suffix, 'create-company-' . $this->suffix . '@seed.test');
+        $this->fixture->grantRole($admin, 'ADMIN');
+        $domain = 'no-founder-' . $this->suffix . '.example.test';
+        $this->domains[] = $domain;
+        try {
+            IntegrationContainer::get()->get(PlatformAdministrationService::class)->createCompany(['name' => 'No Founder ' . $this->suffix, 'domain' => $domain], $admin);
+            self::fail('a company without its Company Administrator was added');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString('Company Administrator', $refused->getMessage());
+        }
+        self::assertFalse($this->db->fetchOne('SELECT 1 FROM companies WHERE domain = :d', ['d' => $domain]));
     }
 }

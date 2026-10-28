@@ -30,7 +30,7 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.exists
 const A = state.courses.a, B = state.courses.b;
 const EDITOR = `/admin/courses/${A.id}/landing`;
 const PUBLIC = `/landing/${A.slug}`;
-const HEADLINE = `Transfer property with confidence ${state.suffix}`;
+const HEADLINE = 'Transfer property with confidence';
 const results = [], failures = [];
 
 let step = '';

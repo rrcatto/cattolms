@@ -185,15 +185,15 @@ final class LandingPageIntegrationTest extends TestCase
         $this->refused(fn() => $this->landing->addSection($this->course, 'hero', $this->owner), 'has only one');
         $this->refused(fn() => $this->landing->addSection($this->course, 'html', $this->owner), 'kind of section');
         $this->refusedSql(fn() => $this->db->executeStatement("INSERT INTO course_landing_sections (landing_page_id, section_type, position) SELECT id, 'reviews', 99 FROM course_landing_pages WHERE course_id=:c", ['c' => $this->course]), 'course_landing_sections_once');
-        $instructor = $this->landing->addSection($this->course, 'instructor', $this->owner);
+        $more = $this->landing->addSection($this->course, 'benefits', $this->owner);
 
         $this->landing->updateSection($this->course, $faq, ['heading' => 'More questions', 'items' => [['question' => 'Is there an exam?', 'answer' => "Yes.\n\nOnline."]]], $this->owner);
         $this->refused(fn() => $this->landing->updateSection($this->course, $faq, ['items' => [['question' => 'No answer', 'answer' => '']]], $this->owner), 'needs its answer');
         $saved = $this->section($faq);
         self::assertSame([['question' => 'Is there an exam?', 'answer' => "Yes.\n\nOnline."]], $saved['data']['items'], 'A refused save leaves the section as it was.');
 
-        $this->landing->setSectionEnabled($this->course, $instructor, false, $this->owner);
-        self::assertFalse($this->section($instructor)['enabled']);
+        $this->landing->setSectionEnabled($this->course, $more, false, $this->owner);
+        self::assertFalse($this->section($more)['enabled']);
         $this->landing->removeSection($this->course, $this->section($faq)['id'], $this->owner);
         $positions = array_map(static fn(array $s): int => $s['position'], $this->landing->page($this->course)['sections']);
         self::assertSame(range(0, count($positions) - 1), $positions, 'Removing a section closes the gap: 1..n after the hero.');
@@ -242,7 +242,6 @@ final class LandingPageIntegrationTest extends TestCase
     {
         $this->landing->create($this->course, $this->owner);
         $this->complete();
-        $this->landing->addSection($this->course, 'instructor', $this->owner);
         $this->landing->publish($this->course, $this->admin);
         $approved = $this->review($this->learner, 5, 'Approved praise', 'approved');
         $this->review($this->student, 1, 'Pending complaint', 'pending');
@@ -257,8 +256,7 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertStringContainsString('Rated 5.0 out of 5 from 1 review', $html, 'The rating counts approved reviews only, as the course page does.');
         self::assertStringContainsString('Deeds and transfers', $html);
         self::assertStringContainsString('Drafting a deed', $html);
-        self::assertStringContainsString('Landing Provider ' . $this->suffix, $html);
-        self::assertStringContainsString('LPC CPD: 2 points', $html);
+        self::assertStringNotContainsString('Provided by', $html, 'There is no Instructor section any more (owner, 2026-10-28: "Remove it").');
         self::assertSame(1, (int) $approved);
 
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=99000 WHERE id=:id', ['id' => $this->variant]);

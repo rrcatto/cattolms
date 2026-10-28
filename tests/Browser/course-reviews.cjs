@@ -48,9 +48,9 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
             const page = await ctx.newPage();
             page.on('pageerror', (error) => pageErrors.push(error.message));
             await page.goto(`${base}/courses/${state.slug}`);
-            await page.getByText('Already approved before the run.').waitFor();
-            assert.ok(await page.getByText('Sam S.').isVisible(), 'published under first name and initial');
-            assert.equal(await page.getByText('Sam Smith').count(), 0, 'the full name is not published');
+            await page.getByText('Clear and practical. The worked examples helped most.').waitFor();
+            assert.ok(await page.getByText(state.reviewer_public).isVisible(), 'published under first name and initial');
+            assert.equal(await page.getByText(state.reviewer_name).count(), 0, 'the full name is not published');
             assert.ok((await page.locator('.cl-rating-summary').first().textContent()).includes('Rated 4.0 out of 5 from 1 review'));
             assert.ok(await page.locator('.cl-rating-figures').first().isVisible(), 'the figures are visible');
             assert.equal(await page.getByRole('link', {name: 'Rate this course'}).count(), 0, 'a visitor is not offered the form');
@@ -105,7 +105,7 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
             await page.goto(`${base}/courses/${state.slug}`);
             await page.getByText('Typed in the browser.').waitFor();
             assert.ok((await page.locator('.cl-rating-summary').first().textContent()).includes('Rated 4.0 out of 5 from 2 reviews'));
-            assert.ok(await page.getByText('Jane D.').isVisible());
+            assert.ok(await page.getByText(state.learner_public).isVisible());
             await ctx.close();
         });
 

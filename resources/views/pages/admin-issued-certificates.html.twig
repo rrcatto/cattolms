@@ -26,7 +26,7 @@
 					<tr data-certificate-id="{{ row.id }}">
 						<td class="cell-text"><strong>{{ row.certificate_number }}</strong>{% if row.transcript_number %}<br><span class="small">{{ row.transcript_number }}</span>{% endif %}</td>
 						<td class="cell-text">{{ ui('data.person', {name: row.learner_name, reference: row.learner_reference, href: '/admin/people/' ~ row.user_id}) }}</td>
-						<td class="cell-text">{{ row.course_title }}</td>
+						<td class="cell-text"><a href="/admin/courses/{{ row.course_id }}">{{ row.course_title }}</a></td>
 						<td class="small">{{ row.issued_at|date('j M Y') }}</td>
 						<td>{{ ui('feedback.badge', {label: row.revoked_at ? 'Revoked' : 'In force', tone: row.revoked_at ? 'danger' : 'success', size: 'small'}) }}</td>
 						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ row.id, aria_label: 'Open certificate ' ~ row.certificate_number, icon: 'action-open'}) }}</td>

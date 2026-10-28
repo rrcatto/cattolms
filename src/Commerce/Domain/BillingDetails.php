@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Domain;
 
+use CattoLearning\Support\Countries;
 use InvalidArgumentException;
 
 /**
@@ -22,7 +23,8 @@ final readonly class BillingDetails
     public const LIMITS = [
         'billing_name' => 200, 'organisation_name' => 200, 'tax_registration_number' => 40,
         'address_line_1' => 200, 'address_line_2' => 200, 'locality' => 120, 'city' => 120,
-        'region' => 120, 'postal_code' => 20, 'country_code' => 2,
+        // The country before the province, which depends on it (2026-10-27).
+        'country_code' => 2, 'region' => 120, 'postal_code' => 20,
     ];
 
     private const REQUIRED = ['billing_name' => 'billing name', 'address_line_1' => 'first address line', 'city' => 'city', 'country_code' => 'country'];
@@ -30,7 +32,7 @@ final readonly class BillingDetails
     private const LABELS = [
         'billing_name' => 'Billing name', 'organisation_name' => 'Organisation or trading name', 'tax_registration_number' => 'Tax or VAT registration number',
         'address_line_1' => 'Address line 1', 'address_line_2' => 'Address line 2', 'locality' => 'Suburb or locality', 'city' => 'City or town',
-        'region' => 'Province, state or region', 'postal_code' => 'Postal code', 'country_code' => 'Country code',
+        'region' => 'Province', 'postal_code' => 'Postal code', 'country_code' => 'Country',
     ];
 
     private function __construct(
@@ -165,10 +167,11 @@ final readonly class BillingDetails
         );
     }
 
-    /** The English (or given locale's) name of an ISO 3166-1 alpha-2 code, or the code itself. */
+    /** The name of an ISO 3166-1 alpha-2 code (British English unless another locale is given), or the code itself. */
     public static function countryName(string $code, ?string $displayLocale = null): string
     {
-        $name = class_exists(\Locale::class) ? (string) \Locale::getDisplayRegion('-' . $code, $displayLocale ?? 'en') : '';
+        if ($displayLocale === null) return Countries::name($code);
+        $name = class_exists(\Locale::class) ? (string) \Locale::getDisplayRegion('-' . $code, $displayLocale) : '';
         return $name === '' || $name === $code ? $code : $name;
     }
 
@@ -177,7 +180,10 @@ final readonly class BillingDetails
      * length, whether required, and the browser's billing autocomplete token. A company form has no
      * organisation name: the company's billing name is its billing identity.
      *
-     * @return list<array{name:string,label:string,limit:int,required:bool,autocomplete:string,full_width:bool,help:string}>
+     * The country is a drop-down of every country by name, South Africa first (owner, 2026-10-27); the province a drop-down
+     * of South Africa's nine for a South African address and typed text for any other country (`options`).
+     *
+     * @return list<array{name:string,label:string,limit:int,required:bool,autocomplete:string,full_width:bool,help:string,options:list<mixed>}>
      */
     public static function formFields(bool $person): array
     {
@@ -189,13 +195,13 @@ final readonly class BillingDetails
         $help = [
             'organisation_name' => 'Optional. A business or trading name to put on your invoices.',
             'tax_registration_number' => 'Optional. Printed on invoices for your records; no tax is charged.',
-            'country_code' => 'The two-letter ISO 3166-1 code.',
         ];
         $fields = [];
         foreach (self::LIMITS as $field => $limit) {
             if (!$person && $field === 'organisation_name') continue;
             $fields[] = ['name' => $field, 'label' => self::label($field), 'limit' => $limit, 'required' => isset(self::REQUIRED[$field]),
-                'autocomplete' => $autocomplete[$field], 'full_width' => in_array($field, ['address_line_1', 'address_line_2'], true), 'help' => $help[$field] ?? ''];
+                'autocomplete' => $autocomplete[$field], 'full_width' => in_array($field, ['address_line_1', 'address_line_2'], true), 'help' => $help[$field] ?? '',
+                'options' => match ($field) { 'country_code' => Countries::options(), 'region' => Countries::SOUTH_AFRICAN_PROVINCES, default => [] }];
         }
         return $fields;
     }
@@ -216,6 +222,9 @@ final readonly class BillingDetails
     /** @param array<string,mixed> $input */
     private static function fromFields(array $input, bool $person): self
     {
+        // The province: one of the nine for a South African address, typed text (region_other) for any other country.
+        $southAfrican = Countries::code($input['country_code'] ?? '') === Countries::SOUTH_AFRICA;
+        if (!$southAfrican && array_key_exists('region_other', $input)) $input['region'] = $input['region_other'];
         $value = [];
         foreach (self::LIMITS as $field => $limit) {
             if (!$person && $field === 'organisation_name') { $value[$field] = null; continue; }
@@ -231,8 +240,11 @@ final readonly class BillingDetails
             if ($text === '' && isset(self::REQUIRED[$field])) throw new InvalidArgumentException('Enter the ' . self::REQUIRED[$field] . '.');
             $value[$field] = $text === '' ? null : $text;
         }
-        $country = self::normaliseCountryCode((string) $value['country_code']);
-        if ($country === null) throw new InvalidArgumentException('Enter the country as its two-letter ISO 3166-1 code, such as GB or US.');
+        $country = Countries::code((string) $value['country_code']);
+        if ($country === null) throw new InvalidArgumentException('Choose the country from the list.');
+        if ($country === Countries::SOUTH_AFRICA && $value['region'] !== null) {
+            $value['region'] = Countries::province($value['region']) ?? throw new InvalidArgumentException('Choose the province from the list.');
+        }
         return new self((string) $value['billing_name'], $value['organisation_name'], $value['tax_registration_number'], (string) $value['address_line_1'],
             $value['address_line_2'], $value['locality'], (string) $value['city'], $value['region'], $value['postal_code'], $country);
     }

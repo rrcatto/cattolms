@@ -30,7 +30,8 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Course\Landing\LandingPageAnalytics $landingAnalytics,
         private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
         private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
-        private readonly \CattoLearning\Commerce\Application\RefundRequestService $refundRequests)
+        private readonly \CattoLearning\Commerce\Application\RefundRequestService $refundRequests,
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing)
     { parent::__construct($auth,$view,$requests); }
 
     private function csrf(): void
@@ -62,7 +63,7 @@ final class CommerceController extends BaseController
                 $this->administration->requestCourse($actor->id,(int)$offer['course_id'],(int)$offer['access_period_seconds'],'');
                 $this->landingClicked($landing, 'request', $id);
                 $this->flash('success','Your course request was sent to your company administrator.');
-                $this->redirect('/account/courses?tab=requests');
+                $this->redirect('/account/courses?list=requests');
             }
             $this->carts->change($id);
             $this->landingClicked($landing, $this->posted('action') === 'buy_now' ? 'buy_now' : 'add', $id);
@@ -141,7 +142,10 @@ final class CommerceController extends BaseController
         $balance = $this->wallets->spendable(\CattoLearning\Commerce\Wallet\WalletOwner::person($actor->id));
         $total = (int) ($cart['total_minor'] ?? 0);
         $applied = ($state['use_wallet'] ?? false) ? min($balance, $total) : 0;
+        // What the buyer gets by email already, so checkout asks only about the rest (mailing, step 1).
+        $cartCourseIds = array_merge(array_map(static fn(array $i): int => (int) $i['course_id'], (array) ($cart['items'] ?? [])), ...array_map(static fn(array $b): array => array_map(static fn(array $c): int => (int) $c['course_id'], (array) ($b['courses'] ?? [])), (array) ($cart['bundles'] ?? [])));
         return $this->render('commerce-checkout', ['title'=>'Checkout', 'step'=>$step, 'cart'=>$cart, 'profile'=>$profile, 'checkout'=>$state,
+            'news_subscribed'=>$this->mailing->isSubscribed($actor->id, 'news'), 'following_course_ids'=>$this->mailing->followedAmong($actor->id, 'course', $cartCourseIds),
             'billing'=>$this->billing->userForm($actor->id, $profile), 'billing_fields'=>BillingDetails::formFields(true),
             // The review shows the billing profile placement will copy into the order.
             'billing_lines'=>$saved === null ? [] : $saved->documentLines(),
@@ -160,7 +164,8 @@ final class CommerceController extends BaseController
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
             $fields = [];
-            foreach (array_merge(['first_name','last_name','mobile_number'], array_keys(BillingDetails::LIMITS)) as $field) $fields[$field] = $this->posted($field);
+            // region_other: the province typed for an address outside South Africa (2026-10-27).
+            foreach (array_merge(['first_name','last_name','mobile_number','region_other'], array_keys(BillingDetails::LIMITS)) as $field) $fields[$field] = $this->posted($field);
             $this->checkout->saveProfile($actor, $fields);
             $this->redirect('/checkout/payment');
         }, '/checkout/profile');
@@ -210,6 +215,9 @@ final class CommerceController extends BaseController
                 $this->flash('warning', 'Promo code '.$rejected->promoCode.' was removed from your order. '.$rejected->getMessage().' Check your new total before placing your order.');
                 return;
             }
+            // What they ticked under Keep me informed, recorded once the order is placed (mailing, step 1).
+            if ($this->posted('news') === '1') $this->mailing->subscribe($actor->id, 'news', null, 'checkout');
+            foreach (array_unique(array_map('intval', (array) ($_POST['follow_course'] ?? []))) as $courseId) if ($courseId > 0) $this->mailing->subscribe($actor->id, 'course', $courseId, 'checkout');
             $this->maintenance->deliverInvoices(1);
             $this->redirect($id === null ? '/account/courses' : '/account/orders/'.$id);
         }, '/checkout/review');
@@ -238,6 +246,8 @@ final class CommerceController extends BaseController
     {
         $purchaser = $this->orders->purchaser($orderId);
         if ($purchaser !== null && $purchaser['id'] === $actor->id) return;
+        // A company's order opens for any of its Company Administrators (owner, 2026-10-26).
+        if ($purchaser !== null && $this->orders->mayOpen($actor, $this->records->order($orderId))) return;
         if ($purchaser !== null && $actor->hasPermission('PLATFORM.ORDER.VIEW')) {
             if ($documentId === null) $this->flash('info', 'This is ' . $purchaser['name'] . '\'s order. It opens here in Administration, where you manage it.');
             $this->redirect('/admin/commerce/orders/' . $orderId . ($documentId === null ? '' : '/documents/' . $documentId));

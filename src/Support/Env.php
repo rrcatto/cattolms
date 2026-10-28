@@ -11,6 +11,9 @@ Description:
 Provides shared support functionality for env used across Catto Learning.
 
 Changelog:
+2026/10/26 SAST
+- seconds(): a length of time written the one way (Support\Duration: 30m, 1d, 1h30m), as seconds (owner,
+  2026-10-26: "I'd also like to create a standard method of expressing time").
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -37,6 +40,17 @@ final class Env
     {
         $value = self::string($key);
         return preg_match('/^\d+$/', $value) === 1 ? (int) $value : $default;
+    }
+
+    /**
+     * A length of time written the one way (Duration: 30m, 1d, 1h30m), in seconds, a year as 365 days. Like int(), a
+     * value that is not one, a plain number included, gives the default, written the same way.
+     */
+    public static function seconds(string $key, string $default): int
+    {
+        $value = self::string($key);
+
+        return Duration::parse(Duration::isValid($value) ? $value : $default)->lengthInSeconds();
     }
 
     public static function bool(string $key, bool $default = false): bool

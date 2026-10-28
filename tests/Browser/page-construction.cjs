@@ -27,6 +27,8 @@ const inspect = () => {
   const h1 = main.querySelector('.cl-page-head h1');
   // A page head with a picture holds its title inside the picture: the picture's edge is the one the cards line up with.
   const picture = main.querySelector('.cl-page-head .cl-picture-head');
+  // A head that opens with a logo (ph_media, the company page) starts at the logo, not at its title.
+  const media = main.querySelector('.cl-page-head .cl-page-head-media');
   // The first box in document order: a card, or the accordion that holds a section on an "All sections" page.
   const card = main.querySelector([':scope > .cl-page-section', ':scope > .cl-page-family .cl-page-section']
     .flatMap(row => [`${row} .cl-ui-surface`, `${row} .cl-ui-accordion-section`]).join(', '));
@@ -94,7 +96,7 @@ const inspect = () => {
     tableSpill, cutActions, referenceFaults, figureSpill,
     h1: main.querySelectorAll('h1').length,
     strays, bare: bare.slice(0, 6), bareCount: bare.length,
-    headLeft: picture ? Math.round(picture.getBoundingClientRect().left) : (h1 ? Math.round(h1.getBoundingClientRect().left) : null),
+    headLeft: picture ? Math.round(picture.getBoundingClientRect().left) : (media ? Math.round(media.getBoundingClientRect().left) : (h1 ? Math.round(h1.getBoundingClientRect().left) : null)),
     cardLeft: card ? Math.round(card.getBoundingClientRect().left) : null,
     cardRow, boxes, headPainted: headPainted && !picture,
     gapAboveFooter: footer && main ? Math.round(footer.getBoundingClientRect().top - main.getBoundingClientRect().bottom) : null,

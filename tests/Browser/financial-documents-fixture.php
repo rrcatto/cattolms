@@ -48,6 +48,7 @@ use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Token;
+use CattoLearning\Support\AccountReference;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\BundleFixture;
 use CattoLearning\Tests\Support\DevelopmentFixture;
@@ -66,15 +67,11 @@ $session = static function (int $user, string $email) use ($container): string {
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Financial documents browser', $email);
     return $token;
 };
-$person = static function (string $key, string $name, string $role, string $suffix) use ($fixture, $container): array {
-    $email = 'fin-docs-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($name, $email);
-    $container->get(RoleRepository::class)->assign($id, $role);
-    return ['id' => $id, 'email' => $email, 'name' => $name];
-};
+// A believable person nobody on the site shares a name with (owner, 2026-10-27).
+$person = static fn(string $role): array => $fixture->person($role);
 $buyer = static fn(array $who): CurrentUser => new CurrentUser($who['id'], Uuid::v4(), $who['email'], $who['name'], ['STUDENT'],
     ['COMMERCE.CART.VIEW', 'COMMERCE.CART.MANAGE', 'COMMERCE.CHECKOUT.START', 'COMMERCE.ORDER.VIEW', 'LEARNING.COURSE.START'], Uuid::v4());
-$billing = static fn(string $name, string $line1): BillingDetails => BillingDetails::forPerson(['billing_name' => $name, 'organisation_name' => 'Browser Attorneys Inc',
+$billing = static fn(string $name, string $line1): BillingDetails => BillingDetails::forPerson(['billing_name' => $name, 'organisation_name' => 'Harbourside Attorneys Inc',
     'tax_registration_number' => '4999999999', 'address_line_1' => $line1, 'city' => 'Durban', 'postal_code' => '4001', 'region' => 'KwaZulu-Natal', 'country_code' => 'ZA']);
 $place = static function (CurrentUser $actor, array $variants, array $offers, ?string $code, string $method = 'dummy') use ($container, $billing): int {
     $orders = $container->get(OrderService::class);
@@ -92,29 +89,30 @@ $documentIds = static function (int $orderId) use ($records): array {
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous financial documents fixture first.');
-    $suffix = $fixture->suffix();
-    $admin = $person('admin', 'Documents Administrator', 'ADMIN', $suffix);
-    $provider = $person('provider', 'Course Provider', 'STUDENT', $suffix);
-    $learner = $person('learner', 'Ayanda Browser Zulu', 'STUDENT', $suffix);
-    $other = $person('other', 'Other Browser Learner', 'STUDENT', $suffix);
-    $eftBuyer = $person('eft', 'Eft Browser Buyer', 'STUDENT', $suffix);
-    $companyAdmin = $person('company', 'Company Browser Admin', 'STUDENT', $suffix);
-    $company = $fixture->createCompany($provider['id'], 'Documents provider ' . $suffix, 'fin-docs-' . $suffix . '.example.test');
+    $names = new \CattoLearning\Tests\Support\CheckNames($db);
+    $admin = $person('ADMIN');
+    $learner = $person('STUDENT');
+    $other = $person('STUDENT');
+    $eftBuyer = $person('STUDENT');
+    // The course provider is a company made with its founding administrator; its four courses, a bundle of two and two
+    // promo codes all carry real names (owner, 2026-10-27).
+    $providerCompany = $fixture->company();
+    $provider = $providerCompany['founder'];
+    $company = $providerCompany['id'];
     $courses = [];
-    foreach (['a' => ['Browser Conveyancing ' . $suffix, 120000], 'b' => ['Browser Deeds Practice ' . $suffix, 80000], 'c' => ['Browser Bonds ' . $suffix, 50000], 'd' => ['Browser Notarial Practice ' . $suffix, 60000]] as $key => [$title, $price]) {
-        $id = $fixture->createCourse($provider['id'], $company, 'fin-docs-' . $key . '-' . $suffix, $title, 'published');
-        $db->executeStatement('UPDATE courses SET published_at = NOW() WHERE id = :id', ['id' => $id]);
-        $courses[$key] = ['id' => $id, 'title' => $title, 'variant' => $fixture->createPriceVariant($id, $provider['id'], 31536000, $price, true)];
+    foreach (['a' => 120000, 'b' => 80000, 'c' => 50000, 'd' => 60000] as $key => $price) {
+        $made = $fixture->course($provider['id'], $company, 'published');
+        $courses[$key] = ['id' => $made['id'], 'title' => $made['title'], 'variant' => $fixture->createPriceVariant($made['id'], $provider['id'], 31536000, $price, true)];
     }
-    $bundle = BundleFixture::create($db, $provider['id'], [$courses['b']['id'], $courses['c']['id']], 110000, ['title' => 'Browser Practice Bundle ' . $suffix]);
+    $bundle = BundleFixture::create($db, $provider['id'], [$courses['b']['id'], $courses['c']['id']], 110000, ['title' => $names->bundle()]);
     $promotions = new PromotionRepository($db);
     $now = (new DateTimeImmutable())->format(DATE_ATOM);
     $base = ['description' => null, 'discount_type' => 'percentage', 'currency' => null, 'starts_at' => null, 'ends_at' => null, 'active' => true,
         'minimum_order_minor' => null, 'maximum_total_uses' => null, 'maximum_uses_per_customer' => null, 'course_scope' => 'all', 'bundle_scope' => 'all'];
-    $ten = 'TEN' . strtoupper($suffix);
-    $free = 'FREE' . strtoupper($suffix);
-    $promotions->create(['code' => $ten, 'name' => 'Browser ten off', 'discount_value' => 1000] + $base, [], $admin['id'], $now);
-    $promotions->create(['code' => $free, 'name' => 'Browser free', 'discount_value' => 10000] + $base, [], $admin['id'], $now);
+    $ten = $names->promotion();
+    $promotionIds = [$promotions->create(['code' => $ten, 'name' => 'Ten percent off', 'discount_value' => 1000] + $base, [], $admin['id'], $now)];
+    $free = $names->promotion();
+    $promotionIds[] = $promotions->create(['code' => $free, 'name' => 'A course on us', 'discount_value' => 10000] + $base, [], $admin['id'], $now);
     $design = $container->get(FinancialDocumentDesignService::class)->design()->toArray();
 
     $learnerActor = $buyer($learner);
@@ -126,22 +124,26 @@ if ($action === 'create') {
     $zero = $place($learnerActor, [$courses['d']['variant']], [], $free);
     $container->get(PaymentService::class)->settleWithoutPayment($learnerActor, $zero);
     $eft = $place($buyer($eftBuyer), [$courses['b']['variant']], [], null, 'eft');
-    $bankReference = 'FNB-BROWSER-' . strtoupper($suffix);
+    $bankReference = AccountReference::format((string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :u', ['u' => $eftBuyer['id']])) . ' FNB';
     $container->get(PaymentAdministrationService::class)->confirmBank($adminActor, $eft, Uuid::v4(), 80000, (new DateTimeImmutable('-1 day'))->format(DATE_ATOM), $bankReference, 'Matched the browser bank statement.');
-    $buyerCompany = $fixture->createCompany($companyAdmin['id'], 'Browser Logistics ' . $suffix, 'fin-docs-buyer-' . $suffix . '.example.test');
-    $db->executeStatement("INSERT INTO company_users(company_id,user_id,company_role,status) VALUES (:company,:user,'owner','active')", ['company' => $buyerCompany, 'user' => $companyAdmin['id']]);
+    // A client company made with its founding Company Administrator, who buys credits for its staff.
+    $buyer = $fixture->company();
+    $buyerCompany = $buyer['id'];
+    $companyAdmin = $buyer['founder'];
     $companyActor = new CurrentUser($companyAdmin['id'], Uuid::v4(), $companyAdmin['email'], $companyAdmin['name'], ['STUDENT'],
         ['COMPANY.CREDIT.MANAGE', 'COMPANY.BILLING.MANAGE', 'COMMERCE.CHECKOUT.START', 'COMMERCE.ORDER.VIEW'], Uuid::v4());
     $purchases = $container->get(CompanyCreditPurchaseService::class);
     $purchases->add($companyActor, $buyerCompany, $courses['c']['variant'], 3);
     $review = $purchases->review($companyActor, $buyerCompany);
     $companyOrder = $purchases->place($companyActor, $buyerCompany, $review['purchase_key'], $review['quote'],
-        BillingDetails::forCompany(['billing_name' => 'Browser Logistics (Pty) Ltd', 'address_line_1' => '3 Harbour Road', 'city' => 'Durban', 'country_code' => 'ZA']), 'dummy', 'demo_success', false, true);
+        BillingDetails::forCompany(['billing_name' => $buyer['name'] . ' (Pty) Ltd', 'address_line_1' => '3 Harbour Road', 'city' => 'Durban', 'country_code' => 'ZA']), 'dummy', 'demo_success', false, true);
     unset($_SESSION['company_credit_basket']);
 
-    $state = ['suffix' => $suffix, 'company' => $company, 'buyer_company' => $buyerCompany, 'courses' => $courses, 'bundle' => $bundle, 'codes' => [$ten, $free],
+    $state = ['company' => $company, 'buyer_company' => $buyerCompany, 'buyer_company_name' => $buyer['name'], 'company_admin_name' => $companyAdmin['name'], 'other_name' => $other['name'], 'courses' => $courses, 'bundle' => $bundle, 'codes' => [$ten, $free],
+        'scrub' => $fixture->seeds() + ['promotions' => $promotionIds],
         'bank_reference' => $bankReference, 'design' => $design,
         'users' => ['admin' => $admin['id'], 'provider' => $provider['id'], 'learner' => $learner['id'], 'other' => $other['id'], 'eft' => $eftBuyer['id'], 'company' => $companyAdmin['id']],
+        'notes' => ['invoice' => 'Thank you for learning with us.', 'credit_note' => 'Refunds are paid within seven days.', 'receipt' => 'Keep this receipt for your records.'],
         'learner' => ['id' => $learner['id'], 'email' => $learner['email'], 'name' => $learner['name']],
         'orders' => ['paid' => $paid, 'zero' => $zero, 'eft' => $eft, 'company' => $companyOrder],
         'documents' => ['paid' => $documentIds($paid), 'zero' => $documentIds($zero), 'eft' => $documentIds($eft), 'company' => $documentIds($companyOrder)],
@@ -153,39 +155,20 @@ if ($action === 'create') {
 } elseif ($action === 'order') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     // A course the learner does not have yet, so the order can always be placed.
-    $course = $fixture->createCourse((int) $state['users']['provider'], (int) $state['company'], 'fin-docs-later-' . $fixture->suffix(), 'Browser Later Course ' . $state['suffix'], 'published');
+    $course = $fixture->course((int) $state['users']['provider'], (int) $state['company'], 'published')['id'];
     $orderId = $place($buyer($state['learner']), [$fixture->createPriceVariant($course, (int) $state['users']['provider'], 31536000, 40000, true)], [], null);
     $state['later_courses'][] = $course;
+    $state['scrub']['courses'][] = $course;
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     echo json_encode(['order' => $orderId, 'documents' => $documentIds($orderId)], JSON_THROW_ON_ERROR), "\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    if (!str_starts_with((string) $state['courses']['a']['title'], 'Browser Conveyancing ')) throw new RuntimeException('Unexpected fixture state.');
-    // The design as it was before the run, as the current version again (published versions stay).
-    $design = $state['design'];
-    $container->get(FinancialDocumentDesignService::class)->save(['typeface' => $design['typeface'], 'colour' => $design['colour'], 'logo_asset' => $design['logo']['sha'] ?? '',
-        'note_invoice' => $design['notes']['invoice'], 'note_receipt' => $design['notes']['receipt'], 'note_credit_note' => $design['notes']['credit_note']], [], (int) $state['users']['admin']);
-    $users = array_map('intval', array_values($state['users']));
-    $ids = '{' . implode(',', $users) . '}';
-    $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
-    $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
-    foreach ([...array_column($state['courses'], 'id'), ...($state['later_courses'] ?? [])] as $course) $db->executeStatement("UPDATE courses SET status='retired' WHERE id = :c", ['c' => $course]);
-    foreach ($users as $user) {
-        if ($db->fetchOne('SELECT 1 FROM commerce_orders WHERE purchaser_user_id = :u', ['u' => $user])
-            || $db->fetchOne('SELECT 1 FROM courses WHERE owner_user_id = :u', ['u' => $user])
-            || $db->fetchOne('SELECT 1 FROM promotions WHERE created_by = :u OR updated_by = :u', ['u' => $user])
-            || $db->fetchOne('SELECT 1 FROM commerce_manual_payment_evidence WHERE actor_user_id = :u', ['u' => $user])
-            || $db->fetchOne('SELECT 1 FROM commerce_refunds WHERE approved_by_user_id = :u', ['u' => $user])) {
-            continue;
-        }
-        foreach (['analytics_events', 'audit_log', 'user_billing_profiles', 'user_roles', 'user_emails'] as $table) {
-            $db->executeStatement('DELETE FROM ' . $table . ' WHERE user_id = :u', ['u' => $user]);
-        }
-        $db->executeStatement('DELETE FROM users WHERE id = :u', ['u' => $user]);
-    }
+    // Everything the check made, its orders, documents, refunds and ledger and the design versions its administrator saved
+    // included; the design goes back to the version from before the run (owner, 2026-10-27).
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
-    echo "Removed the financial documents fixture where the database allows and restored the design.\n";
+    echo "Removed everything the financial documents check made and put the design back.\n";
 } else {
     fwrite(STDERR, "Usage: php tests/Browser/financial-documents-fixture.php create|order|cleanup [state.json]\n");
     exit(1);

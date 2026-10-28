@@ -11,6 +11,9 @@ Description:
 Provides mail infrastructure for Symfony Mailer, resolving the effective SMTP transport and sender identity from administrator-managed database settings with .env fallback at send time.
 
 Changelog:
+2026/10/26 SAST
+- A link's lifetime is worded by Support\Duration, the one way lengths of time are stated (owner, 2026-10-26):
+  "30 minutes", "1 day".
 2026/08/16 21:36 SAST
 - Allowed PHP-DI to proxy the mail adapter for selective lazy injection; SMTP transport creation remains lazy inside the adapter.
 2026/08/12 23:56 SAST
@@ -31,6 +34,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Mail;
 
+use CattoLearning\Support\Duration;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Support\Env;
@@ -48,27 +52,42 @@ class SymfonyMailerAdapter implements MailerInterface
 
     public function sendMagicLink(string $email, string $url, int $ttlSeconds): void
     {
-        $minutes = max(1, (int) ceil($ttlSeconds / 60));
+        $lasts = Duration::ofSeconds(max(1, $ttlSeconds))->words();
         $appName = $this->settings->platformName();
         $this->send(
             $email,
             'Your secure sign-in link',
             '<p>Use the link below to sign in to ' . $this->escape($appName) . '.</p>'
             . '<p><a href="' . $this->escape($url) . '">Sign in securely</a></p>'
-            . '<p>This one-time link expires in ' . $minutes . ' minutes. If you did not request it, ignore this email.</p>',
-            "Sign in: {$url}\n\nThis one-time link expires in {$minutes} minutes."
+            . '<p>This one-time link expires in ' . $lasts . '. If you did not request it, ignore this email.</p>',
+            "Sign in: {$url}\n\nThis one-time link expires in {$lasts}."
+        );
+    }
+
+    public function sendRegistrationLink(string $email, string $url, int $ttlSeconds, string $notice = ''): void
+    {
+        $lasts = Duration::ofSeconds(max(1, $ttlSeconds))->words();
+        $appName = $this->settings->platformName();
+        $this->send(
+            $email,
+            'Finish your registration',
+            '<p>Use the link below to confirm your email address and finish registering at ' . $this->escape($appName) . '.</p>'
+            . '<p><a href="' . $this->escape($url) . '">Finish registering</a></p>'
+            . ($notice !== '' ? '<p><strong>' . $this->escape($notice) . '</strong></p>' : '')
+            . '<p>This one-time link expires in ' . $lasts . '. If you did not ask to register, ignore this email.</p>',
+            "Finish registering: {$url}\n\n" . ($notice !== '' ? $notice . "\n\n" : '') . "This one-time link expires in {$lasts}. If you did not ask to register, ignore this email."
         );
     }
 
     public function sendSecondaryEmailVerification(string $email, string $url, int $ttlSeconds): void
     {
-        $minutes = max(1, (int) ceil($ttlSeconds / 60));
+        $lasts = Duration::ofSeconds(max(1, $ttlSeconds))->words();
         $this->send(
             $email,
             'Verify your backup email address',
             '<p>Confirm that this email address belongs to you.</p><p><a href="' . $this->escape($url)
-            . '">Verify email address</a></p><p>This link expires in ' . $minutes . ' minutes.</p>',
-            "Verify this email address: {$url}\n\nThis link expires in {$minutes} minutes."
+            . '">Verify email address</a></p><p>This link expires in ' . $lasts . '.</p>',
+            "Verify this email address: {$url}\n\nThis link expires in {$lasts}."
         );
     }
 
@@ -148,8 +167,10 @@ class SymfonyMailerAdapter implements MailerInterface
             $email,
             'You have been enrolled: ' . $courseTitle,
             '<p>You have been enrolled on <strong>' . $this->escape($courseTitle) . '</strong>.</p>'
-            . '<p><a href="' . $this->escape($url) . '">Start the course</a></p>',
-            "You have been enrolled on {$courseTitle}.\n\nStart the course: {$url}"
+            . '<p><a href="' . $this->escape($url) . '">Start the course</a></p>'
+            // Following it is the learner's choice, made on the course page (mailing, step 1; owner, 2026-10-26: "Both").
+            . '<p>Want the updates written about this course? <a href="' . $this->escape($url . '#follow') . '">Follow it</a>. You can stop at any time.</p>',
+            "You have been enrolled on {$courseTitle}.\n\nStart the course: {$url}\n\nWant the updates written about this course? Follow it: {$url}#follow\nYou can stop at any time."
         );
     }
 

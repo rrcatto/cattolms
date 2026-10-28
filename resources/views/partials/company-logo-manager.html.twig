@@ -1,0 +1,33 @@
+{#
+	A company's logo, shown large first wherever the company itself is managed (owner, 2026-10-26: the logo had been
+	"buried" at the end of Billing): on Company → Company Profile and on the company's page in Administration. Until a logo
+	is uploaded a drawn picture stands in for it, made from the company's random id and never stored.
+	lm_logo: {url, uploaded}; lm_name: the company's name; lm_upload / lm_remove: where the forms post;
+	lm_can_manage: whether this reader may change it.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'company-logo'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Logo', summary: lm_logo.uploaded ? 'The logo of ' ~ lm_name ~ ', shown with its name across the site.' : 'No logo yet. Until one is uploaded, the drawn picture below is shown with ' ~ lm_name ~ '\'s name across the site.'}) }}
+	<div class="cl-company-logo-panel">
+		<figure class="cl-company-logo-current">
+			<img class="cl-company-logo-large" src="{{ lm_logo.url }}" alt="{{ lm_logo.uploaded ? 'The logo of ' ~ lm_name : 'The drawn picture shown until ' ~ lm_name ~ ' has a logo' }}" width="192" height="192">
+			<figcaption class="help">{{ lm_logo.uploaded ? 'The logo now.' : 'A drawn picture, until a logo is uploaded.' }}</figcaption>
+		</figure>
+		{% if lm_can_manage %}
+		<form action="{{ lm_upload }}" method="post" enctype="multipart/form-data" class="cl-company-logo-form">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: lm_logo.uploaded ? 'Replace the logo' : 'Upload a logo', for: 'company-logo-file', required: true, help: 'An SVG up to 200 KB keeps its own colours. A PNG, JPEG or WebP up to 8 MB is fitted into 512 by 512 pixels.'})} %}
+{% block control %}<input type="file" id="company-logo-file" name="logo" accept="image/svg+xml,image/png,image/jpeg,image/webp" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: lm_logo.uploaded ? 'Replace logo' : 'Upload logo', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-upload'}) }}{% endblock %}
+{% block secondary_actions %}{% if lm_logo.uploaded %}{{ ui('action.button', {label: 'Remove logo', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove the logo of ' ~ lm_name ~ '? A drawn picture is shown instead.', form: 'remove-company-logo', icon: 'action-remove'}) }}{% endif %}{% endblock %}
+{% endembed %}
+		</form>
+		{% if lm_logo.uploaded %}<form action="{{ lm_remove }}" method="post" id="remove-company-logo"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endif %}
+		{% else %}
+		<p class="help">The Company Administrator changes the logo.</p>
+		{% endif %}
+	</div>
+{% endblock %}
+{% endembed %}

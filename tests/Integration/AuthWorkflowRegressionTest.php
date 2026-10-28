@@ -236,29 +236,43 @@ final class AuthWorkflowRegressionTest extends TestCase
         $mailer = new FakeMailer();
         try {
             $auth = $this->authService($container, $mailer);
-            // Adults only (owner, 2026-10-20): a date of birth is required, and someone under 18 is refused.
-            $person = ['account_type'=>'individual','first_name'=>'Reg','middle_names'=>'','last_name'=>'Tester','email'=>$email];
-            $seventeen = (new \DateTimeImmutable('-17 years'))->format('Y-m-d');
+            // A valid South African ID number from someone who lives in South Africa (owner, 2026-10-27), which gives the
+            // date of birth, and someone under 18 is refused (adults only, 2026-10-20).
+            $person = ['account_type'=>'individual','first_name'=>'Reg','middle_names'=>'','last_name'=>'Tester','email'=>$email,'country'=>'ZA'];
             $eighteenToday = (new \DateTimeImmutable('-18 years'))->format('Y-m-d');
-            $tomorrow = (new \DateTimeImmutable('+1 day'))->format('Y-m-d');
-            foreach (['' => 'Enter your date of birth.', '14/03/1990' => 'Enter your date of birth as a real date, for example 1990-03-14.', '1990-02-30' => 'Enter your date of birth as a real date, for example 1990-03-14.',
-                $tomorrow => 'A date of birth cannot be in the future.', '1890-01-01' => 'Check the year of your date of birth.', $seventeen => \CattoLearning\Auth\AdultAge::REFUSED] as $born => $message) {
+            $valid = \CattoLearning\Tests\Support\CheckIdNumbers::free($db, $eighteenToday);
+            $held = $fixture->createUser('Holder', 'holder-' . $fixture->suffix() . '@seed.test');
+            $heldNumber = \CattoLearning\Tests\Support\CheckIdNumbers::give($db, $held);
+            $slip = substr($valid, 0, 12) . (((int) $valid[12] + 1) % 10);
+            $seventeen = \CattoLearning\Auth\SouthAfricanIdNumber::make(new \DateTimeImmutable('-17 years'), 1234);
+            foreach ([
+                [['id_number' => ''], \CattoLearning\Auth\SouthAfricanIdNumber::ENTER],
+                [['id_number' => '12345'], \CattoLearning\Auth\SouthAfricanIdNumber::ENTER],
+                [['id_number' => $slip], \CattoLearning\Auth\SouthAfricanIdNumber::INVALID],
+                [['id_number' => $valid, 'country' => 'GB'], AuthService::SOUTH_AFRICA_ONLY],
+                [['id_number' => $valid, 'country' => ''], 'Choose the country you live in.'],
+                [['id_number' => $seventeen], \CattoLearning\Auth\AdultAge::REFUSED],
+                [['id_number' => $heldNumber], \CattoLearning\Auth\IdNumbers::TAKEN],
+            ] as [$typed, $message]) {
                 try {
-                    $auth->requestRegistration($person + ['date_of_birth' => (string) $born]);
-                    self::fail('Refused: ' . $born);
+                    $auth->requestRegistration($typed + $person);
+                    self::fail('Refused: ' . $message);
                 } catch (\InvalidArgumentException $refused) {
                     self::assertSame($message, $refused->getMessage());
                 }
             }
             self::assertCount(0, $mailer->messages, 'Nothing is sent, and nothing is kept, for someone refused.');
-            $auth->requestRegistration($person + ['date_of_birth' => $eighteenToday]);
+            $auth->requestRegistration(['id_number' => $valid] + $person);
             self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email', ['email'=>$email]));
             parse_str((string)parse_url((string)$mailer->messages[0]['url'], PHP_URL_QUERY), $query);
             $auth->consumeRegistration((string)$query['token']);
             $fixture->rememberUser((int)$db->fetchOne('SELECT user_id FROM user_emails WHERE email=:email', ['email'=>$email]));
             self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email AND is_primary=TRUE', ['email'=>$email]));
-            self::assertSame($eighteenToday, $db->fetchOne('SELECT u.birthdate::text FROM users u JOIN user_emails ue ON ue.user_id = u.id WHERE ue.email=:email', ['email'=>$email]), 'Eighteen today registers, and the account keeps the date of birth.');
-            self::assertSame(1, (int)$db->fetchOne("SELECT COUNT(*) FROM audit_log a JOIN user_emails ue ON ue.user_id = a.user_id WHERE ue.email=:email AND a.event_key='user.date_of_birth_given' AND a.metadata->>'when' = 'registration'", ['email'=>$email]));
+            $kept = $db->fetchAssociative('SELECT u.birthdate::text AS born, u.residence_country, u.id_number_hash, u.id_number_encrypted FROM users u JOIN user_emails ue ON ue.user_id = u.id WHERE ue.email=:email', ['email'=>$email]);
+            self::assertSame([$eighteenToday, 'ZA'], [$kept['born'], $kept['residence_country']], 'Eighteen today registers; the date of birth comes from the ID number.');
+            self::assertSame(\CattoLearning\Auth\SouthAfricanIdNumber::fromInput($valid, new \DateTimeImmutable())->fingerprint(), $kept['id_number_hash']);
+            self::assertStringNotContainsString($valid, (string) $kept['id_number_encrypted'], 'The number is kept encrypted.');
+            self::assertSame(1, (int)$db->fetchOne("SELECT COUNT(*) FROM audit_log a JOIN user_emails ue ON ue.user_id = a.user_id WHERE ue.email=:email AND a.event_key='user.id_number_given' AND a.metadata->>'when' = 'registration'", ['email'=>$email]));
             $fixture->rememberEmail($email);
         } finally { unset($_COOKIE['catto_learning_session']); $fixture->cleanup(); }
     }
@@ -294,16 +308,18 @@ final class AuthWorkflowRegressionTest extends TestCase
                 $controller = new \CattoLearning\Http\Controller\AuthController(
                     $this->authService($container, $mailer),
                     $container->get(\CattoLearning\View\ThemeRenderer::class),
-                    new \Symfony\Component\HttpFoundation\RequestStack()
+                    new \Symfony\Component\HttpFoundation\RequestStack(),
+                    $container->get(\CattoLearning\Support\GeoIpLocator::class)
                 );
                 $_SESSION = [];
                 $_POST = ['csrf' => \CattoLearning\Support\Csrf::token(), 'email' => $email,
-                    'first_name' => 'Redirect', 'last_name' => 'Test', 'account_type' => 'individual', 'date_of_birth' => '1990-05-12'];
+                    'first_name' => 'Redirect', 'last_name' => 'Test', 'account_type' => 'individual', 'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free($container->get(Database::class))];
                 try {
                     $controller->$action();
                     self::fail('Expected a success redirect.');
                 } catch (\CattoLearning\Http\HttpRedirect $redirect) {
-                    self::assertSame('/login/sent', $redirect->path, $action);
+                    // After a registration the page also says, on a demo site, that the account will be held (2026-10-26).
+                    self::assertSame($action === 'register' ? '/login/sent?registered=1' : '/login/sent', $redirect->path, $action);
                     self::assertSame(303, $redirect->status);
                 }
                 self::assertCount(1, $mailer->messages);
@@ -328,7 +344,8 @@ final class AuthWorkflowRegressionTest extends TestCase
             $container->get(AuditRepository::class),
             $mailer,
             $container->get(EventDispatcher::class),
-            $container->get(UserProfileRepository::class)
+            $container->get(UserProfileRepository::class),
+            idNumbers: $container->get(\CattoLearning\Auth\IdNumbers::class)
         );
     }
 }

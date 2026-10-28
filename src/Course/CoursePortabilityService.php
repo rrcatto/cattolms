@@ -435,6 +435,16 @@ final class CoursePortabilityService
             // Replacing an existing course rewrites its content wholesale from a REAL package, so
             // the target must be REAL too.
             $existing = $this->requireRealCourse($replaceCourseId);
+            // Replacing a course's content keeps what the file does not state, and what belongs to this site (2026-10-26
+            // audit: it set the course back to draft, gave it to the importer and cleared its category, accreditation and
+            // access period): its owner, status and approval always; anything else the file is silent on; its category
+            // when none was chosen.
+            $keep = ['owner_company_id', 'owner_user_id', 'status', 'publication_approval_status'];
+            foreach (['slug', 'subtitle', 'summary', 'level', 'estimated_minutes', 'default_access_period_seconds', 'certificate_enabled', 'certificate_accreditation', 'course_style_key', 'presentation_css'] as $key) {
+                if (!array_key_exists($key, $input)) $keep[] = $key;
+            }
+            if ($data['category_id'] === null) $keep[] = 'category_id';
+            foreach ($keep as $key) if (array_key_exists($key, $existing)) $data[$key] = $existing[$key];
             if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug']) !== null) {
                 throw new InvalidArgumentException('A course with the imported slug already exists.');
             }

@@ -37,12 +37,12 @@ final class MaintenanceService
     /** @return array{login_tokens:int,auth_sessions:int,web_sessions:int} */
     public function pending(): array
     {
-        return $this->maintenance->pending(Env::int('PHP_SESSION_TTL', 86400));
+        return $this->maintenance->pending(Env::seconds('PHP_SESSION_TTL', '1d'));
     }
 
     /** @return array{login_tokens:int,auth_sessions:int,web_sessions:int} */
     public function prune(): array
     {
-        return $this->maintenance->prune(Env::int('PHP_SESSION_TTL', 86400));
+        return $this->maintenance->prune(Env::seconds('PHP_SESSION_TTL', '1d'));
     }
 }

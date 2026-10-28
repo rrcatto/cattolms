@@ -1,35 +1,4 @@
-{% if can_manage_enrolments %}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-		{{ ui('layout.section-head', {heading: 'Assign a course', eyebrow: 'Enrolments', summary: 'Put a staff member on a course now. A course this company owns costs nothing; any other course uses one credit seat.'}) }}
-		<form action="/company/enrolments/assign" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'user_id', lk_type: 'people', lk_label: 'Staff member', lk_selected: 0, lk_required: 1, lk_empty: 'Nobody selected'} %}
-			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'course_id', lk_type: 'assignable_courses', lk_label: 'Course', lk_selected: 0, lk_required: 1, lk_empty: 'No course selected'} %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period (days)', full_width: false, for: 'assign-access-days', required: true, help: 'The period starts when the staff member presses Start course, not when you assign the course.'})} %}
-{% block control %}
-
-				<input id="assign-access-days" name="access_days" type="number" min="1" max="3650" value="365" required {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-				{{ ui('action.button', {label: 'Assign course', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-
-{% endblock %}
-{% endembed %}
-{% endif %}
+{% include '@platform/partials/company/assign-course.html.twig' %}
 
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}

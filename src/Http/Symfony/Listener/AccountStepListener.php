@@ -10,7 +10,7 @@ Version: 0.9.6
 Description:
 Sends a signed-in person to what they must do before anything else (owner, 2026-10-19, adults only
 since 2026-10-20; CurrentUser::$accountStep): their date of birth at the first sign-in of an account
-someone else created (/account/confirm-age), and, for good, the adults-only page when their verified
+someone else created, or that has none yet (/account/id-number, the South African ID number, 2026-10-27), and, for good, the adults-only page when their verified
 identity shows them under 18 (/account/adults-only). Those pages, signing out, the legal pages, Help,
 the FAQ, the contact form, public certificates and transcripts, and machine addresses (the API,
 webhooks, assets, robots.txt, the sitemap) are never held up.
@@ -36,11 +36,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
 final class AccountStepListener implements EventSubscriberInterface
 {
     /** Where each step is done. */
-    private const PAGES = ['age' => '/account/confirm-age', 'adults_only' => '/account/adults-only'];
+    private const PAGES = ['id_number' => '/account/id-number', 'adults_only' => '/account/adults-only'];
 
     /** Addresses a pending step never holds up. */
-    private const OPEN = ['/account/confirm-age', '/account/adults-only', '/logout', '/auth/', '/login', '/register', '/terms', '/refunds', '/privacy', '/help', '/faq', '/contact',
-        '/api/', '/webhooks/', '/theme/', '/assets/', '/css/', '/js/', '/img/', '/robots.txt', '/sitemap', '/certificates/', '/transcripts/', '/favicon', '/_'];
+    private const OPEN = ['/account/id-number', '/account/adults-only', '/logout', '/auth/', '/login', '/register', '/terms', '/refunds', '/privacy', '/help', '/faq', '/contact',
+        '/api/', '/webhooks/', '/m/', '/theme/', '/assets/', '/css/', '/js/', '/img/', '/robots.txt', '/sitemap', '/certificates/', '/transcripts/', '/favicon', '/_'];
 
     public function __construct(private readonly AuthService $auth) {}
 

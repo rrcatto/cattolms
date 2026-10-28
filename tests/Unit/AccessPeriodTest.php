@@ -7,12 +7,14 @@ Date time: 2026/10/19 SAST
 Version: 0.9.5
 
 Description:
-A month is a twelfth of a year (owner, 2026-10-19: "fix 12 months to give 365 days of access, and check
-every other period for the same mistake"): every unit converts to whole days, 12 months and 1 year are
-the same period, and a stored period reads back in the unit it was written in. The company credit form
-and every period label use the same rule.
+A month is 30 days and each whole year 365 (owner, 2026-10-26: "if we need to express a month in days, use the
+convention of a 30 day month and 1 year is 365 days"; 2026-10-19: "fix 12 months to give 365 days of access"): every
+unit converts to whole days, 12 months and 1 year are the same period, and a stored period reads back in the unit it
+was written in. The company credit form and every period label use the same rule.
 
 Changelog:
+2026/10/26 SAST
+- 30-day months, each whole year of months 365 days (6 months 180, 18 months 545), in place of a twelfth of a year.
 2026/10/19 SAST
 - First version.
 */
@@ -31,7 +33,7 @@ final class AccessPeriodTest extends TestCase
         self::assertSame(365 * 86400, AccessPeriod::fromInput(12, 'months'));
         self::assertSame(AccessPeriod::fromInput(1, 'years'), AccessPeriod::fromInput(12, 'months'));
         self::assertSame(730 * 86400, AccessPeriod::fromInput(24, 'months'));
-        foreach ([1 => 30, 2 => 61, 3 => 91, 6 => 183, 9 => 274, 18 => 548] as $months => $days) {
+        foreach ([1 => 30, 2 => 60, 3 => 90, 6 => 180, 9 => 270, 11 => 330, 13 => 395, 18 => 545, 36 => 1095] as $months => $days) {
             self::assertSame($days * 86400, AccessPeriod::fromInput($months, 'months'), $months . ' months');
         }
         self::assertSame(14 * 86400, AccessPeriod::fromInput(2, 'weeks'));
@@ -45,20 +47,24 @@ final class AccessPeriodTest extends TestCase
             self::assertSame($label, AccessPeriod::label(AccessPeriod::fromInput($count, $unit)), $count . ' ' . $unit);
         }
         self::assertSame([6, 'months'], AccessPeriod::decompose(AccessPeriod::fromInput(6, 'months')));
-        self::assertSame('360 days', AccessPeriod::label(360 * 86400), 'The old 12 months reads as what it is.');
+        self::assertSame('360 days', AccessPeriod::label(360 * 86400), 'Twelve 30-day months are no number of months: 12 months is a year.');
+        self::assertSame('183 days', AccessPeriod::label(183 * 86400), 'The old 6 months reads as what it is.');
+        self::assertSame([6, 'months'], AccessPeriod::decompose(180 * 86400));
+        self::assertSame([18, 'months'], AccessPeriod::decompose(545 * 86400));
     }
 
-    public function testNoPageOrFormKeepsAThirtyDayMonth(): void
+    public function testNoPageOrFormCountsTwelveMonthsAs360Days(): void
     {
         $root = dirname(__DIR__, 2);
+        // A credit's length is one of its course's own, worded by AccessPeriod (owner, 2026-10-26: "The course's own lengths").
         $credits = (string) file_get_contents($root . '/resources/views/partials/admin/credits.html.twig');
-        self::assertStringContainsString('<option value="' . AccessPeriod::fromInput(6, 'months') . '">6 months</option>', $credits);
-        self::assertStringContainsString('<option value="' . AccessPeriod::fromInput(12, 'months') . '" selected>12 months</option>', $credits);
+        self::assertStringContainsString("partials/credit-length-options.html.twig", $credits);
+        self::assertStringContainsString("'label' => \\CattoLearning\\Support\\AccessPeriod::label(\$seconds)", (string) file_get_contents($root . '/src/Application/PlatformAdministrationService.php'));
         foreach (['src', 'resources/views'] as $dir) {
             foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $dir, \FilesystemIterator::SKIP_DOTS)) as $file) {
                 if (!in_array($file->getExtension(), ['php', 'twig'], true)) continue;
                 $source = (string) file_get_contents($file->getPathname());
-                self::assertDoesNotMatchRegularExpression('/\b(2592000|15552000|31104000)\b|% 30 === 0|\/ 30\)/', $source, $file->getPathname() . ' counts a month as 30 days.');
+                self::assertDoesNotMatchRegularExpression('/\b(31104000|15811200|7862400)\b|365 \/ 12/', $source, $file->getPathname() . ' counts months another way: 12 months is a year (365 days), any other month 30 days.');
             }
         }
     }

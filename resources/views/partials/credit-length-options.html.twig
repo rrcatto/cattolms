@@ -1,0 +1,2 @@
+{# The lengths a credit can have for the chosen course, as options (owner, 2026-10-26: "The course's own lengths"). #}
+{% if lengths|default([]) %}{% for length in lengths %}<option value="{{ length.seconds }}"{{ length.seconds == selected_seconds|default(0) ? ' selected' : '' }}>{{ length.label }}</option>{% endfor %}{% else %}<option value="">{{ course_chosen|default(false) ? empty_words|default('No length for this course') : 'Choose the course first' }}</option>{% endif %}

@@ -48,6 +48,9 @@ const rand = (minor) => `R ${Math.floor(minor / 100).toLocaleString('en-ZA').rep
 const order = (id) => `CL-${String(id).padStart(8, '0')}`;
 /* Now, a minute ago, in South African time with its offset, as the bank confirmation form wants it. */
 const today = () => new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10);
+// A bank's own transaction reference, as a statement prints it: FNB and a number.
+let references = 0;
+const bankReference = () => `FNB ${String(Date.now()).slice(-7)}${++references}`;
 
 async function check(name, run) {
     try {
@@ -145,16 +148,16 @@ async function buyWithWalletAndEft(page, fixture) {
             await adminPage.goto(`${base}/admin/commerce/orders/${placed.id}`);
             // The order page names the account first and says what to do next (owner, 2026-10-18): under the order number,
             // the person linked to their profile, their account reference and their email, each on its own line (owner, 2026-10-21).
-            assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`Thandi Nkosi\\s+${learner.reference}`), 'the name, then the account reference on its own line');
+            assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`${learner.name}\\s+${learner.reference}`), 'the name, then the account reference on its own line');
             assert.equal(await adminPage.locator('.cl-page-head a.cl-ui-person-account').getAttribute('href'), `/admin/people/${learner.id}`, 'the name opens their account');
             assert.match(await text(adminPage), /Waiting for the EFT payment/);
             if (name === 'chromium') {
                 // Record EFT Payment starts from the bank statement: no hunting for the order (owner, 2026-10-18).
                 await adminPage.goto(`${base}/admin/commerce/eft`);
-                await adminPage.locator('#eft-reference').fill(`EFT ${learner.reference} THANDI`);
+                await adminPage.locator('#eft-reference').fill(`EFT ${learner.reference} ${learner.name.split(' ')[0].toUpperCase()}`);
                 await adminPage.locator('#eft-amount').fill('150.00');
                 await adminPage.locator('#eft-received-on').fill(today());
-                await adminPage.locator('#eft-bank-reference').fill(`FNB-${name}-${Date.now()}`);
+                await adminPage.locator('#eft-bank-reference').fill(bankReference());
                 await adminPage.locator('#eft-reason').fill('Seen on the bank statement.');
                 await submit(adminPage, adminPage.getByRole('button', {name: 'Find the account'}));
                 assert.match(await adminPage.locator('[data-eft-account]').innerText(), new RegExp(learner.reference), 'the account is found from the statement');
@@ -163,7 +166,7 @@ async function buyWithWalletAndEft(page, fixture) {
             } else {
                 await adminPage.locator('#bank-amount').fill('150.00');
                 await adminPage.locator('#bank-received-on').fill(today());
-                await adminPage.locator('input[name=bank_reference]').fill(`FNB-${name}-${Date.now()}`);
+                await adminPage.locator('input[name=bank_reference]').fill(bankReference());
                 await adminPage.locator('textarea[name=reason]').first().fill('Seen on the bank statement.');
                 await submit(adminPage, adminPage.getByRole('button', {name: 'Record the EFT payment'}));
             }
@@ -183,7 +186,7 @@ async function buyWithWalletAndEft(page, fixture) {
             const item = await text(adminPage);
             assert.match(item, new RegExp(`${rand(5000)} more than was due went to the payer.s wallet`));
             assert.match(await adminPage.locator('textarea[name=body]').inputValue(), /went to your wallet/, 'the email starts written');
-            const subject = `Your overpayment ${name} ${Date.now()}`;
+            const subject = `Your overpayment on order ${order(placed.id)}`;
             await adminPage.locator('input[name=subject]').fill(subject);
             await submit(adminPage, adminPage.getByRole('button', {name: 'Send email'}));
             assert.match(await flash(adminPage), /sent/i);
@@ -230,9 +233,13 @@ async function buyWithWalletAndEft(page, fixture) {
             await page.locator('input[name=confirm_start]').evaluate((box) => box.removeAttribute('required'));
             await submit(page, start);
             assert.match(await flash(page), /Tick the box to confirm that starting begins your access period/, 'the server refuses without it');
+            // A given course asks once, at Start course, whether to follow it, unticked (mailing, step 1; owner: "Both").
+            assert.equal(await page.locator('input[name=follow_course]').isChecked(), false, 'following the course is not ticked');
+            await page.locator('input[name=follow_course]').check();
             await page.locator('input[name=confirm_start]').check();
             await submit(page, page.getByRole('button', {name: 'Start course'}));
             assert.match(await flash(page), /The course has started/);
+            assert.deepEqual(JSON.parse(php('follows', learner.id)), [['course', fixture.courses.a.id, 'start_course']], 'the answer is kept, given at Start course');
         });
         await check(`${name}: a private learner can buy and a company learner can only ask its company`, async () => {
             const staff = JSON.parse(php('company-learner'));
@@ -354,12 +361,12 @@ async function buyWithWalletAndEft(page, fixture) {
     await check('chromium: money that pays no order waits on Unmatched Money until it is paid back', async () => {
         const admin = await open(chromium, fixture.admin_token);
         const page = admin.page;
-        const payer = `NO SUCH PAYER ${Date.now()}`;
+        const payer = 'CASH DEPOSIT MARKET SQUARE';
         await page.goto(`${base}/admin/commerce/eft`);
         await page.locator('#eft-reference').fill(payer);
         await page.locator('#eft-amount').fill('99.00');
         await page.locator('#eft-received-on').fill(today());
-        await page.locator('#eft-bank-reference').fill(`FNB-UNMATCHED-${Date.now()}`);
+        await page.locator('#eft-bank-reference').fill(bankReference());
         await page.locator('#eft-reason').fill('Seen on the bank statement.');
         await submit(page, page.getByRole('button', {name: 'Find the account'}));
         assert.match(await text(page), /There is no account reference or order number in/, 'the page says nothing matches');
@@ -372,7 +379,7 @@ async function buyWithWalletAndEft(page, fixture) {
         assert.match(await text(page), new RegExp(payer));
         await page.goto(`${base}${item}`);
         await page.locator('#unmatched-returned-on').fill(today());
-        await page.locator('#unmatched-return-reference').fill(`FNB-BACK-${Date.now()}`);
+        await page.locator('#unmatched-return-reference').fill(bankReference());
         await submit(page, page.getByRole('button', {name: 'Record that it was paid back'}));
         assert.match(await page.locator('[data-unmatched-outcome]').innerText(), /^Paid back to the sender on /);
         await page.goto(`${base}/admin/commerce/unmatched`);

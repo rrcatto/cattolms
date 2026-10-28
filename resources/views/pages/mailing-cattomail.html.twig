@@ -1,0 +1,111 @@
+{#
+	Mailing › catto-mail (owner, 2026-10-28: "the ctnlist project has a whole method to connect to catto-mail"; the
+	approved page 9). The four steps of setting up sending, each saying whether it is done: catto-mail's address, Connect
+	this site (catto-mail's own approval page, then back here), the sending domain ready (asked again every 30 seconds),
+	and a test to yourself; then the connection with its checks, the sendings at catto-mail and what catto-mail reported.
+	The key and the webhook secret are never shown.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'catto-mail' %}
+	{% set ph_lead = 'catto-mail carries the news: it signs every email for your domain, reports bounces and spam complaints back, and keeps your sending reputation. Account and order emails go through this server\'s own mail.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set cm_done = steps.done %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'setup'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Set up sending', heading_level: 2, summary: cm_done ~ ' of 4 steps done. ' ~ (cm_done == 4 ? 'News goes out through catto-mail.' : 'News goes out through catto-mail once all four are.') ~ (transport != 'cattomail' ? ' Sending settings send news through a mail server now.' : '')}) }}
+		{% if quota_until %}{{ ui('feedback.notice', {tone: 'warning', heading: 'catto-mail\'s quota is used up until ' ~ quota_until|date('j F \\a\\t H:i') ~ '. News waits until then and goes on by itself.'}) }}{% endif %}
+
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'address', heading: 'catto-mail\'s address', eyebrow: '1 · ' ~ (steps.address ? 'Done' : 'To do'), open: not steps.address})} %}{% block body %}
+			<p>Where catto-mail is. It starts from CATTOMAIL_API_BASE_URL in .env, and what you keep here overrides it.{{ address_source == 'database' ? ' It is kept here now.' : '' }}</p>
+			{% if can_manage %}
+			<form action="/mailing/cattomail/address" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'catto-mail\'s address', for: 'cm-address', full_width: true, help: 'With https://, such as https://mail.example.test.'})} %}{% block control %}<input class="cl-input" type="url" id="cm-address" name="address" required value="{{ host }}" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Keep this address', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'connect', heading: 'Connect this site', eyebrow: '2 · ' ~ (steps.connected ? 'Done' : 'To do'), open: steps.address and not steps.connected})} %}{% block body %}
+			<p>Connect takes you to catto-mail, which shows what this site asks for: its name, its address, where it is told what happened to each email ({{ site_url }}/webhooks/cattomail) and the domain news comes from{{ sending_domain ? ' (' ~ sending_domain ~ ')' : '' }}. You sign in there and approve it for your catto-mail account. catto-mail then hands this site its key and registers where it reports back, and you come back here. The key is kept encrypted and never shown.</p>
+			{% if steps.connected and cm.connected_at %}<p class="small">Connected on {{ cm.connected_at|date('j F Y \\a\\t H:i') }}{{ cm.client_name ? ' to the catto-mail account "' ~ cm.client_name ~ '"' : '' }}{{ cm.connected_by ? ' by ' ~ cm.connected_by : '' }}.</p>{% elseif steps.connected %}<p class="small">A key is set in .env or was typed in before connecting existed. Connect to have catto-mail register where it reports back.</p>{% endif %}
+			{% if can_manage and steps.address %}
+			<form action="/mailing/cattomail/connect" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: steps.connected ? 'Connect again' : 'Connect', variant: steps.connected ? 'secondary' : 'primary', size: 'normal', type: 'submit', icon: 'action-open', confirm: steps.connected ? 'Connect again? catto-mail replaces the connection, and the old key stops working.' : ''}) }}</form>
+			{% endif %}
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'domain', heading: 'Make the sending domain ready', eyebrow: '3 · ' ~ (steps.domain ? 'Done' : 'To do'), open: steps.connected and not steps.domain})} %}{% block body %}
+			{% include '@platform/partials/mailing-cattomail-domain.html.twig' %}
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'test', heading: 'Send a test to yourself', eyebrow: '4 · ' ~ (steps.test ? 'Done' : 'To do'), open: steps.domain and not steps.test})} %}{% block body %}
+			<p>A real email through catto-mail, to see it arrive and how it looks. It opens once the domain is ready.</p>
+			{% if cm.test_sent_at %}<p class="small">Last sent to {{ cm.test_sent_to }} on {{ cm.test_sent_at|date('j F Y \\a\\t H:i') }}.</p>{% endif %}
+			{% if can_manage %}
+			<form action="/mailing/cattomail/test" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send it to', for: 'cm-test', full_width: true})} %}{% block control %}<input class="cl-input" type="email" id="cm-test" name="email" required value="{{ test_to }}"{{ steps.domain ? '' : ' disabled' }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send the test', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-email', disabled: not steps.domain}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	{% if steps.connected %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'connection'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'The connection', heading_level: 2}) }}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'catto-mail account', value: cm.client_name ?: 'Not known (the key was typed in)'},
+			{label: 'This site, as catto-mail knows it', value: (cm.application_name ?: '') ~ (cm.application_name ? ' · ' : '') ~ site_url},
+			{label: 'The key', value: 'Kept encrypted. Given by catto-mail when you approved.'},
+			{label: 'Where catto-mail reports back', value: (cm.webhook_url ?: site_url ~ '/webhooks/cattomail') ~ ': hard bounces, spam complaints, finished and failed sendings.'},
+			{label: 'Sending domain', value: sending_domain ~ ': ' ~ (steps.domain ? 'can send' : 'cannot send yet')},
+			{label: 'Last check', value: cm.last_check_at ? (cm.last_check_ok ? 'Reachable and the key accepted, ' : 'A problem, ') ~ cm.last_check_at|date('j M Y \\a\\t H:i') : 'Not checked yet'},
+			{label: 'Last problem', value: cm.last_problem ? cm.last_problem ~ (cm.last_problem_at ? ' (' ~ cm.last_problem_at|date('j M Y, H:i') ~ ')' : '') : 'None'}
+		]}) }}
+		{% if can_manage %}
+		<div class="cl-mailing-choices">
+			<form action="/mailing/cattomail/check" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Check the connection', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}</form>
+			<form action="/mailing/cattomail/disconnect" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Disconnect from catto-mail', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove', confirm: 'Disconnect? catto-mail ends the connection and the key is forgotten here. News waits until you connect again or choose a mail server.'}) }}</form>
+			<form action="/mailing/cattomail/forget" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Forget it here only', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-cancel', confirm: 'Forget the connection here, leaving it at catto-mail until it is ended there?'}) }}</form>
+		</div>
+		<p class="small">Disconnect asks catto-mail to end the connection and forgets the key here. News then waits until you connect again or choose this server's mail in Sending settings.</p>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'jobs'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Sendings at catto-mail', heading_level: 2, summary: 'Each digest or message is one sending for each list. Anything catto-mail has not finished after 15 minutes is asked about again by itself.'}) }}
+		{% if jobs %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Sendings at catto-mail'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Handed over'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'What became of it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for job in jobs %}<tr>
+			<td class="cell-text"><a href="/mailing/messages/{{ job.campaign_id }}">{{ job.campaign }}</a></td>
+			<td>{{ job.handed_at ? job.handed_at|date('j M Y, H:i') : '' }}</td>
+			<td class="cell-text">{{ job.copies }} {{ job.copies == 1 ? 'copy' : 'copies' }}: {{ job.delivered }} delivered{{ job.on_the_way > 0 ? ', ' ~ job.on_the_way ~ ' on the way' : '' }}{{ job.problems > 0 ? ', ' ~ job.problems ~ ' not delivered' : '' }}</td>
+			<td class="cell-actions">{% if can_manage and job.on_the_way > 0 %}<form action="/mailing/cattomail/jobs/{{ job.job_id }}/again" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Ask again now', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>{% endif %}</td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}<p class="small">Nothing has gone through catto-mail yet.</p>{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'events'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'What catto-mail reported', heading_level: 2, summary: 'Every report catto-mail sent, checked by its signature and each taken once. The latest 50.'}) }}
+		<form class="cl-mailing-period" method="get" action="/mailing/cattomail#events" data-choose-submits>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', for: 'cm-events'})} %}{% block control %}<select class="cl-input" id="cm-events" name="events" {{ ui_field_attrs(props) }}><option value="">Every report</option>{% for value, label in event_labels %}<option value="{{ value }}"{{ value == event_type ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% if events %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'What catto-mail reported'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Here'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for event in events %}<tr>
+			<td>{{ event.received_at|date('j M Y, H:i') }}</td>
+			<td>{{ event_labels[event.event_type]|default(event.event_type) }}</td>
+			<td class="cell-text">{{ event.processed_at ? event.outcome : 'Waiting to be taken' }}</td>
+			<td class="cell-actions">{% if can_manage and event.processed_at %}<form action="/mailing/cattomail/events/{{ event.id }}/again" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Take it again', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>{% endif %}</td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}<p class="small">catto-mail has reported nothing yet.</p>{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -13,7 +13,7 @@ context, and a small category tree after the shipped taxonomy -
 
   A > A1 > A1x, A > A2      B > B1      G      D > D1 > D1x
 
-(named "Tree Alpha <suffix>" and so on). `reset` deletes every category the run made, closes the
+(real category names nobody uses, such as Workplace Skills > Communication). `reset` deletes every category the run made, closes the
 gaps it left and builds that tree again, printing the new ids; `cleanup` does the same without
 rebuilding and removes the identity. The shipped taxonomy keeps its order: a scenario may move a
 test category in front of a shipped one, and closing the gaps puts the shipped ones back to 1..n.
@@ -68,7 +68,7 @@ $clear = static function (array $state) use ($db, $container): void {
 $build = static function (array $state) use ($courses): array {
     $ids = [];
     foreach (TREE as [$key, $parent]) {
-        $category = $courses->createCategory(['name' => 'Tree ' . NAMES[$key] . ' ' . $state['suffix']], $state['user'], $parent === null ? null : $ids[$parent]);
+        $category = $courses->createCategory(['name' => $state['names'][$key]], $state['user'], $parent === null ? null : $ids[$parent]);
         $ids[$key] = (int) $category['id'];
     }
     return $ids;
@@ -82,36 +82,35 @@ $save = static function (array $state) use ($statePath): void {
 if ($command === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous category tree fixture first.');
     $fixture = new DevelopmentFixture($db);
-    $suffix = $fixture->suffix();
-    $email = 'category-tree-' . $suffix . '@example.test';
-    $user = $fixture->createUser('Category tree browser check', $email);
-    $container->get(RoleRepository::class)->assign($user, 'ADMIN');
+    // An administrator with a believable name nobody has, and real category names nobody uses (owner, 2026-10-27).
+    $admin = $fixture->person('ADMIN');
+    $user = $admin['id'];
+    $email = $admin['email'];
     $tokens = [];
     for ($i = 0; $i < 12; $i++) {
         $token = Token::generate();
         $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Category tree browser', $email);
         $tokens[] = $token;
     }
-    $state = ['user' => $user, 'email' => $email, 'suffix' => $suffix, 'tokens' => $tokens,
+    $words = (new \CattoLearning\Tests\Support\CheckNames($db))->categories([...array_keys(NAMES), 'cancelled', 'new_top', 'new_sub', 'new_subsub', 'imported', 'root', 'sub', 'leaf', 'renamed', 'nojs_sub', 'nojs_root']);
+    $titles = new \CattoLearning\Tests\Support\CheckNames($db);
+    $state = ['user' => $user, 'email' => $email, 'tokens' => $tokens, 'scrub' => $fixture->seeds(),
+        'extra' => array_diff_key($words, NAMES) + ['picker_course' => $titles->course()['title'], 'picker_nojs' => $titles->course()['title'], 'import' => $titles->course()],
         'max_category_id' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM course_categories'),
         'shipped_roots' => (int) $db->fetchOne('SELECT COUNT(*) FROM course_categories WHERE parent_id IS NULL')];
-    $state['names'] = array_map(static fn(string $name): string => 'Tree ' . $name . ' ' . $suffix, NAMES);
+    $state['names'] = array_intersect_key($words, NAMES);
     $state['ids'] = $build($state);
     $save($state);
 } elseif (in_array($command, ['reset', 'cleanup'], true)) {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    if (!str_starts_with((string) $state['email'], 'category-tree-')) throw new RuntimeException('Unexpected fixture identity.');
     $clear($state);
     if ($command === 'reset') {
         $state['ids'] = $build($state);
         $save($state);
         return;
     }
-    foreach (['auth_sessions', 'audit_log', 'analytics_events', 'user_roles', 'user_emails'] as $table) {
-        $db->executeStatement('DELETE FROM ' . $table . ' WHERE user_id = :id', ['id' => $state['user']]);
-    }
-    $db->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $state['user']]);
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub'] ?? ['users' => [(int) $state['user']]]);
     unlink($statePath);
     echo "Removed the category tree fixture and every category the run made.\n";
 } else {

@@ -1,0 +1,22 @@
+{#
+	Forward to a friend (owner, 2026-10-28, decision 11A: "Forwarding is part of our marketing strategy"), opened from the
+	link in an email's footer. The friend gets the email once, with who sent it and the note, and is put on no list.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Forward to a friend' %}
+	{% set ph_title = subject ?: 'Forward this email' %}
+	{% set ph_lead = 'Your friend gets this email once, with your name and your note. We do not put them on any list, and they can ask us never to email them.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'forward'})} %}{% block surface_body %}
+		{% if sent %}{{ ui('feedback.notice', {tone: 'success', heading: 'It is on its way to ' ~ sent ~ '.'}) }}{% endif %}
+		{% if error %}{{ ui('feedback.notice', {tone: 'danger', heading: error}) }}{% endif %}
+		{{ ui('layout.section-head', {heading: 'Who to send it to', summary: 'You can forward it to up to ' ~ per_copy ~ ' friends.'}) }}
+		<form action="/m/f/{{ token }}" method="post">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your friend\'s email address', for: 'fw-email', full_width: true})} %}{% block control %}<input class="cl-input" type="email" id="fw-email" name="email" required maxlength="320" value="{{ values.email }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their name (optional)', for: 'fw-name', full_width: true})} %}{% block control %}<input class="cl-input" id="fw-name" name="name" maxlength="120" value="{{ values.name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'A note from you (optional)', for: 'fw-note', full_width: true})} %}{% block control %}<textarea class="cl-input" id="fw-note" name="note" rows="3" maxlength="500" {{ ui_field_attrs(props) }}>{{ values.note }}</textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Forward it', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

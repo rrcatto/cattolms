@@ -58,9 +58,13 @@ final class AccountController extends BaseController
         private readonly CompanyService $companies,
         private readonly AccountSectionRegistry $sections,
         private readonly UserProfileRepository $profiles,
+        private readonly \CattoLearning\Application\ProfilePictures $pictures,
         private readonly BillingProfileService $billing,
         private readonly \CattoLearning\Identity\IdentityVerificationService $identity,
-        private readonly \CattoLearning\Course\Certificate\CertificateSharing $sharing
+        private readonly \CattoLearning\Course\Certificate\CertificateSharing $sharing,
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing,
+        private readonly \CattoLearning\Mailing\MailingSettings $mailingSettings,
+        private readonly \CattoLearning\Mailing\SubscriberRepository $subscribers,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -198,6 +202,22 @@ final class AccountController extends BaseController
     }
 
 
+    /**
+     * Account › My Subscriptions (mailing, step 1, 2026-10-26; owner, 2026-10-28, round two 5A, opened by "Show my
+     * subscriptions" in every email): News and Updates, what the reader follows, the lists to join, and how and how
+     * often updates come.
+     */
+    #[Route('/account/subscriptions', name: 'account_subscriptions', methods: ['GET'])]
+    public function subscriptions(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        return $this->renderAccountSection('subscriptions', ['mailing' => $this->mailing->preferences($user->id), 'deliveries' => \CattoLearning\Mailing\UpdateDelivery::DELIVERIES,
+            'frequencies' => \CattoLearning\Mailing\UpdateDelivery::FREQUENCIES, 'digest_days' => $this->mailingSettings->digestSummary(),
+            // The emails sent to them, each with its web copy (decision 12A).
+            'sent' => array_values(array_filter($this->subscribers->sent($user->id, 30), static fn(array $copy): bool => $copy['handed_at'] !== null)),
+            'web_base' => $this->mailingSettings->linkBase(rtrim(\CattoLearning\Support\Env::string('APP_URL'), '/'))]);
+    }
+
     #[Route('/account/social', name: 'account_social', methods: ['GET'])]
     public function social(): Response
     {
@@ -257,18 +277,36 @@ final class AccountController extends BaseController
     public function profileImage(): Response
     {
         $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
-        $image = $this->profiles->image($user->id);
-        if ($image === null) {
-            throw new NotFoundHttpException('No profile image has been uploaded.');
-        }
+        // Their upload, or their drawn avatar (owner, 2026-10-26): nobody is without a picture.
+        $picture = $this->pictures->picture($user->id);
 
-        return new Response($image['bytes'], 200, [
-            'Content-Type' => $image['mime_type'],
-            'Content-Length' => (string) strlen($image['bytes']),
-            // Private, because it is one person's picture, and immutable because the URL carries a
-            // fingerprint of the stored bytes - a new image is a new address.
-            'Cache-Control' => 'private, max-age=604800, immutable',
-        ]);
+        return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
+    }
+
+    /** "Show me another" (owner, 2026-10-26): a new drawn avatar for someone with no uploaded picture. */
+    #[Route('/account/profile/avatar/another', name: 'account_avatar_another', methods: ['POST'])]
+    public function avatarAnother(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+        return $this->handle(function () use ($user): void {
+            $this->pictures->showAnother($user->id);
+            $this->flash('success', 'Here is another avatar. Press Show me another again for a different one.');
+            $this->redirect('/account/profile#profile-image');
+        }, '/account/profile#profile-image');
+    }
+
+    /** "Back to my first one": the avatar drawn from the account itself. */
+    #[Route('/account/profile/avatar/first', name: 'account_avatar_first', methods: ['POST'])]
+    public function avatarFirst(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+        return $this->handle(function () use ($user): void {
+            $this->pictures->firstAgain($user->id);
+            $this->flash('success', 'Your first avatar is back.');
+            $this->redirect('/account/profile#profile-image');
+        }, '/account/profile#profile-image');
     }
 
 
@@ -312,7 +350,7 @@ final class AccountController extends BaseController
 
         return $this->handle(function () use ($user): void {
             $this->profiles->removeImage($user->id);
-            $this->flash('success', 'Your profile image was removed.');
+            $this->flash('success', 'Your profile image was removed. Your drawn avatar is shown instead.');
             $this->redirect('/account/profile');
         }, '/account/profile');
     }
@@ -358,8 +396,8 @@ final class AccountController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->auth->requestSecondaryEmail($user->id, (string) ($_POST['email'] ?? ''));
             $this->flash('success', 'A verification link has been sent to the secondary email address.');
-            $this->redirect('/account/profile#emails');
-        }, '/account/profile#emails');
+            $this->redirect('/account/emails');
+        }, '/account/emails');
     }
 
 
@@ -370,7 +408,7 @@ final class AccountController extends BaseController
         return $this->handle(function () use ($token): void {
             $this->auth->verifySecondaryEmail($token);
             $this->flash('success', 'The secondary email address has been verified.');
-            $this->redirect('/account/profile#emails');
+            $this->redirect('/account/emails');
         }, '/login');
     }
 
@@ -382,7 +420,7 @@ final class AccountController extends BaseController
         $user = $this->requirePermission('ACCOUNT.EMAIL.MANAGE');
         $this->auth->removeSecondaryEmail($user->id, (int) ($_POST['email_id'] ?? 0));
         $this->flash('success', 'The secondary email address was removed.');
-        $this->redirect('/account/profile#emails');
+        $this->redirect('/account/emails');
     }
 
     #[Route('/account/email/promote', name: 'account_promote_secondary_email', methods: ['POST'])]
@@ -393,8 +431,8 @@ final class AccountController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->auth->promoteSecondaryEmail($user->id, (int) ($_POST['email_id'] ?? 0));
             $this->flash('success', 'The secondary email address is now primary.');
-            $this->redirect('/account/profile#emails');
-        }, '/account/profile#emails');
+            $this->redirect('/account/emails');
+        }, '/account/emails');
     }
 
     /** @return array<string,mixed> */
@@ -533,15 +571,14 @@ final class AccountController extends BaseController
     private function identityHeadData(int $userId): array
     {
         $user = $this->requireUser();
-        $image = $this->profiles->image($userId);
+        $picture = $this->pictures->state($userId);
 
         return [
             'profile' => $this->auth->profile($userId),
             'company' => $this->companies->forUser($userId),
             'user_roles' => $user->roles,
-            'profile_image_url' => $image === null
-                ? ''
-                : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
+            // Their upload or their drawn avatar, at an address that changes when it does.
+            'profile_image_url' => $picture === null ? '' : '/account/profile/image?v=' . $picture['version'],
         ];
     }
 
@@ -552,17 +589,17 @@ final class AccountController extends BaseController
         // The image is addressed rather than embedded. A data URI would put a hundred kilobytes of
         // base64 into every render of the page and defeat the browser cache; a URL is cached like
         // any other image, and the cache key changes when the image does because the address
-        // carries the time it was stored.
-        $image = $this->profiles->image($userId);
+        // carries its version. Without an upload it is their drawn avatar (owner, 2026-10-26).
+        $picture = $this->pictures->state($userId);
         $profile = $this->auth->profile($userId);
         return [
             'profile' => $profile,
             'emails' => $this->auth->emails($userId),
             'company' => $this->companies->forUser($userId),
             'user_roles' => $user->roles,
-            'profile_image_url' => $image === null
-                ? ''
-                : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
+            'profile_image_url' => $picture === null ? '' : '/account/profile/image?v=' . $picture['version'],
+            'profile_image_drawn' => $picture !== null && $picture['drawn'],
+            'profile_avatar_chosen' => $picture !== null && $picture['chosen'],
             'profile_image_size' => ProfileImage::SIZE,
             'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
             // Certificates carry the verified name (owner, 2026-10-19); the profile says where the account stands.

@@ -47,15 +47,20 @@ async function open(browser, token, options = {}) {
 const billedTo = async (page) => (await page.locator('address').first().innerText()).split('\n').map((line) => line.trim()).filter(Boolean);
 const noSideScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 async function fill(page, prefix, values) {
-    for (const [field, value] of Object.entries(values)) await page.locator(`#${prefix}-${field.replaceAll('_', '-')}`).fill(value);
+    for (const [field, value] of Object.entries(values)) {
+        // The country and a South African province are drop-downs (2026-10-27).
+        const control = page.locator(`#${prefix}-${field.replaceAll('_', '-')}`);
+        if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value); else await control.fill(value);
+    }
 }
 async function values(page, prefix, fields) {
     const out = {};
     for (const field of fields) out[field] = await page.locator(`#${prefix}-${field.replaceAll('_', '-')}`).inputValue();
     return out;
 }
-const personA = {billing_name: 'Lerato Dlamini', organisation_name: 'Dlamini & Associates', tax_registration_number: '4000000001', address_line_1: '12 Kéré Street', address_line_2: 'Suite 4', locality: 'Brooklyn', city: 'Pretoria', region: 'Gauteng', postal_code: '0181', country_code: 'za'};
-const companyA = {billing_name: 'Billing Browser (Pty) Ltd', tax_registration_number: '4999999999', address_line_1: '1 Harbour Road', address_line_2: '', locality: 'Foreshore', city: 'Cape Town', region: 'Western Cape', postal_code: '8001', country_code: 'ZA'};
+const personA = {billing_name: 'Lerato Dlamini', organisation_name: 'Dlamini & Associates', tax_registration_number: '4000000001', address_line_1: '12 Kéré Street', address_line_2: 'Suite 4', locality: 'Brooklyn', city: 'Pretoria', region: 'Gauteng', postal_code: '0181', country_code: 'ZA'};
+// The client company's own name (owner, 2026-10-27: never a made-up one).
+const companyA = (s) => ({billing_name: `${s.company_name} (Pty) Ltd`, tax_registration_number: '4999999999', address_line_1: '1 Harbour Road', address_line_2: '', locality: 'Foreshore', city: 'Cape Town', region: 'Western Cape', postal_code: '8001', country_code: 'ZA'});
 
 async function saveAccountBilling(page, data) {
     await page.goto(`${base}/account/billing`);
@@ -80,12 +85,12 @@ async function saveCompanyBilling(page, data) {
             const {ctx, page} = await open(browser, state.learner_token);
             await page.goto(`${base}/account/billing`);
             assert.ok(await page.getByText('No billing details saved yet').isVisible(), 'a new profile says so');
-            assert.equal(await page.locator('#account-billing-billing-name').inputValue(), 'Lerato Dlamini', 'it starts from the person’s name');
+            assert.equal(await page.locator('#account-billing-billing-name').inputValue(), state.learner_name, 'it starts from the person’s name');
             await saveAccountBilling(page, personA);
             assert.ok(await page.getByText('Your billing details were saved.').isVisible());
             await page.reload();
             const saved = await values(page, 'account-billing', Object.keys(personA));
-            assert.deepEqual(saved, {...personA, country_code: 'ZA'}, 'saved values survive a reload, the country upper-cased');
+            assert.deepEqual(saved, personA, 'saved values survive a reload');
             assert.equal(await page.getByText('No billing details saved yet').count(), 0);
             // Billing Address is its own page under Profile; Personal Particulars keeps only the
             // particulars and the profile image (owner instruction, 2026/10/06).
@@ -104,10 +109,10 @@ async function saveCompanyBilling(page, data) {
             await page.goto(`${base}/company/billing`);
             assert.equal(await page.locator('#company-billing-billing-name').inputValue(), state.company_name, 'it starts from the company name');
             assert.equal(await page.locator('#company-billing-organisation-name').count(), 0, 'a company has no organisation field');
-            await saveCompanyBilling(page, companyA);
+            await saveCompanyBilling(page, companyA(state));
             assert.ok(await page.getByText('The company billing details were saved.').isVisible());
             await page.reload();
-            assert.deepEqual(await values(page, 'company-billing', Object.keys(companyA)), companyA);
+            assert.deepEqual(await values(page, 'company-billing', Object.keys(companyA(state))), companyA(state));
             assert.ok(await page.locator('nav a[href="/company/billing"]').count() > 0, 'Billing details is in the company navigation');
             await ctx.close();
         });
@@ -167,14 +172,14 @@ async function saveCompanyBilling(page, data) {
     await scenario('company credit checkout is filled from the company’s details and its order is billed to the company', 'chromium', async () => {
         state = reset();
         const {ctx, page} = await open(chromium, state.company_admin_token);
-        await saveCompanyBilling(page, companyA);
+        await saveCompanyBilling(page, companyA(state));
         await page.goto(`${base}/company/credits/buy?search=${encodeURIComponent(state.course_title)}`);
         const offer = page.locator(`form[action="/company/credits/buy/add"]:has(input[name=variant_id][value="${state.variant}"])`);
         await offer.locator('input[name=quantity]').fill('2');
         await offer.locator('button[type=submit]').click();
         await page.waitForURL(/\/company\/credits\/buy/);
         await page.goto(`${base}/company/credits/checkout`);
-        assert.deepEqual(await values(page, 'company-checkout-billing', ['billing_name', 'address_line_1', 'city']), {billing_name: companyA.billing_name, address_line_1: '1 Harbour Road', city: 'Cape Town'}, 'checkout is filled from the company profile');
+        assert.deepEqual(await values(page, 'company-checkout-billing', ['billing_name', 'address_line_1', 'city']), {billing_name: companyA(state).billing_name, address_line_1: '1 Harbour Road', city: 'Cape Town'}, 'checkout is filled from the company profile');
         assert.equal(await page.locator('textarea[name=billing_address]').count(), 0, 'no one-off address box');
         await page.locator('#company-checkout-billing-address-line-1').fill('2 Corrected Quay');
         await page.locator('#payment-method').selectOption('dummy');
@@ -182,7 +187,7 @@ async function saveCompanyBilling(page, data) {
         await page.locator('input[name=accept_terms]').check();
         await page.getByRole('button', {name: 'Place company order'}).click();
         await page.waitForURL(/\/account\/orders\/\d+/);
-        assert.deepEqual(await billedTo(page), [companyA.billing_name, '2 Corrected Quay', 'Foreshore', 'Cape Town 8001', 'Western Cape', 'South Africa', 'Tax/VAT number: 4999999999'], 'the company order is billed to the company as placed');
+        assert.deepEqual(await billedTo(page), [companyA(state).billing_name, '2 Corrected Quay', 'Foreshore', 'Cape Town 8001', 'Western Cape', 'South Africa', 'Tax/VAT number: 4999999999'], 'the company order is billed to the company as placed');
         await page.goto(`${base}/company/billing`);
         assert.equal(await page.locator('#company-billing-address-line-1').inputValue(), '2 Corrected Quay', 'the correction updated the company’s billing details');
         await ctx.close();
@@ -192,7 +197,7 @@ async function saveCompanyBilling(page, data) {
         state = reset();
         for (const [token, prefix, url, data, selector] of [
             [state.learner_token, 'account-billing', '/account/billing', personA, '#billing button[type=submit]'],
-            [state.company_admin_token, 'company-billing', '/company/billing', companyA, 'form[action="/company/billing"] button[type=submit]'],
+            [state.company_admin_token, 'company-billing', '/company/billing', companyA(state), 'form[action="/company/billing"] button[type=submit]'],
         ]) {
             const {ctx, page} = await open(chromium, token, {js: false});
             await page.goto(`${base}${url}`);

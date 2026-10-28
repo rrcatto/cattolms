@@ -21,9 +21,19 @@ knowledge; SymfonyMailerAdapter still does all of that. The address decision bel
 GeneratedDomainRouter, which is why this class contains no string handling of its own.
 
 Deliberately not rewritten: sendContactMessage(). Its address is the sender of a public contact
-form, not a recipient, and a generated identity never fills that form in.
+form, not a recipient.
+
+Held mail (Seed Database, owner 2026-10-27). While Seed Database builds its people through the app's workflows, every
+email those workflows send is held here instead of sent (the old principle: "A run of a thousand learners must not
+produce a thousand messages"). The seeder reads a registration link out of the hold, as a person clicks the link in
+their inbox, and the rest are dropped when the run ends. While a run is under way, mail to an invented address sent by
+any other process (the scheduler's worker delivering the orders' emails) is dropped too, so nothing the run's people
+would have received leaves while it works.
 
 Changelog:
+2026/10/27 SAST
+- hold() and release(): Seed Database's run holds every email its workflows send, and while a run is under way mail
+  to an invented address from any other process is dropped.
 2026/08/23 04:19 SAST
 - Created for the v0.5.8 Seed Database phase.
 */
@@ -32,57 +42,126 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Mail;
 
+use CattoLearning\Infrastructure\Persistence\SeedRepository;
+
 
 final class GeneratedDomainMailer implements MailerInterface
 {
+    /** @var list<array{kind:string,email:string,url:string}>|null what was held, while holding */
+    private ?array $held = null;
+
+    /** @var array{0:int,1:bool}|null when it was last asked whether a run is under way, and the answer */
+    private ?array $seeding = null;
+
     public function __construct(
         private readonly SymfonyMailerAdapter $mailer,
-        private readonly GeneratedDomainRouter $router
+        private readonly GeneratedDomainRouter $router,
+        private readonly ?SeedRepository $seeds = null
     ) {
+    }
+
+    /** From now until release(), every email is held instead of sent. */
+    public function hold(): void
+    {
+        $this->held ??= [];
+    }
+
+    /** @return list<array{kind:string,email:string,url:string}> what was held; sending resumes */
+    public function release(): array
+    {
+        $held = $this->held ?? [];
+        $this->held = null;
+
+        return $held;
+    }
+
+    /** The link of the latest held registration email to an address, as its inbox would show it. */
+    public function heldRegistrationLink(string $email): ?string
+    {
+        foreach (array_reverse($this->held ?? []) as $mail) {
+            if ($mail['kind'] === 'registration_link' && strcasecmp($mail['email'], $email) === 0) return $mail['url'];
+        }
+
+        return null;
+    }
+
+    private function holds(string $kind, string $email, string $url = ''): bool
+    {
+        if ($this->held === null) return GeneratedDomainRouter::isGeneratedAddress($email) && $this->seedRunUnderWay();
+        $this->held[] = ['kind' => $kind, 'email' => $email, 'url' => $url];
+
+        return true;
+    }
+
+    /** Whether Seed Database is making people now, asked at most every ten seconds. */
+    private function seedRunUnderWay(): bool
+    {
+        if ($this->seeds === null) return false;
+        if ($this->seeding !== null && time() - $this->seeding[0] < 10) return $this->seeding[1];
+        $run = $this->seeds->run();
+        $busy = in_array($run['state'] ?? '', ['waiting', 'running'], true) && time() - (strtotime((string) ($run['updated_at'] ?? '')) ?: 0) < 1800;
+        $this->seeding = [time(), $busy];
+
+        return $busy;
     }
 
     public function sendMagicLink(string $email, string $url, int $ttlSeconds): void
     {
+        if ($this->holds('magic_link', $email, $url)) return;
         $this->mailer->sendMagicLink($this->router->deliveryAddress($email), $url, $ttlSeconds);
+    }
+
+    public function sendRegistrationLink(string $email, string $url, int $ttlSeconds, string $notice = ''): void
+    {
+        if ($this->holds('registration_link', $email, $url)) return;
+        $this->mailer->sendRegistrationLink($this->router->deliveryAddress($email), $url, $ttlSeconds, $notice);
     }
 
     public function sendSecondaryEmailVerification(string $email, string $url, int $ttlSeconds): void
     {
+        if ($this->holds('secondary_email_verification', $email, $url)) return;
         $this->mailer->sendSecondaryEmailVerification($this->router->deliveryAddress($email), $url, $ttlSeconds);
     }
 
     public function sendStaffAddedNotice(string $email, string $companyName): void
     {
+        if ($this->holds('staff_added_notice', $email, '')) return;
         $this->mailer->sendStaffAddedNotice($this->router->deliveryAddress($email), $companyName);
     }
 
     public function sendCourseRequestNotice(string $email, string $staffLabel, string $courseTitle): void
     {
+        if ($this->holds('course_request_notice', $email, '')) return;
         $this->mailer->sendCourseRequestNotice($this->router->deliveryAddress($email), $staffLabel, $courseTitle);
     }
 
     public function sendCourseRequestDecision(string $email, string $courseTitle, bool $approved): void
     {
+        if ($this->holds('course_request_decision', $email, '')) return;
         $this->mailer->sendCourseRequestDecision($this->router->deliveryAddress($email), $courseTitle, $approved);
     }
 
     public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void
     {
+        if ($this->holds('wallet_expiry_reminder', $email, '')) return;
         $this->mailer->sendWalletExpiryReminder($this->router->deliveryAddress($email), $name, $lines, $walletUrl);
     }
 
     public function sendAdministratorMessage(string $email, string $subject, string $body): void
     {
+        if ($this->holds('administrator_message', $email, '')) return;
         $this->mailer->sendAdministratorMessage($this->router->deliveryAddress($email), $subject, $body);
     }
 
     public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void
     {
+        if ($this->holds('course_enrolment_notice', $email, '')) return;
         $this->mailer->sendCourseEnrolmentNotice($this->router->deliveryAddress($email), $courseTitle, $courseSlug);
     }
 
     public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
     {
+        if ($this->holds('course_test_invitation', $email, '')) return;
         $this->mailer->sendCourseTestInvitation($this->router->deliveryAddress($email), $courseTitle, $courseSlug, $expiresAt);
     }
 
@@ -92,41 +171,49 @@ final class GeneratedDomainMailer implements MailerInterface
      */
     public function sendContactMessage(array $message): void
     {
+        if ($this->holds('contact_message', '', '')) return;
         $this->mailer->sendContactMessage($message);
     }
 
     public function sendContactAcknowledgement(string $email, string $reference, string $reason): void
     {
+        if ($this->holds('contact_acknowledgement', $email, '')) return;
         $this->mailer->sendContactAcknowledgement($this->router->deliveryAddress($email), $reference, $reason);
     }
 
     public function sendOrderConfirmation(string $email, array $order, array $receipts): void
     {
+        if ($this->holds('order_confirmation', $email, '')) return;
         $this->mailer->sendOrderConfirmation($this->router->deliveryAddress($email), $order, $receipts);
     }
 
     public function sendCoursesStarted(string $email, string $name, array $courses): void
     {
+        if ($this->holds('courses_started', $email, '')) return;
         $this->mailer->sendCoursesStarted($this->router->deliveryAddress($email), $name, $courses);
     }
 
     public function sendPaymentInstructions(string $email, array $order, array $bank, array $documents): void
     {
+        if ($this->holds('payment_instructions', $email, '')) return;
         $this->mailer->sendPaymentInstructions($this->router->deliveryAddress($email), $order, $bank, $documents);
     }
 
     public function sendOrderCancelled(string $email, array $order): void
     {
+        if ($this->holds('order_cancelled', $email, '')) return;
         $this->mailer->sendOrderCancelled($this->router->deliveryAddress($email), $order);
     }
 
     public function sendInvoice(string $email, string $number, string $pdf): void
     {
+        if ($this->holds('invoice', $email, '')) return;
         $this->mailer->sendInvoice($this->router->deliveryAddress($email), $number, $pdf);
     }
 
     public function sendTestMessage(string $email): void
     {
+        if ($this->holds('test_message', $email, '')) return;
         $this->mailer->sendTestMessage($this->router->deliveryAddress($email));
     }
 }

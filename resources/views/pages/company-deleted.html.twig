@@ -1,0 +1,14 @@
+{% extends layout %}
+{% block page_body %}
+	{# After a Company Administrator deleted their company (owner, 2026-10-26): they are signed out with the rest of its staff. #}
+	{% set ph_kicker = 'Company' %}
+	{% set ph_title = 'The company is deleted' %}
+	{% set ph_lead = 'It is hidden and its records are kept.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Check your email'}) }}
+			<p>Every staff account, yours included, is deactivated, and {{ staff_asked }} {{ staff_asked == 1 ? 'person was' : 'people were' }} emailed. Each has 3 days to keep their account as a private one, with all their courses and certificates, at a private address of their own.</p>
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

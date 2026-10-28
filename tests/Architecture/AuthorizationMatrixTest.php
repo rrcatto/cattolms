@@ -48,7 +48,7 @@ final class AuthorizationMatrixTest extends TestCase
             [AccountController::class, ['activity'], 'ACCOUNT.ACTIVITY.VIEW'],
             [CompanyController::class, ['registerForm','register'], 'COMPANY.CREATE'],
             [CompanyController::class, ['index'], 'COMPANY.DASHBOARD.VIEW'],
-            [CompanyController::class, ['createPerson','removePerson'], 'COMPANY.PERSON.MANAGE'],
+            [CompanyController::class, ['createPerson','deletePerson'], 'COMPANY.PERSON.MANAGE'],
             [CompanyController::class, ['decideRequest'], 'COMPANY.REQUEST.MANAGE'],
             [CompanyController::class, ['removeEnrolment','restoreEnrolment'], 'COMPANY.ENROLMENT.MANAGE'],
             [AdminController::class, ['createPerson','updatePerson','changePersonStatus','revokePersonSession'], 'PLATFORM.PERSON.MANAGE'],
@@ -135,7 +135,7 @@ final class AuthorizationMatrixTest extends TestCase
      */
     public function testCompanyWorkspaceWritesActOnTheCompanyInContext(): void
     {
-        $mutations = ['createPerson','updatePerson','setPersonStatus','removePerson','decideRequest','removeEnrolment','restoreEnrolment'];
+        $mutations = ['createPerson','updatePerson','setPersonStatus','deletePerson','decideRequest','removeEnrolment','restoreEnrolment'];
 
         foreach ($mutations as $method) {
             $source = $this->methodSource(CompanyController::class, $method);

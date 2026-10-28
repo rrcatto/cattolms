@@ -1,0 +1,99 @@
+{#
+	One mailing list (mailing, step 1; owner, 2026-10-25; settings, 2026-10-28, decisions 7A and 9A): for a list of
+	ADMIN's own, its name and words, whether My Subscriptions shows it, its join link and closing it; for any list, its
+	sender, reply-to and template, and a welcome email sent once to each person the moment they join; then the people on
+	it, newest first, each with when and where they said yes, and Take off this list.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/mailing/lists' %}{% set ph_back_label = 'Lists' %}
+	{% set ph_kicker = {news: 'Mailing list', own: 'Your list', category: 'Category list', course: 'Course list', tag: 'Tag list'}[list.kind] %}
+	{% set ph_title = list.name ?: 'A removed ' ~ list.kind %}
+	{% set ph_lead = own and own.description ? own.description : (list.followers == 1 ? '1 person is on it.' : list.followers ~ ' people are on it.') %}
+	{% set ph_badges %}
+		{{ ui('feedback.badge', {label: list.followers == 1 ? '1 person' : list.followers ~ ' people', tone: 'info'}) }}
+		{% if own %}{{ ui('feedback.badge', {label: own.closed_at ? 'Closed' : (own.shown ? 'Shown on My Subscriptions' : 'Join link only'), tone: own.closed_at ? 'neutral' : 'success'}) }}{% endif %}
+		{% if welcome and welcome.status == 'sending' %}{{ ui('feedback.badge', {label: 'Welcome email on', tone: 'success'}) }}{% endif %}
+		{{ ui('feedback.badge', {label: 'Made ' ~ list.created_at|date('j F Y'), tone: 'neutral'}) }}
+	{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if can_manage %}
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}
+{% block body %}
+		{% if own %}
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'words'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Name and words'}) }}
+			<form action="/mailing/lists/{{ list.id }}/words" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true})} %}{% block control %}<input class="cl-input" id="list-name" name="name" maxlength="120" required value="{{ own.name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}>{{ own.description }}</textarea>{% endblock %}{% endembed %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show it on everyone\'s My Subscriptions page', help: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'})} %}{% block control %}<input type="checkbox" name="shown" value="1"{{ own.shown ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'join'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Join link', summary: 'Anyone with this address can join the list once they have an account. Opening it changes nothing until they press Join.'}) }}
+			<p><code class="cl-code-input">{{ join_url ~ own.join_token }}</code></p>
+			<form action="/mailing/lists/{{ list.id }}/link" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make a new link', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset', confirm: 'Make a new join link? The old one stops working.'}) }}</form>
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'close'})} %}{% block surface_body %}
+			{% if own.closed_at %}
+				{{ ui('layout.section-head', {heading: 'The list is closed', summary: 'Nothing is sent to it and nobody can join. The people on it keep everything else they follow.'}) }}
+				<form action="/mailing/lists/{{ list.id }}/open" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Open the list again', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-restore'}) }}</form>
+			{% else %}
+				{{ ui('layout.section-head', {heading: 'Close the list', summary: 'Closing stops all email to it and nobody can join. The people on it keep everything else they follow.'}) }}
+				<form action="/mailing/lists/{{ list.id }}/close" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Close the list', variant: 'danger', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Close ' ~ own.name ~ '? Nothing more is sent to it.'}) }}</form>
+			{% endif %}
+		{% endblock %}{% endembed %}
+		</div>
+		{% endif %}
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'welcome'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Welcome email', summary: 'Sent once to each person the moment they join, never again if they leave and come back.'}) }}
+			<form action="/mailing/lists/{{ list.id }}/welcome" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Off: nothing is sent when someone joins'})} %}{% block control %}<input type="radio" name="on" value="0"{{ not welcome or welcome.status != 'sending' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'On: send a welcome email the moment someone joins'})} %}{% block control %}<input type="radio" name="on" value="1"{{ welcome and welcome.status == 'sending' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				<div class="cl-mailing-choices">
+					{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}
+					{% if not welcome %}{{ ui('action.button', {label: 'Switch it on and write it', variant: 'secondary', size: 'small', type: 'submit', name: 'write', value: '1', icon: 'action-edit'}) }}{% endif %}
+				</div>
+			</form>
+			{% if welcome %}<p class="small"><a href="/mailing/messages/{{ welcome.id }}">{{ welcome.subject ?: welcome.name }}</a>: open it to change its words and see who got it.</p>{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sender'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Sender and template', summary: 'Used for a message written to this list alone, its digest and its welcome email. Empty uses Sending settings\' sender (' ~ sender_name ~ ') and the default template.'}) }}
+			<form action="/mailing/lists/{{ list.id }}/sender" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sender\'s name', for: 'list-from', full_width: true})} %}{% block control %}<input class="cl-input" id="list-from" name="from_name" maxlength="120" value="{{ settings.from_name|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replies go to', for: 'list-reply', full_width: true})} %}{% block control %}<input class="cl-input" type="email" id="list-reply" name="reply_to" value="{{ settings.reply_to|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Template', for: 'list-template', full_width: true})} %}{% block control %}<select class="cl-input" id="list-template" name="template_id" {{ ui_field_attrs(props) }}><option value="0">The default{{ default_template ? ' (' ~ default_template ~ ')' : '' }}</option>{% for t in templates %}<option value="{{ t.id }}"{{ settings.template_id|default(0) == t.id ? ' selected' : '' }}>{{ t.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the sender', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+		</div>
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'followers'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'The people on it', summary: 'Newest first, with when and where each said yes. Taking someone off this list leaves every other list they are on.'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'followers', pagination: followers_pagination})} %}{% block results %}
+			{% if followers %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 36, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Said yes'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'When'}} %}{% if can_manage %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}{% endif %}</tr>{% endblock %}
+			{% block body %}{% for follower in followers %}<tr>
+				<td class="cell-text">{{ ui('data.person', {name: follower.name, href: '/admin/people/' ~ follower.user_id}) }}</td>
+				<td>{{ sources[follower.source]|default(follower.source) }}</td>
+				<td>{{ follower.changed_at|date('j M Y \\a\\t H:i') }}</td>
+				{% if can_manage %}<td class="cell-actions"><form action="/mailing/lists/{{ list.id }}/take-off" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ follower.user_id }}">{{ ui('action.button', {label: 'Take off this list', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Take ' ~ follower.name ~ ' off ' ~ list.name ~ '?'}) }}</form></td>{% endif %}
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'Nobody is on it now', summary: list.kind == 'own' ? 'People join it on My Subscriptions or with its join link.' : 'Everyone who followed it has stopped.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -112,7 +112,7 @@ async function checkoutToReview(page) {
         await submit(page, page.getByRole('button', {name: 'Publish', exact: true}));
         assert.equal(await flash(page), 'The bundle is published.');
         bundleUrl = await page.getByRole('link', {name: 'View public page'}).getAttribute('href');
-        await page.goto(`${base}/admin/bundles?bundles_q=${encodeURIComponent(fixture.suffix)}`);
+        await page.goto(`${base}/admin/bundles?bundles_q=${encodeURIComponent(fixture.bundle_title)}`);
         assert.match(clean(await page.locator('tbody tr').first().innerText()), /On sale/i, 'listed as on sale (themes may upper-case badges)');
         await ctx.close();
     });

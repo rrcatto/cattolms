@@ -22,7 +22,8 @@ final class GeoIpContractTest extends TestCase
 {
     public function testPrivateIpDoesNotRequireGeoipDatabase(): void
     {
-        $locator = new GeoIpLocator('');
+        // A database that is not there (an empty path now means GEOIP_DATABASE, which a development site sets).
+        $locator = new GeoIpLocator('/nonexistent/GeoLite2-City.mmdb');
 
         self::assertFalse($locator->isAvailable());
         self::assertSame('Local/private', $locator->locate('127.0.0.1'));

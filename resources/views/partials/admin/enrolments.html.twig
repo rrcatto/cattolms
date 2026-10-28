@@ -24,7 +24,7 @@
 										{{ ui('data.person', {name: enrolment.learner_name, reference: enrolment.learner_reference, href: '/admin/people/' ~ enrolment.user_id}) }}
 									</td>
 									<td title="{{ enrolment.course_title }}">
-										{{ enrolment.course_title }}
+										{% if enrolment.course_id|default(0) %}<a href="/admin/courses/{{ enrolment.course_id }}">{{ enrolment.course_title }}</a>{% else %}{{ enrolment.course_title }}{% endif %}
 									</td>
 									<td>
 										{% set enrolment_expired = enrolment.status in ['assigned', 'active', 'completed'] and enrolment.expires_at|default(null) and enrolment.expires_at|date('U') < 'now'|date('U') %}

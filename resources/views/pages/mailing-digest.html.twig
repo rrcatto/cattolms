@@ -1,0 +1,138 @@
+{#
+	Mailing › Digest (owner, 2026-10-27/28: "I wanted them kept and sent out when Admin chooses"; decisions 1A, 3A, 4B and
+	round two 1A). Updates are held here until ADMIN releases them, now or at a date and time; released, they go at once
+	to the people who chose them as they happen and into everyone else's next digest. First the release, then the held
+	updates (each kept, reworded or deleted, ticked for release), those nobody follows yet, writing an update, what the
+	digest looks like, and what was released before. Every form works without JavaScript: the ticks belong to the release
+	form through their form attribute.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Digest' %}
+	{% set ph_lead = 'Updates are news about what people follow: the site records course changes, and you can write your own. They are held here, never sent on their own, until you release them.' %}
+	{% if can_manage %}
+	{% set ph_actions %}
+		{{ ui('action.link', {label: 'Write an update', href: '#write', variant: 'secondary', icon: 'action-add'}) }}
+	{% endset %}
+	{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set dg = digest %}
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'release'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Release the updates', heading_level: 2, summary: 'Released updates go at once to the people who chose them as they happen, and into everyone else\'s next digest. Email goes ' ~ dg.hours.hours ~ '.'}) }}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{{ ui('data.stat-card', {value: dg.held|length, label: 'Updates held', icon: 'figure-awaiting', href: '#held'}) }}
+			{{ ui('data.stat-card', {value: dg.reach_total, label: dg.reach_total == 1 ? 'Person they reach' : 'People they reach', icon: 'figure-people', href: '#held'}) }}
+			{{ ui('data.stat-card', {value: dg.nobody|length, label: 'Nobody follows yet', icon: 'figure-cancelled', href: '#nobody'}) }}
+			{{ ui('data.stat-card', {value: dg.choices.instant, label: 'Want them as they happen', icon: 'figure-progress', href: '/mailing/lists'}) }}
+		{% endblock %}{% endembed %}
+		{% set dg_next = [] %}
+		{% for key, label in frequencies %}
+			{% set dg_next = dg_next|merge([{label: label ~ ' digest (' ~ (dg.choices[key] == 1 ? '1 person' : dg.choices[key] ~ ' people') ~ ')', value: dg.next[key] is defined ? 'Next ' ~ dg.next[key] : 'Not due in the next two months'}]) %}
+		{% endfor %}
+		{{ ui('data.key-value-list', {items: dg_next}) }}
+		<p class="small cl-text-secondary">People who have not chosen get the weekly digest. The days and the sending hours are in <a href="/mailing/settings#hours">Sending settings</a>.</p>
+		{% if can_manage and dg.held %}
+		<form id="release-form" class="cl-mailing-release" action="/mailing/digest/release" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<fieldset class="cl-mailing-lists">
+				<legend class="h6">When the ticked updates go</legend>
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Now'})} %}{% block control %}<input type="radio" name="when" value="now" checked>{% endblock %}{% endembed %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'At a day and time I choose'})} %}{% block control %}<input type="radio" name="when" value="later">{% endblock %}{% endembed %}
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Day', for: 'release-date'})} %}{% block control %}<input class="cl-input" type="date" id="release-date" name="date" min="{{ dg.now_date }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time', for: 'release-time', help: 'The site\'s time, such as 09:00.'})} %}{% block control %}<input class="cl-input" type="time" id="release-time" name="time" value="09:00" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% endblock %}{% endembed %}
+			</fieldset>
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release the ticked updates', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
+		</form>
+		{% elseif not dg.held %}
+			<p class="small">Nothing is held for anyone now. The site records course changes as they happen, or you can write an update.</p>
+		{% endif %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'held'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Held updates', heading_level: 2, summary: 'Each one reaches the people who follow its course, the course\'s categories or its tags, or the list it was written for. Change the words, untick one to keep it for later, or delete it: nothing here has been sent.'}) }}
+		{% for update in dg.held %}
+			{% include '@platform/partials/mailing-update-row.html.twig' with {update: update, group: 'held'} %}
+		{% else %}
+			<p class="small">No update is held.</p>
+		{% endfor %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	{% if dg.nobody %}
+	<section class="cl-page-section">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'nobody'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Nobody follows these yet', heading_level: 2, summary: 'An update nobody follows goes to nobody. Post it to News and Updates to reach everyone who asked for news, or delete it. Released as it is, it is closed.'}) }}
+		{% for update in dg.nobody %}
+			{% include '@platform/partials/mailing-update-row.html.twig' with {update: update, group: 'nobody'} %}
+		{% endfor %}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}
+{% block body %}
+		{% if can_manage %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'write'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Write an update', summary: 'It is held with the others until you release it. Nothing is sent now.'}) }}
+			<form action="/mailing/digest/updates" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'For', for: 'update-for', full_width: true, help: 'Who gets it: everyone who follows what you choose.'})} %}{% block control %}<select class="cl-input" id="update-for" name="for" required {{ ui_field_attrs(props) }}>{% for group in digest.for %}<optgroup label="{{ group.group }}">{% for option in group.options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</optgroup>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Headline', for: 'update-headline', full_width: true, help: 'Short and plain, such as "Two new lessons on payroll".'})} %}{% block control %}<input class="cl-input" id="update-headline" name="headline" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'A few words', for: 'update-body', full_width: true})} %}{% block control %}<textarea class="cl-input" id="update-body" name="body" rows="4" maxlength="2000" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Link to (optional)', for: 'update-link', full_width: true, help: 'The full web address its button opens.'})} %}{% block control %}<input class="cl-input" type="url" id="update-link" name="link_url" maxlength="500" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Hold this update', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+{% endblock %}
+{% endembed %}
+		{% endif %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'looks'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'What a digest looks like', summary: 'The held updates in the template for digests. Each person\'s holds only what they follow, each saying why.'}) }}
+			<iframe class="cl-mailing-preview" src="/mailing/digest/preview" title="The digest with the updates held now" loading="lazy" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'released'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Released before', heading_level: 2, summary: 'The latest 20. Each digest and update email is under Messages with who opened it and every link clicked.'}) }}
+		{% if dg.history %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Updates released before'})} %}
+{% block header %}<tr><th scope="col">Released</th><th scope="col">Update</th><th scope="col">For</th><th scope="col">Reached</th><th scope="col">What happened</th></tr>{% endblock %}
+{% block body %}
+			{% for update in dg.history %}
+			<tr>
+				<td>{{ update.when }}</td>
+				<td>{{ update.headline }}</td>
+				<td>{{ update.course_title ?: update.list_name }}</td>
+				<td>{{ update.status == 'released' ? (update.reached == 1 ? '1 person so far' : update.reached ~ ' people so far') : '' }}</td>
+				<td>{{ update.status == 'released' ? 'Released: it goes in each person\'s next digest, or at once to those who want updates as they happen' : update.status_note }}</td>
+			</tr>
+			{% endfor %}
+{% endblock %}
+{% endembed %}
+		{% else %}
+			<p class="small">Nothing has been released yet.</p>
+		{% endif %}
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

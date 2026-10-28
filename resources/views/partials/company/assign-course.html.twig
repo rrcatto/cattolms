@@ -1,0 +1,38 @@
+{#
+	Assign a course: put a staff member on a course now, a course the company owns at no cost or one from its credits (one
+	place each). On Enrolments and on Credits (owner, 2026-10-26: "I do not see any way to spend the credits"), where each
+	credit with free places fills in its course and period. Shown to whoever manages the company's enrolments.
+#}
+{% if can_manage_company_enrolments|default(false) %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'assign-course'})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Assign a course', eyebrow: 'Enrolments', summary: 'Put a staff member on a course now. A course this company owns costs nothing; any other course uses one place of its credit.'}) }}
+		<form action="/company/enrolments/assign" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="return" value="{{ assign_return|default('/company/enrolments') }}">
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'user_id', lk_type: 'people', lk_label: 'Staff member', lk_selected: 0, lk_required: 1, lk_empty: 'Nobody selected'} %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'course_id', lk_type: 'assignable_courses', lk_label: 'Course', lk_selected: assign_course|default(0), lk_required: 1, lk_empty: 'No course selected'} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Length of access', full_width: false, for: 'assign-length', required: true, help: 'The lengths of the company\'s credits for the course. It starts when the staff member presses Start course, not when you assign the course.'})} %}
+{% block control %}
+
+				<select id="assign-length" name="access_period_seconds" required hx-get="/company/assign/lengths" hx-trigger="change from:#course_id-value" hx-include="#course_id-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: assign_lengths|default([]), selected_seconds: assign_seconds|default(0), course_chosen: assign_course|default(0) != 0, empty_words: 'No free credit for this course'} %}</select>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+				{{ ui('action.button', {label: 'Assign course', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+
+{% endblock %}
+{% endembed %}
+{% endif %}

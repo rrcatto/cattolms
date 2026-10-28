@@ -408,6 +408,19 @@ final class OrderService
     public const NOT_YOURS = 'We could not find that order in your account.';
 
     /**
+     * Whether a person may open an order: its buyer, or, for a company's order, any Company Administrator of that company
+     * (owner, 2026-10-26: "A company admin sees only its own company's orders").
+     *
+     * @param array<string,mixed> $order
+     */
+    public function mayOpen(CurrentUser $actor, array $order): bool
+    {
+        if ((int) $order['purchaser_user_id'] === $actor->id) return true;
+
+        return ($order['company_id'] ?? null) !== null && $actor->hasPermission('COMPANY.ORDER.VIEW') && $this->records->isCompanyAdministrator((int) $order['company_id'], $actor->id);
+    }
+
+    /**
      * The purchaser's own order. To anyone else, as to an order that does not exist, it is not found (owner, 2026-10-23:
      * "should it not fail more gracefully?"): order numbers count up, and "it belongs to another purchaser" told a
      * stranger that order exists. Administration opens every order on its own pages.
@@ -418,7 +431,7 @@ final class OrderService
     {
         self::requireCapability($actor,'COMMERCE.ORDER.VIEW');
         $order=$this->purchaser($orderId) === null ? null : $this->records->order($orderId);
-        if ($order === null || (int)$order['purchaser_user_id']!==$actor->id) throw new NotFoundHttpException(self::NOT_YOURS);
+        if ($order === null || !$this->mayOpen($actor, $order)) throw new NotFoundHttpException(self::NOT_YOURS);
         $order['details']=CommerceRepository::decode((string)$order['snapshot']);
         $order['documents']=$this->records->documents($orderId);
         $order['payments']=$this->records->payments($orderId);

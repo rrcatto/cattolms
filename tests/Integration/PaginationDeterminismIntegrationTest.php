@@ -290,9 +290,10 @@ final class PaginationDeterminismIntegrationTest extends TestCase
      */
     public function testDeferredJoinPreservesTheOrderOfItsKeyQuery(): void
     {
-        $rows = $this->administration->companyPeople($this->companyId, self::ROWS + 1, 0, '');
+        $rows = $this->administration->companyPeople($this->companyId, self::ROWS + 2, 0, '');
 
-        $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
+        // The fixture's people only: the company's founding administrator has a name of their own.
+        $ids = array_values(array_filter(array_map(static fn(array $row): int => (int) $row['id'], $rows), fn(int $id): bool => in_array($id, $this->userIds, true)));
         $expected = $ids;
         sort($expected);
 

@@ -36,17 +36,17 @@ use PHPUnit\Framework\TestCase;
 
 final class CommerceSettingsValuesTest extends TestCase
 {
-    public function testADurationIsWrittenWithYearsWeeksDaysAndHoursInThatOrder(): void
+    public function testADurationIsWrittenWithItsUnitsLargestFirst(): void
     {
         self::assertSame('3 years', Duration::parse('3y')->words());
         self::assertSame('4 weeks 2 days', Duration::parse('4w2d')->words());
         self::assertSame('1 hour', Duration::parse('1h')->words());
-        self::assertSame('1 year 1 week 1 day 1 hour', Duration::parse('1Y1W1D1H')->words(), 'Capitals are read too.');
-        foreach (['', '2d3w', '0d', '3 years', '5m', 'y', '1y0d'] as $wrong) {
+        self::assertSame('1 year 1 week 1 day 1 hour 1 minute 1 second', Duration::parse('1Y1W1D1H1M1S')->words(), 'Capitals are read too.');
+        foreach (['', '2d3w', '0d', '3 years', '30s5m', 'y', '1y0d', '1mo', '1800', '1h 30m'] as $wrong) {
             self::assertFalse(Duration::isValid($wrong), '"' . $wrong . '" is not a duration.');
         }
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Write a duration with y, w, d and h in that order, such as 3y, 4w2d or 1h.');
+        $this->expectExceptionMessage('Write a length of time with y, w, d, h, m and s in that order, such as 3y, 4w2d, 1h30m or 90s (m is minutes).');
         Duration::parse('2d3w');
     }
 
@@ -146,7 +146,7 @@ final class CommerceSettingsValuesTest extends TestCase
         self::assertSame('3y', CommerceSettings::SETTINGS['wallet_expiry'][2], 'Wallet credit lasts 3 years by default (CPA section 63).');
         self::assertSame('7d', CommerceSettings::SETTINGS['refund_window'][2]);
         self::assertSame('Use 1 to 3 capital letters, such as CL.', CommerceSettings::check('account_prefix', 'cl'));
-        self::assertSame('Write a duration with y, w, d and h in that order, such as 3y, 4w2d or 1h.', CommerceSettings::check('wallet_expiry', '3 years'));
+        self::assertSame(\CattoLearning\Support\Duration::HOW, CommerceSettings::check('wallet_expiry', '3 years'));
         self::assertNotNull(CommerceSettings::check('stitch_fee', '3%'));
         $example = (string) file_get_contents(dirname(__DIR__, 2) . '/.env.example');
         foreach (CommerceSettings::SETTINGS as [, $env, $default]) {

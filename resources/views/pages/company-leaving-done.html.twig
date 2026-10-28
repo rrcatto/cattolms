@@ -1,0 +1,20 @@
+{% extends layout %}
+{% block page_body %}
+	{# After a staff member chose (owner, 2026-10-26): a private account at the address they confirmed, or none. #}
+	{% set ph_kicker = 'Your account' %}
+	{% set ph_title = private_email ? 'Your account is private' : 'Your account is deleted' %}
+	{% set ph_lead = private_email ? 'It keeps every course and certificate it had.' : 'Thank you for learning with us.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{% if private_email %}
+				{{ ui('layout.section-head', {heading: 'Sign in with ' ~ private_email}) }}
+				<p>Your account is a private one now, at {{ private_email }}, and belongs to no company.</p>
+				{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'normal', href: '/login?email=' ~ private_email|url_encode, icon: 'action-next'}) }}
+			{% else %}
+				{{ ui('layout.section-head', {heading: 'Done'}) }}
+				<p>Your account and its courses are gone.</p>
+			{% endif %}
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

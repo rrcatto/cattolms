@@ -3,13 +3,38 @@
 	Add person opens a form window, as it does in Administration › People; the button is in the page
 	head on this section's own page and in this card's head on the company workspace.
 #}
+{% set cp_status = {active: ['Active', 'success'], disabled: ['Disabled', 'danger'], awaiting_approval: ['Awaiting approval', 'warning']} %}{% set cp_role_names = {owner: 'Company Administrator', administrator: 'Company Administrator', course_owner: 'Course owner', course_editor: 'Course editor', student: 'Student'} %}{% set cp_role_keys = {owner: 'COMPANY_ADMIN', administrator: 'COMPANY_ADMIN', course_owner: 'COURSE_OWNER', course_editor: 'COURSE_EDITOR'} %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', eyebrow: 'People', summary: 'People in the company you are administering.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
+{% block toolbar %}{% if company_people_view_switch|default(null) and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: company_people_view_switch} %}</div>{% endif %}{% endblock %}
 {% block results %}
 
+			{% if company_people_view|default('list') == 'grid' %}
+			{# The people as cards, 5 to a row (owner, 2026-10-26: cards by default for 10 people or fewer): picture, name, role,
+			   courses and status, with Edit and their page. #}
+			{% if people %}
+			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'People'})} %}
+{% block body %}
+				{% for person in people %}
+					{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: '/company/people/' ~ person.id, picture: 'round'})} %}
+{% block picture %}{% if person.picture_url|default('') %}<img src="{{ person.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
+{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/company/people/' ~ person.id}) }}{% endblock %}
+{% block details %}
+						<div class="role-list">{{ ui('feedback.badge', {label: cp_role_names[person.company_role|default('student')]|default('Student'), tone: 'info'}) }}{{ ui('feedback.badge', {label: (cp_status[person.status]|default(['Disabled', 'danger']))[0], tone: (cp_status[person.status]|default(['Disabled', 'danger']))[1]}) }}{% if company_people_waiting[person.id] is defined %}{{ ui('feedback.badge', {label: 'Asked to choose by ' ~ company_people_waiting[person.id].answer_by_words, tone: 'warning'}) }}{% endif %}</div>
+						<p class="cl-ui-card-line cl-ui-card-quiet">{{ person.course_count }} {{ person.course_count == 1 ? 'course' : 'courses' }}</p>
+{% endblock %}
+{% block actions %}{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ person.id, icon: 'action-edit'}) }}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/company/people/' ~ person.id, icon: 'action-open'}) }}{% endblock %}
+{% endembed %}
+				{% endfor %}
+{% endblock %}
+{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'Nobody matches', summary: 'Try another name or email address, or clear the search.'}) }}
+			{% endif %}
+			{% else %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 
@@ -32,13 +57,13 @@
 								</div>
 							</td>
 							<td>
-								{{ person.company_role ?: person.roles_label }}
+								{{ cp_role_names[person.company_role|default('')]|default(person.roles_label|default('Student')) }}
 							</td>
 							<td>
 								{{ person.course_count }}
 							</td>
 							<td>
-								{{ ui('feedback.badge', {label: (person.status=='active' ? 'Active' : 'Disabled'), tone: person.status=='active' ? 'success' : 'danger'}) }}
+								{{ ui('feedback.badge', {label: (cp_status[person.status]|default(['Disabled', 'danger']))[0], tone: (cp_status[person.status]|default(['Disabled', 'danger']))[1]}) }}{% if company_people_waiting[person.id] is defined %} {{ ui('feedback.badge', {label: 'Asked to choose by ' ~ company_people_waiting[person.id].answer_by_words, tone: 'warning'}) }}{% endif %}
 							</td>
 							<td class="cell-actions">
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
@@ -51,16 +76,17 @@
 												<input type="hidden" name="status" value="disabled">
 												{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.', icon: 'action-disable'}) }}
 											</form>
-										{% else %}
+										{% elseif person.status == 'disabled' %}
 											<form action="/company/people/{{ person.id }}/status" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="status" value="active">
 												{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 											</form>
 										{% endif %}
-										<form action="/company/people/{{ person.id }}/remove" method="post">
+										{# Delete, never removal from the company (owner, 2026-10-26); its page says what it will do. #}
+										<form action="/company/people/{{ person.id }}/delete" method="post">
 											<input type="hidden" name="csrf" value="{{ csrf }}">
-											{{ ui('action.button', {label: 'Remove', variant: 'danger', size: 'small', confirm: 'Remove this person from the company? Course access this company granted them ends. Their account and learning history are kept, and this does not stop them signing in.', icon: 'action-remove'}) }}
+											{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', confirm: 'Delete ' ~ person.name ~ '? If they are busy with a course we email them first to choose, and someone who completed a course is never deleted. Their page says which applies.', icon: 'action-remove'}) }}
 										</form>
 
 {% endblock %}
@@ -71,6 +97,7 @@
 
 {% endblock %}
 {% endembed %}
+			{% endif %}
 
 		{% for person in people %}
 			{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-person-' ~ (person.id), title: 'Edit ' ~ (person.name), action: '/company/people/' ~ (person.id), method: 'post'})} %}
@@ -84,36 +111,26 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="first_name" value="{{ person.first_name }}" id="field-people-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-people-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-									<input name="middle_names" maxlength="160" value="{{ person.middle_names }}" id="field-people-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+									<input name="first_name" value="{{ person.first_name }}" required id="field-people-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="last_name" value="{{ person.last_name }}" id="field-people-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+									<input name="last_name" value="{{ person.last_name }}" required id="field-people-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: true, for: 'field-people-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-									<input name="mobile_number" value="{{ person.mobile_number }}" id="field-people-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
+								{# The same fields as Add person (owner, 2026-10-26: "surely they should both reflect the same info?"): the
+								   administrator sets a staff member's company address. #}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'company-person-email-' ~ person.id, required: true, help: 'At ' ~ company_context_domain|default('') ~ ', as every staff address is.'})} %}
+{% block control %}<input type="email" name="email" value="{{ person.email }}" required id="company-person-email-{{ person.id }}" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-								<div class="cl-ui-field--full">
-									<p class="help">
-										Email address, roles and account status are changed elsewhere: the address is part of the sign-in identity, and the account status has its own Disable and Enable action.
-									</p>
-								</div>
+								{# Their role in the company (owner, 2026-10-26: "what about their roles? I want to assign one Administrator rights"). #}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', full_width: true, for: 'company-person-role-' ~ person.id, help: 'A Company Administrator manages the company with you. You cannot change your own.'})} %}
+{% block control %}<select name="role" id="company-person-role-{{ person.id }}"{{ person.id == current_user_id|default(0) ? ' disabled' : '' }} {{ ui_field_attrs(props) }}>{% set cp_current = cp_role_keys[person.company_role|default('')]|default('STUDENT') %}{% for key, label in {STUDENT: 'Student', COURSE_EDITOR: 'Course editor', COURSE_OWNER: 'Course owner', COMPANY_ADMIN: 'Company Administrator'} %}<option value="{{ key }}"{{ key == cp_current ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
 
 {% endblock %}
 {% endembed %}
@@ -160,17 +177,17 @@
 
 {% endblock %}
 {% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'At ' ~ company_context_domain|default('') ~ ', as every staff address is.'})} %}
 {% block control %}
 
 						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select>
+						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">Course editor</option><option value="COURSE_OWNER">Course owner</option><option value="COMPANY_ADMIN">Company Administrator</option></select>
 
 {% endblock %}
 {% endembed %}

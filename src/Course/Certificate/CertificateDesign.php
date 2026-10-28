@@ -129,7 +129,7 @@ final class CertificateDesign
             $errors[] = 'Choose a typeface.';
         }
         if (preg_match('/^#[0-9A-Fa-f]{6}$/D', $this->colour) !== 1) {
-            $errors[] = 'Choose the title and name colour.';
+            $errors[] = 'Title and name colour: write it as # and six hex digits, such as #1F3A5F.';
         }
         if (!in_array('learner.name', CertificateWording::fieldsUsed($this->wording), true)) {
             $errors[] = 'The wording must include the Learner name field: use Insert field.';

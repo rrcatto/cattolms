@@ -3,12 +3,13 @@
  *
  * It runs on a demo site with a clean database and the site's catalogue package (CATTO_CATALOGUE, or the private
  * CATALOGUE/cattolms-catalogue.zip beside the code tree; owner, 2026-10-23). ADMIN signs in for the first time with
- * the sign-in link Mailpit receives (that makes the ADMIN account) and gives its date of birth, sets the card
+ * the sign-in link Mailpit receives (that makes the ADMIN account) and gives its South African ID number, sets the card
  * provider's transaction fee to 3% in Settings and imports the package at Administration -> Courses -> Import &
  * Export Catalogue: the review lists every course as new, and Import brings the categories as a tree and the tags,
  * each with its icon, and every course with its code, category, tags, cover, position, related courses and the
  * package's 12-month price and was price, published. ADMIN adds the learner Thandi Nkosi under
- * People. Thandi signs in with her own link and gives her date of birth (a date under 18 is refused first). Nothing
+ * People. Thandi signs in with her own link and gives her South African ID number (one that makes her 17, and one with a
+ * slip, are refused first). Nothing
  * about her identity is asked before she buys. Thandi puts one course (CATTO_BOUGHT, or the catalogue's first)
  * in her cart, gives her details at checkout and pays with the simulated card, which stands in for the card
  * provider on a demo site. The course starts at once. Last, ADMIN's order page is read for what was recorded,
@@ -113,10 +114,26 @@ async function chooseCategory(page, id, categoryPath) {
     await option.click();
     assert.equal(clean(await page.locator(`#${id} .cl-ui-tree-select-value`).innerText()), categoryPath, 'the picker shows the chosen category');
 }
-/* The date of birth, at the first sign-in of an account someone else made (adults only, owner, 2026-10-20). */
-async function giveDateOfBirthIfAsked(page, born) {
-    if (!(await page.locator('input[name=date_of_birth]').count())) return false;
-    await page.locator('input[name=date_of_birth]').fill(born);
+/* A valid South African ID number for a date of birth (owner, 2026-10-27): YYMMDD, a sequence, 0 for a citizen, 8, and
+   the Luhn check digit. */
+function saIdNumber(born, sequence = 4321) {
+    const first12 = born.slice(2, 4) + born.slice(5, 7) + born.slice(8, 10) + String(sequence).padStart(4, '0') + '08';
+    for (let check = 0; check <= 9; check++) {
+        const digits = first12 + check;
+        let sum = 0;
+        for (let i = 0; i < 13; i++) {
+            let d = Number(digits[12 - i]);
+            if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+            sum += d;
+        }
+        if (sum % 10 === 0) return digits;
+    }
+    throw new Error('no check digit fits');
+}
+/* The ID number, at the next sign-in of an account without one (owner, 2026-10-27; it gives the date of birth). */
+async function giveIdNumberIfAsked(page, idNumber) {
+    if (!(await page.locator('input[name=id_number]').count())) return false;
+    await page.locator('input[name=id_number]').fill(idNumber);
     await submit(page, page.getByRole('button', {name: 'Continue'}));
     return true;
 }
@@ -148,7 +165,7 @@ async function signIn(page, address) {
             await signIn(admin, adminEmail);
             await admin.goto(`${base}/admin/dashboard`);
             // ADMIN gives its date of birth at its account's first sign-in (made by the rebuild's sign-in, or here).
-            if (await giveDateOfBirthIfAsked(admin, '1978-06-15')) summary.admin_date_of_birth_given_here = true;
+            if (await giveIdNumberIfAsked(admin, saIdNumber('1978-06-15'))) summary.admin_id_number_given_here = true;
             await admin.goto(`${base}/admin/dashboard`);
             assert.equal(await admin.locator('h1').count(), 1);
             await shot(admin, '01-admin-dashboard');
@@ -213,20 +230,19 @@ async function signIn(page, address) {
         await step('5. Thandi signs in with the link her sign-in email holds', async () => {
             await signIn(learner, LEARNER.email);
             assert.ok(!new URL(learner.url()).pathname.startsWith('/login'), 'she is signed in');
-            assert.match(new URL(learner.url()).pathname, /^\/account\/confirm-age/, 'her account was made by ADMIN, so she is asked her date of birth first');
-            await shot(learner, '05a-confirm-age');
-            // The site is for adults only: a date that makes her 17 is refused, as it would be for anyone. The
-            // date field itself will not take it; with that check set aside, the site refuses it too.
+            assert.match(new URL(learner.url()).pathname, /^\/account\/id-number/, 'her account was made by ADMIN, so she is asked her ID number first');
+            await shot(learner, '05a-id-number');
+            // The site is for adults only: a number that makes her 17 is refused, as it would be for anyone.
             const seventeen = new Date(); seventeen.setFullYear(seventeen.getFullYear() - 17);
-            const born = learner.locator('input[name=date_of_birth]');
-            await born.fill(seventeen.toISOString().slice(0, 10));
-            assert.ok(await born.evaluate((field) => field.validity.rangeOverflow), 'the date field will not take a date under 18');
-            await learner.locator('form[action="/account/confirm-age"]').evaluate((form) => { form.noValidate = true; });
-            await submit(learner, learner.getByRole('button', {name: 'Continue'}));
-            assert.match(await flash(learner), /18 or older/, 'someone under 18 is refused by the site too');
-            assert.match(new URL(learner.url()).pathname, /^\/account\/confirm-age/, 'and goes no further');
-            assert.ok(await giveDateOfBirthIfAsked(learner, LEARNER.born), 'she gives her date of birth');
-            assert.ok(!new URL(learner.url()).pathname.startsWith('/account/confirm-age'), 'and continues');
+            assert.ok(await giveIdNumberIfAsked(learner, saIdNumber(seventeen.toISOString().slice(0, 10))));
+            assert.match(await flash(learner), /18 or older/, 'someone under 18 is refused');
+            assert.match(new URL(learner.url()).pathname, /^\/account\/id-number/, 'and goes no further');
+            // A slip in one digit fails the checksum.
+            const valid = saIdNumber(LEARNER.born);
+            assert.ok(await giveIdNumberIfAsked(learner, valid.slice(0, 12) + String((Number(valid[12]) + 1) % 10)));
+            assert.match(await flash(learner), /not a valid South African ID number/, 'a slip is refused in plain words');
+            assert.ok(await giveIdNumberIfAsked(learner, valid), 'she gives her ID number');
+            assert.ok(!new URL(learner.url()).pathname.startsWith('/account/id-number'), 'and continues');
         });
 
         const bought = summary.courses.find((c, i) => COURSES[i].bought);
@@ -268,9 +284,12 @@ async function signIn(page, address) {
             assert.doesNotMatch(clean(await learner.locator('main').innerText()), /Verify your identity/, 'checkout asks nothing about her identity');
             await learner.goto(`${base}/checkout/profile`);
             await learner.locator('#mobile-number').fill(LEARNER.mobile);
-            for (const [name, value] of Object.entries(LEARNER.billing)) await learner.locator(`[name=${name}]`).fill(value);
-            const country = learner.locator('[name=country_code]');
-            if ((await country.evaluate((el) => el.tagName)) === 'SELECT') await country.selectOption('ZA'); else await country.fill('ZA');
+            // South Africa is chosen already; the province is one of its nine, chosen from the drop-down (2026-10-27).
+            assert.equal(await learner.locator('[name=country_code]').inputValue(), 'ZA', 'the country starts as South Africa');
+            for (const [name, value] of Object.entries(LEARNER.billing)) {
+                const control = learner.locator(`[name=${name}]`);
+                if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value); else await control.fill(value);
+            }
             await submit(learner, learner.getByRole('button', {name: 'Continue to payment'}));
             await learner.locator('#payment-method').selectOption('dummy');
             if (await learner.locator('#method-token').count()) await learner.locator('#method-token').selectOption('demo_success');

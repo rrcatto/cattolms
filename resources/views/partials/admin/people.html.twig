@@ -4,6 +4,7 @@
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
+{% block toolbar %}{% if people_view_switch is defined and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: people_view_switch} %}{% if people_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'people', gs_headers: people_sort_headers, gs_pager: people_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
@@ -16,6 +17,33 @@
 {% endblock %}
 {% endembed %}
 
+					{% if people_view|default('list') == 'grid' and people_pagination|default(null) %}
+					{# The people as cards, 5 to a row (owner, 2026-10-26): picture, name, company, roles, courses and last sign-in. #}
+					{% if people %}
+					{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'People'})} %}
+{% block body %}
+						{% for person in people %}
+							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: '/admin/people/' ~ person.id, picture: 'round'})} %}
+{% block picture %}{% if person.picture_url|default('') %}<img src="{{ person.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
+{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/admin/people/' ~ person.id}) }}{% endblock %}
+{% block details %}
+								<p class="cl-ui-card-line">{% if person.company_id|default(null) %}<a href="/admin/companies/{{ person.company_id }}">{{ person.company_name }}</a>{% else %}No company{% endif %}</p>
+								<div class="role-list">
+									{% if person.status|default('') == 'awaiting_approval' %}{{ ui('feedback.badge', {label: 'Awaiting approval', tone: 'warning'}) }}{% endif %}{% if person.status|default('') == 'deactivated' %}{{ ui('feedback.badge', {label: 'Deactivated', tone: 'neutral'}) }}{% endif %}
+									{% for role in person.roles %}{{ ui('feedback.badge', {label: role|role_label, tone: 'info'}) }}{% endfor %}
+									{% if person.risk|default(null) %}{{ ui('feedback.badge', {label: person.risk.label, tone: person.risk.tone}) }}{% endif %}
+								</div>
+								<p class="cl-ui-card-line cl-ui-card-quiet">{{ person.course_count }} {{ person.course_count == 1 ? 'course' : 'courses' }} · Last sign-in {{ person.last_login_at ?: 'never' }}</p>
+{% endblock %}
+{% block actions %}{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}{% endblock %}
+{% endembed %}
+						{% endfor %}
+{% endblock %}
+{% endembed %}
+					{% else %}
+						{{ ui('feedback.empty', {heading: 'Nobody matches', summary: 'Try another name, email address or account reference, or clear the search.'}) }}
+					{% endif %}
+					{% else %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 
@@ -40,12 +68,12 @@
 										</div>
 									</td>
 									<td>
-										{{ person.company_name ?: '—' }}
+										{% if person.company_id|default(null) %}<a href="/admin/companies/{{ person.company_id }}">{{ person.company_name }}</a>{% else %}—{% endif %}
 									</td>
 									<td>
 										<div class="role-list">
 											{# Waiting for approval on a demo site (owner, 2026-10-21); person.roles holds each role's name, shown in words. #}
-											{% if person.status|default('') == 'awaiting_approval' %}{{ ui('feedback.badge', {label: 'Awaiting approval', tone: 'warning'}) }}{% endif %}
+											{% if person.status|default('') == 'awaiting_approval' %}{{ ui('feedback.badge', {label: 'Awaiting approval', tone: 'warning'}) }}{% endif %}{% if person.status|default('') == 'deactivated' %}{{ ui('feedback.badge', {label: 'Deactivated', tone: 'neutral'}) }}{% endif %}
 											{% for role in person.roles %}
 												{{ ui('feedback.badge', {label: role|role_label, tone: 'info'}) }}
 											{% endfor %}
@@ -53,6 +81,10 @@
 									</td>
 									<td>
 										{{ person.course_count }}
+									</td>
+									<td>
+										{# The sign-up check's risk (owner, 2026-10-26), opening the attempt; nothing for an account made here. #}
+										{% if person.risk|default(null) %}<a href="{{ person.risk.href }}">{{ ui('feedback.badge', {label: person.risk.label, tone: person.risk.tone, size: 'small'}) }}</a>{% endif %}
 									</td>
 									<td>
 										{{ person.created_at }}
@@ -74,6 +106,7 @@
 
 {% endblock %}
 {% endembed %}
+					{% endif %}
 
 {% endblock %}
 {% block preview %}
@@ -109,14 +142,14 @@
 
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'An address at a company\'s domain makes them its staff. Any other makes a private account.'})} %}
 {% block control %}
 
 									<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Initial role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The person starts as a private account, in no company. To place them in a company, open their full profile afterwards. A Company Administrator needs a company, so choose one there.'})} %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Initial role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'A Company Administrator needs an address at their company\'s domain.'})} %}
 {% block control %}
 
 									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>

@@ -8,9 +8,12 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
+				{# A follow asked for before signing in (owner, 2026-10-28, decision 8B): it is carried out once they are in. #}
+				{% if follow|default('') and follow_name|default('') %}{% set fa_verb = follow starts with 'list:' ? 'join' : 'follow' %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'You will ' ~ fa_verb ~ ' ' ~ follow_name})} %}{% block body %}<p>Once you have signed in, you {{ fa_verb }} {{ follow_name }} straight away and its news comes to you by email.</p>{% endblock %}{% endembed %}{% endif %}
 				<form action="/login" method="post" novalidate>
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="return_path" value="{{ return_path }}">
+					<input type="hidden" name="follow" value="{{ follow|default('') }}">
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: false, for: 'email', required: true})} %}
 {% block control %}
 
@@ -27,7 +30,7 @@
 {% endembed %}
 				</form>
 				<p class="small cl-text-secondary mt-5 mb-0">
-					New here? <a href="/register">Register an account</a>.
+					New here? <a href="/register{{ follow|default('') ? '?follow=' ~ follow|url_encode ~ '&return=' ~ return_path|url_encode : '' }}">Register an account</a>.
 				</p>
 
 {% endblock %}

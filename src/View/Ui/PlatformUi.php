@@ -21,6 +21,7 @@ final class PlatformUi
     /** Sole logical-name to template/property ownership map. No aliases or dynamic paths. */
     public const COMPONENTS = [
         'layout.surface' => ['template' => 'layout/surface', 'defaults' => ['variant' => 'standard', 'section_spacing' => false, 'id' => '', 'sticky' => false, 'tone' => 'neutral']],
+        // columns 'main-side' (the person page, owner-approved 2026-10-26): a main column and a narrower side column.
         'layout.section-grid' => ['template' => 'layout/section-grid', 'defaults' => ['columns' => 'auto', 'section_spacing' => true]],
         'layout.section-head' => ['template' => 'layout/section-head', 'defaults' => ['eyebrow' => '', 'heading' => null, 'summary' => '', 'heading_level' => 2]],
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
@@ -43,6 +44,11 @@ final class PlatformUi
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
         'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto', 'density' => 'normal'], 'props' => ['columns' => ['auto', 1, 2, 3, 4, 5]]],
+        // A list shown as cards (owner, 2026-10-26: "offer a grid view and show grids of cards for each person, course,
+        // company"): the grid holds whole rows of cards, 4 or 5 to a row at full width (Support\ListView), fewer on a narrow
+        // screen; each card a picture, its title, details and actions.
+        'data.card-grid' => ['template' => 'data/card-grid', 'defaults' => ['columns' => 4, 'label' => ''], 'props' => ['columns' => [4, 5]]],
+        'data.card' => ['template' => 'data/card', 'defaults' => ['title' => '', 'href' => '', 'picture' => 'square'], 'props' => ['picture' => ['round', 'square', 'wide']]],
         'data.stat-card' => ['template' => 'data/stat-card', 'defaults' => ['value' => null, 'label' => null, 'note' => '', 'href' => '', 'size' => 'normal', 'icon' => ''], 'props' => ['size' => ['normal', 'large', 'small']]],
         'data.list' => ['template' => 'data/item-list', 'defaults' => []],
         'data.list-item' => ['template' => 'data/list-item', 'defaults' => []],
@@ -116,12 +122,15 @@ final class PlatformUi
             'variant' => $component === 'layout.surface' ? ['standard', 'compact'] : ['primary', 'secondary', 'quiet', 'danger'],
             'size' => $component === 'overlay.modal' ? ['normal', 'wide'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
-            'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ['auto', 1, 2, 3, 4])),
+            'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
             'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
         ];
         if ($component === 'overlay.accordion-section') {
             $enums['workspace'] = ['', 'admin', 'account', 'company', 'library'];
+        }
+        if ($component === 'data.card') {
+            $enums['picture'] = ['round', 'square', 'wide'];
         }
         foreach ($enums as $key => $allowed) {
             if (array_key_exists($key, $values) && !in_array($values[$key], $allowed, true)) {

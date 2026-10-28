@@ -26,6 +26,8 @@ the clamped offset:
     $rows       = $repository->people($pagination->pageSize, $pagination->offset, $filters);
 
 Changelog:
+2026/10/26 SAST
+- within(): a page from a list's own sizes, for a grid of cards paged in whole rows (Support\ListView).
 2026/09/06 18:00 SAST
 - Added has_pages, so a list that fits on one page shows its row count without a navigation control that cannot go anywhere.
 2026/09/04 20:49 SAST
@@ -203,6 +205,24 @@ final class Pagination
         return new self(
             self::normalisePage($page),
             self::normalisePageSize($pageSize, $defaultPageSize),
+            max(0, $total)
+        );
+    }
+
+    /**
+     * A page from a list's own sizes instead of the tables' (a grid of cards pages in whole rows, ListView): a size the
+     * list does not offer falls back to its first.
+     *
+     * @param list<int> $sizes
+     */
+    public static function within(mixed $page, mixed $pageSize, int $total, array $sizes): self
+    {
+        $sizes = array_values(array_filter($sizes, static fn(int $size): bool => $size >= 1 && $size <= max(self::PAGE_SIZES)));
+        $chosen = is_string($pageSize) && preg_match('/^\d+$/', trim($pageSize)) === 1 ? (int) trim($pageSize) : (is_int($pageSize) ? $pageSize : 0);
+
+        return new self(
+            self::normalisePage($page),
+            in_array($chosen, $sizes, true) ? $chosen : ($sizes[0] ?? self::DEFAULT_PAGE_SIZE),
             max(0, $total)
         );
     }

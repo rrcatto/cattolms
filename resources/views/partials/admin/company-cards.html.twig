@@ -1,0 +1,40 @@
+{#
+	Companies as cards, 5 to a row (owner, 2026-10-26): the logo, or the company's drawn picture; its name and web address;
+	what the list counts (people and enrolments for Course Consumers, owned courses for Course Creators); its status; and
+	the row's Manage and Edit (the Edit window is the list's, company-modals.html.twig).
+	cc_rows: the companies; cc_creators: true for Course Creators. The name opens the company's page.
+#}
+{% if cc_rows %}
+	{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'Companies'})} %}
+{% block body %}
+		{% for company in cc_rows %}
+			{% embed ui_template('data.card') with {props: ui_props('data.card', {title: company.name, href: '/admin/companies/' ~ company.id, picture: 'square'})} %}
+{% block picture %}{% if company.logo_url|default('') %}<img src="{{ company.logo_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
+{% block details %}
+				{% if company.domain|default('') %}<p class="cl-ui-card-line cl-ui-card-quiet">{{ company.domain }}</p>{% endif %}
+				{% if cc_creators %}
+					<p class="cl-ui-card-line">{{ company.owned_course_count }} owned {{ company.owned_course_count == 1 ? 'course' : 'courses' }}</p>
+				{% else %}
+					<p class="cl-ui-card-line">{{ company.people_count }} {{ company.people_count == 1 ? 'person' : 'people' }} · {{ company.enrolment_count }} {{ company.enrolment_count == 1 ? 'enrolment' : 'enrolments' }}</p>
+				{% endif %}
+				<div class="role-list">{{ ui('feedback.badge', {label: company.status_label, tone: company.status == 'active' ? 'success' : 'danger'}) }}</div>
+{% endblock %}
+{% block actions %}
+				{% if can_select_company and company.status == 'active' %}
+					<form action="/company/context" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<input type="hidden" name="company_id" value="{{ company.id }}">
+						{{ ui('action.button', {label: 'Manage', variant: 'primary', size: 'small', type: 'submit', icon: 'action-manage'}) }}
+					</form>
+				{% endif %}
+				{% if can_manage_companies %}
+					{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ company.id, icon: 'action-edit'}) }}
+				{% endif %}
+{% endblock %}
+{% endembed %}
+		{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+	{{ ui('feedback.empty', {heading: 'No company matches', summary: 'Try another name or web address, or clear the search.'}) }}
+{% endif %}

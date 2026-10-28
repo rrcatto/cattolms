@@ -11,10 +11,11 @@
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: 0, lk_required: 1} %}
 			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course_id', lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: 0} %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', full_width: false, for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Length of access', full_width: false, help: 'The lengths the course is sold for.', for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="access_period_seconds" id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="15811200">6 months</option><option value="31536000" selected>12 months</option></select>
+				{# The lengths the chosen course is sold for, redrawn when the course is chosen (owner, 2026-10-26). #}
+				<select name="access_period_seconds" required id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course_id-value" hx-include="#course_id-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: [], course_chosen: false} %}</select>
 
 {% endblock %}
 {% endembed %}
@@ -94,16 +95,32 @@
 						<tr>
 							<td>
 								{# A company holds it, or a person, named with their account reference and linked to their account (owner, 2026-10-21). #}
-								{% if credit.company_id %}{{ credit.holder_name }}{% else %}{{ ui('data.person', {name: credit.holder_name, reference: credit.holder_reference, href: '/admin/people/' ~ credit.user_id}) }}{% endif %}
+								{% if credit.company_id %}<a href="/admin/companies/{{ credit.company_id }}">{{ credit.holder_name }}</a>{% else %}{{ ui('data.person', {name: credit.holder_name, reference: credit.holder_reference, href: '/admin/people/' ~ credit.user_id}) }}{% endif %}
 							</td>
 							<td>
-								{{ credit.course_title }}
+								{% if credit.course_id|default(0) %}<a href="/admin/courses/{{ credit.course_id }}">{{ credit.course_title }}</a>{% else %}{{ credit.course_title }}{% endif %}
 							</td>
 							<td>
 								{{ credit.access_period_label }}
 							</td>
 							<td>
 								{{ credit.available_count }}
+								{# Unused places of a credit given by hand can be taken back (owner, 2026-10-26); a bought one's go through a refund. #}
+								{% if can_manage_credits|default(false) and credit.given_by_hand|default(false) in [true, 1, '1', 't'] and credit.available_count > 0 %}
+									{{ ui('action.button', {label: 'Take back', variant: 'secondary', size: 'small', type: 'button', modal: 'take-back-credit-' ~ credit.id, icon: 'action-revoke'}) }}
+									{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'take-back-credit-' ~ credit.id, title: 'Take back unused places', action: '/admin/course/credits/' ~ credit.id ~ '/take-back', method: 'post'})} %}
+{% block modal_body %}
+										<input type="hidden" name="csrf" value="{{ csrf }}">
+										<p>{{ credit.holder_name }}: {{ credit.course_title }}, {{ credit.access_period_label }}. {{ credit.available_count }} of its places are free. Places already assigned or used are never taken back.</p>
+										{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Places to take back', for: 'take-back-places-' ~ credit.id, required: true})} %}{% block control %}<input type="number" id="take-back-places-{{ credit.id }}" name="places" min="1" max="{{ credit.available_count }}" value="{{ credit.available_count }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+										{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'take-back-reason-' ~ credit.id, required: true, help: 'Kept on the credit and in the activity log.'})} %}{% block control %}<input id="take-back-reason-{{ credit.id }}" name="reason" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}
+{% block modal_actions %}
+										{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+										{{ ui('action.button', {label: 'Take back', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-revoke'}) }}
+{% endblock %}
+{% endembed %}
+								{% endif %}
 							</td>
 							<td>
 								{{ credit.assigned_count }}
@@ -123,7 +140,7 @@
 			{% if credits_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} credit records.</span>
-					{{ ui('action.link', {label: 'View all credit records', variant: 'secondary', size: 'small', href: '/admin/credits', icon: 'action-view-all'}) }}
+					{{ ui('action.link', {label: 'View all credit records', variant: 'secondary', size: 'small', href: '/admin/course/credits', icon: 'action-view-all'}) }}
 				</div>
 			{% endif %}
 

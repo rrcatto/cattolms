@@ -43,7 +43,6 @@ enum LandingSectionType: string
     case Outcomes = 'outcomes';
     case Contents = 'contents';
     case Benefits = 'benefits';
-    case Instructor = 'instructor';
     case Reviews = 'reviews';
     case Pricing = 'pricing';
     case Faq = 'faq';
@@ -70,8 +69,7 @@ enum LandingSectionType: string
     }
 
     /**
-     * The sections a new landing page starts with, in order. The instructor section is offered but
-     * not added: the platform knows a course's provider, not a person who teaches it.
+     * The sections a new landing page starts with, in order.
      *
      * @return list<self>
      */
@@ -88,7 +86,6 @@ enum LandingSectionType: string
             self::Outcomes => 'Learning outcomes',
             self::Contents => 'Course contents',
             self::Benefits => 'Benefits',
-            self::Instructor => 'Instructor',
             self::Reviews => 'Reviews',
             self::Pricing => 'Pricing',
             self::Faq => 'FAQ',
@@ -105,7 +102,6 @@ enum LandingSectionType: string
             self::Outcomes => 'What a learner will be able to do after the course.',
             self::Contents => 'The course’s outline, read from the course itself.',
             self::Benefits => 'Cards, each a benefit with a short explanation.',
-            self::Instructor => 'Who provides the course and its accreditation, with your introduction.',
             self::Reviews => 'The course’s rating and its latest approved reviews.',
             self::Pricing => 'The course’s current prices and access periods, with the buy button.',
             self::Faq => 'Questions and answers that open one at a time.',
@@ -128,7 +124,6 @@ enum LandingSectionType: string
             self::Outcomes => 'What you will learn',
             self::Contents => 'What the course covers',
             self::Benefits => 'Why take this course',
-            self::Instructor => 'Who provides this course',
             self::Reviews => 'What learners say',
             self::Pricing => 'Price and access',
             self::Faq => 'Questions and answers',
@@ -148,7 +143,7 @@ enum LandingSectionType: string
             self::Audience, self::Outcomes => ['heading' => '', 'text' => '', 'items' => []],
             self::Contents => ['heading' => '', 'text' => '', 'show_items' => true, 'show_descriptions' => false],
             self::Benefits => ['heading' => '', 'text' => '', 'items' => []],
-            self::Instructor, self::Pricing, self::Cta => ['heading' => '', 'text' => ''],
+            self::Pricing, self::Cta => ['heading' => '', 'text' => ''],
             // With no approved review the section is always left out (owner, 2026-10-20).
             self::Reviews => ['heading' => '', 'text' => '', 'limit' => 3],
             self::Faq => ['heading' => '', 'text' => '', 'items' => []],
@@ -183,7 +178,6 @@ enum LandingSectionType: string
                 'text' => $text(),
                 'items' => LandingCopy::rows($input['items'] ?? [], ['title' => ['Title', 80, false], 'text' => ['Explanation', 400, true]], 12, 'Benefit'),
             ],
-            self::Instructor => ['heading' => $heading(), 'text' => $text(1500)],
             self::Reviews => [
                 'heading' => $heading(),
                 'text' => $text(),
@@ -236,7 +230,6 @@ enum LandingSectionType: string
             self::Benefits => trim($named . ' · ' . $plural($count, 'benefit', 'benefits'), ' ·'),
             self::Faq => trim($named . ' · ' . $plural($count, 'question', 'questions'), ' ·'),
             self::Contents => ((bool) ($data['show_items'] ?? false) ? 'Sections and items' : 'Sections only') . ((bool) ($data['show_descriptions'] ?? false) ? ', with descriptions' : '') . ', from the course',
-            self::Instructor => 'The course’s provider and accreditation',
             self::Reviews => 'Up to ' . $plural((int) ($data['limit'] ?? 3), 'approved review', 'approved reviews'),
             self::Pricing => 'The course’s current prices',
             self::Cta => $named !== '' ? $named : 'The buy button',

@@ -35,7 +35,8 @@ final class BillingDetailsTest extends TestCase
     {
         foreach (BillingDetails::LIMITS as $field => $limit) {
             if ($field === 'country_code') continue;
-            $input = BillingFixture::personFields();
+            // A South African address's province is one of the nine; any other country's is typed.
+            $input = ($field === 'region' ? ['country_code' => 'GB'] : []) + BillingFixture::personFields();
             $input[$field] = str_repeat('é', $limit);
             self::assertSame(str_repeat('é', $limit), BillingDetails::forPerson($input)->toRow()[$field], $field . ' accepts ' . $limit . ' characters, counted as characters.');
             $input[$field] = str_repeat('é', $limit + 1);
@@ -60,7 +61,9 @@ final class BillingDetailsTest extends TestCase
 
     public function testMalformedInputIsRefused(): void
     {
-        foreach (['Z' => 'two-letter', 'ZAF' => 'may not exceed 2', '1A' => 'two-letter', 'Z-' => 'two-letter', 'ÄB' => 'two-letter', '' => 'Enter the country'] as $country => $message) {
+        // A country is one from the list, chosen by name (owner, 2026-10-27); a made-up code is refused too.
+        foreach (['Z' => 'Choose the country from the list', 'ZAF' => 'may not exceed 2', '1A' => 'Choose the country from the list', 'Z-' => 'Choose the country from the list',
+            'ÄB' => 'Choose the country from the list', 'QZ' => 'Choose the country from the list', '' => 'Enter the country'] as $country => $message) {
             $this->refused(['country_code' => (string) $country] + BillingFixture::personFields(), $message);
         }
         $this->refused(['address_line_1' => "Line one\nline two"] + BillingFixture::personFields(), 'single line');
@@ -104,6 +107,27 @@ final class BillingDetailsTest extends TestCase
         $minimal = BillingDetails::forCompany(['billing_name' => 'Acme', 'address_line_1' => '1 Road', 'city' => 'London', 'country_code' => 'GB']);
         self::assertSame(['Acme', '1 Road', 'London', 'United Kingdom'], $minimal->documentLines('en'));
         self::assertSame('QZ', BillingDetails::countryName('QZ'), 'An unknown code prints as itself.');
+    }
+
+    public function testASouthAfricanAddressHasOneOfTheNineProvincesAndAnyOtherCountryATypedOne(): void
+    {
+        self::assertSame('KwaZulu-Natal', BillingDetails::forPerson(['country_code' => 'ZA', 'region' => ' kwazulu-natal '] + BillingFixture::personFields())->region, 'Written as the list writes it.');
+        $this->refused(['country_code' => 'ZA', 'region' => 'Natal'] + BillingFixture::personFields(), 'Choose the province from the list');
+        self::assertNull(BillingDetails::forPerson(['country_code' => 'ZA', 'region' => ''] + BillingFixture::personFields())->region, 'The province may be left out.');
+        // The form sends both fields: the drop-down for South Africa (region) and the text box for any other country (region_other).
+        self::assertSame('Gauteng', BillingDetails::forPerson(['country_code' => 'ZA', 'region' => 'Gauteng', 'region_other' => 'Ontario'] + BillingFixture::personFields())->region);
+        self::assertSame('Ontario', BillingDetails::forPerson(['country_code' => 'CA', 'region' => 'Gauteng', 'region_other' => 'Ontario'] + BillingFixture::personFields())->region);
+        self::assertSame('Bavaria', BillingDetails::forPerson(['country_code' => 'DE', 'region' => 'Bavaria'] + BillingFixture::personFields())->region, 'A caller without the text box still gives the province.');
+    }
+
+    public function testTheFormShowsCountriesByNameSouthAfricaFirstAndTheNineProvinces(): void
+    {
+        $fields = array_column(BillingDetails::formFields(true), null, 'name');
+        self::assertSame('Country', $fields['country_code']['label']);
+        self::assertSame(['code' => 'ZA', 'name' => 'South Africa'], $fields['country_code']['options'][0]);
+        self::assertCount(249, $fields['country_code']['options']);
+        self::assertSame(['Eastern Cape', 'Free State', 'Gauteng', 'KwaZulu-Natal', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape', 'Western Cape'], $fields['region']['options']);
+        self::assertLessThan(array_search('region', array_keys($fields), true), array_search('country_code', array_keys($fields), true), 'The country comes before the province, which depends on it.');
     }
 
     /** @param array<string,mixed> $input */

@@ -365,10 +365,6 @@ final class AdminLandingPageController extends BaseController
             $data['can_upload'] = $user->hasPermission('COURSE.MEDIA.MANAGE');
             $data['secondary_targets'] = LandingSectionType::SECONDARY_TARGETS;
         }
-        if ($type === LandingSectionType::Instructor) {
-            $data['provider'] = (string) ($course['owner_company_name'] ?? '');
-            $data['accreditation'] = (string) ($course['certificate_accreditation'] ?? '');
-        }
         if ($type === LandingSectionType::Reviews) {
             $data['review_limit_max'] = LandingSectionType::REVIEW_LIMIT_MAX;
         }

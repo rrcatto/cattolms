@@ -19,7 +19,8 @@
 					{% for company in picker_companies %}
 						<tr>
 							<td>
-								<strong>{{ company.name }}</strong>
+								{# Each company's logo, so one is recognised at a glance (owner, 2026-10-26). #}
+								<span class="cl-company-named">{% if company.logo_url|default('') %}<img class="cl-company-named-logo" src="{{ company.logo_url }}" alt="" width="28" height="28" loading="lazy">{% endif %}<strong>{{ company.name }}</strong></span>
 							</td>
 							<td class="mono small">
 								{{ company.domain }}

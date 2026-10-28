@@ -1,0 +1,247 @@
+# The first part of a generated company's name: South African places, landmarks and the familiar words businesses here
+# are named after (owner, 2026-10-27: realistic names, never made-up words). One per line; # starts a comment.
+# Combined with company-trades.txt: Karoo Ridge Accounting, Umhlanga Dental Studio, Table Bay Freight.
+Addo
+Agulhas
+Aloe
+Amanzi
+Amatola
+Atlantic
+Augrabies
+Baobab
+Barberton
+Bathurst
+Bay View
+Beacon Hill
+Berea
+Bergvliet
+Bethlehem
+Blouberg
+Bluegum
+Bontebok
+Boschendal
+Braamfontein
+Breede River
+Brooklyn
+Bryanston
+Buffalo River
+Cape Point
+Cape Vidal
+Cederberg
+Centurion
+Champagne Castle
+Citrusdal
+Clanwilliam
+Clarens
+Clearwater
+Clifton
+Coastal
+Constantia
+Cradock
+Crystal Springs
+Dassen Island
+Delville
+Dolphin Coast
+Doornkop
+Drakensberg
+Dullstroom
+Durbanville
+Eagle Rock
+Eastgate
+Elands River
+Elgin
+Emerald Bay
+Eshowe
+False Bay
+Fernwood
+Fish Hoek
+Five Rivers
+Florida Park
+Fountains
+Franschhoek
+Fynbos
+Garden Route
+George
+Giant's Castle
+Gold Reef
+Gonubie
+Graaff-Reinet
+Grahamstown
+Granite Peak
+Green Point
+Greyton
+Groot Constantia
+Hartbeespoort
+Hazyview
+Heidelberg
+Hermanus
+Highveld
+Hillcrest
+Hluhluwe
+Hobhouse
+Hogsback
+Houghton
+Hout Bay
+Ifafa
+Illovo
+Impala
+Inanda
+Iron Crown
+Ironwood
+Isipingo
+Jacaranda
+Jeffreys Bay
+Jonkershoek
+Kalahari
+Kamiesberg
+Karoo
+Karoo Ridge
+Kei River
+Kenilworth
+Kensington
+Keurbooms
+Kingfisher
+Kirstenbosch
+Klein Karoo
+Kloof
+Knysna
+Kokstad
+Kommetjie
+Kosi Bay
+Kowie
+Kruger Park
+Kuruman
+Kwelera
+Lakeside
+Langebaan
+Lebombo
+Lekkerbreek
+Limpopo
+Lion's Head
+Llandudno
+Long Street
+Loskop
+Lowveld
+Lydenburg
+Magaliesberg
+Mahikeng
+Makhado
+Maluti
+Mamre
+Marula
+Matjiesfontein
+McGregor
+Melville
+Midrand
+Milnerton
+Mont-aux-Sources
+Montagu
+Mooi River
+Mossel Bay
+Mountain View
+Muizenberg
+Nahoon
+Namaqua
+Newlands
+Nieu-Bethesda
+Noordhoek
+Nottingham Road
+Oakdale
+Olifants River
+Orange River
+Oranjezicht
+Oudtshoorn
+Paarl
+Parkhurst
+Parktown
+Paternoster
+Pella
+Pietermaritzburg
+Pilanesberg
+Pilgrim's Rest
+Pinelands
+Plettenberg
+Polokwane
+Port Alfred
+Port Nolloth
+Port St Johns
+Protea
+Queenstown
+Randburg
+Richmond
+Riebeek Valley
+Riverbend
+Robben Island
+Robertson
+Rondebosch
+Rooiels
+Rosebank
+Rustenburg
+Sabie
+Saldanha
+Sandton
+Savanna
+Scarborough
+Scottburgh
+Sea Point
+Sedgefield
+Seaview
+Silverleaf
+Silvermine
+Simon's Town
+Skukuza
+Somerset West
+Soutpansberg
+Springbok
+St Francis
+St Lucia
+Stellenbosch
+Steenberg
+Stonehill
+Storms River
+Summerstrand
+Sunbird
+Sunningdale
+Sutherland
+Swartberg
+Swellendam
+Table Bay
+Table Mountain
+Tafelberg
+Thornhill
+Tokai
+Tsitsikamma
+Tugela
+Tulbagh
+Two Oceans
+Tzaneen
+Umdloti
+Umhlanga
+Umkomaas
+Umtata
+Upington
+Vaal River
+Valley of a Thousand Hills
+Velddrif
+Verloren Vlei
+Victoria Bay
+Villiersdorp
+Vredefort
+Walker Bay
+Waterberg
+Waterfront
+Wellington
+Westcliff
+Westville
+Wild Coast
+Wilderness
+Willowmore
+Winelands
+Witsand
+Wolseley
+Woodstock
+Wynberg
+Yzerfontein
+Zebra Hill
+Zeekoevlei
+Zululand

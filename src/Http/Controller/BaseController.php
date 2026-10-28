@@ -316,6 +316,20 @@ abstract class BaseController
         } catch (RuntimeException|\InvalidArgumentException $e) {
             $this->flash('danger', $e->getMessage());
             $this->redirect($fallbackPath);
+        } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException) {
+            // The database's own refusals in words, never an error page (2026-10-26 audit: a taken course address, an
+            // address already on an account): a service that knows the reason says it first.
+            $this->flash('danger', 'That was not saved: something in it is already used by another record. Change it and try again.');
+            $this->redirect($fallbackPath);
+        } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException) {
+            $this->flash('danger', 'That was not done: other records still depend on it.');
+            $this->redirect($fallbackPath);
+        } catch (\Doctrine\DBAL\Exception\DriverException $refused) {
+            // A company always keeps its Company Administrator (owner, 2026-10-27; the database checks it when a change
+            // ends): whatever path tried to take the last one away is told why, never shown an error page.
+            if ($refused->getSQLState() !== '23514' || !str_contains($refused->getMessage(), 'Company Administrator')) throw $refused;
+            $this->flash('danger', 'That was not done: a company always has a Company Administrator. Make someone else at the company its administrator first.');
+            $this->redirect($fallbackPath);
         }
 
         // A callback that produced a response is showing the reader something; one that produced

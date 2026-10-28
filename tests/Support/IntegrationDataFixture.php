@@ -78,9 +78,9 @@ final class IntegrationDataFixture
             ['user_id' => $id, 'email' => $email]
         );
         $this->emails[] = strtolower($email);
-        // The person gave their date of birth, as everyone does once (adults only, owner, 2026-10-20),
-        // as the registration form records it.
-        $this->db->executeStatement("UPDATE users SET birthdate = DATE '1990-05-12' WHERE id = :id", ['id' => $id]);
+        // The person gave their South African ID number, as everyone does once (owner, 2026-10-27): a valid one, unique on
+        // the site, for 12 May 1990, which gives their date of birth (adults only, 2026-10-20).
+        CheckIdNumbers::give($this->db, $id);
 
         return $id;
     }
@@ -95,13 +95,34 @@ final class IntegrationDataFixture
         );
     }
 
-    public function createCompany(int $actorUserId, string $name, string $domain): int
+    /**
+     * A company made as every company is, with its founding Company Administrator (owner, 2026-10-27: "It is IMPOSSIBLE
+     * for a company to be created and have ZERO people attached"; the database refuses one without), a person with a
+     * real name at its domain, or the person a test names as its founder. Members the test adds come on top.
+     */
+    public function createCompany(int $actorUserId, string $name, string $domain, ?int $founderUserId = null): int
     {
-        $id = (int) $this->db->fetchAllAssociative(
-            "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
-             VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
-            ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
-        )[0]['id'];
+        $this->db->beginTransaction();
+        try {
+            $id = (int) $this->db->fetchAllAssociative(
+                "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
+                 VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
+                ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
+            )[0]['id'];
+            $founder = $founderUserId;
+            if ($founder === null) {
+                ['first' => $first, 'last' => $last] = (new CheckNames($this->db))->person();
+                $founder = $this->createUser($first . ' ' . $last, strtolower(str_replace(' ', '', $first) . '.' . str_replace(' ', '', $last)) . '@' . $domain);
+                $this->db->executeStatement('UPDATE users SET first_name = :f, last_name = :l WHERE id = :id', ['f' => $first, 'l' => $last, 'id' => $founder]);
+                $this->grantRole($founder, 'STUDENT');
+            }
+            $this->grantRole($founder, 'COMPANY_ADMIN');
+            $this->db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:c,:u,'owner','active',NOW())", ['c' => $id, 'u' => $founder]);
+            $this->db->commit();
+        } catch (\Throwable $failed) {
+            $this->db->rollBack();
+            throw $failed;
+        }
         $this->companies[] = $id;
 
         return $id;
@@ -246,13 +267,18 @@ final class IntegrationDataFixture
             $this->db->executeStatement('DELETE FROM course_categories WHERE id=:id', ['id' => $id]);
         }
         foreach (array_reverse($this->companies) as $id) {
+            // Together: a company never stands without its administrator, even for a moment (the database checks it).
+            $this->db->beginTransaction();
             $this->db->executeStatement('DELETE FROM company_users WHERE company_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM companies WHERE id=:id', ['id' => $id]);
+            $this->db->commit();
         }
         foreach (array_unique($this->emails) as $email) {
             $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email)=:email', ['email' => $email]);
         }
         foreach (array_reverse($this->users) as $id) {
+            // What they did goes with them: the owner's Activity page never lists a test's actions by nobody.
+            $this->db->executeStatement('DELETE FROM audit_log WHERE user_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE user_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM auth_sessions WHERE user_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM company_users WHERE user_id=:id', ['id' => $id]);

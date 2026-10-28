@@ -1,4 +1,4 @@
-/* Every Account, Company and Administration menu page in every bundled theme at 1440 and 390px,
+/* Every Account, Company, Administration and Mailing menu page in every bundled theme at 1440 and 390px,
    through the theme preview (nothing is activated). Checks the one construction every page shares:
    - exactly one h1;
    - only page rows directly in main (flash stack, page head, identity band, page sections, a theme's
@@ -23,20 +23,24 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter(slug => fs.exist
 const only = (process.env.CATTO_THEMES || '').split(',').filter(Boolean);
 const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
 
-// The 55 menu pages: Account, Company and Administration, as their menus list them.
+// The 70 menu pages: Account, Company, Administration and Mailing (its own menu since 2026-10-28), as their menus list
+// them, and the fixture company's page.
 const pages = [
   '/account', '/account/dashboard', '/account/profile', '/account/billing', '/account/emails', '/account/social',
   '/account/courses', '/account/certificates', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
-  '/company', '/company/dashboard', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
-  '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/wallet', '/company/billing',
+  '/company', '/company/dashboard', '/company/profile', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
+  '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/orders', '/company/wallet', '/company/billing',
   '/admin', '/admin/dashboard', '/admin/courses', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
   '/admin/courses/tags', '/admin/course-reviews', '/admin/bundles', '/admin/certificates/designs', '/admin/course/requests',
-  '/admin/course/enrolments', '/admin/people', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
+  '/admin/course/enrolments', '/admin/people', '/admin/people/signup-attempts', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
   '/admin/commerce/orders', '/admin/commerce/refund-requests', '/admin/wallets', '/admin/promotions', '/admin/commerce/documents',
   '/admin/commerce/eft', '/admin/commerce/unmatched', '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
+  '/mailing', '/mailing/digest', '/mailing/messages', '/mailing/lists', '/mailing/subscribers', '/mailing/never-emailed', '/mailing/templates', '/mailing/automatic', '/mailing/settings', '/mailing/reports',
 ];
 const {inspect, judge} = require('./page-construction.cjs');
+// The company's own page in Administration (owner, 2026-10-26), opened from its name: the fixture's company.
+if (state.company) pages.push(`/admin/companies/${state.company}`);
 
 (async () => {
   fs.mkdirSync(output, {recursive: true});

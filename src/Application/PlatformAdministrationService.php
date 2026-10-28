@@ -11,6 +11,20 @@ Description:
 Implements Catto Learning business and application logic for platform administration operations.
 
 Changelog:
+2026/10/26 SAST
+- The company domain rule (owner, restated 2026-10-26: "no domain name, no company. And every person who belonged to
+  the company had to use the same domain name"): Add person takes the company from the address and refuses an address
+  that already has an account (it used to take the account over, moving a buyer into a company); saving a person in
+  Administration lets the company follow their address (Company\CompanyService::followAddress) instead of a chosen
+  company; Company People's Edit asks what Add person asks (names, company email at the domain, role); one role
+  change counts the founder ("owner") as a Company Administrator and keeps one.
+- Grid views (owner, 2026-10-26): People, Companies, Course Creators and Courses return their view and its switch
+  (<dataset>_view, <dataset>_view_switch); a grid pages in whole rows (listSizes(), Support\ListView), and
+  paginationView()/paginationPayload() take a list's own page sizes.
+
+2026/10/25 SAST
+- An administrator can neither disable their own account nor remove their own Platform Administrator role
+  (OWN_ACCOUNT_DISABLE, OWN_ADMIN_ROLE): an ADMIN had disabled their own account and was locked out.
 
 2026/10/20 SAST
 - The course list shows each course's price (its active default price, with the was price struck through; blank when none is set), sortable; Category and Ownership move to the end and the Started column is gone (owner, 2026-10-20).
@@ -117,6 +131,7 @@ use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\GeoIpLocator;
+use CattoLearning\Support\ListView;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\PersonName;
 use CattoLearning\Support\SortOrder;
@@ -127,8 +142,15 @@ use RuntimeException;
 
 final class PlatformAdministrationService
 {
+    /** An administrator never locks themselves out (owner, 2026-10-25): another administrator can do either. */
+    public const OWN_ACCOUNT_DISABLE = 'You cannot disable your own account. Another administrator can.';
+    public const OWN_COMPANY_ADMIN_ROLE = 'You cannot remove your own Company Administrator role. Another Company Administrator can.';
+    public const LAST_COMPANY_ADMIN = 'The company must keep at least one Company Administrator. Make someone else one first.';
+    public const OWN_ADMIN_ROLE = 'You cannot remove your own Platform Administrator role. Another administrator can.';
+
     /** Why a Company Administrator cannot be made without a company (owner, 2026-10-18). */
-    public const COMPANY_ADMIN_NEEDS_COMPANY = 'A Company Administrator needs a company. Choose the company they administer.';
+    public const COMPANY_ADMIN_NEEDS_COMPANY = 'A Company Administrator needs an address at their company\'s domain.';
+    public const ADDRESS_HAS_ACCOUNT = 'That email address already has an account. Find them under People instead.';
 
     /**
      * The timestamp columns every list normaliser trims, and the fields they live in.
@@ -440,7 +462,9 @@ final class PlatformAdministrationService
         private readonly EntityLookupRepository $lookups,
         private readonly AuthSessionRepository $sessions,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
-        private readonly ?SiteOwner $owner = null
+        private readonly ?SiteOwner $owner = null,
+        private readonly ?\CattoLearning\Company\CompanyService $companyRule = null,
+        private readonly ?\CattoLearning\Auth\IdNumbers $idNumbers = null
     ) {
     }
 
@@ -572,6 +596,54 @@ final class PlatformAdministrationService
     public static function companySearchTerm(array $request): string
     {
         return self::searchTerm('companies', $request);
+    }
+
+    /** Takes back unused places of a credit given by hand, with the reason recorded (owner, 2026-10-26). */
+    public function takeBackCredit(int $creditId, int $places, string $reason, int $actorUserId): string
+    {
+        $reason = trim($reason);
+        if (mb_strlen($reason) < 5) throw new InvalidArgumentException('Say why the places are taken back.');
+        $done = $this->transactions->run(fn (): array => $this->administration->takeBackCreditPlaces($creditId, $places, mb_substr($reason, 0, 500)));
+        $this->audit->record($actorUserId, 'course_credit.taken_back', ['credit_id' => $creditId, 'places' => $done['places'], 'left' => $done['left'], 'reason' => $reason]);
+
+        return $done['left'] > 0
+            ? 'Took back ' . $done['places'] . ' ' . ($done['places'] === 1 ? 'place' : 'places') . '. The credit holds ' . $done['left'] . ' now.'
+            : 'Took back every place. The credit is gone.';
+    }
+
+    /**
+     * The lengths a credit for a course can have, in words (owner, 2026-10-26: "The course's own lengths").
+     *
+     * @return list<array{seconds:int,label:string}>
+     */
+    public function creditLengths(int $courseId): array
+    {
+        return array_map(static fn(int $seconds): array => ['seconds' => $seconds, 'label' => \CattoLearning\Support\AccessPeriod::label($seconds)], $courseId > 0 ? $this->administration->courseSaleLengths($courseId) : []);
+    }
+
+    /**
+     * The lengths a company can assign a course for: its free credits' lengths, or, for a course it owns, the lengths the
+     * course is sold for and its default.
+     *
+     * @return list<array{seconds:int,label:string}>
+     */
+    public function assignLengths(int $companyId, int $courseId): array
+    {
+        if ($companyId < 1 || $courseId < 1) return [];
+        $course = $this->courses->findById($courseId);
+        $owned = $course !== null && (int) ($course['owner_company_id'] ?? 0) === $companyId;
+        $lengths = $owned
+            ? array_values(array_unique([...$this->administration->courseSaleLengths($courseId), (int) ($course['default_access_period_seconds'] ?? 31536000)]))
+            : $this->administration->companyFreeCreditLengths($companyId, $courseId);
+        sort($lengths);
+
+        return array_map(static fn(int $seconds): array => ['seconds' => $seconds, 'label' => \CattoLearning\Support\AccessPeriod::label($seconds)], $lengths);
+    }
+
+    /** @return array<string,mixed>|null one entity as a lookup shows it, chosen already */
+    public function describeEntity(string $type, int $id): ?array
+    {
+        return $this->lookups->describe($type, $id);
     }
 
     /**
@@ -813,6 +885,11 @@ final class PlatformAdministrationService
     /** @param array<string,mixed> $request */
     public function paginationFor(string $dataset, array $request, int $total): Pagination
     {
+        // A grid of cards pages in whole rows (ListView, owner 2026-10-26).
+        $sizes = self::listSizes($dataset, $request);
+        if ($sizes !== null) {
+            return Pagination::within($request[$dataset . '_page'] ?? null, $request[$dataset . '_page_size'] ?? null, $total, $sizes);
+        }
         return Pagination::create(
             $request[$dataset . '_page'] ?? null,
             $request[$dataset . '_page_size'] ?? null,
@@ -846,12 +923,51 @@ final class PlatformAdministrationService
      * markup so a caller cannot pair a control with another dataset's table.
      *
      * @param array<string,mixed> $filters
+     * @param list<int>|null $sizes the list's own page sizes (a grid's whole rows), else the tables'
      * @return array<string,mixed>
      */
-    public function paginationView(string $dataset, Pagination $pagination, string $base, string $label, array $filters = []): array
+    public function paginationView(string $dataset, Pagination $pagination, string $base, string $label, array $filters = [], ?array $sizes = null): array
     {
         return $pagination->toPrefixedArray($dataset)
-            + [$dataset . '_pagination' => self::paginationPayload($dataset, $pagination, $base, $label, $filters)];
+            + [$dataset . '_pagination' => self::paginationPayload($dataset, $pagination, $base, $label, $filters, null, null, $sizes)];
+    }
+
+    /**
+     * A list's page sizes in the view its reader chose (ListView: a grid's whole rows), or null for the tables' sizes.
+     *
+     * @param array<string,mixed> $request
+     * @return list<int>|null
+     */
+    public static function listSizes(string $dataset, array $request): ?array
+    {
+        return self::listView($dataset, $request) === ListView::GRID ? ListView::pageSizes($dataset, ListView::GRID) : null;
+    }
+
+    /**
+     * The view a list is shown in (the controller resolves the reader's choice into the request as <dataset>_view).
+     *
+     * @param array<string,mixed> $request
+     */
+    public static function listView(string $dataset, array $request): string
+    {
+        if (!isset(ListView::DEFAULTS[$dataset])) return ListView::LIST;
+        $view = $request[$dataset . '_view'] ?? ListView::DEFAULTS[$dataset];
+
+        return in_array($view, [ListView::LIST, ListView::GRID], true) ? (string) $view : ListView::DEFAULTS[$dataset];
+    }
+
+    /**
+     * The view and its switch for a list's template: <dataset>_view, and <dataset>_view_switch with the two addresses.
+     *
+     * @param array<string,mixed> $request
+     * @param array<string,mixed> $filters kept on the switch's links (the search and the sort)
+     * @return array<string,mixed>
+     */
+    private static function viewData(string $dataset, array $request, string $base, array $filters): array
+    {
+        $view = self::listView($dataset, $request);
+
+        return [$dataset . '_view' => $view, $dataset . '_view_switch' => ListView::switcher($dataset, $view, $base, $filters)];
     }
 
     /**
@@ -870,6 +986,7 @@ final class PlatformAdministrationService
      * its own, which is what it had.
      *
      * @param array<string,mixed> $filters
+     * @param list<int>|null $sizes the list's own page sizes (a grid's whole rows), else the catalogue's or the tables'
      * @return array<string,mixed>
      */
     public static function paginationPayload(
@@ -879,7 +996,8 @@ final class PlatformAdministrationService
         string $label,
         array $filters = [],
         ?string $pageParam = null,
-        ?string $sizeParam = null
+        ?string $sizeParam = null,
+        ?array $sizes = null
     ): array {
         $pageParam ??= $dataset . '_page';
         $sizeParam ??= $dataset . '_page_size';
@@ -895,7 +1013,8 @@ final class PlatformAdministrationService
         foreach ($pagination->window() as $item) {
             $pages[] = $item + ['href' => $item['is_gap'] ? '' : $href($item['page'])];
         }
-        $sizes = $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES;
+        // A list's own sizes when it has them (a grid's whole rows, ListView), else the catalogue's one size or the tables'.
+        $sizes ??= $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES;
 
         return $pagination->toArray() + [
             'prefix' => $dataset,
@@ -1182,7 +1301,8 @@ final class PlatformAdministrationService
                     'courses_before_page' => $arrange && $pagination->offset > 0
                         ? (int) ($this->adminCoursePage($actorUserId, $viewAll, 1, $pagination->offset - 1, '', $sort)[0]['id'] ?? 0) : 0,
                 ]
-                    + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'))
+                    + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'), self::listSizes('courses', $activityFilters))
+                    + self::viewData('courses', $activityFilters, '/admin/courses', $searchFilter + $sort->toPrefixedArray('courses'))
                     + $this->sortView('courses', $sort, '/admin/courses', [
                         // What matters most first (owner, 2026-10-20): the course and its price; category and
                         // ownership last. A bought course starts at once, so there is no Started column.
@@ -1217,20 +1337,24 @@ final class PlatformAdministrationService
                     'people_search' => $search,
                     'roles' => $this->normalAssignableRoles(),
                 ]
-                    + $this->paginationView('people', $pagination, '/admin/people', 'People', $filters)
+                    + $this->paginationView('people', $pagination, '/admin/people', 'People', $filters, self::listSizes('people', $activityFilters))
+                    + self::viewData('people', $activityFilters, '/admin/people', $filters)
                     // Every column in the table, sortable or not, in the order it is drawn. The
                     // header row is then one repeat over this model rather than markup that has to
                     // agree with it.
                     + $this->sortView('people', $sort, '/admin/people', [
                         // The name only, so Last login shows its whole date and time (owner, 2026-10-21).
-                        'name' => 'Person|24',
-                        'company' => 'Company|20',
+                        'name' => 'Person|22',
+                        'company' => 'Company|17',
                         'roles' => 'Roles|12',
                         'courses' => 'Courses|7',
-                        'created' => 'Created|14',
-                        'last_login' => 'Last login|17',
+                        // The sign-up check's risk, so the problems show at a glance (owner, 2026-10-26).
+                        'risk' => 'Risk|9',
+                        'created' => 'Created|12',
+                        'last_login' => 'Last login|15',
                         'actions' => 'Actions|6',
                     ], array_keys(AdministrationRepository::PEOPLE_SORTS), self::withSearch($scope, 'people', $search), [
+                        'risk' => SortOrder::DESCENDING,
                         'courses' => SortOrder::DESCENDING,
                         'created' => SortOrder::DESCENDING,
                         'last_login' => SortOrder::DESCENDING,
@@ -1619,10 +1743,23 @@ final class PlatformAdministrationService
             return $data + $this->datasetDefaults();
         }
 
-        if ($section === 'billing') {
+        // The company's own profile with its logo (owner, 2026-10-26) needs only the company, as billing does.
+        if ($section === 'billing' || $section === 'profile') {
             // The billing form's data is the company's billing profile, which the controller adds;
             // this section has no dataset of its own.
             return $data + $this->datasetDefaults();
+        }
+        // The company's orders, newest first, each with what is still owed (owner, 2026-10-26).
+        if ($section === 'orders') {
+            $pagination = $this->paginationFor('company_orders', $request, $companyId > 0 ? $this->administration->companyOrdersCount($companyId) : 0);
+            $data['company_orders'] = $companyId > 0 ? array_map(static fn(array $order): array => $order + [
+                'number' => 'CL-' . str_pad((string) $order['id'], 8, '0', STR_PAD_LEFT),
+                'total_label' => \CattoLearning\Support\Money::ofMinorUnits((int) $order['total_minor'], (string) $order['currency'])->format(),
+                'due_label' => (int) $order['due_minor'] > 0 ? \CattoLearning\Support\Money::ofMinorUnits((int) $order['due_minor'], (string) $order['currency'])->format() : '',
+                'state_label' => ['placed' => 'Placed', 'awaiting_payment' => 'Waiting for payment', 'manual_review' => 'Being checked', 'paid' => 'Paid', 'fulfilled' => 'Paid, credits ready', 'cancelled' => 'Cancelled', 'partially_refunded' => 'Part refunded', 'refunded' => 'Refunded'][(string) $order['state']] ?? ucfirst((string) $order['state']),
+            ], $this->administration->companyOrders($companyId, $pagination->pageSize, $pagination->offset)) : [];
+
+            return $data + $this->paginationView('company_orders', $pagination, '/company/orders', 'Orders') + $this->datasetDefaults();
         }
         if ($section === 'favourites') {
             $sort = $this->sortFor('company_favourites', $request, array_keys(CourseRepository::COMPANY_FAVOURITE_SORTS), 'added', SortOrder::DESCENDING);
@@ -1778,6 +1915,69 @@ final class PlatformAdministrationService
         };
     }
 
+    /**
+     * A member's role in the company (owner, 2026-10-26: "I want to assign one Administrator rights but can't seem to find
+     * how to do that"): Student, Course editor, Course owner or Company Administrator. Their company-wide roles and their
+     * membership's role change together; any platform role (ADMIN) is kept. A Company Administrator cannot remove their
+     * own role, and the company always keeps one.
+     */
+    public function setCompanyPersonRole(int $actorUserId, int $companyId, int $targetUserId, string $role): void
+    {
+        $company = $this->contextCompany($companyId);
+        $this->assertCompanyMember((int) $company['id'], $targetUserId);
+        $this->transactions->run(fn () => $this->changeCompanyRole($actorUserId, (int) $company['id'], $targetUserId, $role));
+    }
+
+    /** @return array{orders:int,certificates:int} the figures under a person's name on their page */
+    public function personFigures(int $userId): array
+    {
+        return $this->administration->personFigures($userId);
+    }
+
+    /** A membership role in words: the founder's "owner" is a Company Administrator too. */
+    public static function companyRoleWords(string $role): string
+    {
+        return match ($role) {
+            'owner', 'administrator' => 'Company Administrator',
+            'course_owner' => 'Course owner',
+            'course_editor' => 'Course editor',
+            default => 'Student',
+        };
+    }
+
+    /** A member's role changed, unless it is the one they have (the founder's "owner" is a Company Administrator's). */
+    private function changeCompanyRole(int $actorUserId, int $companyId, int $targetUserId, string $role): void
+    {
+        $role = strtoupper(trim($role));
+        if (!in_array($role, $this->normalAssignableRoleKeys(), true)) throw new InvalidArgumentException('Choose a valid company role.');
+        $current = (string) ($this->companies->membership($targetUserId)['company_role'] ?? 'student');
+        $wanted = self::companyRoleFor([$role]);
+        $isAdministrator = in_array($current, CompanyRepository::ADMINISTRATOR_ROLES, true);
+        if ($wanted === $current || ($isAdministrator && $wanted === 'administrator')) return;
+        if ($isAdministrator) {
+            if ($targetUserId === $actorUserId) throw new InvalidArgumentException(self::OWN_COMPANY_ADMIN_ROLE);
+            if ($this->companies->administratorCount($companyId) <= 1) throw new InvalidArgumentException(self::LAST_COMPANY_ADMIN);
+        }
+        $roles = array_values(array_diff($this->roles->roles($targetUserId), [RoleCatalog::COMPANY_ADMIN, RoleCatalog::COURSE_EDITOR, RoleCatalog::COURSE_OWNER]));
+        if (!in_array(RoleCatalog::STUDENT, $roles, true)) $roles[] = RoleCatalog::STUDENT;
+        if ($role !== RoleCatalog::STUDENT) $roles[] = $role;
+        $this->roles->replaceUserRoles($targetUserId, $roles);
+        $this->companies->assignUser($companyId, $targetUserId, $wanted);
+        $this->audit->record($actorUserId, 'company.person_role_changed', ['company_id' => $companyId, 'user_id' => $targetUserId, 'role' => $role]);
+    }
+
+    /**
+     * The membership role that goes with a person's roles.
+     *
+     * @param list<string> $roles
+     */
+    private static function companyRoleFor(array $roles): string
+    {
+        return in_array(RoleCatalog::COMPANY_ADMIN, $roles, true) ? 'administrator'
+            : (in_array(RoleCatalog::COURSE_OWNER, $roles, true) ? 'course_owner'
+            : (in_array(RoleCatalog::COURSE_EDITOR, $roles, true) ? 'course_editor' : 'student'));
+    }
+
     /** @param array<string,mixed> $input */
     public function createCompanyPerson(int $actorUserId, int $companyId, array $input): int
     {
@@ -1793,37 +1993,6 @@ final class PlatformAdministrationService
         $input['company_id'] = (int) $company['id'];
         $input['role'] = $role;
         return $this->createPerson($input, $actorUserId);
-    }
-
-    /**
-     * Removes a person's relationship with the context company.
-     *
-     * This is a membership operation and nothing more. It used to also set
-     * `users.status = 'disabled'`, which conflated two unrelated decisions: "this person no longer
-     * works here" and "this person may no longer sign in anywhere". Somebody moving between
-     * companies was banned from the platform as a side effect, and there was no way to reverse it
-     * from the Company workspace. Disabling an account is now its own action -
-     * {@see setCompanyPersonStatus()} - and removal leaves the global identity alone.
-     *
-     * Company-sponsored enrolments are still ended, because those are the company's to grant and
-     * the person is no longer a member. The learning history behind them is preserved; only access
-     * is withdrawn.
-     */
-    public function removeCompanyPerson(int $actorUserId, int $companyId, int $targetUserId): void
-    {
-        $company = $this->contextCompany($companyId);
-        $this->assertCompanyMember((int) $company['id'], $targetUserId);
-        if ($actorUserId === $targetUserId) {
-            throw new InvalidArgumentException('You cannot remove your own company-administrator account.');
-        }
-        $this->transactions->run(function () use ($company, $targetUserId, $actorUserId): void {
-            $companyId = (int) $company['id'];
-            foreach ($this->administration->activeCompanyUserEnrolmentIds($companyId, $targetUserId) as $enrolmentId) {
-                $this->administration->removeEnrolmentAccess($enrolmentId, $actorUserId, 'Company membership removed');
-            }
-            $this->companies->removeUser($companyId, $targetUserId);
-            $this->audit->record($actorUserId, 'company.person_removed', ['company_id' => $companyId, 'user_id' => $targetUserId]);
-        });
     }
 
     /**
@@ -1848,6 +2017,11 @@ final class PlatformAdministrationService
         $this->assertCompanyMember((int) $company['id'], $targetUserId);
         if ($actorUserId === $targetUserId) {
             throw new InvalidArgumentException('You cannot disable your own account.');
+        }
+        // Enabling is for a disabled account: one waiting for the site's approval is approved by the site, which emails them
+        // (2026-10-26 audit: Enable made it active without the approval and its email).
+        if ($status === 'active' && (string) (($this->users->findById($targetUserId) ?? [])['status'] ?? '') === 'awaiting_approval') {
+            throw new InvalidArgumentException('This account is waiting for the site\'s approval, which comes from the site\'s administrators.');
         }
 
         // A company-level control must never reach a platform administrator or a system identity.
@@ -1886,17 +2060,29 @@ final class PlatformAdministrationService
      */
     public function updateCompanyPerson(int $actorUserId, int $companyId, int $targetUserId, array $input): void
     {
+        // What Add person asks for, and nothing else (owner, 2026-10-26: "surely they should both reflect the same info?"):
+        // their names, their company email address, at the company's domain as when they were added ("they are staff and
+        // the administrator sets their email address"), and their role in the company.
         $company = $this->contextCompany($companyId);
-        $this->assertCompanyMember((int) $company['id'], $targetUserId);
-
-        // Adults only (owner, 2026-10-20): a date of birth is checked as at registration.
-        if (array_key_exists('birthdate', $input)) $input['birthdate'] = \CattoLearning\Auth\AdultAge::optionalInput($input['birthdate'], new \DateTimeImmutable());
-        $this->transactions->run(function () use ($actorUserId, $company, $targetUserId, $input): void {
-            $this->users->updateProfile($targetUserId, $input);
-            $this->audit->record($actorUserId, 'company.person_updated', [
-                'company_id' => (int) $company['id'],
-                'user_id' => $targetUserId,
-            ]);
+        $companyId = (int) $company['id'];
+        $this->assertCompanyMember($companyId, $targetUserId);
+        $first = trim((string) ($input['first_name'] ?? ''));
+        $last = trim((string) ($input['last_name'] ?? ''));
+        if ($first === '' || $last === '') throw new InvalidArgumentException('Enter the person’s first and last names.');
+        $email = EmailAddress::normalize((string) ($input['email'] ?? ''));
+        if (EmailAddress::domain($email) !== strtolower((string) $company['domain'])) {
+            throw new InvalidArgumentException('The staff email address must use ' . $company['domain'] . ' exactly.');
+        }
+        $role = is_string($input['role'] ?? null) && $input['role'] !== '' ? $input['role'] : null;
+        $before = $this->users->findById($targetUserId) ?? [];
+        $this->transactions->run(function () use ($actorUserId, $companyId, $targetUserId, $first, $last, $email, $role, $before): void {
+            $profile = ['first_name' => $first, 'last_name' => $last];
+            // The display name follows the names when it was only the names, as Add person made it.
+            if (trim((string) ($before['display_name'] ?? '')) === trim(($before['first_name'] ?? '') . ' ' . ($before['last_name'] ?? ''))) $profile['display_name'] = $first . ' ' . $last;
+            $this->users->updateProfile($targetUserId, $profile);
+            $this->users->replacePrimaryEmail($targetUserId, $email);
+            if ($role !== null) $this->changeCompanyRole($actorUserId, $companyId, $targetUserId, $role);
+            $this->audit->record($actorUserId, 'company.person_updated', ['company_id' => $companyId, 'user_id' => $targetUserId]);
         });
     }
 
@@ -2014,8 +2200,13 @@ final class PlatformAdministrationService
         if ($firstName === '' || $lastName === '') {
             throw new InvalidArgumentException('Enter the person’s first and last names.');
         }
-        // No company chosen means a private account, which belongs to no company (owner, 2026-10-18).
-        $companyId = max(0, (int) ($input['company_id'] ?? 0));
+        // The company follows the address (owner's rule, restated 2026-10-26): an address at a company's domain makes them its
+        // staff, any other a private account. Nobody chooses a company for a person.
+        $company = $this->companyRule?->companyForAddress($email);
+        $companyId = $company === null ? 0 : (int) $company['id'];
+        // An address that already has an account is refused, never taken over: it used to move a private buyer into the
+        // company, or fail on a disabled account's address (2026-10-26).
+        if ($this->users->emailTaken($email)) throw new InvalidArgumentException(self::ADDRESS_HAS_ACCOUNT);
         $role = strtoupper(trim((string) ($input['role'] ?? RoleCatalog::STUDENT))) ?: RoleCatalog::STUDENT;
         if (!in_array($role, $this->normalAssignableRoleKeys(), true)) {
             throw new InvalidArgumentException('Choose a valid genuine-data role.');
@@ -2040,13 +2231,7 @@ final class PlatformAdministrationService
                 $this->roles->assign((int) $user['id'], $role);
             }
             if ($companyId > 0) {
-                $companyRole = match ($role) {
-                    RoleCatalog::COMPANY_ADMIN => 'administrator',
-                    RoleCatalog::COURSE_OWNER => 'course_owner',
-                    RoleCatalog::COURSE_EDITOR => 'course_editor',
-                    default => 'student',
-                };
-                $this->companies->assignUser($companyId, (int) $user['id'], $companyRole);
+                $this->companies->assignUser($companyId, (int) $user['id'], self::companyRoleFor([$role]));
             }
             $this->audit->record($actorUserId, 'user.created_by_administrator', [
                 'user_id' => (int) $user['id'],
@@ -2066,6 +2251,23 @@ final class PlatformAdministrationService
     /** @param array<string,mixed> $input */
     public function updatePerson(int $userId, array $input, int $actorUserId): void
     {
+        // The person page saves its two cards apart (the approved page, 2026-10-26): Particulars keep the roles as they
+        // are, and Company and roles keep the particulars and addresses, its role in the company chosen from a list.
+        $part = (string) ($input['part'] ?? '');
+        if ($part === 'particulars') $input['roles'] = $this->roles->roles($userId);
+        if ($part === 'roles') {
+            $input = ['roles' => is_array($input['roles'] ?? null) ? $input['roles'] : [], 'company_role' => $input['company_role'] ?? null];
+            foreach ($this->users->emails($userId) as $row) {
+                $input[in_array($row['is_primary'] ?? false, [true, 1, '1', 't', 'true'], true) ? 'primary_email' : 'secondary_email'] = (string) $row['email'];
+            }
+            if (is_string($input['company_role']) && $input['company_role'] !== '') {
+                $companyRoles = [RoleCatalog::COMPANY_ADMIN, RoleCatalog::COURSE_EDITOR, RoleCatalog::COURSE_OWNER];
+                $chosen = strtoupper($input['company_role']);
+                $input['roles'] = array_values(array_diff(array_map('strval', $input['roles']), $companyRoles));
+                if (in_array($chosen, $companyRoles, true)) $input['roles'][] = $chosen;
+            }
+            if (!in_array(RoleCatalog::STUDENT, $input['roles'], true)) $input['roles'][] = RoleCatalog::STUDENT;
+        }
         $primaryEmail = EmailAddress::normalize((string) ($input['primary_email'] ?? ''));
         $secondaryRaw = trim((string) ($input['secondary_email'] ?? ''));
         $secondaryEmail = $secondaryRaw !== '' ? EmailAddress::normalize($secondaryRaw) : null;
@@ -2080,29 +2282,37 @@ final class PlatformAdministrationService
         $currentRoles = $this->roles->roles($userId);
         $allowedRoles = array_column($this->roleOptionsForUser($currentRoles), 'role_key');
         $roles = array_values(array_filter($roles, static fn(string $role): bool => in_array(strtoupper($role), $allowedRoles, true)));
+        // Nobody removes their own Platform Administrator role either, or they are locked out of Administration
+        // (2026-10-25, with the rule above). Another administrator can.
+        if ($userId === $actorUserId && in_array(RoleCatalog::ADMIN, $currentRoles, true) && !in_array(RoleCatalog::ADMIN, $roles, true)) {
+            throw new InvalidArgumentException(self::OWN_ADMIN_ROLE);
+        }
         if (in_array(RoleCatalog::ADMIN, $currentRoles, true)
             && !in_array(RoleCatalog::ADMIN, $roles, true)
             && $this->roles->countActiveUsersWithRole(RoleCatalog::ADMIN) <= 1) {
             throw new InvalidArgumentException('The platform must always have at least one Platform Administrator. Assign another administrator before removing this role.');
         }
 
-        if (array_key_exists('birthdate', $input)) $input['birthdate'] = \CattoLearning\Auth\AdultAge::optionalInput($input['birthdate'], new \DateTimeImmutable());
+        // The date of birth comes from the person's ID number (owner, 2026-10-27, 2A): never typed here.
+        unset($input['birthdate']);
         $this->transactions->run(function () use ($userId, $input, $actorUserId, $primaryEmail, $secondaryEmail, $roles): void {
             $this->users->updateProfile($userId, $input);
             $this->users->replacePrimaryEmail($userId, $primaryEmail);
             $this->users->replaceSecondaryEmail($userId, $secondaryEmail);
             $this->roles->replaceUserRoles($userId, $roles);
-            // No company chosen ends the person's membership: a private account belongs to no company.
-            $companyId = max(0, (int) ($input['company_id'] ?? 0));
-            if ($companyId < 1) {
+            // The company follows the address (owner's rule): a new address at another company's domain moves them there,
+            // a private one makes the account private, keeping every course. Their role there follows the ticks.
+            $this->companyRule?->followAddress($userId, $primaryEmail, $actorUserId);
+            $membership = $this->companies->membership($userId);
+            if ($membership === null) {
                 if (in_array(RoleCatalog::COMPANY_ADMIN, $roles, true)) throw new InvalidArgumentException(self::COMPANY_ADMIN_NEEDS_COMPANY);
-                $current = $this->companies->findForUser($userId);
-                if ($current !== null) $this->companies->removeUser((int) $current['id'], $userId);
             } else {
-                $companyRole = in_array(RoleCatalog::COMPANY_ADMIN, $roles, true) ? 'administrator'
-                    : (in_array(RoleCatalog::COURSE_OWNER, $roles, true) ? 'course_owner'
-                    : (in_array(RoleCatalog::COURSE_EDITOR, $roles, true) ? 'course_editor' : 'student'));
-                $this->companies->assignUser($companyId, $userId, $companyRole);
+                $wanted = self::companyRoleFor($roles);
+                $isAdministrator = in_array($membership['company_role'], CompanyRepository::ADMINISTRATOR_ROLES, true);
+                if ($wanted !== $membership['company_role'] && !($isAdministrator && $wanted === 'administrator')) {
+                    if ($isAdministrator && $this->companies->administratorCount($membership['company_id']) <= 1) throw new InvalidArgumentException(self::LAST_COMPANY_ADMIN);
+                    $this->companies->assignUser($membership['company_id'], $userId, $wanted);
+                }
             }
             $this->audit->record($actorUserId, 'user.updated_by_administrator', ['user_id' => $userId]);
         });
@@ -2114,9 +2324,25 @@ final class PlatformAdministrationService
         $name = trim((string) ($input['name'] ?? ''));
         $domain = strtolower(trim((string) ($input['domain'] ?? '')));
         $this->validateCompanyInput($name, $domain);
-        $company = $this->companies->createManaged($actorUserId, $name, $domain);
-        $this->audit->record($actorUserId, 'company.created', ['company_id' => (int) $company['id']]);
-        return (int) $company['id'];
+        // A company is made with its Company Administrator, never empty (owner, 2026-10-27): the person named here,
+        // at its domain, made in the same step.
+        $first = trim((string) ($input['admin_first_name'] ?? ''));
+        $last = trim((string) ($input['admin_last_name'] ?? ''));
+        if ($first === '' || $last === '') throw new InvalidArgumentException('Enter the first name and last name of its Company Administrator.');
+        try {
+            $email = EmailAddress::normalize((string) ($input['admin_email'] ?? ''));
+        } catch (InvalidArgumentException) {
+            $email = '';
+        }
+        if ($email === '' || EmailAddress::domain($email) !== $domain) throw new InvalidArgumentException('Enter its Company Administrator\'s email address at ' . ($domain !== '' ? $domain : 'the company\'s domain') . ', such as name@' . ($domain !== '' ? $domain : 'example.co.za') . '.');
+
+        return (int) $this->transactions->run(function () use ($actorUserId, $name, $domain, $first, $last, $email): int {
+            $company = $this->companies->createManaged($actorUserId, $name, $domain);
+            $this->createPerson(['first_name' => $first, 'last_name' => $last, 'email' => $email, 'role' => RoleCatalog::COMPANY_ADMIN], $actorUserId);
+            $this->audit->record($actorUserId, 'company.created', ['company_id' => (int) $company['id']]);
+
+            return (int) $company['id'];
+        });
     }
 
     /** @param array<string,mixed> $input */
@@ -2134,8 +2360,53 @@ final class PlatformAdministrationService
         if ($this->companies->domainExistsForOther($domain, $companyId)) {
             throw new InvalidArgumentException('That company email domain is already registered.');
         }
-        $this->companies->updateManaged($companyId, $name, $domain);
-        $this->audit->record($actorUserId, 'company.updated', ['company_id' => $companyId]);
+        if (\CattoLearning\Support\PublicEmailDomains::contains($domain)) throw new InvalidArgumentException('A public webmail domain cannot be used for a company account.');
+        // Its staff's addresses are at its domain (owner's rule), so a new domain moves every one of them (owner, 2026-10-26:
+        // "a domain change affects all the staff and it should warn about this before the change is made"): the warning
+        // page lists them (domainChangeMoves()), and only its confirmation moves them.
+        $old = strtolower((string) $company['domain']);
+        $moves = $domain === $old ? [] : $this->domainChangeMoves($companyId, $domain);
+        if ($moves !== [] && empty($input['move_staff'])) {
+            throw new InvalidArgumentException('Changing the domain moves every staff address. Confirm it on the warning page first.');
+        }
+        $taken = array_values(array_filter($moves, static fn(array $move): bool => $move['taken']));
+        if ($taken !== []) throw new InvalidArgumentException('These addresses already belong to other accounts: ' . implode(', ', array_column($taken, 'to')) . '. Nothing was changed.');
+        $this->transactions->run(function () use ($companyId, $name, $domain, $old, $moves, $actorUserId): void {
+            foreach ($moves as $move) {
+                $this->users->replacePrimaryEmail($move['user_id'], $move['to']);
+                $this->users->removeSecondaryEmailsAt($move['user_id'], $old);
+            }
+            $this->companies->updateManaged($companyId, $name, $domain);
+            $this->audit->record($actorUserId, 'company.updated', ['company_id' => $companyId, 'domain_from' => $domain === $old ? null : $old, 'addresses_moved' => count($moves)]);
+        });
+        // Each moved person is told at the address they knew, which no longer signs them in.
+        foreach ($moves as $move) {
+            try {
+                $this->mailer->sendAdministratorMessage($move['from'], 'Your sign-in address has changed', $name . ' changed its domain from ' . $old . ' to ' . $domain . ".\n\nYour address at " . $this->settings->platformName() . ' is now ' . $move['to'] . '. Sign in with it from now on. Your courses and certificates are unchanged.');
+            } catch (\Throwable) {
+                // The change stands; the warning page told the administrator who would be moved.
+            }
+        }
+    }
+
+    /**
+     * What changing a company's domain does to its staff: each active member's primary address at the old domain, the
+     * address it becomes (the part before the @ kept) and whether that address already belongs to another account.
+     *
+     * @return list<array{user_id:int,name:string,from:string,to:string,taken:bool}>
+     */
+    public function domainChangeMoves(int $companyId, string $newDomain): array
+    {
+        $company = $this->companies->findById($companyId) ?? throw new RuntimeException('The company does not exist.');
+        $newDomain = strtolower(trim($newDomain));
+        if ($newDomain === '' || $newDomain === strtolower((string) $company['domain'])) return [];
+        $moves = [];
+        foreach ($this->administration->companyStaffAddresses($companyId, (string) $company['domain']) as $row) {
+            $to = strstr((string) $row['email'], '@', true) . '@' . $newDomain;
+            $moves[] = ['user_id' => (int) $row['user_id'], 'name' => (string) $row['name'], 'from' => (string) $row['email'], 'to' => $to, 'taken' => $this->users->emailTaken($to)];
+        }
+
+        return $moves;
     }
 
     /**
@@ -2157,6 +2428,8 @@ final class PlatformAdministrationService
      */
     public function setCompanyStatus(int $companyId, string $status, int $actorUserId): void
     {
+        // A deleted company stays deleted: its records are kept for review (owner, 2026-10-26).
+        if ((string) ($this->companies->findById($companyId)['status'] ?? '') === 'deleted') throw new InvalidArgumentException('A deleted company stays deleted. Its records are kept for review.');
         $this->transactions->run(function () use ($companyId, $status, $actorUserId): void {
             $this->companies->setStatus($companyId, $status);
 
@@ -2172,6 +2445,11 @@ final class PlatformAdministrationService
 
     public function setPersonStatus(int $userId, string $status, int $actorUserId): void
     {
+        // Nobody disables their own account here (owner, 2026-10-25: an ADMIN disabled their own account and was locked
+        // out, though the Company workspace already refused it). Another administrator can.
+        if ($status !== 'active' && $userId === $actorUserId) {
+            throw new InvalidArgumentException(self::OWN_ACCOUNT_DISABLE);
+        }
         if ($status !== 'active'
             && in_array(RoleCatalog::ADMIN, $this->roles->roles($userId), true)
             && $this->roles->countActiveUsersWithRole(RoleCatalog::ADMIN) <= 1) {
@@ -2205,16 +2483,22 @@ final class PlatformAdministrationService
             $role['selected'] = in_array((string) ($role['role_key'] ?? ''), $selectedRoles, true);
         }
         unset($role);
+        $shown = $this->idNumbers?->shown($userId) ?? ['masked' => '', 'residence_country' => ''];
+        $profile['id_number_masked'] = $shown['masked'];
+        $profile['residence_country_name'] = $shown['residence_country'] !== '' ? \CattoLearning\Support\Countries::name($shown['residence_country']) : '';
         return [
             'profile' => $profile,
             'primary_email' => $primary,
             'secondary_email' => $secondary,
-            'company' => $this->companies->findForUser($userId),
+            'company' => ($memberOf = $this->companies->memberCompanyId($userId)) !== null ? $this->companies->findById($memberOf) : null,
             'roles' => $selectedRoles,
             'role_options' => $roleOptions,
             // The company reassignment control used to load every company into a <select>.
-            // It is now an htmx lookup, so only the currently selected company is resolved.
-            'selected_company' => $this->lookups->describe('companies', (int) ($profile['company_id'] ?? 0)),
+            // It is now an htmx lookup, so only the currently selected company is resolved: the one the person is a
+            // member of. A user row has no company_id, so reading it there showed every member as a private account and
+            // saving the page ended their membership (owner, 2026-10-26: "saving the profile does not save the company").
+            'selected_company' => $this->lookups->describe('companies', (int) ($this->companies->memberCompanyId($userId) ?? 0)),
+            'company_membership_role' => (string) ($this->companies->membership($userId)['company_role'] ?? ''),
         ];
     }
 
@@ -2288,6 +2572,10 @@ final class PlatformAdministrationService
         $userId = null;
         $courseId = max(1, (int) ($input['course_id'] ?? 0));
         $period = max(86400, (int) ($input['access_period_seconds'] ?? 31536000));
+        // One of the lengths the course is sold for (owner, 2026-10-26), so assigning and requests always find it.
+        $lengths = $this->administration->courseSaleLengths($courseId);
+        if ($lengths === []) throw new InvalidArgumentException('This course is not sold at any length yet. Give it a price on its Pricing tab first.');
+        if (!in_array($period, $lengths, true)) throw new InvalidArgumentException('Choose one of the lengths the course is sold for.');
         $quantity = max(1, min(10000, (int) ($input['quantity'] ?? 1)));
         $id = $this->administration->addCredit(
             $companyId,
@@ -2411,7 +2699,12 @@ final class PlatformAdministrationService
     public function saveSettings(array $input, int $actorUserId): void
     {
         $platformName = trim((string) ($input['platform_name'] ?? ''));
-        if ($platformName !== '') {
+        // A blank name is refused, not skipped while the page says saved; and the .env name itself is no override, so a
+        // later .env change still shows (2026-10-26 audit: saving unchanged made one).
+        if ($platformName === '') throw new InvalidArgumentException('Enter the platform name.');
+        if ($platformName === Env::string('APP_NAME', 'Catto Learning')) {
+            if ($this->settings->platformNameSource() === 'database') $this->settings->resetPlatformName();
+        } else {
             $this->options->set('platform_name', $platformName, $actorUserId);
         }
         $this->audit->record($actorUserId, 'platform.settings_updated');
@@ -2608,6 +2901,12 @@ final class PlatformAdministrationService
         ];
     }
 
+    /** @return list<array<string,mixed>> the roles Add person may give, for a form outside the People page */
+    public function assignableRoles(): array
+    {
+        return $this->normalAssignableRoles();
+    }
+
     /** @return list<array<string,mixed>> */
     private function normalAssignableRoles(): array
     {
@@ -2641,6 +2940,8 @@ final class PlatformAdministrationService
         if ($this->companies->domainExists($domain)) {
             throw new InvalidArgumentException('That company email domain is already registered.');
         }
+        // No own domain, no company (owner's rule, restated 2026-10-26): a webmail domain is everybody's.
+        if (\CattoLearning\Support\PublicEmailDomains::contains($domain)) throw new InvalidArgumentException('A public webmail domain cannot be used for a company account.');
     }
 
     /**
@@ -2718,13 +3019,40 @@ final class PlatformAdministrationService
                 $this->administration->companies($pagination->pageSize, $pagination->offset, $search, $sort, $audience)
             ),
         ]
-            + $this->paginationView($dataset, $pagination, $base, self::UNIVERSE_COUNT_LABELS[$dataset], $filters)
+            + $this->paginationView($dataset, $pagination, $base, self::UNIVERSE_COUNT_LABELS[$dataset], $filters, self::listSizes($dataset, $request))
+            + self::viewData($dataset, $request, $base, $filters)
             + $this->sortView($dataset, $sort, $base, $columns, array_keys(AdministrationRepository::COMPANY_SORTS), $searchFilter, [
                 'people' => SortOrder::DESCENDING,
                 'courses' => SortOrder::DESCENDING,
                 'enrolments' => SortOrder::DESCENDING,
                 'created' => SortOrder::DESCENDING,
             ]);
+    }
+
+    /**
+     * A company's page in Administration (owner, 2026-10-26: "a page per company ... with the logo at the top"): the
+     * company with its figures and type, and its active people, each named and linked to their page.
+     *
+     * @return array{admin_company:array<string,mixed>,people:list<array<string,mixed>>,people_total:int}|null
+     */
+    public function adminCompanyView(int $companyId): ?array
+    {
+        $row = $this->administration->company($companyId);
+        if ($row === null) return null;
+        $people = [];
+        foreach ($this->administration->companyPeople($companyId, 100, 0) as $person) {
+            $people[] = [
+                'id' => (int) $person['id'],
+                'name' => PersonName::full($person),
+                'account_reference' => (string) ($person['account_reference'] ?? ''),
+                // In the words the company's own person page uses.
+                'role' => self::companyRoleWords((string) ($person['company_role'] ?? '')),
+                'course_count' => (int) ($person['course_count'] ?? 0),
+                'last_login_at' => $person['last_login_at'] !== null ? substr((string) $person['last_login_at'], 0, 16) : '',
+            ];
+        }
+
+        return ['admin_company' => $this->normaliseCompanies([$row])[0], 'people' => $people, 'people_total' => $this->administration->companyPeopleCount($companyId)];
     }
 
     /**

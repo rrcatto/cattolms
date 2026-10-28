@@ -1,0 +1,81 @@
+{#
+	Mailing › Reports (owner, 2026-10-27: the plan's Reports): for the period chosen (the dashboard's list, or two dates),
+	what was sent and what became of it, as figures and as columns over the period; the same by kind of email; each
+	message and digest that started in it; the lists with who joined and left; and the links clicked most. Without
+	JavaScript, Show applies the period.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'Reports' %}
+	{% set ph_lead = 'What the mailing system sent in a period and what became of it. Each rate is of the emails sent in the period.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set r = report %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'figures'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: r.period.label, summary: r.period.from == r.period.to ? r.period.from|date('j F Y') : r.period.from|date('j F Y') ~ ' to ' ~ r.period.to|date('j F Y')}) }}
+		<form class="cl-mailing-period" method="get" action="/mailing/reports" data-choose-submits>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'auto'})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', for: 'mr-period'})} %}{% block control %}<select class="cl-input" id="mr-period" name="period" {{ ui_field_attrs(props) }}>{% for value, label in r.periods %}<option value="{{ value }}"{{ value == r.period.key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From (for Dates)', for: 'mr-from'})} %}{% block control %}<input class="cl-input" type="date" id="mr-from" name="from" value="{{ r.period.key == 'custom' ? r.period.from : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To (for Dates)', for: 'mr-to'})} %}{% block control %}<input class="cl-input" type="date" id="mr-to" name="to" value="{{ r.period.key == 'custom' ? r.period.to : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{{ ui('data.stat-card', {value: r.totals.sent|number_format, label: 'Emails sent', icon: 'figure-orders', href: '#kinds'}) }}
+			{{ ui('data.stat-card', {value: r.totals.opened|number_format, label: 'Opened' ~ (r.rates.opened ? ' (' ~ r.rates.opened ~ ')' : ''), icon: 'figure-progress', href: '#messages'}) }}
+			{{ ui('data.stat-card', {value: r.totals.clicked|number_format, label: 'Clicked' ~ (r.rates.clicked ? ' (' ~ r.rates.clicked ~ ')' : ''), icon: 'figure-completion', href: '#links'}) }}
+			{{ ui('data.stat-card', {value: r.totals.forwarded|number_format, label: 'Forwarded to a friend', icon: 'figure-people', href: '#messages'}) }}
+			{{ ui('data.stat-card', {value: r.totals.bounced|number_format, label: 'Bounced' ~ (r.rates.bounced ? ' (' ~ r.rates.bounced ~ ')' : ''), icon: 'figure-risk-medium', href: '/mailing/never-emailed'}) }}
+			{{ ui('data.stat-card', {value: r.totals.complained|number_format, label: 'Marked as spam' ~ (r.rates.complained ? ' (' ~ r.rates.complained ~ ')' : ''), icon: 'figure-risk-high', href: '/mailing/never-emailed'}) }}
+			{{ ui('data.stat-card', {value: r.joined|number_format, label: 'People who joined a list', icon: 'figure-enrolments', href: '#lists'}) }}
+			{{ ui('data.stat-card', {value: r.left|number_format, label: 'People who left a list', icon: 'figure-cancelled', href: '#lists'}) }}
+		{% endblock %}{% endembed %}
+		<h3 class="h6 cl-mt-3">Emails sent by {{ r.columns.unit }}</h3>
+		{% include '@platform/partials/column-chart.html.twig' with {cc_label: 'Emails sent by ' ~ r.columns.unit ~ ', ' ~ r.period.label, cc_top: r.columns.top, cc_columns: r.columns.columns} %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}
+{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'kinds'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'By kind of email'}) }}
+			{% if r.kinds %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Emails by kind'})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Clicked'}} %}</tr>{% endblock %}
+			{% block body %}{% for kind in r.kinds %}<tr><td class="cell-text">{{ kind.label }}</td><td>{{ kind.sent|number_format }}</td><td>{{ kind.opened }}</td><td>{{ kind.clicked }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}<p class="small">Nothing was sent in this period.</p>{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'links'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Links clicked most', summary: 'By the people who clicked them first in this period.'}) }}
+			{% if r.links %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Links clicked most'})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Link'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'In'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'People'}} %}</tr>{% endblock %}
+			{% block body %}{% for link in r.links %}<tr><td class="cell-text">{{ link.url }}</td><td class="cell-text"><a href="/mailing/messages/{{ link.campaign_id }}">{{ link.campaign }}</a></td><td>{{ link.people }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}<p class="small">No link was clicked in this period.</p>{% endif %}
+		{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'messages'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Messages and digests', summary: 'Each that started in this period, newest first. Open one for who got it and every link clicked.'}) }}
+		{% if r.messages %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Messages and digests in the period'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Started'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}</tr>{% endblock %}
+		{% block body %}{% for m in r.messages %}<tr><td class="cell-text"><a href="/mailing/messages/{{ m.id }}">{{ m.name }}</a></td><td>{{ m.kind_label }}</td><td>{{ m.started_at|date('j M Y') }}</td><td>{{ m.sent }}</td><td>{{ m.opened_rate }}</td><td>{{ m.clicked_rate }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}<p class="small">No message or digest started in this period.</p>{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'lists'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Lists', summary: 'The 25 largest, with the people on each now and who joined and left in this period.'}) }}
+		{% if r.lists %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Lists in the period'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'List'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'On it now'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Joined'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Left'}} %}</tr>{% endblock %}
+		{% block body %}{% for list in r.lists %}<tr><td class="cell-text"><a href="/mailing/lists/{{ list.id }}">{{ list.name }}</a></td><td>{{ list.people }}</td><td>{{ list.joined }}</td><td>{{ list.left_count }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}<p class="small">No lists yet.</p>{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

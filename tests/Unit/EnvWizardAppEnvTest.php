@@ -16,6 +16,9 @@ existing value, starts a new site with the example's (development), writes produ
 refuses anything else. APP_DEBUG is gone (debugging follows APP_ENV): the wizard no longer writes it.
 
 Changelog:
+2026/10/26 SAST
+- Lengths of time (owner, 2026-10-26: "a standard method of expressing time"): an older site's value in seconds is
+  offered written the one way (86400 as 1d), and a plain number given as an answer is refused with how to write one.
 2026/10/24 SAST
 - APP_DEBUG retired: not written, an existing one dropped (owner, 2026-10-24, option 1).
 - Created with the fix.
@@ -52,6 +55,19 @@ final class EnvWizardAppEnvTest extends TestCase
     {
         $existing = $this->file("APP_ENV=development\n");
         self::assertSame(['production', null], $this->written($existing, ['APP_ENV' => 'production']), 'The owner\'s own answer.');
+    }
+
+    public function testLengthsOfTimeAreWrittenTheOneWay(): void
+    {
+        [$status, $output, $written] = $this->wizard($this->file("APP_ENV=development\nAUTH_SESSION_TTL=86400\nAUTH_MAGIC_LINK_TTL=1800\nAUTH_REQUEST_WINDOW=45m\n"), []);
+        self::assertSame(0, $status, $output);
+        self::assertMatchesRegularExpression('/^AUTH_SESSION_TTL=1d$/m', $written, 'An older site\'s seconds, written the one way.');
+        self::assertMatchesRegularExpression('/^AUTH_MAGIC_LINK_TTL=30m$/m', $written);
+        self::assertMatchesRegularExpression('/^AUTH_REQUEST_WINDOW=45m$/m', $written, 'A value already written the one way is kept.');
+        self::assertMatchesRegularExpression('/^PHP_SESSION_TTL=1d$/m', $written, 'A new value: the example\'s.');
+        [$status, $output] = $this->wizard(null, ['AUTH_SESSION_TTL' => '86400']);
+        self::assertNotSame(0, $status);
+        self::assertStringContainsString('AUTH_SESSION_TTL in the answers file: Write a length of time with y, w, d, h, m and s in that order', $output);
     }
 
     public function testAnythingElseIsRefused(): void

@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 0.9.11 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.0.0 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -30,7 +30,6 @@ php tools/reset-development-database.php --force        # drops and recreates th
 php vendor/bin/phinx migrate -c phinx.php -e development # the one baseline: schema and reference data
 composer themes:install && composer themes:sync && composer seeds:publish
 php tools/smoke-app-boot.php
-php tools/seed-generate.php 100000                       # optional random dataset; not used since 2026-10-19 (clean database)
 php bin/console popularity:recalculate --no-debug
 php bin/console cache:clear
 ```
@@ -80,9 +79,12 @@ One scheduler runs everything on an installation: `php bin/console schedule:run 
 |---|---|---|
 | Orders and emails (`commerce`) | every minute | the commerce job, below |
 | Course popularity (`popularity`) | every hour | recalculates the popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read; pages never calculate it |
-| Clean-up (`cleanup`) | every day | deletes activity log entries and analytics events older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
+| Clean-up (`cleanup`) | every day | deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
+| Sign-up check lists (`signup_lists`) | every day | fetches the Tor exit addresses daily and, weekly, the VPN and hosting networks and the throwaway email domains the sign-up check reads |
+| News emails (`mailing`) | every minute | records course changes as held updates, releases the updates whose time has come and delivers them (at once to people who want them as they happen, in each digest on its day), sends within the sending hours at the pace Mailing › Sending settings allows, pauses a sending whose bounces or complaints are too high, reads back what became of each email and asks sleeping addresses once a day |
+| Log archive (`log_archive`) | every day just after midnight | moves `storage/logs/application.log`, and any other log beside it such as `schedule.log`, into `storage/logs/archive` compressed (`application-2026-10-27.log.gz`), starts each afresh and deletes archives older than `LOG_ARCHIVES_KEPT_FOR` (2 weeks; Settings → Maintenance overrides it). See "Application logging" below |
 
-Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce after 5 minutes, popularity after 3 hours, clean-up after 2 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
+Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce and news emails after 5 minutes, popularity after 3 hours, clean-up and the log archive after 2 days, the sign-up check lists after 3 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
 
 The commerce job does these things:
 
@@ -104,6 +106,20 @@ Learners verify on Didit's hosted page: they photograph their ID or passport and
 3. Put `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID` and the destination's secret as `DIDIT_WEBHOOK_SECRET` in `.env` (`.env.example` has placeholders that count as not set). Restart PHP-FPM and the scheduler.
 
 Without all three, verification is not available and certificates wait. Verification is never skipped. A learner verifies once, when their first certificate is due: nothing is asked before a purchase. A declined check says why; after three, ADMIN allows another try on the person's page, where ADMIN also sees the status and history, opens Didit's console (search for the session id under Verifications) and revokes a verification with a reason. Checks Didit is reviewing are listed on the dashboard. The site is for adults only: a verified learner whose document shows them under 18 is stopped at the adults-only page and issued nothing. Every event is in the Activity log, without the document number or date of birth.
+
+## News emails (mailing)
+
+Mailing has its own menu. People choose what news they get: News and Updates at registration, at checkout or on Account → My Subscriptions, Follow on a category, course or tag, and the lists an administrator makes (Mailing › Lists), which people join only themselves, on My Subscriptions or with the list's join link. Each person chooses once how updates reach them: as they happen, a digest for each thing they follow, or one digest with everything, daily, weekly or monthly (weekly until they choose; the first Follow asks).
+
+Updates are news about what people follow. The site records course changes as updates (a course published for the first time, lessons or sections added, a price lowered, a promotion starting, a landing page published, a course retired; each switched on or off in Mailing › Sending settings), and an administrator can write one for any list. Each is held on Mailing › Digest, never sent on its own, until an administrator releases it, now or at a date and time; an update nobody follows can be posted to News and Updates, and one released while nobody follows it is closed. Mailing › Messages writes emails in blocks to chosen lists, in a template from Mailing › Templates. Mailing › Lists makes lists of your own (each with a join link, a welcome email, its own sender and template, and closing); Mailing › Subscribers shows everyone on a list, how they get updates, what they were sent and their history, with Take off this list and Stop all email. Mailing › Automatic emails lists every email that goes by itself and holds the words of the update emails, the digests and "Do you still want our news?" (which can be switched off). Mailing › Reports shows, for a period, what was sent and what became of it. Every email has "View it in your browser" and "Forward to a friend": the friend gets that one email through the site's own mail, with a link to create an account and "Never email me", and is put on no list (at most 5 friends an email and 10 a day). Everything the mailing system sends waits for the sending hours (Mailing › Sending settings); account and order emails always go at once. The `mailing` scheduled job does the work, once a minute.
+
+1. Give news its own subdomain, for example `news.example.test`: point it at the site (an address record and, behind a web server, the site's server name), so the stop, open, click and picture links under `/m/` reach it, and set `MAILING_LINK_BASE=https://news.example.test` and `MAILING_FROM_ADDRESS=news@news.example.test`.
+2. Choose how it leaves with `MAILING_TRANSPORT`:
+   - `smtp`: through `MAILING_DSN`, or `MAILER_DSN` when it is empty. The site adds `List-Unsubscribe`, `List-Unsubscribe-Post` (one click) and `List-Id` to each copy. The mail server must sign the subdomain with DKIM, and SPF and DMARC must allow it.
+   - `cattomail`: through a cattomail smarthost's API. Set `CATTOMAIL_API_BASE_URL` and `CATTOMAIL_API_KEY`, and give cattomail the webhook address Settings → Mailing shows, `https://<the site's domain>/webhooks/cattomail`, with its signing secret as `CATTOMAIL_WEBHOOK_SECRET` (and the previous one as `CATTOMAIL_WEBHOOK_SECRET_PREVIOUS` while it changes). Verify the news subdomain as a sending domain in cattomail first: cattomail signs with DKIM, sets the bounce address and reports hard bounces and spam complaints at once.
+3. Mailing › Sending settings overrides every one of these, with a Reset, and holds the sending discipline: opens and clicks recorded, emails an hour, a gentle first day that doubles daily, the bounce and complaint rates at which a sending pauses itself, the sending hours, the weekly and monthly digests' days (each digest goes at the start of the sending hours), what becomes an update, and when a sleeping address is asked whether it still wants news.
+
+A hard bounce or a spam complaint puts the address on Addresses Never Emailed; a complaint also stops everything its person follows. Restart the scheduler after changing the mailing code.
 
 ## Who can sign in
 
@@ -142,12 +158,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.11`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.0`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.11  # the tag being released
+   V=v1.0.0  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
@@ -202,7 +218,6 @@ tools/validate-release.php
 Development instruments, run by hand and never part of the gate:
 
 ```text
-tools/seed-benchmark-dataset.php
 tools/benchmark-pagination.php
 ```
 
@@ -212,13 +227,10 @@ An environment without PHP 8.5, Composer and PostgreSQL may run the syntax and s
 
 Pagination 2.0 is measured rather than assumed, and the two tools that do it are development instruments only — both refuse to run on a live site (`APP_SITE_MODE`, below).
 
-The Seed Database generates a *realistic* graph: a volume of 100,000 is a budget of 100,000 rows spread across roughly thirty tables, so it produces about 1,300 people and 2,500 enrolments. That is right for exercising the interface and useless for measuring pagination, because a list of 1,300 rows is fast however it is written. `seed-benchmark-dataset.php` writes the opposite shape: one hundred thousand rows in each of the tables the paginated lists actually read, and nothing underneath them.
+The dataset writer this benchmark used (`tools/seed-benchmark-dataset.php`, which inserted hundreds of thousands of made-up rows) was removed on 2026-10-27 with the bulk generator: test data is made only through the workflows now (Seed Database, below), and a benchmark needs its own volume.
 
 ```bash
-catto 'php tools/seed-benchmark-dataset.php'          # ~920,000 rows, about 2.5 minutes
 catto 'php tools/benchmark-pagination.php --runs=3'   # every list at page 1, the middle and the last
-catto 'php tools/seed-benchmark-dataset.php --list'   # the seed batches present
-catto 'php tools/seed-benchmark-dataset.php --remove=<token>'
 ```
 
 **Neither instrument runs on v0.7, and the commands above are the v0.6 ones.** Both were written against the universe model and neither was carried across when it was removed: `benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the class; `seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which no longer exists, and its inserts still name the dropped `seed_token` and `company_type` columns. Every listed command therefore ends in an uncaught `Error` rather than a measurement.
@@ -334,6 +346,10 @@ The HTTP bootstrap writes PHP errors and one lightweight request line to:
 
 Request logging records method + URL path only. Query strings are excluded so login/magic-link tokens and other request parameters are not written to the log.
 
+The log is archived every night (owner, 2026-10-27; `Maintenance\LogArchive`, the `log_archive` job): just after midnight it is moved into `storage/logs/archive/`, compressed as `application-<day>.log.gz` (a second archive of the same day gets `-2`), and started afresh with the same permissions. PHP opens the log for each line it writes, so no line is lost while the old log is compressed. Any other `.log` file in `storage/logs`, such as the `schedule.log` that `install.sh`'s cron line appends to, is archived the same way under its own name. Archives older than `LOG_ARCHIVES_KEPT_FOR` (a length of time, `2w` by default) are deleted; Administration → Settings → Maintenance shows where the log and its archives are and how big they are, and overrides the keep period with a Reset. Read an archive with `zless` or `zcat`.
+
+On a development site the log records every step of every request: the development laptop's grew by about 100 MB a day (4.8 GB in seven weeks), about 4 MB a day once compressed.
+
 Core and theme browser assets are emitted with content fingerprints. A repaired CSS/JS file therefore receives a new browser URL automatically after publication.
 
 ## Working tree traps
@@ -364,7 +380,7 @@ Never use this on a live site.
 
 ## GeoIP
 
-Administration Activity stores the raw IP address and can optionally display a location via Geocoder PHP + the GeoIP2 provider + a local MaxMind GeoLite2 City database.
+Administration Activity stores the raw IP address and can optionally display a location via Geocoder PHP + the GeoIP2 provider + a local MaxMind GeoLite2 City database. The sign-up check (below) and a person's Recent sign-ins read the same database for each address's country, and the GeoLite2 ASN database for its network.
 
 Composer dependency:
 
@@ -382,7 +398,25 @@ GEOIP_DATABASE=/home/<site-user>/storage/geoip/GeoLite2-City.mmdb
 
 The LMS must continue to work when the MMDB file is absent; location simply remains unavailable. Private/local IPs should be presented as local/private rather than treated as geolocation errors.
 
-For automatic database updates, install/configure MaxMind `geoipupdate` at the server level. This is operational tooling, not an LMS runtime dependency.
+For automatic database updates, install/configure MaxMind `geoipupdate` at the server level. This is operational tooling, not an LMS runtime dependency. A free MaxMind account downloads the databases; put `GeoLite2-ASN.mmdb` in the same folder as the City (or Country) database for network names. The service builds the locator with no path, so it reads `GEOIP_DATABASE` itself (until 2026-10-26 it never did, and every location said "GeoIP unavailable").
+
+## Sign-up check
+
+Every registration form sent is judged and recorded (owner, 2026-10-26; `src/Auth/Signup/`, `signup_attempts`, UX rule 2.6h): the country and network of its IP address, Tor, VPN and hosting networks, the email domain (throwaway, or unable to receive mail), the browser, how long the form was open, the browser's time zone against the address's country, other sign-ups from the same address and a made-up looking name, each worth points (`SignupRisk::POINTS`), giving a score and a band. A throwaway address is refused. A registration from a blocked country is held for approval without being told why, and on a live site so is a high-risk one; one from outside the allowed countries is a warning sign only (owner, 2026-10-27); a demo site holds everyone not on the Who can sign in list anyway. A bot that fills the hidden field is shown the usual "check your email" page and sent nothing. Administration > People & Companies > Sign-up Attempts lists every attempt; the person's page shows their Sign-up check and Recent sign-ins (country and network of each); Needs your attention shows a waiting account's risk and a first sign-in from a new country.
+
+- **Countries:** Administration > Settings > Sign-up checks, starting from `SIGNUP_ALLOWED_COUNTRIES` and `SIGNUP_BLOCKED_COUNTRIES` in `.env` (two-letter codes, commas; empty allowed means every country).
+- **Lists:** the scheduler's "Sign-up check lists" job (`ScheduledJob::SignupLists`) fetches the Tor Project's exit addresses daily and, weekly, X4BNet's VPN and hosting networks (MIT) and the disposable-email-domains list (CC0) into `storage/signup-lists/`; Settings > Sign-up checks shows each list's size and date and fetches them at once. The server needs outbound HTTPS to `check.torproject.org` and `raw.githubusercontent.com`. Without a list, its signal is simply not found.
+- **The visitor's address** comes from `REMOTE_ADDR`: behind a proxy, the web server must pass the visitor's address through (nginx `real_ip`), or every address is the proxy's, private, and every registration's country is unknown. A country outside the allowed list is a warning sign, not a hold (owner, 2026-10-27): only a blocked country, or a high-risk registration on a live site, is held.
+- **Kept:** an attempt that became an account is deleted with it; one that never did is deleted by the daily clean-up after 5 years (the Privacy Policy).
+
+## South African ID numbers
+
+Only people with a valid South African ID number register (owner, 2026-10-27; `Auth\SouthAfricanIdNumber`, `Auth\IdNumbers`). The Register page asks the country they live in, preset to the one their IP address shows, and their ID number; anyone who chooses another country is told "Registration is open to people living in South Africa for now." A number is valid when it is 13 digits, its first six are a real date of birth, its citizenship digit is 0 (a citizen) or 1 (a permanent resident) and its last digit fits the Luhn checksum; the date of birth comes from it, and someone under 18 is refused with nothing kept. This shows the number is well formed, not that it is a real person's or the typist's: only Home Affairs' population register, or the identity verification before a certificate, can show that.
+
+- **One account per number:** a number another account holds is refused ("That ID number already has an account. Sign in instead."), by a keyed fingerprint of it (`users.id_number_hash`, HMAC-SHA256 with `APP_KEY`, unique).
+- **Kept encrypted** (`users.id_number_encrypted`, `SecretCipher`, `APP_KEY`) and shown masked (`780615 **** ***`) on Account > Personal Particulars and on the person's page in Administration, with the country they say they live in (`users.residence_country`). Nobody types it anywhere else, and a checkout never asks for it. Changing `APP_KEY` makes the kept numbers unreadable and their fingerprints no longer match: never change it on a site with accounts.
+- **Accounts without one** (added by an administrator or a Company Administrator, and every account made before 2026-10-27) give it at their next sign-in, before any other page (`/account/id-number`).
+- **Seed Database** gives each person it registers a valid number for their date of birth.
 
 ## Theme re-sync diagnostics
 
@@ -390,23 +424,23 @@ Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` s
 
 ## Seed Database
 
-Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE`.
+Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE`, only on a demo site and only once courses are on sale (import the catalogue first). It fills the site with test data made by following the site's own workflows (owner, 2026-10-27: "it is only useful for testing the app if it produces data which is a result of following the app's workflows"): nothing is inserted directly and no date is made up, so everything it makes is something people using the site could have made, dated when the run made it.
 
-**Generating.** Enter an approximate record count. It is a soft whole-set target across every seeded table, not a per-table quota, and lands within about 1% of the request from 1,000 upward. Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
+**Asking for a run.** Enter how many companies (0 to 40) and how many private learners (0 to 300), and what the data is for (kept in the activity log). The page answers at once and the run carries on after it (`SeedRunListener`, on the kernel's terminate event); the card at the top shows the step it has reached and what it has made so far, asks again every five seconds while the run is under way (htmx; without JavaScript, Check again), and when it ends lists everything made and anything the app refused to do, with why. One run at a time; a run that has said nothing for half an hour has stopped, and another may start. `php bin/console seed:run --companies=8 --learners=30` runs the same in the foreground, for scripts (`composer seeds:generate`).
 
-**Memory.** The full 500,000-row maximum completes against the deployed `memory_limit=128M`, peaking at about 58 MB on a fresh database. It did not always: every phase used to build all of its rows before writing any of them, which made cost linear in the request and put the largest sets out of reach with `Allowed memory size ... exhausted`. The generator now streams — a chunk is built, written, its identifiers kept and its rows discarded — so peak cost follows `SeedGenerator::GENERATION_CHUNK` rather than the volume asked for. Generating repeatedly adds a few MB per set, because the name factory is primed with every name already stored so a later set cannot repeat one; three consecutive maximum sets peak at about 75 MB.
+**What a run makes** (`Seed\SeedRun`), each through the service its page calls, as the person who would do it:
 
-**There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively removed once written. Resetting the database is the only way back to a clean state, which is what `composer smoke:install` does.
+- A company is registered by its founder on the Register page (on a demo site held until ADMIN approves the account) or added by ADMIN with its Company Administrator, never empty; its Company Administrator adds 3 to 12 staff at the company's domain, a larger company a second administrator; buys credits for a few courses at the checkout (the simulated card, or EFT recorded by ADMIN from the bank statement at Record EFT Payment, a few left waiting) and assigns them; staff start most of their courses, and some ask for others (approved where a place is left, declined, or waiting).
+- A private learner registers (the run reads the link from their held email, as they would click it; ADMIN approves the account; a couple are left waiting and one never clicks) or is added by ADMIN, and most buy a course or two, or a bundle, at the checkout; some tick Keep me informed.
+- Learners answer their courses' graded assessments one question at a time, some part of the way and some to the end, some better than others; some review a course, and ADMIN approves most reviews, rejects one now and then and leaves a few; three ask for a refund (one approved as goodwill with the Refund Policy's override, one refused by the policy, one waiting); a few people write in through the contact form.
 
-**What a set contains.** People with emails and roles, companies and memberships, courses with Course Items, structure nodes and placements, assessments with questions and options, grade bands, price variants, editors, enrolments, attempts, responses, assessment sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 28 tables (`SeedGenerationPlan`). Generated certificates are recorded like issued ones, with their document data and the version of the default certificate design, which every generated course starts on (the baseline makes Classic the default).
+**Names** are real and never repeated: a person is a first name and surname from `first-names.txt` and `surnames.txt`, a company a South African place or familiar word and a trade from `company-words.txt` and `company-trades.txt` (Karoo Ridge Accounting); no name is one already on the site and none carries a number. The lists ship in `resources/seeds/`, `composer seeds:publish` copies them to the instance's `storage/seeds/`, and the instance's copy is the one read, so an operator's additions survive upgrades. A company's domain is its name with `.invalid` (RFC 2606: never delivered to), and its staff are first.last at it; a private learner is first.last at an invented private domain that is just as undeliverable.
 
-Never fabricated: sessions, login and API tokens, Resources, and everything commerce and analytics records (orders, payments, entitlement sources, billing profiles, promotions, bundles, reviews, analytics events). Those come only from using the application. Popularity is calculated from what exists by `popularity:recalculate`. Generation sends **zero email**.
+**No email.** Every email the run's workflows send is held (`GeneratedDomainMailer::hold()`), the orders' queued emails are handed over inside the hold, and while a run is under way mail to an invented address from any other process (the scheduler's worker) is dropped too. Later mail the workflows send by themselves (an unpaid EFT order cancelled at its deadline, a wallet reminder) is re-addressed to the same local part at `APP_DOMAIN`, as for any invented address.
 
-**Signing in as a generated identity.** Request an ordinary passwordless login for the generated address. The stored domain is the company's name plus `.invalid` — RFC 2606 reserves that suffix so the address can never leave the building — and `GeneratedDomainMailer` re-addresses the message to the same local part at `APP_DOMAIN`, so it arrives in the one inbox you already read. There is no `SEED_SYSTEM_COMPANY_DOMAIN` any more, and nothing in the mail path refers to seed data: these are simply the domains the platform invents.
+**Signing in as one of them.** Request an ordinary sign-in link for the address; it arrives at the same local part at `APP_DOMAIN` (Mailpit on a development site).
 
-**There is nothing to clean up, switch between or verify the isolation of.** Those three operations were this section's bulk until v0.7 and all three are gone with the REAL/SEED split: there is no Clean up action, no All/Real/Seed control above the Administration lists, and no cross-universe trigger to test an INSERT against. A generated row is an ordinary row. If the paragraphs you remember are the ones that described them, they described v0.6.
-
-What replaces all three is the single sentence above: reset the database. `composer smoke:install` is the whole cleanup story now, and it is the only one, which is why generating is safe to do freely and impossible to undo selectively.
+**Removing seeded data.** There is no undo: seeded records are ordinary records. Rebuild the database to start again (above).
 
 ## The Site Owner and its bank details
 

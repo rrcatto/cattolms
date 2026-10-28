@@ -1,0 +1,36 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		The warning before a company's domain changes (owner, 2026-10-26: "a domain change affects all the staff and it should
+		warn about this before the change is made"): every staff address it moves, from and to, then the change itself.
+	#}
+	{% set ph_kicker = 'Companies' %}
+	{% set ph_title = 'Change the domain of ' ~ domain_company.name|default('the company') %}
+	{% set ph_lead = 'From ' ~ domain_company.domain|default('') ~ ' to ' ~ new_domain ~ '.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: moves|length == 1 ? 'This moves 1 staff address' : 'This moves ' ~ moves|length ~ ' staff addresses'})} %}{% block body %}<p>Every staff address is at the company's domain, so each one below moves to {{ new_domain }}. From then on each person signs in with the new address only, and is emailed at the old one to say so. Their courses and certificates are unchanged.</p>{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'The addresses it moves', summary: moves_taken ? moves_taken ~ ' of them already belong to other accounts, so the change cannot be made until they are free.' : 'Check them before you confirm.'}) }}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 28, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 32, label: 'Now'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Becomes'}} %}</tr>{% endblock %}
+			{% block body %}{% for move in moves %}<tr>
+				<td class="cell-text">{{ ui('data.person', {name: move.name, href: '/admin/people/' ~ move.user_id}) }}</td>
+				<td class="cell-text">{{ move.from }}</td>
+				<td class="cell-text">{{ move.to }}{% if move.taken %} {{ ui('feedback.badge', {label: 'Already an account\'s address', tone: 'danger', size: 'small'}) }}{% endif %}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			<form action="/admin/companies/{{ domain_company.id }}" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="name" value="{{ new_name }}">
+				<input type="hidden" name="domain" value="{{ new_domain }}">
+				<input type="hidden" name="confirm_domain" value="{{ new_domain }}">
+				{% if return_to starts with '/admin/companies/' %}<input type="hidden" name="return" value="page">{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{% if not moves_taken %}{{ ui('action.button', {label: moves|length == 1 ? 'Change the domain and move 1 address' : 'Change the domain and move ' ~ moves|length ~ ' addresses', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endif %}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel: keep ' ~ domain_company.domain|default(''), variant: 'secondary', size: 'normal', href: return_to, icon: 'action-cancel'}) }}{% endblock %}
+				{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

@@ -34,7 +34,7 @@
 		{{ ui('form.picture-choice', {name: 'placement', legend: 'Where the words go', items: placements, selected: design.placement}) }}
 		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Typeface', for: 'design-typeface'})} %}{% block control %}<select id="design-typeface" name="typeface" {{ ui_field_attrs(props) }}>{% for key, label in typefaces %}<option value="{{ key }}"{% if key == design.typeface %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title and name colour', for: 'design-colour'})} %}{% block control %}<input id="design-colour" type="color" name="colour" value="{{ design.colour }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% include '@platform/partials/hex-colour-field.html.twig' with {hc: {id: 'design-colour', name: 'colour', value: design.colour, label: 'Title and name colour'}} %}
 		{% endblock %}{% endembed %}
 	</fieldset>
 {% endblock %}{% endembed %}

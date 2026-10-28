@@ -333,6 +333,12 @@ final class CommerceRepository
     }
 
     /** What is still to pay on an order: its total less the payments received, never below nothing. */
+    /** Whether a person is an active Company Administrator of a company, its founder included (2026-10-26). */
+    public function isCompanyAdministrator(int $companyId, int $userId): bool
+    {
+        return $this->db->fetchOne("SELECT 1 FROM company_users WHERE company_id = :c AND user_id = :u AND status = 'active' AND company_role IN ('owner', 'administrator')", ['c' => $companyId, 'u' => $userId]) !== false;
+    }
+
     public function dueAmount(int $orderId): int
     {
         return max(0, (int)$this->order($orderId)['total_minor'] - $this->paidTotal($orderId));

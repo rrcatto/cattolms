@@ -352,7 +352,7 @@ final class LearningService
         return $expires !== '' && (strtotime($expires) ?: PHP_INT_MAX) < time();
     }
 
-    /** In the words every offer uses (a month is a twelfth of a year, owner 2026-10-19). */
+    /** In the words every offer uses (Support\AccessPeriod: a month is 30 days and each whole year 365, owner 2026-10-26). */
     private function durationLabel(int $seconds): string
     {
         return AccessPeriod::label($seconds);

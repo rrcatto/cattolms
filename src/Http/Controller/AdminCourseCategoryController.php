@@ -71,7 +71,8 @@ final class AdminCourseCategoryController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly \CattoLearning\View\Artwork\IconLibrary $icons
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -147,6 +148,7 @@ final class AdminCourseCategoryController extends BaseController
         return $this->render('admin-course-category-edit', [
             'title' => 'Edit category · ' . (string) $category['name'],
             'category' => $category,
+            'followers' => $this->mailingLists->followersOf('category', $categoryId) + ['name' => (string) $category['name']],
             // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
             'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $category['name'], $iconQuery), 'action' => '/admin/courses/categories/' . $categoryId],
             'category_path' => $this->courses->categoryTrail($categoryId),

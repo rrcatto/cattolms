@@ -22,6 +22,12 @@ print comes from there. No name, address or legal form of a real business is wri
 Changing a document's text means changing its date here in the same change.
 
 Changelog:
+2026/10/26 SAST
+- Privacy: the sign-up check's registration records, a sign-in's country in the activity log, and unfinished
+  registrations kept 5 years (owner, 2026-10-26); its date moves to 2026-10-26.
+  The same day the Privacy Policy gains the email choices (mailing, step 1): what is kept and why; its date stays 2026-10-26.
+  2026-10-27: it gains the news emails (mailing, step 2): each one sent, its opening and clicks, bounces and complaints never
+  sent to again, and their records kept 5 years; its date moves to 2026-10-27.
 2026/10/20 SAST
 - Terms: a promo code is entered at checkout or applied automatically, and one promotion applies to an
   order, the one that saves the most (owner, 2026-10-20).
@@ -70,7 +76,7 @@ final class LegalDocuments
             'intro' => 'These terms apply to everyone who uses this site and to every purchase made on it.'],
         self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-19',
             'intro' => 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.'],
-        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-10-20',
+        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-10-28',
             'intro' => 'This policy explains how personal information is handled on this site, as the Protection of Personal Information Act 4 of 2013 (POPIA) requires.'],
     ];
 

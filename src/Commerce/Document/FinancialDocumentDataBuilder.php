@@ -33,6 +33,8 @@ assemble() is the pure part, given the business and bank details; the samples on
 are built by it too, so a preview is drawn exactly as an issued document is.
 
 Changelog:
+2026/10/26 SAST
+- A line's access period is stated through AccessPeriod ("1 year", "6 months"), as on every page, not as days.
 2026/10/19 SAST
 - A receipt names the payment method and its provider (PaymentMethods::receiptLabel, owner 2026-10-19).
 2026/10/08 SAST
@@ -43,6 +45,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Document;
 
+use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Commerce\Settings\PaymentMethods;
@@ -334,10 +337,10 @@ final class FinancialDocumentDataBuilder
         return array_sum(array_map(static fn(mixed $item): int => (int) ((array) $item)['line_total_minor'], (array) ($snapshot['items'] ?? [])));
     }
 
+    /** In the words every offer states its period in (Support\AccessPeriod, owner 2026-10-19 and 2026-10-26): "1 year", "6 months". */
     private static function period(int $seconds): string
     {
-        $days = (int) round($seconds / 86400);
-        return $days === 1 ? '1 day' : $days . ' days';
+        return AccessPeriod::label($seconds);
     }
 
     /** A moment as the date it fell on here. */

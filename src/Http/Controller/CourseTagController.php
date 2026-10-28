@@ -8,6 +8,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
+use CattoLearning\Support\ListView;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,7 +26,8 @@ final class CourseTagController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly PlatformAdministrationService $platformAdministration
+        private readonly PlatformAdministrationService $platformAdministration,
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -68,6 +70,9 @@ final class CourseTagController extends BaseController
         $courses = $showing
             ? $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset)
             : [];
+        // Cards or a list, as the reader chose on the catalogue or here (owner, 2026-10-26).
+        $view = ListView::chosen(self::DATASET, $request->query->all(), $request->cookies->all());
+        ListView::rememberAsked(self::DATASET, $request->query->all());
 
         if ($identity !== null && $courses !== []) {
             $favourites = [];
@@ -96,9 +101,13 @@ final class CourseTagController extends BaseController
             'workspace' => [
                 'heading' => $search !== '' ? 'Search results' : ($tag !== null ? 'Courses tagged ' . $tag['name'] : 'Choose a tag'),
                 'summary' => $tag !== null ? 'Courses carrying ' . $tag['name'] . ($search !== '' ? ' matching your search.' : '.') : 'Search all courses or choose a label above.',
+                'view' => $view,
+                'view_switch' => ListView::switcher(self::DATASET, $view, $base, [PlatformAdministrationService::searchParam(self::DATASET) => $search]),
                 'paginated' => $showing,
                 'empty_heading' => $showing ? 'No courses match this selection' : 'Explore the catalogue by tag',
                 'empty_summary' => $showing ? 'Try another term or choose another tag.' : 'Choose a tag above or search for a course.',
+                // The tag shown can be followed (mailing, step 1; owner, 2026-10-26).
+                'follow' => $tag === null ? null : ['kind' => 'tag', 'id' => (int) $tag['id'], 'name' => (string) $tag['name'], 'following' => $identity !== null && $this->mailing->isSubscribed($identity->id, 'tag', (int) $tag['id']), 'signed_in' => $identity !== null, 'return' => $base . '#follow'] + $this->mailing->followChoice($identity === null ? 0 : $identity->id),
             ],
             'catalogue_search' => $search,
             'universe_query' => '',

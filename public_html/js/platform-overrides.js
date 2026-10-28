@@ -393,6 +393,8 @@
         if (selected) selected.innerHTML = `<strong></strong>`, selected.firstChild.textContent = choice.getAttribute('data-lookup-label') || '';
         if (search instanceof HTMLInputElement) search.value = '';
         if (results) results.innerHTML = '';
+        // A field that depends on the choice follows it (the lengths of a credit for the chosen course, 2026-10-26).
+        if (value instanceof HTMLInputElement) value.dispatchEvent(new Event('change', {bubbles: true}));
         return;
       }
       const clear = event.target instanceof Element ? event.target.closest('[data-lookup-clear]') : null;
@@ -402,6 +404,7 @@
         const selected = document.getElementById(`${name}-selected`);
         if (value instanceof HTMLInputElement) value.value = '';
         if (selected) selected.innerHTML = '<span class="muted">Nothing selected</span>';
+        if (value instanceof HTMLInputElement) value.dispatchEvent(new Event('change', {bubbles: true}));
       }
     });
 
@@ -527,11 +530,17 @@
        moment, or the card narrowing with the window (2026-10-25: Gilded Noir's Net money was still seen past its card
        once after a late font, though the page refits on every font and load event). The amount is an inline-block so
        its width can be watched. The fit runs in the next frame, never inside the observer's own delivery, so resizing
-       the amount cannot loop. */
+       the amount cannot loop. The amount is never animated (Core's CSS): a theme's transition made a measurement read
+       the size it was changing from, so a too-wide amount was sometimes judged to fit (2026-10-26). Its width is
+       measured again after each shrink, because text does not always narrow exactly in step with its size. */
     const fitFigure = amount => {
       amount.style.fontSize = '';
-      const room = amount.parentElement.clientWidth, width = amount.getBoundingClientRect().width;
-      if (room && width > room) amount.style.fontSize = (parseFloat(getComputedStyle(amount).fontSize) * room / width * 0.98).toFixed(2) + 'px';
+      const room = amount.parentElement.clientWidth;
+      for (let pass = 0; pass < 4; pass++) {
+        const width = amount.getBoundingClientRect().width;
+        if (!room || width <= room) break;
+        amount.style.fontSize = (parseFloat(getComputedStyle(amount).fontSize) * room / width * (pass ? 0.95 : 0.98)).toFixed(2) + 'px';
+      }
     };
     const figureWatch = 'ResizeObserver' in window ? new ResizeObserver(entries => requestAnimationFrame(() => {
       new Set(entries.map(entry => entry.target.matches('.cl-ui-stat-value') ? entry.target.querySelector(':scope > span') : entry.target))
@@ -715,4 +724,61 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
         openedForPrint = Array.prototype.filter.call(document.querySelectorAll('details.cl-ui-accordion-section:not([open])'), function (section) { section.open = true; return true; });
     });
     window.addEventListener('afterprint', function () { openedForPrint.forEach(function (section) { section.open = false; }); openedForPrint = []; });
+})();
+
+/* An address's province (2026-10-27): South Africa's nine provinces when the country is South Africa, a text box for
+   any other country. Without this script both fields show, each saying when it is used, and the server reads the one
+   that fits the chosen country. */
+(function () {
+    function sync(select) {
+        var scope = select.closest('form') || document;
+        var southAfrica = select.value === 'ZA';
+        scope.querySelectorAll('[data-region-for]').forEach(function (field) {
+            field.hidden = (field.getAttribute('data-region-for') === 'ZA') !== southAfrica;
+        });
+    }
+    function initialise(root) {
+        (root || document).querySelectorAll('select[data-billing-country]').forEach(sync);
+    }
+    document.addEventListener('change', function (event) {
+        if (event.target instanceof HTMLSelectElement && event.target.matches('select[data-billing-country]')) sync(event.target);
+    });
+    document.addEventListener('htmx:after:swap', function () { initialise(document); });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { initialise(document); }, {once: true}); else initialise(document);
+})();
+
+/* A colour typed as a hex code (owner, 2026-10-28: "I do not want a colour picker. I want to input a hex code and see a
+   colour swatch, without having to submit the form"): the swatch beside the field follows the code as it is typed, and
+   shows nothing while the code is not yet six hex digits. Without this script the swatch shows the saved colour. */
+(function () {
+    function paint(input) {
+        var swatch = input.parentElement ? input.parentElement.querySelector('.cl-hex-colour-swatch rect') : null;
+        if (!swatch) return;
+        var code = input.value.trim();
+        if (/^[0-9a-f]{6}$/i.test(code)) code = '#' + code;
+        var fine = /^#[0-9a-f]{6}$/i.test(code);
+        swatch.setAttribute('fill', fine ? code : 'none');
+        input.setAttribute('aria-invalid', fine || code === '' ? 'false' : 'true');
+    }
+    document.addEventListener('input', function (event) {
+        if (event.target instanceof HTMLInputElement && event.target.matches('input[data-hex-colour]')) paint(event.target);
+    });
+    function initialise(root) { (root || document).querySelectorAll('input[data-hex-colour]').forEach(paint); }
+    document.addEventListener('htmx:after:swap', function () { initialise(document); });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { initialise(document); }, {once: true}); else initialise(document);
+})();
+
+/* A choice that fills a field (owner, 2026-10-28: the addresses matching what is typed on Addresses never emailed):
+   pressing it puts its value in the field it names and closes the list of choices. */
+(function () {
+    document.addEventListener('click', function (event) {
+        var choice = event.target instanceof Element ? event.target.closest('[data-fill-into]') : null;
+        if (!choice || choice.disabled) return;
+        var field = document.getElementById(choice.getAttribute('data-fill-into'));
+        if (!field) return;
+        field.value = choice.getAttribute('data-fill-value') || '';
+        field.focus();
+        var list = choice.closest('[role="region"]');
+        if (list) list.innerHTML = '';
+    });
 })();

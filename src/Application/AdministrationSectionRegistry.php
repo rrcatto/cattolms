@@ -59,7 +59,7 @@ final class AdministrationSectionRegistry
             $this->section('company_report', 'Company Enrolments', 'reports', '/admin/reports/companies', 'partials/admin/company-report.html.twig', 'Learner and completion figures by organisation.'),
             $this->section('themes', 'Themes', 'themes', '/admin/themes', 'partials/admin/themes.html.twig', 'Install, inspect, activate and reconcile themes.'),
             $this->section('roles', 'Roles & ACL', 'roles', '/admin/roles', 'partials/admin/roles.html.twig', 'Roles, permissions and access-control assignments.'),
-            $this->section('seed', 'Seed Database', 'seed', '/admin/seed', 'partials/admin/seed.html.twig', 'Generate a set of data so the platform can be seen with something in it.'),
+            $this->section('seed', 'Seed Database', 'seed', '/admin/seed', 'partials/admin/seed.html.twig', 'Make test data through the site\'s own workflows: companies, their staff and private learners.'),
             $this->section('ui_components', 'UI Components', 'themes', '/admin/system/ui-components', 'partials/admin/ui-components.html.twig', 'Canonical platform components and semantic states, using sample data.'),
             $this->section('settings', 'Settings', 'settings', '/admin/settings', 'partials/admin/settings.html.twig', 'Site mode, the Site Owner, platform identity, outgoing mail, commerce and maintenance.'),
         ];

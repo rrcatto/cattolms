@@ -65,7 +65,7 @@ services:
 
     CattoLearning\Auth\:
         resource: '../src/Auth/'
-        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,AdultAge.php,Security/WebUser.php,*Exception.php}'
+        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,AdultAge.php,SouthAfricanIdNumber.php,Security/WebUser.php,*Exception.php,Signup/NetworkFacts.php,Signup/SignupFacts.php,Signup/RiskAssessment.php,Signup/SignupRisk.php}'
 
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
@@ -142,12 +142,9 @@ services:
             $deliveryDomain: '%env(APP_DOMAIN)%'
     CattoLearning\Infrastructure\Mail\MailerInterface: '@CattoLearning\Infrastructure\Mail\GeneratedDomainMailer'
 
-    # Data generation, so the Seed Database screen can move across with the rest.
+    # Seed Database: a demo site's test data, made through the app's own workflows (SeedRun, owner 2026-10-27).
     CattoLearning\Seed\:
         resource: '../src/Seed/'
-        # SeedNameFactory is built per run with that run's key, by the generator; SeedGenerationPlan
-        # is a value object with a static factory. Neither is a service.
-        exclude: '../src/Seed/{SeedGenerationPlan.php,SeedNameFactory.php}'
 
     # The word lists ship in the release, the installer publishes them to the instance, and the
     # instance copy is the one read - so an operator's edits survive every upgrade.
@@ -216,6 +213,11 @@ services:
         resource: '../src/Setup/'
 
     # The contact form and its messages (owner, 2026-10-20). The reasons are a list of values.
+    # Mailing, step 1 (owner, 2026-10-26): who agreed to be emailed about what.
+    CattoLearning\Mailing\:
+        resource: '../src/Mailing/'
+        exclude: '../src/Mailing/{EmailBlocks.php,MailingTransportUnavailable.php,MailingTransportRefused.php,CattomailQuotaExceeded.php,CattomailSignature.php,FollowIntent.php,TemplateDesign.php}'
+
     CattoLearning\Contact\:
         resource: '../src/Contact/'
         exclude: '../src/Contact/ContactReason.php'

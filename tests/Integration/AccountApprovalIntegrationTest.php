@@ -52,7 +52,7 @@ final class AccountApprovalIntegrationTest extends TestCase
         $auth = $this->auth($container, $mailer, 'demo');
         try {
             $auth->requestRegistration(['account_type' => 'individual', 'first_name' => 'Waiting', 'middle_names' => '', 'last_name' => 'Person', 'email' => $email,
-                'date_of_birth' => (new \DateTimeImmutable('-30 years'))->format('Y-m-d')]);
+                'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db())]);
             parse_str((string) parse_url((string) self::sent($mailer)[0]['url'], PHP_URL_QUERY), $query);
             $mailer->messages = [];
             self::assertSame(AuthService::AWAITING_APPROVAL_PATH, $auth->consumeRegistration((string) $query['token']), 'Confirming the email shows the waiting page.');
@@ -104,7 +104,7 @@ final class AccountApprovalIntegrationTest extends TestCase
         $auth = $this->auth($container, $mailer, 'live');
         try {
             $auth->requestRegistration(['account_type' => 'individual', 'first_name' => 'Live', 'middle_names' => '', 'last_name' => 'Person', 'email' => $email,
-                'date_of_birth' => (new \DateTimeImmutable('-30 years'))->format('Y-m-d')], '/account/courses');
+                'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db())], '/account/courses');
             parse_str((string) parse_url((string) $mailer->messages[0]['url'], PHP_URL_QUERY), $query);
             self::assertSame('/account/courses', $auth->consumeRegistration((string) $query['token']));
             $userId = (int) $db->fetchOne('SELECT user_id FROM user_emails WHERE email = :email', ['email' => $email]);
@@ -139,7 +139,7 @@ final class AccountApprovalIntegrationTest extends TestCase
             $restriction->save(true, $friend . "\n");
             $auth = $this->auth($container, $mailer, 'demo', $restriction);
             foreach (['sign in' => fn() => $auth->requestLogin($member), 'register' => fn() => $auth->requestRegistration(['account_type' => 'individual', 'first_name' => 'A', 'last_name' => 'Stranger', 'email' => $stranger,
-                'date_of_birth' => (new \DateTimeImmutable('-30 years'))->format('Y-m-d')])] as $what => $try) {
+                'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db())])] as $what => $try) {
                 try {
                     $try();
                     self::fail('Allowed: ' . $what);
@@ -149,7 +149,7 @@ final class AccountApprovalIntegrationTest extends TestCase
             }
             self::assertCount(0, self::sent($mailer), 'Nothing is sent to someone kept out.');
             $auth->requestRegistration(['account_type' => 'individual', 'first_name' => 'A', 'middle_names' => '', 'last_name' => 'Friend', 'email' => $friend,
-                'date_of_birth' => (new \DateTimeImmutable('-30 years'))->format('Y-m-d')], '/account/courses');
+                'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db())], '/account/courses');
             parse_str((string) parse_url((string) self::sent($mailer)[0]['url'], PHP_URL_QUERY), $query);
             self::assertSame('/account/courses', $auth->consumeRegistration((string) $query['token']), 'A listed friend needs no approval, even on a demo site.');
             self::assertSame('active', $db->fetchOne('SELECT u.status FROM users u JOIN user_emails ue ON ue.user_id = u.id WHERE ue.email = :email', ['email' => $friend]));
@@ -264,7 +264,8 @@ final class AccountApprovalIntegrationTest extends TestCase
             $container->get(UserProfileRepository::class),
             null,
             SiteMode::fixed($mode),
-            $restriction
+            $restriction,
+            idNumbers: $container->get(\CattoLearning\Auth\IdNumbers::class)
         );
     }
 }

@@ -26,35 +26,35 @@ $action = $argv[1] ?? '';
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous review fixture first.');
     $fixture = new DevelopmentFixture($db);
-    $suffix = $fixture->suffix();
     $session = static function (int $user, string $email) use ($container): string {
         $token = Token::generate();
         $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Course review browser', $email);
         return $token;
     };
-    $adminEmail = 'course-review-admin-' . $suffix . '@example.test';
-    $admin = $fixture->createUser('Course review admin', $adminEmail);
-    $container->get(RoleRepository::class)->assign($admin, 'ADMIN');
-    $company = $fixture->createCompany($admin, 'Course review ' . $suffix, 'course-review-' . $suffix . '.example.test');
-    $slug = 'course-review-' . $suffix;
-    $course = $fixture->createCourse($admin, $company, $slug, 'Reviewed in the browser', 'published');
+    // An administrator, a course from a provider made with its founding administrator, and two learners on it, every
+    // name a real one nobody on the site has (owner, 2026-10-27).
+    $adminPerson = $fixture->person('ADMIN');
+    $admin = $adminPerson['id'];
+    $adminEmail = $adminPerson['email'];
+    $provider = $fixture->company();
+    $made = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
+    $course = $made['id'];
+    $slug = $made['slug'];
     $learners = [];
-    foreach (['learner' => ['Jane', 'Doe'], 'reviewer' => ['Sam', 'Smith']] as $key => [$first, $last]) {
-        $email = 'course-review-' . $key . '-' . $suffix . '@example.test';
-        $user = $fixture->createUser($first . ' ' . $last, $email);
-        $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $user]);
-        $container->get(RoleRepository::class)->assign($user, 'STUDENT');
+    foreach (['learner', 'reviewer'] as $key) {
+        $person = $fixture->person('STUDENT');
         // ADMIN assigns the course and the learner starts it, as in the app (owner, 2026-10-19).
-        $container->get(CourseService::class)->grantToPerson($course, $user, 365, $admin);
-        $container->get(LearningService::class)->start($user, $slug);
-        $learners[$key] = ['user' => $user, 'email' => $email];
+        $container->get(CourseService::class)->grantToPerson($course, $person['id'], 365, $admin);
+        $container->get(LearningService::class)->start($person['id'], $slug);
+        $learners[$key] = ['user' => $person['id'], 'email' => $person['email'], 'name' => $person['name']];
     }
     $reviews = $container->get(CourseReviewService::class);
-    $reviews->submit($learners['reviewer']['user'], $course, 4, 'Already approved before the run.');
+    $reviews->submit($learners['reviewer']['user'], $course, 4, 'Clear and practical. The worked examples helped most.');
     $approved = $container->get(CourseReviewRepository::class)->forLearner($course, $learners['reviewer']['user']) ?? [];
     $reviews->approve((int) $approved['id'], $admin, $approved['revision'], null);
     $state = [
-        'suffix' => $suffix, 'slug' => $slug, 'course' => $course, 'company' => $company,
+        'slug' => $slug, 'course' => $course, 'course_title' => $made['title'], 'company' => $provider['id'], 'scrub' => $fixture->seeds(), 'learner_name' => $learners['learner']['name'], 'reviewer_name' => $learners['reviewer']['name'], 'learner_public' => (string) $db->fetchOne("SELECT first_name || ' ' || left(last_name, 1) || '.' FROM users WHERE id = :u", ['u' => $learners['learner']['user']]),
+        'reviewer_public' => (string) $db->fetchOne("SELECT first_name || ' ' || left(last_name, 1) || '.' FROM users WHERE id = :u", ['u' => $learners['reviewer']['user']]),
         'admin' => $admin, 'admin_email' => $adminEmail, 'admin_token' => $session($admin, $adminEmail),
         'learner' => $learners['learner']['user'], 'learner_email' => $learners['learner']['email'],
         'learner_token' => $session($learners['learner']['user'], $learners['learner']['email']),
@@ -65,23 +65,12 @@ if ($action === 'create') {
     echo "Created course review fixture.\n";
 } elseif ($action === 'reset' || $action === 'cleanup') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    if (!str_starts_with((string) $state['slug'], 'course-review-')) throw new RuntimeException('Unexpected fixture course.');
     $db->executeStatement('DELETE FROM course_reviews WHERE course_id=:c AND user_id=:u', ['c' => $state['course'], 'u' => $state['learner']]);
     if ($action === 'reset') {
         echo json_encode($state, JSON_THROW_ON_ERROR), "\n";
         exit;
     }
-    $users = [$state['admin'], $state['learner'], $state['reviewer']];
-    $db->executeStatement('DELETE FROM analytics_events WHERE course_id=:c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM course_reviews WHERE course_id=:c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM courses WHERE id=:c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM companies WHERE id=:c', ['c' => $state['company']]);
-    foreach ($users as $user) {
-        $db->executeStatement('DELETE FROM analytics_events WHERE user_id=:u', ['u' => $user]);
-        $db->executeStatement('DELETE FROM audit_log WHERE user_id=:u', ['u' => $user]);
-        $db->executeStatement("DELETE FROM users WHERE id=:u AND EXISTS (SELECT 1 FROM user_emails WHERE user_id=users.id AND email LIKE 'course-review-%@example.test')", ['u' => $user]);
-    }
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed course review fixture.\n";
 } else {

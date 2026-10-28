@@ -16,7 +16,9 @@ the list when the thing is resolved. Each kind is listed only for an administrat
 resolve it.
 
 Kinds, in this order, oldest first within each:
-- account: a demo site's new account waiting for approval (the person's page: Approve account or Disable account);
+- account: a demo site's new account waiting for approval (the person's page: Approve account or Disable account),
+  with its sign-up check's risk and country (2026-10-26);
+- signin_country: a sign-in from a country the account had never used, until it is marked as seen (2026-10-26);
 - review: a course review waiting for moderation (Course Reviews, at that review: Approve or Reject);
 - request: a company learner's course request waiting for a decision (Course Requests, at that request);
 - message: a contact message not yet answered (the message's page: reply, then Mark as answered);
@@ -55,7 +57,7 @@ final class AdminAttention
     ];
 
     /** Each kind's button icon, in keeping with what its button does (owner, 2026-10-21: every button has an icon). */
-    private const ICONS = ['account' => 'action-approve', 'review' => 'action-approve', 'request' => 'action-approve', 'message' => 'action-reply', 'identity' => 'action-open', 'draft' => 'action-open'];
+    private const ICONS = ['account' => 'action-approve', 'review' => 'action-approve', 'request' => 'action-approve', 'message' => 'action-reply', 'identity' => 'action-open', 'draft' => 'action-open', 'signin_country' => 'action-view', 'mailing' => 'action-approve'];
 
     /** And each money item's. */
     private const MONEY_ICONS = [
@@ -71,7 +73,10 @@ final class AdminAttention
         private readonly AdminAttentionRepository $records,
         private readonly UserRepository $users,
         private readonly TransactionAttention $money,
-        private readonly IdentityVerificationService $identity
+        private readonly IdentityVerificationService $identity,
+        private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signups = null,
+        private readonly ?\CattoLearning\Auth\Signup\SignInHistory $signIns = null,
+        private readonly ?\CattoLearning\Mailing\CampaignRepository $campaigns = null
     ) {
     }
 
@@ -80,16 +85,32 @@ final class AdminAttention
      * account, with their account reference) is the subject of its title ("<person> reviewed …") or, for money, named
      * in front of its summary.
      *
-     * @return list<array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,icon:string,at:string}>
+     * @return list<array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,icon:string,at:string,risk?:array{label:string,tone:string}}>
      */
     public function items(CurrentUser $admin): array
     {
         $items = [];
         if ($admin->hasPermission('PLATFORM.PERSON.MANAGE')) {
-            foreach ($this->users->awaitingApproval() as $person) {
-                $items[] = self::item('account', 'Account', self::person($person['id'], $person['name'] ?: $person['email'], $person['account_reference']), true, 'is waiting for approval',
-                    'Registered ' . self::date($person['created_at']) . ' with ' . $person['email'] . '. Approve the account to let them sign in, or disable it to keep them out.',
+            $waiting = $this->users->awaitingApproval();
+            // Each one's sign-up check, so the risky ones show at a glance (owner, 2026-10-26).
+            $checks = $this->signups?->forUsers(array_map(static fn(array $person): int => (int) $person['id'], $waiting)) ?? [];
+            foreach ($waiting as $person) {
+                $check = $checks[(int) $person['id']] ?? null;
+                $from = $check !== null && $check['country_code'] !== '' ? ' from ' . \CattoLearning\Auth\Signup\SignupCountries::name($check['country_code']) : '';
+                $item = self::item('account', 'Account', self::person($person['id'], $person['name'] ?: $person['email'], $person['account_reference']), true, 'is waiting for approval',
+                    'Registered ' . self::date($person['created_at']) . $from . ' with ' . $person['email'] . '. Approve the account to let them sign in, or disable it to keep them out.',
                     '/admin/people/' . $person['id'], 'Approve or disable', $person['created_at']);
+                if ($check !== null) {
+                    $item['risk'] = ['label' => \CattoLearning\Auth\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'], 'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band'])];
+                }
+                $items[] = $item;
+            }
+            // A sign-in from a country the account had never signed in from (owner, 2026-10-26), until it is marked as seen.
+            foreach ($this->signIns?->newCountries() ?? [] as $signIn) {
+                $items[] = self::item('signin_country', 'Sign-in', self::person($signIn['user_id'], $signIn['name'] ?: $signIn['email'], $signIn['account_reference']), true,
+                    'signed in from ' . $signIn['country_name'] . ' for the first time',
+                    'On ' . self::date($signIn['at']) . ' from ' . $signIn['ip'] . '. Their earlier sign-ins came from ' . implode(', ', $signIn['earlier']) . '. Look at their recent sign-ins, then mark it as seen.',
+                    '/admin/people/' . $signIn['user_id'] . '#recent-sign-ins', 'Look at it', $signIn['at']);
             }
         }
         if ($admin->hasPermission('COURSE.REVIEW.MANAGE')) {
@@ -140,7 +161,17 @@ final class AdminAttention
                     '/admin/courses/' . $course['id'], 'Open the course', (string) $course['updated_at']);
             }
         }
-        $order = array_flip(['account', 'review', 'request', 'message', 'money', 'identity', 'draft']);
+        // A campaign waiting for approval, or one that paused itself (mailing, step 2; owner, 2026-10-26).
+        if ($admin->hasPermission('PLATFORM.MAILING.MANAGE')) {
+            foreach ($this->campaigns?->waiting() ?? [] as $campaign) {
+                $approval = $campaign['status'] === 'awaiting_approval';
+                $items[] = self::item('mailing', 'Email', null, false,
+                    $approval ? $campaign['name'] . ' is waiting for your approval' : $campaign['name'] . ' is paused',
+                    $approval ? 'Look at the preview, then approve it to send it, or cancel it.' : (string) ($campaign['status_note'] ?: 'Resume it or cancel it.'),
+                    '/mailing/messages/' . $campaign['id'] . '#send', $approval ? 'Approve or cancel' : 'Resume or cancel', (string) $campaign['updated_at']);
+            }
+        }
+        $order = array_flip(['account', 'signin_country', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'draft']);
         usort($items, static fn(array $a, array $b): int => [$order[$a['kind']], $a['at']] <=> [$order[$b['kind']], $b['at']]);
         return $items;
     }

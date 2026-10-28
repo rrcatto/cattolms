@@ -12,12 +12,14 @@
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Summary', eyebrow: 'Person'}) }}
+			{# Their picture, uploaded or drawn (owner, 2026-10-26: "why is their profile pic not displayed?"). #}
+			{% if person_picture_url|default('') %}<img class="cl-person-picture" src="{{ person_picture_url }}" alt="The picture of {{ person.name }}" width="128" height="128">{% endif %}
 			{{ ui('data.key-value-list', {items: [
 				{label: 'Account reference', value: person.account_reference|account_reference},
 				{label: 'Email', value: person.email},
 				{label: 'Mobile number', value: person.mobile_number ?: 'Not given'},
-				{label: 'Role in the company', value: (person.company_role ?: 'student')|replace({'_': ' '})|capitalize},
-				{label: 'Status', value: person.status == 'active' ? 'Active: can sign in' : 'Disabled: cannot sign in'},
+				{label: 'Role in the company', value: {owner: 'Company Administrator', administrator: 'Company Administrator', course_owner: 'Course owner', course_editor: 'Course editor'}[person.company_role|default('')]|default('Student')},
+				{label: 'Status', value: {active: 'Active: can sign in', awaiting_approval: 'Awaiting approval: cannot sign in yet'}[person.status]|default('Disabled: cannot sign in')},
 				{label: 'Member since', value: person.member_since|date('j F Y')},
 				{label: 'Last sign-in', value: person.last_login_at ? person.last_login_at|date('j F Y \\a\\t H:i') : 'Never'},
 				{label: 'Courses', value: person.course_count},
@@ -30,29 +32,43 @@
 						{% if person.status == 'active' %}
 							<input type="hidden" name="status" value="disabled">
 							{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.', icon: 'action-disable'}) }}
-						{% else %}
+						{% elseif person.status == 'disabled' %}{# An account waiting for the site's approval is never enabled here (2026-10-26 audit). #}
 							<input type="hidden" name="status" value="active">
 							{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 						{% endif %}
 					</form>
-					<form action="/company/people/{{ person.id }}/remove" method="post">
+					{# Delete, by the owner's rules (2026-10-26): what it will do is said before it is pressed. #}
+					{% if delete_assessment.action != 'refused' and delete_assessment.action != 'waiting' %}
+					<form action="/company/people/{{ person.id }}/delete" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{{ ui('action.button', {label: 'Remove from the company', variant: 'danger', size: 'small', confirm: 'Remove this person from the company? Course access this company granted them ends. Their account and learning history are kept, and this does not stop them signing in.', icon: 'action-remove'}) }}
+						<input type="hidden" name="return" value="{{ back }}">
+						{% set dl_confirm = {
+							ask: 'Delete ' ~ person.name ~ '? They are busy with a course, so we email them first to choose: keep their account as a private one, or delete it. If they have not chosen in 3 days, you can delete them.',
+							deactivate: 'Delete ' ~ person.name ~ '? They did not answer in time, so their account leaves the company and is deactivated, with everything kept, so the site can restore it at a private address.',
+							delete: 'Delete ' ~ person.name ~ '? They have started no course, so their account is deleted. Credit for courses they never started goes back to the company.'
+						} %}
+						{{ ui('action.button', {label: delete_assessment.action == 'ask' ? 'Delete (ask them first)' : 'Delete', variant: 'danger', size: 'small', confirm: dl_confirm[delete_assessment.action], icon: 'action-remove'}) }}
 					</form>
+					{% endif %}
 				{% endblock %}{% endembed %}
+				{% if delete_assessment.action == 'refused' or delete_assessment.action == 'waiting' %}<p class="help">{{ delete_assessment.why }}</p>{% endif %}
 			{% endif %}
 		{% endblock %}{% endembed %}
 		{% if can_manage_person %}
 			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-				{{ ui('layout.section-head', {heading: 'Details', summary: 'Their email address is part of how they sign in, so it is changed by them.'}) }}
+				{# What Add person asks (owner, 2026-10-26: "surely they should both reflect the same info?"): names, the company
+				   email address the administrator sets, and the role in the company. #}
+				{{ ui('layout.section-head', {heading: 'Details', summary: 'What you gave when you added them: their names, company email and role.'}) }}
 				<form action="/company/people/{{ person.id }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="return" value="{{ back }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'person-first-name'})} %}{% block control %}<input id="person-first-name" name="first_name" value="{{ person.first_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'person-middle-names'})} %}{% block control %}<input id="person-middle-names" name="middle_names" maxlength="160" value="{{ person.middle_names }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'person-last-name'})} %}{% block control %}<input id="person-last-name" name="last_name" value="{{ person.last_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', for: 'person-mobile'})} %}{% block control %}<input id="person-mobile" name="mobile_number" value="{{ person.mobile_number }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'person-first-name', required: true})} %}{% block control %}<input id="person-first-name" name="first_name" value="{{ person.first_name }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'person-last-name', required: true})} %}{% block control %}<input id="person-last-name" name="last_name" value="{{ person.last_name }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'person-email', required: true, help: 'At ' ~ company_context_domain|default('') ~ ', as every staff address is.'})} %}{% block control %}<input type="email" id="person-email" name="email" value="{{ person.email }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', full_width: true, for: 'company-person-role', help: can_change_role|default(false) ? 'A Company Administrator manages the company with you.' : 'You cannot change your own.'})} %}
+{% block control %}{% set cp_current = {owner: 'COMPANY_ADMIN', administrator: 'COMPANY_ADMIN', course_owner: 'COURSE_OWNER', course_editor: 'COURSE_EDITOR'}[person.company_role|default('')]|default('STUDENT') %}<select name="role" id="company-person-role"{{ can_change_role|default(false) ? '' : ' disabled' }} {{ ui_field_attrs(props) }}>{% for key, label in {STUDENT: 'Student', COURSE_EDITOR: 'Course editor', COURSE_OWNER: 'Course owner', COMPANY_ADMIN: 'Company Administrator'} %}<option value="{{ key }}"{{ key == cp_current ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
 					{% endblock %}{% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 				</form>
@@ -73,8 +89,9 @@
 						<td><strong>{{ enrolment.course_title }}</strong></td>
 						<td>{{ enrolment.status|ucfirst }}</td>
 						<td>{{ enrolment.progress_percentage }}%</td>
-						<td class="small">{{ enrolment.expires_at ?: 'No end date' }}</td>
-						<td class="cell-actions">{% if can_manage_person %}
+						<td class="small">{{ enrolment.expires_at ? enrolment.expires_at|date('j M Y') : 'Not started' }}</td>
+						{# Only a course the company paid for or owns is the company's to remove or restore (2026-10-26 audit). #}
+						<td class="cell-actions">{% if can_manage_person and enrolment.company_funded|default(false) in [true, 1, '1', 't'] %}
 							<form action="/company/enrolments/{{ enrolment.id }}/{{ enrolment.status == 'cancelled' ? 'restore' : 'remove' }}" method="post">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
 								<input type="hidden" name="return" value="{{ back }}">

@@ -11,6 +11,10 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for company records.
 
 Changelog:
+2026/10/26 SAST
+- The company domain rule (owner, restated 2026-10-26: "no domain name, no company. And every person who belonged to
+  the company had to use the same domain name"): findByDomain() and membership(); the founder's membership role
+  "owner" counts as a Company Administrator (ADMINISTRATOR_ROLES, administratorCount()).
 2026/10/18 SAST
 - No System Company (owner, 2026-10-18): systemCompany(), ensureSystemCompany(), the sweep that put every company-less person into it and assignSystemCompanyOwner() are gone. createManaged() names seven columns for its seven values again (Administration > Create company had been failing).
 2026/09/08 19:52 SAST
@@ -101,6 +105,69 @@ final class CompanyRepository
         $row = $this->db->fetchAssociative('SELECT * FROM companies WHERE id = :id', ['id' => $companyId]);
 
         return $row === false ? null : $row;
+    }
+
+    /** The membership roles of a Company Administrator: "owner" is the founder's, who registered the company. */
+    public const ADMINISTRATOR_ROLES = ['owner', 'administrator'];
+
+    /** How many active Company Administrators a company has, its founder included (it always keeps one, 2026-10-26). */
+    public function administratorCount(int $companyId): int
+    {
+        return (int) $this->db->fetchOne("SELECT COUNT(*) FROM company_users WHERE company_id = :c AND status = 'active' AND company_role IN ('owner', 'administrator')", ['c' => $companyId]);
+    }
+
+    /** @return list<int> a company's active members */
+    public function activeMemberIds(int $companyId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn("SELECT user_id FROM company_users WHERE company_id = :c AND status = 'active' ORDER BY user_id", ['c' => $companyId]));
+    }
+
+    /** How many of a company's active staff have their primary address at a domain. */
+    public function staffAtDomain(int $companyId, string $domain): int
+    {
+        return (int) $this->db->fetchOne(
+            "SELECT COUNT(*) FROM company_users cu JOIN user_emails e ON e.user_id = cu.user_id AND e.is_primary
+             WHERE cu.company_id = :c AND cu.status = 'active' AND lower(split_part(e.email, '@', 2)) = lower(:d)",
+            ['c' => $companyId, 'd' => $domain]
+        );
+    }
+
+    /**
+     * The company that holds a domain, whatever its status (owner's rule: no own domain, no company, and its staff use it).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function findByDomain(string $domain): ?array
+    {
+        $rows = $this->db->fetchAllAssociative('SELECT * FROM companies WHERE lower(domain) = lower(:domain) LIMIT 1', ['domain' => $domain]);
+
+        return $rows[0] ?? null;
+    }
+
+    /**
+     * A person's active membership, whatever the company's status.
+     *
+     * @return array{company_id:int,company_role:string}|null
+     */
+    public function membership(int $userId): ?array
+    {
+        $rows = $this->db->fetchAllAssociative("SELECT company_id, company_role FROM company_users WHERE user_id = :u AND status = 'active' LIMIT 1", ['u' => $userId]);
+
+        return isset($rows[0]) ? ['company_id' => (int) $rows[0]['company_id'], 'company_role' => (string) $rows[0]['company_role']] : null;
+    }
+
+    /**
+     * The company a person is an active member of, whatever that company's own status (a disabled company's member is
+     * still its member): the person's page shows it and keeps it when the page is saved (2026-10-26).
+     */
+    public function memberCompanyId(int $userId): ?int
+    {
+        $id = $this->db->fetchOne(
+            "SELECT company_id FROM company_users WHERE user_id = :user_id AND status = 'active' ORDER BY created_at ASC LIMIT 1",
+            ['user_id' => $userId]
+        );
+
+        return $id === false || $id === null ? null : (int) $id;
     }
 
     /**
@@ -260,6 +327,12 @@ final class CompanyRepository
                 'id' => $companyId,
             ]
         );
+    }
+
+    /** A company its Company Administrator deleted: hidden everywhere but Administration, its records kept (2026-10-26). */
+    public function markDeleted(int $companyId): void
+    {
+        $this->db->executeStatement("UPDATE companies SET status = 'deleted', deleted_at = NOW(), updated_at = NOW() WHERE id = :id AND status <> 'deleted'", ['id' => $companyId]);
     }
 
     public function setStatus(int $companyId, string $status): void

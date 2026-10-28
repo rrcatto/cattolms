@@ -1,0 +1,51 @@
+{#
+	Mailing › Automatic emails (owner, 2026-10-27: "I need control over every aspect"; the approved mockup's page 7): every
+	email that goes by itself, what sends it, its template, when one last went and whether it is on; then the words of the
+	update emails, the digests and "Do you still want our news?", each with Save and Back to the starting words. A list's
+	welcome email is written like a message and switched on its list's page.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'Automatic emails' %}
+	{% set ph_lead = 'The emails that go by themselves when something happens. Each is drawn in its template, waits for the sending hours, and can be reworded here.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'every'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Every automatic email', summary: 'Templates are under Mailing, Design. The updates in the digests and update emails are the ones you release on the Digest page.'}) }}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Automatic emails'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Sent when'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Template'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Last sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'On or off'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for row in rows %}<tr>
+			<td class="cell-text">{{ row.name }}</td>
+			<td class="cell-text">{{ row.when }}</td>
+			<td>{{ row.template }}</td>
+			<td>{{ row.last ? row.last|date('j M Y') : 'Not yet' }}</td>
+			<td>{{ ui('feedback.badge', {label: row.on ? 'On' : 'Off', tone: row.on ? 'success' : 'neutral'}) }}</td>
+			<td class="cell-actions">{{ ui('action.link', {label: row.key == 'welcome' ? 'Edit the email' : 'Edit the words', variant: 'secondary', size: 'small', href: row.href, icon: 'action-edit'}) }}</td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	{% set ae_forms = [
+		{key: 'updates', heading: 'Updates as they happen', summary: 'The opening words of the email someone gets when updates they follow are released. Their updates follow these words, each saying why it came.'},
+		{key: 'digest', heading: 'The digests', summary: 'The opening words of every daily, weekly and monthly digest. The updates since the reader\'s last digest follow them.'},
+		{key: 'sleeping', heading: 'Do you still want our news?', summary: 'Asked once of an address that has opened and clicked nothing for a long while, with a button that keeps the news coming. With no answer within ' ~ wait ~ ', news to it stops.'}
+	] %}
+	{% for form in ae_forms %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: form.key})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: form.heading, summary: form.summary}) }}
+		{% if can_manage %}
+		<form action="/mailing/automatic/{{ form.key }}" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% if form.key == 'sleeping' %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Ask sleeping addresses whether they still want our news', help: 'Off, nobody is asked, and addresses that open nothing are emailed as before.'})} %}{% block control %}<input type="checkbox" name="on" value="1"{{ words.sleeping_on ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subject', for: 'ae-sleeping-subject', full_width: true, help: placeholder ~ ' is the reader\'s first name.'})} %}{% block control %}<input class="cl-input" id="ae-sleeping-subject" name="subject" maxlength="200" required value="{{ words.sleeping_subject }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endif %}
+			{% set ae_value = form.key == 'updates' ? words.updates_intro : (form.key == 'digest' ? words.digest_intro : words.sleeping_intro) %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: form.key == 'sleeping' ? 'The words' : 'The opening words', for: 'ae-' ~ form.key, full_width: true, help: placeholder ~ ' is the reader\'s first name. A blank line starts a new paragraph.' ~ (form.key == 'sleeping' ? ' {wait} is how long they have to answer (' ~ wait ~ ').' : '')})} %}{% block control %}<textarea class="cl-input" id="ae-{{ form.key }}" name="intro" rows="5" maxlength="4000" required {{ ui_field_attrs(props) }}>{{ ae_value }}</textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the words', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.button', {label: 'Back to the starting words', variant: 'secondary', size: 'normal', type: 'submit', name: 'reset', value: '1', icon: 'action-reset', skip_validation: true}) }}{% endblock %}{% endembed %}
+		</form>
+		{% else %}
+			<p>{{ (form.key == 'updates' ? words.updates_intro : (form.key == 'digest' ? words.digest_intro : words.sleeping_intro))|nl2br }}</p>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+	{% endfor %}
+{% endblock %}

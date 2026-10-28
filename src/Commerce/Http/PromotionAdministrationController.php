@@ -180,7 +180,8 @@ final class PromotionAdministrationController extends BaseController
     private function keepDraft(string $key, RuntimeException $failed, string $back): Response
     {
         $draft = [];
-        foreach (['code','name','description','active','discount_type','discount_value','minimum_order','maximum_total_uses','maximum_uses_per_customer','starts_at','ends_at','course_scope','bundle_scope','add_course_id','add_bundle_id'] as $field) {
+        // applies_automatically kept too (2026-10-26 audit: a refused save dropped the tick); unticked, it is simply absent.
+        foreach (['code','name','description','active','applies_automatically','discount_type','discount_value','minimum_order','maximum_total_uses','maximum_uses_per_customer','starts_at','ends_at','course_scope','bundle_scope','add_course_id','add_bundle_id'] as $field) {
             if (is_scalar($_POST[$field] ?? null)) $draft[$field] = mb_substr((string) $_POST[$field], 0, 2000);
         }
         $draft['course_ids'] = array_values(array_filter((array) ($_POST['course_ids'] ?? []), 'is_scalar'));

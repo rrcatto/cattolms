@@ -39,26 +39,28 @@ $command = $argv[1] ?? '';
 if ($command === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous course content fixture first.');
     $fixture = new DevelopmentFixture($db);
-    $suffix = $fixture->suffix();
-    $email = 'course-content-tree-' . $suffix . '@example.test';
-    $user = $fixture->createUser('Course Content tree browser check', $email);
+    // A course provider made with its founding administrator (who is also ADMIN), one of its courses and its lessons,
+    // every name a real one nobody on the site has (owner, 2026-10-27).
+    $company = $fixture->company();
+    $user = $company['founder']['id'];
+    $email = $company['founder']['email'];
     $container->get(RoleRepository::class)->assign($user, 'ADMIN');
-    $company = $fixture->createCompany($user, 'Course Content tree ' . $suffix, 'course-content-tree-' . $suffix . '.example.test');
-    $course = $fixture->createCourse($user, $company, 'course-content-tree-' . $suffix, 'Course Content tree ' . $suffix);
+    $made = $fixture->course($user, $company['id']);
+    $course = $made['id'];
+    $titles = ['a1' => 'Welcome to the course', 'a2' => 'How it works', 'a3' => 'The rules in practice', 'b1' => 'Common mistakes', 'b1x' => 'A worked example', 'c' => 'Course summary'];
     $itemIds = [];
-    foreach (['a1', 'a2', 'a3', 'b1', 'b1x', 'c'] as $key) {
-        $itemIds[$key] = $items->create(['item_key' => 'cct-' . $key . '-' . $suffix, 'item_type' => 'html_lesson', 'title' => 'Item ' . $key, 'content_source' => '<p>' . $key . '</p>'], $user);
+    foreach ($titles as $key => $title) {
+        $itemIds[$key] = $items->create(['item_key' => $made['slug'] . '-' . $key, 'item_type' => 'html_lesson', 'title' => $title, 'content_source' => '<p>' . $title . '</p>'], $user);
     }
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Course Content tree browser', $email);
-    $state = ['user' => $user, 'email' => $email, 'token' => $token, 'company' => $company, 'course' => $course, 'items' => $itemIds];
+    $state = ['user' => $user, 'email' => $email, 'token' => $token, 'company' => $company['id'], 'course' => $course, 'items' => $itemIds, 'titles' => $titles, 'scrub' => $fixture->seeds()];
     $state['nodes'] = $build($state);
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo json_encode($state, JSON_THROW_ON_ERROR), "\n";
 } elseif (in_array($command, ['reset', 'empty', 'cleanup'], true)) {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    if (!str_starts_with($state['email'], 'course-content-tree-')) throw new RuntimeException('Unexpected fixture identity.');
     if ($command === 'empty') {
         $db->executeStatement('DELETE FROM course_structure_nodes WHERE course_id = :course', ['course' => $state['course']]);
         $state['nodes'] = [];
@@ -75,11 +77,7 @@ if ($command === 'create') {
         echo json_encode($state, JSON_THROW_ON_ERROR), "\n";
         return;
     }
-    $db->executeStatement('DELETE FROM courses WHERE id = :id', ['id' => $state['course']]);
-    $db->executeStatement('DELETE FROM course_items WHERE created_by_user_id = :id', ['id' => $state['user']]);
-    $db->executeStatement('DELETE FROM companies WHERE id = :id', ['id' => $state['company']]);
-    $db->executeStatement('DELETE FROM audit_log WHERE user_id = :id', ['id' => $state['user']]);
-    $db->executeStatement('DELETE FROM users WHERE id = :id AND EXISTS (SELECT 1 FROM user_emails WHERE user_id = users.id AND email = :email)', ['id' => $state['user'], 'email' => $state['email']]);
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed the Course Content tree fixture.\n";
 } else {

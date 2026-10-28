@@ -31,7 +31,7 @@
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'what-we-collect', eyebrow: 'Section 2', icon: icons['what-we-collect'], heading: 'What we collect'})} %}{% block body %}
 <ul>
-	<li><strong>Your account.</strong> Your names, your display name, your email addresses and your date of birth. If you give them: your gender, cell number, identification number, profile picture and links to your social media. Your role on the site and the company you belong to, if any. Your account reference, which the site gives your account when it is made. Checkout asks for your first name, last name and cell number.</li>
+	<li><strong>Your account.</strong> Your names, your display name, your email addresses, your South African ID number, the date of birth it gives and the country you say you live in. Your ID number is kept encrypted and shown with its last seven digits hidden. If you give them: your gender, cell number, profile picture and links to your social media. Your role on the site and the company you belong to, if any. Your account reference, which the site gives your account when it is made. Checkout asks for your first name, last name and cell number.</li>
 	<li><strong>Identity verification.</strong> The result of each identity check, your verified name, the type, number and issuing country of your identity document, your date of birth and when you were verified. No image of your document or of your face is kept on this site.</li>
 	<li><strong>Billing details.</strong> Your billing name, organisation, tax number and address. They are copied into each order you place.</li>
 	<li><strong>Orders and payments.</strong> Your orders, what you bought and the prices, your invoices, receipts and credit notes, and each payment's method, amount and reference. For an EFT, the bank reference and date we confirmed it with. Any refund request, what you wrote in it and our decision, and any refund and the reason for it. For money back by EFT, the bank details you give us are used only to make that payment and are not stored on this site. We do not receive or store card numbers or banking login details.</li>
@@ -39,9 +39,13 @@
 	<li><strong>Emails about your payments.</strong> An email we send you about a payment, a refund or your wallet is recorded with the transaction it is about.</li>
 	<li><strong>Learning records.</strong> The courses you are enrolled on, your progress, every answer you give in an assessment and how long you took to answer, your marks and results, course requests and their notes, and your certificates and transcripts, with whether you have made each one public.</li>
 	<li><strong>Reviews.</strong> Your rating and what you write. Once a review is approved it is shown publicly with your first name and the first letter of your surname.</li>
-	<li><strong>Activity log.</strong> A record of actions on your account, such as signing in or changing your details. The activity log stores the IP address of each recorded action. You can see your own activity in your account.</li>
+	<li><strong>Activity log.</strong> A record of actions on your account, such as signing in or changing your details. The activity log stores the IP address of each recorded action, and for a sign-in the country it came from. You can see your own activity in your account.</li>
 	<li><strong>Sessions.</strong> Each browser session and each sign-in session stores a hashed IP address and your browser's user agent. This applies to every visitor, signed in or not. A request for a sign-in link also stores a hashed IP address.</li>
+	<li><strong>Registration checks.</strong> When you register, we record the IP address you register from, the country and network it belongs to, your browser's user agent and time zone, how long the registration form was open, and a risk score worked out from these and your email address, to keep out automated and fraudulent registrations. It is kept with your account. A registration that never became an account is kept for 5 years.</li>
 	<li><strong>Analytics events.</strong> Our own record of events such as a course page being viewed, a checkout being started or a course being bought. An event stores your user number if you are signed in, or a random visitor number kept only for your browser session, with the course or order concerned and any campaign tags in the address you arrived by. Analytics events store neither an IP address nor a user agent.</li>
+	<li><strong>Your email choices.</strong> Whether you want News and Updates by email, each category, course and tag you follow and each list you join, with when and where you chose (when registering, at checkout, when starting a course, with a Follow button, with a list's join link or on My Subscriptions), and how you would like updates to reach you: as they happen, or in a digest daily, weekly or monthly. You change them at any time under Account › My Subscriptions.</li>
+	<li><strong>News emails.</strong> Each news email we send you, whether it arrived or bounced, and whether you opened it and which of its links you clicked. A news email records its opening with a small picture and its clicks with its own link addresses, and you can unsubscribe with the unsubscribe link at its foot. An address that bounced as not existing, or whose owner marked our news as spam, is never sent news again.</li>
+	<li><strong>Emails you forward.</strong> When you forward one of our emails to a friend, we keep their address, the name and the note you gave, with that email's record, so that it is never sent to them twice. They get it once, we put them on none of our lists, and the email lets them ask us never to email them again.</li>
 	<li><strong>Messages.</strong> A message you send through the contact form: what it is about, your name, email address and message, your account reference and an order number or course if you give them, and the answers the form asks for its reason, such as the day, amount and reference of an EFT payment. It is kept on this site and emailed to us, and we email you its reference.</li>
 </ul>
 <p>If you belong to a company, your Company Administrator can see your name, email address and role, the courses you are on and your status, progress and dates on them. The company also sees totals for each course with an average result.</p>
@@ -53,17 +57,19 @@
 	<li>to take orders, confirm payments, make refunds and issue invoices, receipts and credit notes</li>
 	<li>to mark your assessments, record your results and issue certificates and transcripts</li>
 	<li>to verify your identity before a certificate or transcript is issued</li>
-	<li>to make sure that you are 18 or older</li>
+	<li>to make sure that you hold a valid South African ID number, that you are 18 or older and that each person has only one account</li>
 	<li>to let a company manage the courses of its staff members</li>
 	<li>to keep the site secure and to investigate misuse</li>
 	<li>to measure which courses are viewed and bought</li>
+	<li>to send you News and Updates, and news about what you follow, only when you have chosen it</li>
+	<li>to see which news is read, and to stop sending news to addresses that do not want it or no longer read it</li>
 	<li>to answer your questions and complaints</li>
 	<li>to keep the financial records the law requires</li>
 </ul>
 <p>We do not sell personal information.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'age', eyebrow: 'Section 4', icon: icons['age'], heading: 'Age'})} %}{% block body %}
-<p>This site is for adults. Learners must be 18 or older. You give your date of birth when you register, or the first time you sign in if someone else created your account. If you are under 18 we refuse the registration and keep nothing you typed. If your verified identity document shows that you are under 18, your account cannot be used.</p>
+<p>This site is for adults. Learners must be 18 or older. You give your South African ID number when you register, or the next time you sign in if your account does not have one yet, and your date of birth is taken from it. If you are under 18 we refuse it and keep nothing you typed. If your verified identity document shows that you are under 18, your account cannot be used.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'identity', eyebrow: 'Section 5', icon: icons['identity'], heading: 'Identity verification, certificates and transcripts'})} %}{% block body %}
 <p>You may take a course under any name you choose.</p>
@@ -92,7 +98,7 @@
 	<li><strong>An identity verification provider.</strong> When you verify your identity, you photograph your identity document and take a live selfie on the provider's secure page. The provider checks them and tells this site the result, with your verified name, the type, number and issuing country of your document and your date of birth. It may process personal information outside South Africa.</li>
 	<li><strong>A hosting provider.</strong> The site and its database are hosted on a server in Canada. Your personal information is therefore stored outside South Africa.</li>
 	<li><strong>Email.</strong> Email is sent from the site's own mail server on the same host.</li>
-	<li><strong>A web font service.</strong> When the site is shown in the Gilded Noir or Light Default theme, your browser loads fonts from a web font service, which then receives your IP address.</li>
+	<li><strong>A web font service.</strong> When the site is shown in a theme that takes its fonts from a web font service (of the themes that come with the site, Gilded Noir, Light Default and Saharan Sunset do), your browser loads those fonts from that service, which then receives your IP address.</li>
 	<li><strong>A video service.</strong> Some course videos are embedded from a video service in its privacy-enhanced mode. When you open a page with such a video, your browser connects to that service.</li>
 	<li><strong>Your company.</strong> Your Company Administrator sees the information set out in <a href="#what-we-collect">section 2</a>.</li>
 	<li><strong>The public.</strong> An approved review, as <a href="#what-we-collect">section 2</a> explains, and a certificate or transcript you have made public, as <a href="#identity">section 5</a> explains.</li>
@@ -105,10 +111,12 @@
 	{label: 'Activity log', value: '5 years'},
 	{label: 'Analytics events', value: '5 years'},
 	{label: 'Contact messages', value: '5 years'},
+	{label: 'Registrations that never became an account', value: '5 years'},
+	{label: 'Records of the news emails sent to you', value: '5 years'},
 	{label: 'Sign-in links', value: '30 minutes'},
 	{label: 'Sessions', value: '24 hours'},
 ]}) }}
-<p>Your account details, your date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events and contact messages older than 5 years are deleted automatically every day.</p>
+<p>Your account details, your ID number and date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day. Your email choices are kept for as long as you have an account, so that we can always show what you agreed to.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'security', eyebrow: 'Section 9', icon: icons['security'], heading: 'How we protect it'})} %}{% block body %}
 <ul>

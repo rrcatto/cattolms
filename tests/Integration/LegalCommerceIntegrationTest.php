@@ -175,17 +175,18 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertStringNotContainsString('identification_number', $profile);
         self::assertStringNotContainsString('ID number', $profile);
 
-        $this->db->executeStatement("UPDATE users SET identification_number='8001015009087' WHERE id=:id", ['id' => $buyer->id]);
+        $before = $this->db->fetchOne('SELECT id_number_hash FROM users WHERE id=:id', ['id' => $buyer->id]);
         $fields = BillingFixture::personFields('Legal Buyer') + ['first_name' => 'Legal', 'last_name' => 'Buyer', 'mobile_number' => '0821234567'];
-        $saved = InProcessPage::run($buyer, CommerceController::class, 'profile', [], ['csrf' => $_SESSION['csrf'], 'identification_number' => '123'] + $fields);
-        self::assertSame('/checkout/payment', $saved['location'], 'The details step is complete without an identity number.');
+        $saved = InProcessPage::run($buyer, CommerceController::class, 'profile', [], ['csrf' => $_SESSION['csrf'], 'id_number' => '8001015009087'] + $fields);
+        self::assertSame('/checkout/payment', $saved['location'], 'The details step is complete without an ID number.');
         self::assertTrue($_SESSION['checkout'][$buyer->id]['profile_confirmed']);
-        self::assertSame('8001015009087', $this->db->fetchOne('SELECT identification_number FROM users WHERE id=:id', ['id' => $buyer->id]), 'Checkout does not collect or change the number, even when one is posted.');
+        self::assertSame($before, $this->db->fetchOne('SELECT id_number_hash FROM users WHERE id=:id', ['id' => $buyer->id]), 'Checkout does not collect or change the number, even when one is posted.');
 
-        // The account profile keeps the field, and it is optional there.
+        // Nor does a profile save: the number is given once, at registration or at sign-in (owner, 2026-10-27).
         $auth = IntegrationContainer::get()->get(AuthService::class);
-        $auth->updateProfile($buyer->id, ['first_name' => 'Legal', 'last_name' => 'Buyer', 'identification_number' => '']);
-        self::assertNull($this->db->fetchOne('SELECT identification_number FROM users WHERE id=:id', ['id' => $buyer->id]));
+        $auth->updateProfile($buyer->id, ['first_name' => 'Legal', 'last_name' => 'Buyer', 'id_number' => '', 'birthdate' => '2001-01-01']);
+        self::assertSame($before, $this->db->fetchOne('SELECT id_number_hash FROM users WHERE id=:id', ['id' => $buyer->id]));
+        self::assertSame('1990-05-12', $this->db->fetchOne('SELECT birthdate::text FROM users WHERE id=:id', ['id' => $buyer->id]), 'The date of birth comes from the ID number.');
     }
 
     public function testABoughtCourseStartsOnPaymentAndIsNotRefundedUnlessAdminOverridesWithAReason(): void

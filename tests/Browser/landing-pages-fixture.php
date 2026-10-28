@@ -37,14 +37,19 @@ $session = static function (int $user, string $email) use ($container): string {
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Landing pages browser', $email);
     return $token;
 };
-$person = static function (string $key, string $first, string $last, array $roles, string $suffix) use ($fixture, $db, $container): array {
-    $email = 'landing-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($first . ' ' . $last, $email);
-    $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $id]);
-    foreach ($roles as $role) {
-        $container->get(RoleRepository::class)->assign($id, $role);
+// A believable person nobody on the site shares a name with (owner, 2026-10-27).
+$person = static function (array $roles) use ($fixture, $container): array {
+    $person = $fixture->person('STUDENT');
+    foreach ($roles as $role) $container->get(RoleRepository::class)->assign($person['id'], $role);
+    return $person;
+};
+// A property course title no course has: the fixture's lessons are about deeds and bonds.
+$title = static function () use ($db): array {
+    foreach (['Property Transfers in Practice', 'Conveyancing Essentials', 'Deeds Office Procedures', 'Sectional Title Basics', 'Bond Registration Explained', 'Transfer Duty and Costs'] as $candidate) {
+        $slug = trim((string) preg_replace('/[^a-z]+/', '-', strtolower($candidate)), '-');
+        if ((int) $db->fetchOne('SELECT COUNT(*) FROM courses WHERE lower(title) = lower(:t) OR slug = :s', ['t' => $candidate, 's' => $slug]) === 0) return ['title' => $candidate, 'slug' => $slug];
     }
-    return ['id' => $id, 'email' => $email];
+    throw new RuntimeException('Every property course title is in use.');
 };
 $node = static fn(int $course, ?int $parent, int $position, string $type): int => (int) $db->fetchOne(
     'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type) VALUES (:p,:c,:parent,:position,:type) RETURNING id',
@@ -67,29 +72,31 @@ if ($action === 'create') {
     if (is_file($statePath)) {
         throw new RuntimeException('Clean up the previous landing pages fixture first.');
     }
-    $s = $fixture->suffix();
-    $owner = $person('owner', 'Thandi', 'Owner', ['COURSE_OWNER'], $s);
-    $admin = $person('admin', 'Landing', 'Administrator', ['ADMIN'], $s);
-    $learner = $person('learner', 'Sipho', 'Ndlovu', ['STUDENT'], $s);
-    $holder = $person('holder', 'Lerato', 'Mokoena', ['STUDENT'], $s);
-    $reviewer = $person('reviewer', 'Johan', 'Botha', ['STUDENT'], $s);
-    $company = $fixture->createCompany($owner['id'], 'Landing Provider ' . $s, 'landing-browser-' . $s . '.example.test');
+    // A course provider made with its founding administrator (the courses' owner), an administrator and three learners.
+    $provider = $fixture->company();
+    $owner = $provider['founder'];
+    $container->get(RoleRepository::class)->assign($owner['id'], 'COURSE_OWNER');
+    $company = $provider['id'];
+    $admin = $person(['ADMIN']);
+    $learner = $person([]);
+    $holder = $person([]);
+    $reviewer = $person([]);
 
-    $a = ['slug' => 'landing-browser-a-' . $s, 'title' => 'Landing browser course ' . $s];
+    $a = $title();
     $a['id'] = $fixture->createCourse($owner['id'], $company, $a['slug'], $a['title'], 'published');
     $db->executeStatement("UPDATE courses SET published_at=NOW(), subtitle='Property transfers from offer to registration', summary='A practical course on transferring property in South Africa.', certificate_accreditation='LPC CPD: 4 points', level='Intermediate' WHERE id=:id", ['id' => $a['id']]);
     $price($a['id'], $owner['id'], 1, 31536000, 150000, true);
-    $price($a['id'], $owner['id'], 2, 15811200, 90000, false); // 6 months: 183 days (a month is a twelfth of a year)
+    $price($a['id'], $owner['id'], 2, 15552000, 90000, false); // 6 months: 180 days (a month is 30 days)
     $deeds = $node($a['id'], null, 1, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Deeds and transfers')", ['n' => $deeds]);
-    $place($node($a['id'], $deeds, 1, 'item'), $a['id'], $item($owner['id'], 'landing-browser-lesson-' . $s, 'html_lesson', 'Drafting a deed of transfer', '<p>How a deed is drafted.</p>', '<p>SECRET BROWSER LESSON</p>'), true);
-    $test = $item($owner['id'], 'landing-browser-test-' . $s, 'assessment', 'Deeds test', '', '');
+    $place($node($a['id'], $deeds, 1, 'item'), $a['id'], $item($owner['id'], $a['slug'] . '-lesson', 'html_lesson', 'Drafting a deed of transfer', '<p>How a deed is drafted.</p>', '<p>SECRET BROWSER LESSON</p>'), true);
+    $test = $item($owner['id'], $a['slug'] . '-test', 'assessment', 'Deeds test', '', '');
     $db->executeStatement('INSERT INTO course_item_assessments (course_item_id) VALUES (:i)', ['i' => $test]);
     $db->executeStatement("INSERT INTO assessment_questions (public_id,course_item_id,position,question_html) VALUES (:p,:i,1,'SECRET BROWSER QUESTION')", ['p' => Uuid::v4(), 'i' => $test]);
     $place($node($a['id'], $deeds, 2, 'item'), $a['id'], $test, false);
     $bonds = $node($a['id'], null, 2, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Bonds')", ['n' => $bonds]);
-    $place($node($a['id'], $bonds, 1, 'item'), $a['id'], $item($owner['id'], 'landing-browser-bonds-' . $s, 'html_lesson', 'Registering a bond', '', '<p>SECRET BROWSER BONDS</p>'), false);
+    $place($node($a['id'], $bonds, 1, 'item'), $a['id'], $item($owner['id'], $a['slug'] . '-bonds', 'html_lesson', 'Registering a bond', '', '<p>SECRET BROWSER BONDS</p>'), false);
     // The holder and the reviewer have course A as a person gets it (owner, 2026-10-19: "No check may ever
     // write records a real person could not have produced"): ADMIN assigns it and they start it. Only a
     // learner with the course may review it, and ADMIN approves the review.
@@ -103,7 +110,7 @@ if ($action === 'create') {
     $reviews->approve((int) $submitted['id'], $admin['id'], $submitted['revision'], null);
 
     // Course B: published, its landing page published, and no active price.
-    $b = ['slug' => 'landing-browser-b-' . $s, 'title' => 'Landing browser closed course ' . $s];
+    $b = $title();
     $b['id'] = $fixture->createCourse($owner['id'], $company, $b['slug'], $b['title'], 'published');
     $landing = $container->get(LandingPageService::class);
     $landing->create($b['id'], $admin['id']);
@@ -123,8 +130,8 @@ if ($action === 'create') {
     $landing->publish($b['id'], $admin['id']);
 
     $state = [
-        'suffix' => $s,
         'company' => $company,
+        'scrub' => $fixture->seeds(),
         'courses' => ['a' => $a, 'b' => $b],
         'users' => ['owner' => $owner['id'], 'admin' => $admin['id'], 'learner' => $learner['id'], 'holder' => $holder['id'], 'reviewer' => $reviewer['id']],
         'tokens' => [
@@ -142,27 +149,8 @@ if ($action === 'create') {
         exit(0);
     }
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    $users = '{' . implode(',', array_map('intval', $state['users'])) . '}';
-    $courses = '{' . implode(',', array_map(static fn(array $c): int => (int) $c['id'], $state['courses'])) . '}';
-    $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $users]);
-    $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $users]);
-    // Guests' carts live in their sessions; a cart row naming these prices would block their removal.
-    $db->executeStatement('DELETE FROM commerce_cart_items WHERE variant_id IN (SELECT id FROM course_price_variants WHERE course_id = ANY(CAST(:ids AS BIGINT[])))', ['ids' => $courses]);
-    $items = $db->fetchFirstColumn('SELECT DISTINCT course_item_id FROM course_item_placements WHERE course_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $courses]);
-    $db->executeStatement('DELETE FROM course_structure_nodes WHERE course_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $courses]);
-    foreach ($items as $id) {
-        $db->executeStatement('DELETE FROM course_items WHERE id = :id', ['id' => (int) $id]);
-    }
-    foreach (['analytics_events', 'course_reviews', 'course_enrolments', 'course_landing_pages', 'course_edit_history', 'course_price_variants'] as $table) {
-        $db->executeStatement("DELETE FROM {$table} WHERE course_id = ANY(CAST(:ids AS BIGINT[]))", ['ids' => $courses]);
-    }
-    $db->executeStatement('DELETE FROM courses WHERE id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $courses]);
-    $db->executeStatement('DELETE FROM company_users WHERE company_id = :c', ['c' => $state['company']]);
-    $db->executeStatement('DELETE FROM companies WHERE id = :c', ['c' => $state['company']]);
-    foreach (['analytics_events', 'audit_log', 'course_enrolments', 'user_roles', 'user_emails'] as $table) {
-        $db->executeStatement("DELETE FROM {$table} WHERE user_id = ANY(CAST(:ids AS BIGINT[]))", ['ids' => $users]);
-    }
-    $db->executeStatement('DELETE FROM users WHERE id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $users]);
+    // Everything the check made, the courses' lessons, landing pages, carts and reviews included (owner, 2026-10-27).
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed the landing pages fixture.\n";
 } else {

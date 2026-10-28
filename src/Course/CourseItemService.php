@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Support\Duration;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use InvalidArgumentException;
@@ -517,10 +518,10 @@ final class CourseItemService
         return (string) ($row['item_title'] ?? '') === 'Review Study Aid' && str_ends_with((string) ($row['item_key'] ?? ''), '-review');
     }
 
+    /** A number of minutes in the words every length of time is stated in (Support\Duration, owner 2026-10-26): "1 week 2 days". */
     public static function duration(int $minutes): string
     {
-        $minutes = max(0, $minutes); $weeks = intdiv($minutes, 10080); $minutes %= 10080; $days = intdiv($minutes, 1440); $minutes %= 1440; $hours = intdiv($minutes, 60); $minutes %= 60;
-        return sprintf('%02d weeks %02d days %02d hours %02d minutes', $weeks, $days, $hours, $minutes);
+        return $minutes < 1 ? '0 minutes' : Duration::ofSeconds($minutes * 60)->words();
     }
 
     /**

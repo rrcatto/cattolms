@@ -20,6 +20,9 @@ bytes is not reliably a string as far as that inference is concerned. Base64 mak
 unambiguously text and leaves the column genuinely binary, which is the property that matters.
 
 Changelog:
+2026/10/26 SAST
+- pictureState() and setAvatarSeed(): what a person's picture is (an upload or the drawn avatar's seed) without reading
+  any image bytes, and the seed "Show me another" saves. pictureStates(): the same for a page of people in one query.
 2026/09/10 02:25 SAST
 - Created for the Profile submenu: personal particulars with an image, and social media links.
 */
@@ -99,6 +102,72 @@ final class UserProfileRepository
     public function removeImage(int $userId): void
     {
         $this->db->executeStatement('DELETE FROM user_profile_images WHERE user_id = :user_id', ['user_id' => $userId]);
+    }
+
+    /**
+     * What a person's picture is, without reading any image bytes: their upload's fingerprint, or the seed of their drawn
+     * avatar (the chosen one, else their public id). Null for an account that does not exist.
+     *
+     * @return array{uploaded:bool,upload_version:string,seed:string,chosen:bool}|null
+     */
+    public function pictureState(int $userId): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT u.public_id::text AS public_id, u.avatar_seed, i.byte_size,
+                    to_char(i.updated_at, 'YYYY-MM-DD HH24:MI:SS.US') AS updated_at
+             FROM users u LEFT JOIN user_profile_images i ON i.user_id = u.id
+             WHERE u.id = :user_id",
+            ['user_id' => $userId]
+        );
+        if ($row === false) {
+            return null;
+        }
+        $uploaded = $row['byte_size'] !== null;
+
+        return [
+            'uploaded' => $uploaded,
+            'upload_version' => $uploaded ? substr(sha1((string) $row['updated_at'] . (string) $row['byte_size']), 0, 12) : '',
+            'seed' => $row['avatar_seed'] !== null ? (string) $row['avatar_seed'] : (string) $row['public_id'],
+            'chosen' => $row['avatar_seed'] !== null,
+        ];
+    }
+
+    /**
+     * pictureState() for many people at once, keyed by user id (one query for a page of them).
+     *
+     * @param list<int> $userIds
+     * @return array<int, array{uploaded:bool,upload_version:string,seed:string,chosen:bool}>
+     */
+    public function pictureStates(array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), static fn(int $id): bool => $id > 0)));
+        if ($userIds === []) {
+            return [];
+        }
+        $states = [];
+        foreach ($this->db->fetchAllAssociative(
+            "SELECT u.id, u.public_id::text AS public_id, u.avatar_seed, i.byte_size,
+                    to_char(i.updated_at, 'YYYY-MM-DD HH24:MI:SS.US') AS updated_at
+             FROM users u LEFT JOIN user_profile_images i ON i.user_id = u.id
+             WHERE u.id = ANY(CAST(:ids AS BIGINT[]))",
+            ['ids' => '{' . implode(',', $userIds) . '}']
+        ) as $row) {
+            $uploaded = $row['byte_size'] !== null;
+            $states[(int) $row['id']] = [
+                'uploaded' => $uploaded,
+                'upload_version' => $uploaded ? substr(sha1((string) $row['updated_at'] . (string) $row['byte_size']), 0, 12) : '',
+                'seed' => $row['avatar_seed'] !== null ? (string) $row['avatar_seed'] : (string) $row['public_id'],
+                'chosen' => $row['avatar_seed'] !== null,
+            ];
+        }
+
+        return $states;
+    }
+
+    /** The drawn avatar's seed after "Show me another", or null to go back to the first one. */
+    public function setAvatarSeed(int $userId, ?string $seed): void
+    {
+        $this->db->executeStatement('UPDATE users SET avatar_seed = :seed, updated_at = NOW() WHERE id = :user_id', ['seed' => $seed, 'user_id' => $userId]);
     }
 
     /**

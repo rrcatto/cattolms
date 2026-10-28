@@ -13,6 +13,8 @@ The Administration course list and the public published catalogue are bounded an
 the home page asks for only the handful of courses it renders.
 
 Changelog:
+2026/10/26 SAST
+- Administration -> Courses rows carry the course's cover (cover_svg) for its card in grid view (owner, 2026-10-26).
 2026/10/23 SAST
 - Course codes (owner, 2026-10-23): createCourse() stores the code given, else a random C- one; updateCourse() writes it when
   given; findByCode(); Administration -> Courses searches and sorts by code too.
@@ -612,7 +614,7 @@ final class CourseRepository
 
     private static function courseAdministrationDetail(): string
     {
-        return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position,
+        return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position, c.cover_svg,
                     c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,

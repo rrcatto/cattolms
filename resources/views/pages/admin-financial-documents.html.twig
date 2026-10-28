@@ -48,7 +48,7 @@
 	{{ ui('layout.section-head', {heading: 'Look', heading_level: 2, summary: 'Every document is A4 portrait.'}) }}
 	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Typeface', for: 'document-typeface'})} %}{% block control %}<select id="document-typeface" name="typeface" {{ ui_field_attrs(props) }}>{% for key, label in typefaces %}<option value="{{ key }}"{% if key == design.typeface %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Accent colour', for: 'document-colour', help: 'For the headings and the rules under the table heading and above the total.'})} %}{% block control %}<input id="document-colour" type="color" name="colour" value="{{ design.colour|lower }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% include '@platform/partials/hex-colour-field.html.twig' with {hc: {id: 'document-colour', name: 'colour', value: design.colour, label: 'Accent colour', help: 'For the headings and the rules under the table heading and above the total. Write it as # and six hex digits, such as #9A3F12.'}} %}
 	{% endblock %}{% endembed %}
 {% endblock %}{% endembed %}
 

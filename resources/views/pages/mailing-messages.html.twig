@@ -1,0 +1,58 @@
+{#
+	Mailing › Messages (mailing, step 2; owner, 2026-10-26; its own menu since 2026-10-28): a new message, and every message
+	and digest with its figures, newest first. Rebuilt to the approved mockup in a later step.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Messages' %}
+	{% set ph_lead = 'A message is an email you write to the lists you choose. Saving never sends it: send a proof to yourself first, then send it now or at a time you set.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	{% if can_manage %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'new'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Write a new email', summary: 'Give it a name you will recognise here, and choose who it goes to. You write its subject and content next.'}) }}
+			<form action="/mailing/messages" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'campaign-name', full_width: true, help: 'For Administration only, such as "November news". Readers never see it.'})} %}{% block control %}<input class="cl-input" id="campaign-name" name="name" maxlength="160" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% if lists %}
+				<fieldset class="cl-mailing-lists">
+					<legend class="h6">Who it goes to</legend>
+					{% for list in lists %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name ~ ' (' ~ (list.followers == 1 ? '1 person' : list.followers ~ ' people') ~ ')'})} %}{% block control %}<input type="checkbox" name="list_ids[]" value="{{ list.id }}"{{ list.id == chosen_list or (chosen_list == 0 and list.kind == 'news') ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% endfor %}
+					<p class="help">Someone on several lists gets it once.</p>
+				</fieldset>
+				{% else %}
+					<p class="help">Nobody follows anything yet. A list appears here when its first person follows it.</p>
+				{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Write the email', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+			</form>
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'campaigns'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Messages and digests', summary: 'Newest first. Open one to write it, send it or see what became of each email.'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'campaigns', pagination: campaigns_pagination, search: {ds_name: 'campaigns', ds_label: 'Search names and subjects', ds_value: campaigns_search, ds_action: '/mailing/messages'}})} %}{% block results %}
+			{% if campaigns %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Campaign'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Date'}} %}</tr>{% endblock %}
+			{% block body %}{% for c in campaigns %}<tr>
+				<td class="cell-text"><a href="/mailing/messages/{{ c.id }}">{{ c.name }}</a><br><span class="small cl-text-secondary">{{ kind_labels[c.kind] }}{{ c.subject ? ' · ' ~ c.subject : '' }}</span></td>
+				<td>{{ ui('feedback.badge', {label: status_labels[c.status], tone: status_tones[c.status]}) }}</td>
+				<td>{{ c.sent }}{% if c.total > c.sent %} of {{ c.total }}{% endif %}</td>
+				<td>{{ c.sent > 0 ? c.opened ~ ' (' ~ (100 * c.opened / c.sent)|round ~ '%)' : '' }}</td>
+				<td>{{ c.sent > 0 ? c.clicked ~ ' (' ~ (100 * c.clicked / c.sent)|round ~ '%)' : '' }}</td>
+				<td>{{ (c.started_at ?: c.created_at)|date('j M Y') }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: campaigns_search ? 'No campaign matches' : 'No campaigns yet', summary: campaigns_search ? 'Try another word.' : 'Write the first email above.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -45,7 +45,9 @@ final class CommerceSettingsController extends BaseController
         foreach (CommerceSettings::SETTINGS as $key => [$section, $env, $default, $type]) {
             $text = $settings->text($key);
             $field = ['key' => $key, 'label' => CommerceSettings::label($key), 'text' => $text, 'env' => $env, 'default' => $settings->environmentText($key),
-                'source' => $settings->source($key), 'type' => $type, 'words' => $type === 'duration' ? Duration::parse($text)->words() : ''];
+                'source' => $settings->source($key), 'type' => $type, 'words' => $type === 'duration' ? Duration::parse($text)->words() : '',
+                // How to write a length of time, beside every field that takes one (owner, 2026-10-26).
+                'how' => $type === 'duration' ? Duration::HOW : ''];
             if ($type === 'processor_fee') {
                 $fee = ProcessorFee::fromText($text);
                 $field['percent'] = $fee->percent;

@@ -35,17 +35,18 @@
 
 {% endblock %}
 {% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Identification number', full_width: false, for: 'field-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+			{# The South African ID number and the date of birth it gives (owner, 2026-10-27): shown, never typed here. #}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'South African ID number', full_width: false, for: 'field-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Kept encrypted. To correct it, use the contact form.'})} %}
 {% block control %}
 
-				<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+				<input value="{{ profile.id_number_masked|default('') ?: 'Not given yet' }}" id="field-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" readonly {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', help: '18 or older.', full_width: false, for: 'field-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', help: 'From your ID number.', full_width: false, for: 'field-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+				<input value="{{ profile.birthdate ? profile.birthdate|date('j F Y') : 'Not given yet' }}" id="field-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" readonly {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -105,15 +106,30 @@
 		<div class="cl-profile-image-panel" {{ stimulus_controller('profile-image', {size: profile_image_size}) }}>
 			<div class="cl-profile-image-current" {{ stimulus_target('profile-image', 'placeholder') }}>
 				{% if profile_image_url %}
-					<img class="cl-profile-image-preview" src="{{ profile_image_url }}" alt="Your current profile image" width="128" height="128">
+					<img class="cl-profile-image-preview" src="{{ profile_image_url }}" alt="{{ profile_image_drawn|default(false) ? 'Your drawn avatar' : 'Your current profile image' }}" width="128" height="128">
 				{% else %}
 					<div class="cl-profile-image-preview cl-profile-image-empty">
 						<span>{{ profile.full_name|slice(0, 1)|upper }}</span>
 					</div>
 				{% endif %}
 				<p class="help">
-					{{ profile_image_url ? 'Your image now.' : 'No image yet.' }}
+					{{ not profile_image_url ? 'No image yet.' : (profile_image_drawn|default(false) ? 'Your drawn avatar. Upload a picture to use your own instead.' : 'Your image now.') }}
 				</p>
+				{# A drawn avatar can be swapped for another (owner, 2026-10-26: "Show me another"). Nothing is uploaded. #}
+				{% if profile_image_drawn|default(false) %}
+					<div class="cl-profile-avatar-actions">
+						<form action="/account/profile/avatar/another" method="post">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							{{ ui('action.button', {label: 'Show me another', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-generate'}) }}
+						</form>
+						{% if profile_avatar_chosen|default(false) %}
+							<form action="/account/profile/avatar/first" method="post">
+								<input type="hidden" name="csrf" value="{{ csrf }}">
+								{{ ui('action.button', {label: 'Back to my first one', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-restore'}) }}
+							</form>
+						{% endif %}
+					</div>
+				{% endif %}
 			</div>
 			<div class="cl-profile-image-actions">
 				<form action="/account/profile/image" method="post" enctype="multipart/form-data" data-action="submit->profile-image#capture">
@@ -180,14 +196,14 @@
 
 {% endblock %}
 {% block secondary_actions %}
-{% if profile_image_url %}
-							{{ ui('action.button', {label: 'Remove image', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove your profile image? Your initial is shown instead.', form: 'remove-profile-image', icon: 'action-remove'}) }}
+{% if profile_image_url and not profile_image_drawn|default(false) %}
+							{{ ui('action.button', {label: 'Remove image', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove your profile image? Your drawn avatar is shown instead.', form: 'remove-profile-image', icon: 'action-remove'}) }}
 						{% endif %}
 
 {% endblock %}
 {% endembed %}
 				</form>
-				{% if profile_image_url %}
+				{% if profile_image_url and not profile_image_drawn|default(false) %}
 					<form action="/account/profile/image/remove" method="post" id="remove-profile-image">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 					</form>

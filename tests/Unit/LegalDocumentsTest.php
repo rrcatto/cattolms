@@ -169,15 +169,19 @@ final class LegalDocumentsTest extends TestCase
         foreach (file(RenderHarness::root() . '/.env.example', FILE_IGNORE_NEW_LINES) ?: [] as $line) {
             if (preg_match('/^([A-Z_]+)=(.*)$/', $line, $match) === 1) $defaults[$match[1]] = trim($match[2], '"');
         }
-        self::assertSame(['catto_learning_web', 'catto_learning_session', '86400', '86400', '1800'],
-            [$defaults['PHP_SESSION_COOKIE'], $defaults['AUTH_SESSION_COOKIE'], $defaults['PHP_SESSION_TTL'], $defaults['AUTH_SESSION_TTL'], $defaults['AUTH_MAGIC_LINK_TTL']]);
+        self::assertSame(['catto_learning_web', 'catto_learning_session'], [$defaults['PHP_SESSION_COOKIE'], $defaults['AUTH_SESSION_COOKIE']]);
+        // Lengths of time are written the one way (Duration): 24 hours and 30 minutes, as the policy says.
+        self::assertSame([86400, 86400, 1800], array_map(static fn(string $text): int => Duration::parse($text)->lengthInSeconds(),
+            [$defaults['PHP_SESSION_TTL'], $defaults['AUTH_SESSION_TTL'], $defaults['AUTH_MAGIC_LINK_TTL']]));
         $privacy = self::document('privacy');
         foreach (['<strong>catto_learning_web</strong> keeps your browser session', '<strong>catto_learning_session</strong> keeps you signed in', 'It lasts 24 hours and is renewed while you use the site.', '<strong>cl_palette</strong> remembers the colour palette', 'It lasts 1 year.', "{label: 'Sign-in links', value: '30 minutes'}", "{label: 'Sessions', value: '24 hours'}",
             "{label: 'Orders and transaction records', value: 'At least 5 years'}", "{label: 'Activity log', value: '5 years'}", "{label: 'Analytics events', value: '5 years'}"] as $stated) {
             self::assertStringContainsString($stated, $privacy);
         }
         self::assertStringContainsString("cl_palette='+encodeURIComponent(String(index))+';path=/;max-age=31536000", (string) file_get_contents(RenderHarness::root() . '/public_html/js/platform-overrides.js'), 'The palette cookie still lasts the year the policy states.');
-        self::assertStringContainsString('The activity log stores the IP address of each recorded action.', $privacy);
+        self::assertStringContainsString('The activity log stores the IP address of each recorded action, and for a sign-in the country it came from.', $privacy);
+        // The sign-up check's records (owner, 2026-10-26).
+        self::assertStringContainsString('<strong>Registration checks.</strong> When you register, we record the IP address you register from', $privacy);
         self::assertStringContainsString('stores a hashed IP address and your browser\'s user agent', $privacy);
         self::assertStringContainsString('Analytics events store neither an IP address nor a user agent.', $privacy);
         self::assertStringContainsString('https://inforegulator.org.za', $privacy);
@@ -188,7 +192,8 @@ final class LegalDocumentsTest extends TestCase
         foreach (['Offline copies', 'download it for secure offline storage', 'OVHcloud', 'Google', 'YouTube'] as $gone) {
             self::assertStringNotContainsString($gone, $privacy);
         }
-        self::assertStringContainsString('Activity log entries, analytics events and contact messages older than 5 years are deleted automatically every day.', $privacy);
+        // The records of news emails joined the daily clean-up (mailing, step 2; owner, 2026-10-26).
+        self::assertStringContainsString('Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day.', $privacy);
         self::assertSame(5, \CattoLearning\Maintenance\RetentionCleanup::YEARS, 'The clean-up deletes what the Privacy Policy says it does.');
     }
 
@@ -224,8 +229,12 @@ final class LegalDocumentsTest extends TestCase
         $html = RenderHarness::renderSource("{% include '@platform/partials/commerce-terms-acceptance.html.twig' %}", []);
         self::assertStringContainsString('<label><input type="checkbox" name="accept_terms" value="yes" required>', (string) preg_replace('/>\s+</', '><', $html));
         self::assertStringContainsString('I have read and accept the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/refunds" target="_blank" rel="noopener">Refund Policy</a>.', $html);
-        // The account profile keeps its identity number field, and it is optional.
-        self::assertMatchesRegularExpression('/<input name="identification_number" maxlength="120" value="\{\{ profile\.identification_number \}\}" id="[^"]+" \{\{ ui_field_attrs\(props\) \}\}>/', self::source('partials/account/profile'));
+        // The account profile shows the South African ID number masked, given at registration or at sign-in, never a field to
+        // type one (owner, 2026-10-27); a checkout never asks for it.
+        $profile = self::source('partials/account/profile');
+        self::assertStringContainsString('profile.id_number_masked', $profile);
+        self::assertStringNotContainsString('name="identification_number"', $profile);
+        foreach (['pages/commerce-checkout', 'pages/company-credit-checkout'] as $checkout) self::assertStringNotContainsString('id_number', self::source($checkout));
     }
 
     public function testAChoiceLabelMayCarryLinksThroughItsLabelSlot(): void

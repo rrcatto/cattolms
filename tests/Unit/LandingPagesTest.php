@@ -43,7 +43,7 @@ final class LandingPagesTest extends TestCase
             self::assertSame($type->defaults(), $type->normalise($type->defaults()), $type->value . ' defaults are stored as they are.');
             $labels[] = $type->label();
         }
-        self::assertSame(['Hero', 'Who this course is for', 'Learning outcomes', 'Course contents', 'Benefits', 'Instructor', 'Reviews', 'Pricing', 'FAQ', 'Call to action'], $labels);
+        self::assertSame(['Hero', 'Who this course is for', 'Learning outcomes', 'Course contents', 'Benefits', 'Reviews', 'Pricing', 'FAQ', 'Call to action'], $labels);
     }
 
     public function testOnlyBenefitsQuestionsAndCallsToActionMayRepeat(): void
@@ -51,7 +51,7 @@ final class LandingPagesTest extends TestCase
         $repeatable = array_values(array_filter(LandingSectionType::cases(), static fn(LandingSectionType $type): bool => !$type->once()));
         self::assertSame([LandingSectionType::Benefits, LandingSectionType::Faq, LandingSectionType::Cta], $repeatable);
         $baseline = (string) file_get_contents(self::ROOT . '/database/migrations/20261006120000_create_v088_baseline.php');
-        self::assertStringContainsString("WHERE section_type IN ('hero','audience','outcomes','contents','instructor','reviews','pricing')", $baseline, 'The database holds the same rule.');
+        self::assertStringContainsString("WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing')", $baseline, 'The database holds the same rule.');
     }
 
     public function testANewPageStartsWithTheRecommendedSectionsAndNoCopyWrittenForTheAuthor(): void
@@ -109,7 +109,7 @@ final class LandingPagesTest extends TestCase
         foreach ([LandingSectionType::Audience, LandingSectionType::Outcomes, LandingSectionType::Benefits, LandingSectionType::Faq] as $type) {
             self::assertCount(1, $type->missing($type->defaults()), $type->value . ' with nothing in it cannot be published.');
         }
-        foreach ([LandingSectionType::Contents, LandingSectionType::Reviews, LandingSectionType::Pricing, LandingSectionType::Cta, LandingSectionType::Instructor] as $type) {
+        foreach ([LandingSectionType::Contents, LandingSectionType::Reviews, LandingSectionType::Pricing, LandingSectionType::Cta] as $type) {
             self::assertSame([], $type->missing($type->defaults()), $type->value . ' shows live course data, so it is complete as it is.');
         }
         self::assertSame('3 questions', LandingSectionType::Faq->summary(['items' => [[], [], []]]));

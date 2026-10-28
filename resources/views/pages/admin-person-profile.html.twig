@@ -1,442 +1,348 @@
 {% extends layout %}
 {% block page_body %}
-	{# Built one way, as every page is (UX rule 1.7; owner, 2026-10-20: this page had its cards outside the page section and
-	   no margin): the page head with the person's name, then one page section holding every card. #}
+	{#
+		A person's page in Administration, as the owner approved it (2026-10-26: "the layout of /admin/people/[person id] is a
+		wreck ... recommend me something"): who they are and their figures first, then their particulars, company and roles
+		and courses in the main column, and their account and security on the right (sign-up risk, sign-ins, age and
+		identity, sessions), never ahead of their profile. Built one way, as every page is (UX rule 1.7).
+	#}
 	{% set ph_back_href = '/admin/people' %}
 	{% set ph_back_label = 'People' %}
 	{% set ph_kicker = 'Person' %}
 	{% set ph_title = profile.full_name ?: primary_email %}
-	{% set ph_lead = 'Particulars, company, roles, access and sessions.' %}
+	{% if profile.status == 'awaiting_approval' and can_manage_people %}
+		{% set ph_actions %}
+			<form action="/admin/people/{{ target_user_id }}/approve" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Approve account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}</form>
+			<form action="/admin/people/{{ target_user_id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="disabled">{{ ui('action.button', {label: 'Disable account', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disable this account instead of approving it?', icon: 'action-disable'}) }}</form>
+		{% endset %}
+	{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
+	{% set pp_status = {active: ['Active', 'success'], awaiting_approval: ['Awaiting approval', 'warning'], deactivated: ['Deactivated', 'neutral']}[profile.status]|default([profile.status|capitalize, 'danger']) %}
+	{% set pp_company_role = {owner: 'Company Administrator', administrator: 'Company Administrator', course_owner: 'Course owner', course_editor: 'Course editor'}[company_membership_role|default('')]|default('Student') %}
+
 	<section class="cl-page-section">
+	{% if profile.status == 'awaiting_approval' %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Waiting for your approval'})} %}{% block body %}<p>{% if site_is_demo|default(false) %}They registered while the site is in demo mode, so they cannot sign in until you approve the account.{% else %}The sign-up check held this registration, so they cannot sign in until you approve the account. Look at their sign-up risk before you decide.{% endif %}</p>{% endblock %}{% endembed %}
+	{% endif %}
+
+	{# Who they are, with the figures that open what they count. #}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
-
 		{{ ui('layout.section-head', {heading: 'Summary', heading_level: 2}) }}
-		<div class="profile-head">
-			{# Their own picture when they uploaded one, else a plain placeholder (owner, 2026-10-20: never initials). #}
-			{% if profile_image_url %}
-				<img class="cl-person-photo" src="{{ profile_image_url }}" alt="Profile picture of {{ profile.full_name ?: primary_email }}" width="96" height="96">
-			{% else %}
-				<span class="cl-person-photo cl-person-photo--placeholder" role="img" aria-label="No profile picture"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></span>
-			{% endif %}
-			<div class="profile-meta">
-				<p>
-					{{ primary_email }}
-					{% if company %}
-						· {{ company.name }}
+		<div class="cl-person-summary">
+			<div class="profile-head">
+				{# Their own picture when they uploaded one, else their drawn avatar (owner, 2026-10-26); never initials (2026-10-20). #}
+				{% if profile_image_url %}
+					<img class="cl-person-photo" src="{{ profile_image_url }}" alt="{{ profile_image_drawn|default(false) ? 'Drawn avatar' : 'Profile picture' }} of {{ profile.full_name ?: primary_email }}" width="96" height="96">
+				{% else %}
+					<span class="cl-person-photo cl-person-photo--placeholder" role="img" aria-label="No profile picture"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>
+				{% endif %}
+				<div class="profile-meta">
+					<p>{{ primary_email }}</p>
+					{% if account_reference_label|default('') %}<p>Account reference: <strong>{{ account_reference_label }}</strong></p>{% endif %}
+					{% if person_company %}
+						<p class="cl-person-company-line">{% if person_company_logo|default('') %}<img class="cl-company-named-logo" src="{{ person_company_logo }}" alt="" width="28" height="28">{% endif %}<a href="/admin/companies/{{ person_company.id }}">{{ person_company.name }}</a> · {{ pp_company_role }}</p>
+					{% else %}
+						<p>A private account: their address is at no company's domain.</p>
 					{% endif %}
-				</p>
-				{% if account_reference_label|default('') %}<p>Account reference: <strong>{{ account_reference_label }}</strong></p>{% endif %}
-				<div class="chip-row cl-mt-2">
-					{{ ui('feedback.badge', {label: profile.status == 'awaiting_approval' ? 'Awaiting approval' : (profile.status|ucfirst), tone: profile.status=='active' ? 'success' : (profile.status == 'awaiting_approval' ? 'warning' : 'danger')}) }}
-					{% for role in roles %}
-						{% set role_option = role_options|filter(option => option.role_key == role)|first %}
-						{{ ui('feedback.badge', {label: role_option ? role_option.role_name|role_label(role) : ''|role_label(role), tone: 'info'}) }}
-					{% endfor %}
+					<div class="chip-row cl-mt-2">
+						{{ ui('feedback.badge', {label: pp_status[0], tone: pp_status[1]}) }}
+						{% for role in roles %}
+							{% set role_option = role_options|filter(option => option.role_key == role)|first %}
+							{{ ui('feedback.badge', {label: role_option ? role_option.role_name|role_label(role) : ''|role_label(role), tone: 'info'}) }}
+						{% endfor %}
+						{% if signup_check %}<a class="cl-person-risk-link" href="#signup-check">{{ ui('feedback.badge', {label: signup_check.risk_label ~ ' · ' ~ signup_check.score, tone: signup_check.risk_tone}) }}</a>{% endif %}
+					</div>
 				</div>
-				{% if not profile_image_url %}<p class="small cl-text-muted">No profile picture.</p>{% endif %}
 			</div>
-		</div>
-
-{% endblock %}
-{% endembed %}
-	{# The date of birth and identity verification (owner, 2026-10-19; adults only, 2026-10-20). #}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'identity'})} %}
-{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Age and identity', summary: 'The date of birth they gave (the site is for adults only) and identity verification through Didit. No identity images are kept.'}) }}
-		{% set document_birth = identity and identity.verification ? identity.verification.date_of_birth|default(null) : null %}
-		{{ ui('data.key-value-list', {items: [
-			{label: 'Date of birth', value: profile.birthdate|default(null) ? (profile.birthdate|date('j F Y')) ~ ' (' ~ date(profile.birthdate).diff(date()).y ~ ')' : 'Not given yet: asked at their next sign-in'},
-		] | merge(document_birth and document_birth|date('Y-m-d') != (profile.birthdate|default(null) ? profile.birthdate|date('Y-m-d') : '') ? [{label: 'On their identity document', value: document_birth|date('j F Y') ~ ' (' ~ date(document_birth).diff(date()).y ~ '), not the date they gave'}] : []) | merge(identity and identity.minor ? [{label: 'Adults only', value: 'Under 18 on their identity document: the account stops at the adults-only page'}] : []) | merge(identity ? [{label: 'Identity', value: identity.status_words}, {label: 'Declined checks that count', value: identity.tries_used ~ ' of 3'}] : [])}) }}
-		{% if identity %}
-			{% if can_manage_identity and identity.blocked %}
-			<form action="/admin/people/{{ target_user_id }}/identity/allow-retry" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Allow another try', variant: 'primary', size: 'small', type: 'submit', confirm: 'Allow this person three more identity checks?', icon: 'action-refresh'}) }}</form>
+			{% set pp_figures = [
+				{value: library_total, label: library_total == 1 ? 'Course' : 'Courses', href: '#courses', icon: 'figure-courses'},
+				{value: person_figures.orders, label: person_figures.orders == 1 ? 'Order' : 'Orders', href: '/admin/commerce/orders?q=' ~ primary_email|url_encode, icon: 'figure-orders'},
+				{value: person_figures.certificates, label: person_figures.certificates == 1 ? 'Certificate' : 'Certificates', href: '/admin/certificates?q=' ~ (profile.full_name ?: primary_email)|url_encode, icon: 'figure-certificates'},
+			] %}
+			{% if company_account %}
+				{% set pp_figures = pp_figures|merge([{value: requests|length, label: requests|length == 1 ? 'Course request' : 'Course requests', href: '?courses=requests#courses', icon: 'figure-requests'}]) %}
+			{% else %}
+				{% set pp_figures = pp_figures|merge([{value: wallet_balance, label: 'Wallet credit', href: '/admin/wallets/person/' ~ target_user_id, icon: 'figure-wallet-held', size: 'small'}]) %}
 			{% endif %}
-			{% if identity_history %}
-			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Identity checks, newest first'})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Started', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 45, label: 'Result'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Didit session', wide: true}} %}</tr>{% endblock %}
-			{% block body %}{% for check in identity_history %}<tr data-identity-check="{{ check.id }}">
-				<td class="small">{{ check.started_at|date('j M Y H:i') }}</td>
-				<td>{{ check.status_words }}</td>
-				<td class="cell-text">{% if check.verified_name %}<strong>{{ check.verified_name }}</strong><br><span class="small">{{ check.document_type|default('Document') }}{{ check.document_number ? ' ' ~ check.document_number : '' }}{{ check.issuing_country ? ', ' ~ check.issuing_country : '' }}{{ check.date_of_birth ? ', born ' ~ check.date_of_birth|date('j F Y') : '' }}{{ check.decided_at ? ', decided ' ~ check.decided_at|date('j M Y H:i') : '' }}</span>{% elseif check.decline_reason %}{{ check.decline_reason }}{% else %}—{% endif %}{% if check.status == 'revoked' %}<br><span class="small">Revoked {{ check.revoked_at|date('j M Y H:i') }}{% if check.revoked_by_user_id %} by {{ ui('data.person', {name: check.revoked_by_name ?: 'User ' ~ check.revoked_by_user_id, reference: check.revoked_by_reference, href: '/admin/people/' ~ check.revoked_by_user_id}) }}{% endif %}: {{ check.revocation_reason }}</span>{% endif %}
-				{% if can_manage_identity and check.status == 'approved' %}
-					<form action="/admin/people/{{ target_user_id }}/identity/{{ check.id }}/revoke" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason for revoking', for: 'revoke-identity-' ~ check.id, required: true})} %}{% block control %}<input id="revoke-identity-{{ check.id }}" name="reason" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{{ ui('action.button', {label: 'Revoke verification', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this verification? The person must verify again before a purchase or a certificate.', icon: 'action-revoke'}) }}
-					</form>
-				{% endif %}</td>
-				<td class="small"><span class="mono">{{ check.session_id }}</span><br>{{ ui('action.link', {label: 'Open the Didit console', variant: 'quiet', size: 'small', href: identity_console, new_window: true, icon: 'action-external'}) }}</td>
-			</tr>{% endfor %}{% endblock %}
-			{% endembed %}
-			<p class="help">Didit's console finds a check by its session id: search for it under Verifications.</p>
-			{% else %}<p>No identity check yet.</p>{% endif %}
-		{% endif %}
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+				{% for figure in pp_figures %}{{ ui('data.stat-card', figure) }}{% endfor %}
+			{% endblock %}{% endembed %}
+		</div>
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
-{% block body %}
 
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side', section_spacing: true})} %}
+{% block body %}
+		<div class="cl-person-main">
+		{# What they can change on their own profile, and you for them. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'particulars'})} %}
 {% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Complete profile', summary: 'Platform Administrators can edit the same profile information that the person can edit themselves, plus company and roles.'}) }}
-			<form action="/admin/people/{{ target_user_id }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
+			{{ ui('layout.section-head', {heading: 'Particulars', eyebrow: 'Profile', summary: 'What they can change on their own profile. You can change it for them.'}) }}
+			<form action="/admin/people/{{ target_user_id }}" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-admin-person-profile-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-admin-person-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
+				<input type="hidden" name="part" value="particulars">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'person-first-name'})} %}{% block control %}<input id="person-first-name" name="first_name" maxlength="120" value="{{ profile.first_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'person-middle-names'})} %}{% block control %}<input id="person-middle-names" name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'person-last-name'})} %}{% block control %}<input id="person-last-name" name="last_name" maxlength="120" value="{{ profile.last_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Display name', for: 'person-display-name'})} %}{% block control %}<input id="person-display-name" name="display_name" maxlength="160" value="{{ profile.display_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Gender', for: 'person-gender'})} %}{% block control %}<select id="person-gender" name="gender" {{ ui_field_attrs(props) }}><option value="">Select</option>{% for gender in ['Male', 'Female', 'Non-binary', 'Prefer not to say'] %}<option{{ profile.gender == gender ? ' selected' : '' }}>{{ gender }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', for: 'person-mobile'})} %}{% block control %}<input id="person-mobile" name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Primary email', full_width: true, for: 'person-primary-email', required: true, help: 'An address at a company\'s domain makes them its staff. Any other makes a private account.'})} %}{% block control %}<input type="email" id="person-primary-email" name="primary_email" value="{{ primary_email }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Secondary email', full_width: true, for: 'person-secondary-email'})} %}{% block control %}<input type="email" id="person-secondary-email" name="secondary_email" value="{{ secondary_email }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% endblock %}
 {% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-admin-person-profile-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname" id="field-admin-person-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save particulars', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
 {% endblock %}
 {% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-admin-person-profile-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+
+		{# Their company follows their address (the owner's rule, restated 2026-10-26): it is shown, never chosen. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'company-and-roles'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Company and roles', eyebrow: 'Access', summary: 'Which company they belong to, and what they may do on the site.'}) }}
+			<div class="cl-person-company">
+				{% if person_company %}
+					{% if person_company_logo|default('') %}<img class="cl-company-named-logo cl-company-named-logo--large" src="{{ person_company_logo }}" alt="" width="40" height="40">{% endif %}
+					<div><strong><a href="/admin/companies/{{ person_company.id }}">{{ person_company.name }}</a></strong><br><span class="small">{{ person_company.domain }}: their address is at its domain{{ person_company.status != 'active' ? ' · ' ~ person_company.status|capitalize : '' }}</span></div>
+				{% else %}
+					<div><strong>No company</strong><br><span class="small">A private account. An address at a company's domain, changed under Particulars, makes a person its staff.</span></div>
+				{% endif %}
+			</div>
+			<form action="/admin/people/{{ target_user_id }}" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="part" value="roles">
+				{% set pp_company_keys = ['COMPANY_ADMIN', 'COURSE_EDITOR', 'COURSE_OWNER'] %}
+				{% if person_company %}
+					{% set pp_current = {owner: 'COMPANY_ADMIN', administrator: 'COMPANY_ADMIN', course_owner: 'COURSE_OWNER', course_editor: 'COURSE_EDITOR'}[company_membership_role|default('')]|default('STUDENT') %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', for: 'person-company-role'})} %}{% block control %}<select id="person-company-role" name="company_role" {{ ui_field_attrs(props) }}>{% for key, label in {STUDENT: 'Student', COURSE_EDITOR: 'Course editor', COURSE_OWNER: 'Course owner', COMPANY_ADMIN: 'Company Administrator'} %}<option value="{{ key }}"{{ key == pp_current ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% endif %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: person_company ? 'Across the whole site' : 'Roles', full_width: true, for: 'profile-role-0', help: (is_own_account and role_options|filter(option => option.role_key == 'ADMIN' and option.selected)|length) ? 'You cannot remove your own Platform Administrator role. Another administrator can.' : ''})} %}
 {% block control %}
-
-					<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-admin-person-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Identification number', full_width: false, for: 'field-admin-person-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-admin-person-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', help: '18 or older.', full_width: false, for: 'field-admin-person-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-admin-person-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Gender', full_width: false, for: 'field-admin-person-profile-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<select name="gender" id="field-admin-person-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: false, for: 'field-admin-person-profile-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-admin-person-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Display name', full_width: true, for: 'field-admin-person-profile-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-					<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-admin-person-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Primary email', full_width: true, for: 'field-admin-person-profile-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Administrator changes take effect immediately.'})} %}
-{% block control %}
-
-					<input type="email" name="primary_email" value="{{ primary_email }}" required id="field-admin-person-profile-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Secondary email', full_width: true, for: 'field-admin-person-profile-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Leave blank to remove it. An address entered by a Platform Administrator is treated as verified.'})} %}
-{% block control %}
-
-					<input type="email" name="secondary_email" value="{{ secondary_email }}" id="field-admin-person-profile-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-				{# No company is a private account (owner, 2026-10-18); a Company Administrator needs one. #}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: selected_company, lk_required: 0, lk_empty: 'No company: a private account'} %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Roles', full_width: true, for: 'profile-role-0', help: 'The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.'})} %}
-{% block control %}
-
 					<div class="role-checkbox-grid">
-						{% for roleOption in role_options %}
-							{% embed ui_template('form.choice') with {role_field: props, props: ui_props('form.choice', {label: roleOption.role_name|role_label(roleOption.role_key)})} %}
+						{% for roleOption in role_options|filter(option => option.role_key != 'STUDENT' and (not person_company or option.role_key not in pp_company_keys) and (person_company or option.role_key != 'COMPANY_ADMIN')) %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: roleOption.role_name|role_label(roleOption.role_key)})} %}
 {% block control %}
-<input type="checkbox" name="roles[]" value="{{ roleOption.role_key }}" {{ roleOption.selected ? 'checked' : '' }} id="profile-role-{{ loop.index0 }}" {{ ui_field_attrs(role_field) }}>
+{% if is_own_account and roleOption.role_key == 'ADMIN' and roleOption.selected %}{# Kept: a disabled box is not sent, so the role goes with this hidden field. #}<input type="hidden" name="roles[]" value="ADMIN"><input type="checkbox" checked disabled id="profile-role-{{ loop.index0 }}">{% else %}<input type="checkbox" id="profile-role-{{ loop.index0 }}" name="roles[]" value="{{ roleOption.role_key }}"{{ roleOption.selected ? ' checked' : '' }}>{% endif %}
 {% endblock %}
 {% endembed %}
 						{% endfor %}
 					</div>
-
+					<p class="help">Every account is a Student.</p>
 {% endblock %}
 {% endembed %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-					{{ ui('action.button', {label: 'Save complete profile', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
-
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save company and roles', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
 {% endblock %}
 {% endembed %}
 
-{% endblock %}
-{% endembed %}</form>
-
-{% endblock %}
-{% endembed %}
-		<div class="admin-person-side">
-			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+		{# Their courses as one table chosen by short feature cards (UX rule 2.6c): their library, their favourites and, for a
+		   company account, their requests; access granted from the card's head. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'courses'})} %}
 {% block surface_body %}
-
-				{{ ui('layout.section-head', {heading: 'Account status', summary: 'Created ' ~ (profile.created_at) ~ ' · Last login ' ~ (profile.last_login_at ?: 'Never')}) }}
-				{% if profile.status == 'awaiting_approval' %}
-					{# A demo site's new account (owner, 2026-10-21): it cannot sign in until it is approved. #}
-					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Waiting for your approval'})} %}{% block body %}<p>This account registered on the demo site and cannot sign in until you approve it. Approving it emails the person that they can sign in.</p>{% endblock %}{% endembed %}
-					<form action="/admin/people/{{ target_user_id }}/approve" method="post" class="cl-mt-2">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{{ ui('action.button', {label: 'Approve account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}
-					</form>
-					<form action="/admin/people/{{ target_user_id }}/status" method="post" class="cl-mt-2">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<input type="hidden" name="status" value="disabled">
-						{{ ui('action.button', {label: 'Disable account', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disable this account instead of approving it?', icon: 'action-disable'}) }}
-					</form>
-				{% else %}
-				<form action="/admin/people/{{ target_user_id }}/status" method="post">
-					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<input type="hidden" name="status" value="{{ profile.status=='active' ? 'disabled' : 'active' }}">
-					{{ ui('action.button', {label: (profile.status=='active' ? 'Disable account' : 'Enable account'), variant: profile.status=='active' ? 'danger' : 'primary', size: 'normal', type: 'submit', confirm: (profile.status=='active' ? 'Disable this account?' : 'Enable this account?'), icon: (profile.status == 'active' ? 'action-disable' : 'action-enable')}) }}
-				</form>
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Courses', eyebrow: 'Learning', summary: company_account ? 'Their library, the courses they saved and the courses they asked their company for.' : 'Their library and the courses they saved.'})} %}{% block section_actions %}{% if can_manage_enrolments %}{{ ui('action.link', {label: 'Grant course access', variant: 'primary', size: 'small', href: '?grant=1#grant-course', icon: 'action-grant'}) }}{% endif %}{% endblock %}{% endembed %}
+			{# The same pictures as My Courses' cards. #}
+			{% set pp_a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+			{% set pp_lists = [
+				{value: 'library', label: 'In their library', icon: '<svg ' ~ pp_a ~ '><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/><path d="M15.5 8h2M15.5 11h2M6.5 8h2M6.5 11h2"/></svg>', note: library_total ~ (library_total == 1 ? ' course' : ' courses')},
+				{value: 'favourites', label: 'Favourites', icon: '<svg ' ~ pp_a ~ '><path d="M12 20.5s-7.5-4.6-8.9-9.4C2.2 7.9 4.3 4.5 7.6 4.5c2 0 3.4 1.1 4.4 2.6 1-1.5 2.4-2.6 4.4-2.6 3.3 0 5.4 3.4 4.5 6.6-1.4 4.8-8.9 9.4-8.9 9.4z"/></svg>', note: favourites|length ~ ' saved'}
+			] %}
+			{% if company_account %}{% set pp_lists = pp_lists|merge([{value: 'requests', label: 'Course requests', icon: '<svg ' ~ pp_a ~ '><path d="M21 3 10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/></svg>', note: requests|length ~ (requests|length == 1 ? ' request' : ' requests')}]) %}{% endif %}
+			<form class="cl-library-lists" method="get" action="/admin/people/{{ target_user_id }}#courses" data-choose-submits>
+				{{ ui('form.picture-choice', {name: 'courses', legend: 'Which courses', id: 'person-course-lists', size: 'small', columns: 4, selected: courses_list, items: pp_lists}) }}
+				<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+			</form>
+			{% if courses_list == 'library' %}
+				{# A search of their own courses only when there are enough to need one (owner, 2026-10-20). #}
+				{% if library_total >= 5 %}
+					{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'library', ds_label: 'Search their courses', ds_value: library_search, ds_action: '/admin/people/' ~ target_user_id, ds_help: 'Searches this person\'s ' ~ library_total ~ ' courses by title.'} %}
 				{% endif %}
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-				{{ ui('layout.section-head', {heading: 'Active sessions', summary: 'Revoke individual login sessions.'}) }}
-				{% if sessions %}
-					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-						{% for session in sessions %}
-							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-									<strong>{{ session.user_agent }}</strong>
-									<p>
-										Last used {{ session.last_seen_at }}
-									</p>
-
-{% endblock %}
-{% block actions %}
-
-								{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
-{% block body %}
-
-									{% if session.is_current %}
-										{{ ui('feedback.badge', {label: 'Current', tone: 'success'}) }}
-									{% endif %}
-									<form action="/admin/people/{{ target_user_id }}/sessions/revoke" method="post">
-										<input type="hidden" name="csrf" value="{{ csrf }}">
-										<input type="hidden" name="session_id" value="{{ session.public_id }}">
-										{{ ui('action.button', {label: 'Revoke', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this session?', icon: 'action-revoke'}) }}
-									</form>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-						{% endfor %}
-
-{% endblock %}
-{% endembed %}
+				<div id="library-region"><div id="library-results">
+				{% if library_courses %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access until'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}</tr>{% endblock %}
+					{% block body %}{% for course in library_courses %}<tr>
+						<td class="cell-text"><a href="/admin/courses/{{ course.course_id }}">{{ course.title }}</a></td>
+						<td>{{ ui('feedback.badge', {label: course.status|capitalize, tone: {completed: 'success', active: 'info', cancelled: 'danger', expired: 'neutral'}[course.status]|default('neutral')}) }}</td>
+						<td>{{ course.progress_percentage }}%</td>
+						<td>{{ course.expires_at ? course.expires_at|date('j M Y') : 'Not started' }}</td>
+						<td class="cell-actions">{% if can_manage_enrolments %}<form action="/admin/course/enrolments/{{ course.id }}/{{ course.status == 'cancelled' ? 'restore' : 'remove' }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="/admin/people/{{ target_user_id }}">{% if course.status == 'cancelled' %}{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small', icon: 'action-restore'}) }}{% else %}{{ ui('action.button', {label: 'Remove access', variant: 'danger', size: 'small', confirm: 'Remove their access to ' ~ course.title ~ '? Their progress and results are kept, and you can restore it.', icon: 'action-remove'}) }}{% endif %}</form>{% endif %}</td>
+					</tr>{% endfor %}{% endblock %}
+					{% endembed %}
 				{% else %}
-					{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
-{% block body %}
-
-						No active sessions.
-
-{% endblock %}
-{% endembed %}
+					{{ ui('feedback.empty', {heading: library_search ? 'Nothing matches' : 'No courses yet', summary: library_search ? 'None of their courses matches "' ~ library_search ~ '".' : 'Nothing in their library.'}) }}
 				{% endif %}
-
+				</div></div>
+			{% elseif courses_list == 'favourites' %}
+				{% if favourites %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course status'}} %}</tr>{% endblock %}
+					{% block body %}{% for course in favourites %}<tr><td class="cell-text"><a href="/admin/courses/{{ course.id }}">{{ course.title }}</a></td><td>{{ course.status|capitalize }}</td></tr>{% endfor %}{% endblock %}
+					{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No favourites', summary: 'They have saved no course for later.'}) }}
+				{% endif %}
+			{% else %}
+				{% if requests %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Asked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Decided'}} %}</tr>{% endblock %}
+					{% block body %}{% for request in requests %}<tr><td class="cell-text"><a href="/admin/courses/{{ request.course_id }}">{{ request.course_title }}</a></td><td>{{ request.status|capitalize }}</td><td>{{ request.requested_at|date('j M Y') }}</td><td>{{ request.decided_at ? request.decided_at|date('j M Y') : 'Not yet' }}</td></tr>{% endfor %}{% endblock %}
+					{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No course requests', summary: 'They have asked their company for no course.'}) }}
+				{% endif %}
+			{% endif %}
+			{# Granting access (owner, 2026-10-20: its search finds a course in the whole catalogue), opened from the card's head. #}
+			{% if can_manage_enrolments %}
+				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Grant course access', id: 'grant-course', open: grant_open, eyebrow: 'Find any course in the catalogue'})} %}{% block body %}
+					{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: '/admin/people/' ~ target_user_id, ds_push_url: true, ds_help: 'Searches every course in the catalogue by title.'} %}
+					<div id="grant_courses-region"><div id="grant_courses-results">
+					{% if grant_course_search|length >= 2 %}
+						<form action="/admin/people/{{ target_user_id }}/courses/grant" method="post">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							{% if grant_courses %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}">{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="30" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+								{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}{% endembed %}
+							{% else %}<p>No courses match this search.</p>{% endif %}
+						</form>
+					{% endif %}
+					</div></div>
+					{% if test_grants %}
+						<h3 class="h5">Test access grants</h3>
+						{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+							{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'person'} %}{% endfor %}
+						{% endblock %}{% endembed %}
+					{% endif %}
+				{% endblock %}{% endembed %}
+			{% endif %}
 {% endblock %}
 {% endembed %}
 		</div>
 
-{% endblock %}
-{% endembed %}
-	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 3, section_spacing: true})} %}
-{% block body %}
-
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+		<aside class="cl-person-side" aria-label="Account and security">
+		{# Their account: its state, and what you can do about it. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'account'})} %}
 {% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Courses in library', summary: 'Current learner access.'}) }}
-			{# A search of their own courses only when there are enough to need one (owner, 2026-10-20: "Only display it, if
-			   they have at least 5 courses"). #}
-			{% if library_total >= 5 %}
-				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'library', ds_label: 'Search their courses', ds_value: library_search, ds_action: '/admin/people/' ~ target_user_id, ds_help: 'Searches this person\'s ' ~ library_total ~ ' courses by title.'} %}
-			{% endif %}
-			<div id="library-region"><div id="library-results">
-			{% if library_courses %}
-				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-					{% for course in library_courses %}
-						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-								{# The course opens in Administration; its access is managed here (owner, 2026-10-21: the Manage link opened the
-								   whole enrolments list). #}
-								<strong><a href="/admin/courses/{{ course.course_id }}">{{ course.title }}</a></strong>
-								<p>
-									{{ course.status|capitalize }} · {{ course.progress_percentage }}% progress{% if course.expires_at %} · until {{ course.expires_at|date('j M Y H:i') }}{% endif %}
-								</p>
-
-{% endblock %}
-{% block actions %}
-
-							{% if can_manage_enrolments %}
-								<form action="/admin/course/enrolments/{{ course.id }}/{{ course.status == 'cancelled' ? 'restore' : 'remove' }}" method="post">
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									<input type="hidden" name="return" value="/admin/people/{{ target_user_id }}">
-									{% if course.status == 'cancelled' %}
-										{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small', icon: 'action-restore'}) }}
-									{% else %}
-										{{ ui('action.button', {label: 'Remove access', variant: 'danger', size: 'small', confirm: 'Remove their access to ' ~ course.title ~ '? Their progress and results are kept, and you can restore it.', icon: 'action-remove'}) }}
-									{% endif %}
-								</form>
-							{% endif %}
-
-{% endblock %}
-{% endembed %}
-					{% endfor %}
-
-{% endblock %}
-{% endembed %}
-			{% else %}
-				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
-{% block body %}
-
-					{{ library_search ? 'None of their courses matches “' ~ library_search ~ '”.' : 'No courses in this library.' }}
-
-{% endblock %}
-{% endembed %}
-			{% endif %}
-			</div></div>
-
-{% endblock %}
-{% endembed %}
-		{# Granting access is its own card (owner, 2026-10-20): its search finds a course in the whole catalogue, not among
-		   this person's courses. #}
-		{% if can_manage_enrolments %}
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Grant course access', summary: 'Find any course in the catalogue and give this person access to it.'}) }}
-				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: '/admin/people/' ~ target_user_id, ds_push_url: true, ds_help: 'Searches every course in the catalogue by title.'} %}
-				<div id="grant_courses-region"><div id="grant_courses-results">
-				{% if grant_course_search|length >= 2 %}
-					<form action="/admin/people/{{ target_user_id }}/courses/grant" method="post">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{% if grant_courses %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}">{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="30" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}{% endembed %}
-						{% else %}<p>No courses match this search.</p>{% endif %}
-					</form>
+			{{ ui('layout.section-head', {heading: 'Account'}) }}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Status', value: {active: 'Active: can sign in', awaiting_approval: 'Awaiting approval', deactivated: 'Deactivated: cannot sign in', disabled: 'Disabled: cannot sign in'}[profile.status]|default(profile.status|capitalize)},
+				{label: 'Created', value: profile.created_at|date('j F Y')},
+				{label: 'Last sign-in', value: profile.last_login_at ? profile.last_login_at|date('j F Y \\a\\t H:i') : 'Never'}
+			]}) }}
+			{% if profile.status == 'deactivated' %}
+				{# Taken out of their company and deactivated, with everything kept (owner, 2026-10-26). #}
+				<p>Their company deleted them, or closed, and they did not choose in time. Everything is kept. Restore the account at a new address and they continue with every course it has.</p>
+				{% if can_manage_people %}
+				<form action="/admin/people/{{ target_user_id }}/restore" method="post" class="cl-mt-2">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their new address', for: 'restore-email', required: true, help: 'A private address makes a private account. One at a company\'s domain makes them its staff.'})} %}{% block control %}<input type="email" id="restore-email" name="email" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Restore account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-restore'}) }}{% endblock %}{% endembed %}
+				</form>
 				{% endif %}
-				</div></div>
-			{% if test_grants %}
-				<h3 class="h5">Test access grants</h3>
+			{% elseif profile.status == 'awaiting_approval' %}
+				<p>Approve or disable it from the top of the page.</p>
+			{% elseif is_own_account and profile.status == 'active' %}
+				{# The reader's own account (2026-10-25: an ADMIN disabled their own and was locked out). #}
+				<p>This is your own account, so it cannot be disabled here. Another administrator can disable it.</p>
+			{% elseif can_manage_people %}
+				<form action="/admin/people/{{ target_user_id }}/status" method="post" class="cl-mt-2">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					<input type="hidden" name="status" value="{{ profile.status == 'active' ? 'disabled' : 'active' }}">
+					{{ ui('action.button', {label: profile.status == 'active' ? 'Disable account' : 'Enable account', variant: profile.status == 'active' ? 'danger' : 'primary', size: 'small', type: 'submit', confirm: profile.status == 'active' ? 'Disable this account? They are signed out and cannot sign in until it is enabled.' : '', icon: profile.status == 'active' ? 'action-disable' : 'action-enable'}) }}
+				</form>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+
+		{# How they registered, judged by the sign-up check (owner, 2026-10-26: "put that on the right hand side"). #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'signup-check'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Sign-up risk', eyebrow: 'Security', summary: 'How their registration looked when they sent it: where it came from and anything a bot or a fraudster would do.'}) }}
+			{% if signup_check %}
+				<p>{{ ui('feedback.badge', {label: signup_check.risk_label ~ ' · ' ~ signup_check.score ~ ' points', tone: signup_check.risk_tone}) }}{% if signup_check.hold_words %} Held for approval: {{ signup_check.hold_words|join(', ') }}.{% endif %}</p>
+				{% if signup_check.signals %}
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+						{% for signal in signup_check.signals %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<span>{{ signal.words }}</span>{% endblock %}{% block actions %}<strong>+{{ signal.points }}</strong>{% endblock %}{% endembed %}{% endfor %}
+					{% endblock %}{% endembed %}
+				{% else %}<p>The sign-up check found nothing against it.</p>{% endif %}
+				{{ ui('data.key-value-list', {items: [
+					{label: 'Registered', value: signup_check.created_at},
+					{label: 'From', value: signup_check.country},
+					{label: 'IP address', value: signup_check.ip_address ?: 'None'},
+					{label: 'Network', value: signup_check.network_name ?: 'Unknown'},
+					{label: 'Browser', value: signup_check.user_agent ?: 'None described'}
+				]}) }}
+				{{ ui('action.link', {label: 'Open the sign-up attempt', variant: 'secondary', size: 'small', href: signup_check.href, icon: 'action-open'}) }}
+			{% else %}
+				<p>This account was not registered through the site, so it has no sign-up check. It was added in Administration, by a company or before the sign-up check began.</p>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'recent-sign-ins'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Recent sign-ins', summary: recent_signins ? 'The last ' ~ recent_signins|length ~ ', newest first.' : 'No sign-ins yet.'}) }}
+			{% if recent_signins %}
 				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
-					{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'person'} %}{% endfor %}
+					{% for signin in recent_signins %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<span data-signin="{{ signin.id }}"><strong>{{ signin.at }}</strong><br><span class="small">{{ signin.place }} · {{ signin.ip ?: 'No IP address' }}{{ signin.network ? ' · ' ~ signin.network : '' }}</span></span>{% endblock %}{% block actions %}{% if signin.new_country %}{{ ui('feedback.badge', {label: 'First from this country', tone: signin.seen ? 'neutral' : 'warning', size: 'small'}) }}{% if not signin.seen and can_manage_people %}<form action="/admin/people/{{ target_user_id }}/sign-ins/{{ signin.id }}/seen" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Mark as seen', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-done'}) }}</form>{% endif %}{% endif %}{% endblock %}{% endembed %}{% endfor %}
 				{% endblock %}{% endembed %}
 			{% endif %}
-
 {% endblock %}
 {% endembed %}
-		{% endif %}
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+
+		{# The South African ID number, the date of birth it gives and where they say they live (owner, 2026-10-27), and
+		   identity verification (owner, 2026-10-19; adults only, 2026-10-20). #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'identity'})} %}
 {% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Favourites', summary: 'Courses saved for later.'}) }}
-			{% if favourites %}
-				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-					{% for course in favourites %}
-						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-								<strong>{{ course.title }}</strong>
-
-{% endblock %}
-{% block actions %}
-
-{% endblock %}
-{% endembed %}
-					{% endfor %}
-
-{% endblock %}
-{% endembed %}
-			{% else %}
-				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
-{% block body %}
-
-					No favourites.
-
-{% endblock %}
-{% endembed %}
+			{{ ui('layout.section-head', {heading: 'Age and identity', summary: 'Their South African ID number, the date of birth it gives (the site is for adults only) and identity verification. No identity images are kept.'}) }}
+			{% set document_birth = identity and identity.verification ? identity.verification.date_of_birth|default(null) : null %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'South African ID number', value: profile.id_number_masked|default('') ?: 'Not given yet: asked at their next sign-in'},
+				{label: 'Date of birth', value: profile.birthdate|default(null) ? (profile.birthdate|date('j F Y')) ~ ' (' ~ date(profile.birthdate).diff(date()).y ~ ')' : 'Not given yet: from their ID number'},
+				{label: 'Says they live in', value: profile.residence_country_name|default('') ?: 'Not asked'},
+			] | merge(document_birth and document_birth|date('Y-m-d') != (profile.birthdate|default(null) ? profile.birthdate|date('Y-m-d') : '') ? [{label: 'On their identity document', value: document_birth|date('j F Y') ~ ' (' ~ date(document_birth).diff(date()).y ~ '), not the date they gave'}] : []) | merge(identity and identity.minor ? [{label: 'Adults only', value: 'Under 18 on their identity document: the account stops at the adults-only page'}] : []) | merge(identity ? [{label: 'Identity', value: identity.status_words}, {label: 'Declined checks that count', value: identity.tries_used ~ ' of 3'}] : [])}) }}
+			{% if identity %}
+				{% if can_manage_identity and identity.blocked %}
+				<form action="/admin/people/{{ target_user_id }}/identity/allow-retry" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Allow another try', variant: 'primary', size: 'small', type: 'submit', confirm: 'Allow this person three more identity checks?', icon: 'action-refresh'}) }}</form>
+				{% endif %}
+				{% if identity_history %}
+					<h3 class="h6 cl-mt-3">Identity checks, newest first</h3>
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+					{% for check in identity_history %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<div data-identity-check="{{ check.id }}">
+						<strong>{{ check.status_words }}</strong> · <span class="small">{{ check.started_at|date('j M Y H:i') }}</span><br>
+						<span class="small">{% if check.verified_name %}{{ check.verified_name }}: {{ check.document_type|default('Document') }}{{ check.document_number ? ' ' ~ check.document_number : '' }}{{ check.issuing_country ? ', ' ~ check.issuing_country : '' }}{{ check.date_of_birth ? ', born ' ~ check.date_of_birth|date('j F Y') : '' }}{{ check.decided_at ? ', decided ' ~ check.decided_at|date('j M Y H:i') : '' }}{% elseif check.decline_reason %}{{ check.decline_reason }}{% endif %}</span>
+						{% if check.status == 'revoked' %}<br><span class="small">Revoked {{ check.revoked_at|date('j M Y H:i') }}{% if check.revoked_by_user_id %} by {{ ui('data.person', {name: check.revoked_by_name ?: 'User ' ~ check.revoked_by_user_id, reference: check.revoked_by_reference, href: '/admin/people/' ~ check.revoked_by_user_id}) }}{% endif %}: {{ check.revocation_reason }}</span>{% endif %}
+						<br><span class="small mono">{{ check.session_id }}</span> {{ ui('action.link', {label: 'Open the Didit console', variant: 'quiet', size: 'small', href: identity_console, new_window: true, icon: 'action-external'}) }}
+						{% if can_manage_identity and check.status == 'approved' %}
+							<form action="/admin/people/{{ target_user_id }}/identity/{{ check.id }}/revoke" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason for revoking', for: 'revoke-identity-' ~ check.id, required: true})} %}{% block control %}<input id="revoke-identity-{{ check.id }}" name="reason" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+								{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Revoke verification', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this verification? The person must verify again before a certificate.', icon: 'action-revoke'}) }}{% endblock %}{% endembed %}
+							</form>
+						{% endif %}
+					</div>{% endblock %}{% endembed %}{% endfor %}
+					{% endblock %}{% endembed %}
+					<p class="help">Didit's console finds a check by its session id: search for it under Verifications.</p>
+				{% else %}<p>No identity check yet.</p>{% endif %}
 			{% endif %}
-
 {% endblock %}
 {% endembed %}
-		{# Only a company account has course requests (owner, 2026-10-21): a private account's page renders no block. #}
-		{% if company_account %}
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'sessions'})} %}
 {% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Course requests', summary: 'Current and previous requests.'}) }}
-			{% if requests %}
-				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-					{% for request in requests %}
-						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-								<strong>{{ request.course_title }}</strong>
-								<p>
-									{{ request.status }}
-								</p>
-
-{% endblock %}
-{% block actions %}
-
-{% endblock %}
-{% endembed %}
-					{% endfor %}
-
-{% endblock %}
-{% endembed %}
+			{{ ui('layout.section-head', {heading: 'Signed in now', summary: 'Each place they are signed in. Signing one out ends it at once.'}) }}
+			{% if sessions %}
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+					{% for session in sessions %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ session.user_agent }}</strong><br><span class="small">Last used {{ session.last_seen_at }}</span>{% endblock %}{% block actions %}{% if session.is_current %}{{ ui('feedback.badge', {label: 'This browser', tone: 'success'}) }}{% endif %}<form action="/admin/people/{{ target_user_id }}/sessions/revoke" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="session_id" value="{{ session.public_id }}">{{ ui('action.button', {label: 'Sign out', variant: 'danger', size: 'small', type: 'submit', confirm: 'Sign them out of this browser?', icon: 'action-revoke'}) }}</form>{% endblock %}{% endembed %}{% endfor %}
+				{% endblock %}{% endembed %}
 			{% else %}
-				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
-{% block body %}
-
-					No course requests.
-
-{% endblock %}
-{% endembed %}
+				<p>Not signed in anywhere.</p>
 			{% endif %}
-
 {% endblock %}
 {% endembed %}
-		{% endif %}
-
+		</aside>
 {% endblock %}
 {% endembed %}
 	</section>

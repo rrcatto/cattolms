@@ -146,7 +146,7 @@ other navigation can use the core popout. Preserve visible keyboard focus and ac
 navigation controls. Navigation destinations are not a theme-maintained route catalogue.
 
 The current menus provide Account (All sections, Dashboard, a Profile group holding Personal
-Particulars, Billing Address, Email Addresses and Social Media, a COURSES group holding My Orders and My Courses,
+Particulars, Billing Address, Email Addresses, My Subscriptions and Social Media, a COURSES group holding My Orders and My Courses,
 Sessions, Activity), Company (All sections, Dashboard, a People group holding People,
 Course Requests, Enrolments and Performance, a Courses group holding Courses Created, Favourites, Courses
 Bought and Credits, then Billing details), and Administration in five groups: Courses (courses, the Course Item and Resource

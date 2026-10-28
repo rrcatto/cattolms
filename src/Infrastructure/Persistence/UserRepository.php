@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for user records.
 
 Changelog:
+2026/10/26 SAST
+- replacePrimaryEmail() changes the primary row in place (saving anyone with a secondary address had failed on the
+  one-secondary index); emailTaken() and removeSecondaryEmailsAt() for the company domain rule.
 2026/09/08 19:52 SAST
 - Depends on the Database interface rather than naming Doctrine's Connection, so the bound PDO parameter type is inferred from the PHP value.
 2026/08/17 00:57 SAST
@@ -30,6 +33,7 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\Uuid;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use RuntimeException;
 
 final class UserRepository
@@ -160,7 +164,7 @@ final class UserRepository
 
         $values = [];
         foreach ([
-            'first_name', 'middle_names', 'last_name', 'identification_number', 'gender',
+            'first_name', 'middle_names', 'last_name', 'gender',
             'mobile_number', 'display_name'
         ] as $field) {
             if (array_key_exists($field, $data)) {
@@ -229,7 +233,8 @@ final class UserRepository
     public function setStatus(int $userId, string $status): void
     {
         // awaiting_approval (owner, 2026-10-21): a demo site's new account, which cannot sign in until ADMIN approves it.
-        if (!in_array($status, ['active','disabled','awaiting_approval'], true)) {
+        // deactivated (2026-10-26): taken out of a company that deleted them or closed, everything kept until ADMIN restores it.
+        if (!in_array($status, ['active','disabled','awaiting_approval','deactivated'], true)) {
             throw new RuntimeException('Invalid user status.');
         }
         $affected = $this->db->executeStatement(
@@ -334,6 +339,13 @@ final class UserRepository
         );
     }
 
+    /**
+     * The account's primary address replaced (Administration and Company People set it).
+     *
+     * The primary row takes the new address in place. It used to be marked not primary and a new row added, which gave
+     * anyone with a secondary address two non-primary rows, refused by the one-secondary index, so saving such a person
+     * failed with an error page (2026-10-26). Their own secondary address made primary drops that secondary row.
+     */
     public function replacePrimaryEmail(int $userId, string $email): void
     {
         $rows = $this->db->fetchAllAssociative(
@@ -343,22 +355,53 @@ final class UserRepository
         if (isset($rows[0]) && (int) $rows[0]['user_id'] !== $userId) {
             throw new RuntimeException('That email address belongs to another account.');
         }
-
-        $this->db->executeStatement(
-            'UPDATE user_emails SET is_primary=FALSE WHERE user_id=:user_id AND is_primary=TRUE',
-            ['user_id' => $userId]
-        );
         if (isset($rows[0])) {
-            $this->db->executeStatement(
-                'UPDATE user_emails SET is_primary=TRUE, verified_at=COALESCE(verified_at,NOW()) WHERE id=:id',
-                ['id' => (int) $rows[0]['id']]
-            );
-            return;
+            if ($this->databaseBoolean($rows[0]['is_primary'])) return;
+            $this->db->executeStatement('DELETE FROM user_emails WHERE id=:id', ['id' => (int) $rows[0]['id']]);
         }
+        $updated = $this->db->executeStatement(
+            'UPDATE user_emails SET email=:email, verified_at=NOW() WHERE user_id=:user_id AND is_primary=TRUE',
+            ['user_id' => $userId, 'email' => $email]
+        );
+        if ($updated > 0) return;
         $this->db->executeStatement(
             'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at)
              VALUES (:user_id,:email,TRUE,NOW(),NOW())',
             ['user_id' => $userId, 'email' => $email]
+        );
+    }
+
+    /**
+     * Deletes an account unless records kept for good name it (orders, payments, ledger lines, courses they wrote):
+     * then nothing is deleted and false says so. Inside the caller's transaction, behind a savepoint.
+     */
+    public function deleteUnlessKept(int $userId): bool
+    {
+        $this->db->executeStatement('SAVEPOINT delete_person');
+        try {
+            $this->db->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $userId]);
+        } catch (ForeignKeyConstraintViolationException) {
+            $this->db->executeStatement('ROLLBACK TO SAVEPOINT delete_person');
+
+            return false;
+        }
+        $this->db->executeStatement('RELEASE SAVEPOINT delete_person');
+
+        return true;
+    }
+
+    /** Whether any account has this address, primary or not, verified or not, whatever its status. */
+    public function emailTaken(string $email): bool
+    {
+        return $this->db->fetchOne('SELECT 1 FROM user_emails WHERE lower(email) = lower(:email) LIMIT 1', ['email' => $email]) !== false;
+    }
+
+    /** A person's addresses at a domain other than their primary one removed (an employer's, when they leave). */
+    public function removeSecondaryEmailsAt(int $userId, string $domain): void
+    {
+        $this->db->executeStatement(
+            "DELETE FROM user_emails WHERE user_id = :user_id AND is_primary = FALSE AND lower(split_part(email, '@', 2)) = lower(:domain)",
+            ['user_id' => $userId, 'domain' => $domain]
         );
     }
 
@@ -394,5 +437,30 @@ final class UserRepository
     private function databaseBoolean(mixed $value): bool
     {
         return in_array($value, [true, 1, '1', 't', 'true'], true);
+    }
+
+    /** The account that holds an ID number, by its fingerprint, or null. */
+    public function idNumberHolder(string $fingerprint): ?int
+    {
+        $id = $this->db->fetchOne('SELECT id FROM users WHERE id_number_hash = :h', ['h' => $fingerprint]);
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /** The ID number given (encrypted and its fingerprint), the date of birth it holds and the country they live in. */
+    public function saveIdNumber(int $userId, string $encrypted, string $fingerprint, string $birthdate, ?string $residenceCountry): void
+    {
+        $this->db->executeStatement(
+            'UPDATE users SET id_number_encrypted = :e, id_number_hash = :h, birthdate = CAST(:b AS DATE), residence_country = COALESCE(:c, residence_country), updated_at = NOW() WHERE id = :id',
+            ['e' => $encrypted, 'h' => $fingerprint, 'b' => $birthdate, 'c' => $residenceCountry, 'id' => $userId]
+        );
+    }
+
+    /** @return array{id_number_encrypted:string,residence_country:string} what is kept of a person's ID number and country */
+    public function idNumber(int $userId): array
+    {
+        $row = $this->db->fetchAssociative("SELECT COALESCE(id_number_encrypted, '') AS id_number_encrypted, COALESCE(residence_country, '') AS residence_country FROM users WHERE id = :id", ['id' => $userId]);
+
+        return ['id_number_encrypted' => (string) ($row['id_number_encrypted'] ?? ''), 'residence_country' => (string) ($row['residence_country'] ?? '')];
     }
 }

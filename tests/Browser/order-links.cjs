@@ -93,7 +93,7 @@ async function as(browser, token) {
             assert.equal(response.status(), 403);
             assert.equal(clean(await page.locator('h1').innerText()), 'You can\'t open this page');
             assert.ok(await page.locator('.cl-identity-head').count(), 'the identity band');
-            assert.match(clean(await page.locator('.cl-identity-head').innerText()), /Other Browser Learner/, 'naming the reader');
+            assert.match(clean(await page.locator('.cl-identity-head').innerText()), new RegExp(state.other_name), 'naming the reader');
             assert.equal(await page.locator('main').getByRole('link', {name: 'Sign in'}).count(), 0, 'no Sign in for someone signed in');
             assert.ok(await page.getByRole('button', {name: 'Sign out'}).count(), 'Sign out, to use another account');
             assert.ok(await page.getByRole('link', {name: 'Go to your account'}).count());

@@ -22,7 +22,8 @@ final class ProfileImageUiRenderTest extends TestCase
     #[\PHPUnit\Framework\Attributes\WithoutErrorHandler]
     public function testProfileImageRendersExactStimulusActionsAndWorkingNativeUpload(): void
     {
-        $profile = array_fill_keys(['first_name', 'middle_names', 'last_name', 'identification_number', 'birthdate', 'gender', 'mobile_number', 'display_name', 'certificate_name', 'full_name'], 'Example');
+        $profile = array_fill_keys(['first_name', 'middle_names', 'last_name', 'gender', 'mobile_number', 'display_name', 'certificate_name', 'full_name'], 'Example')
+            + ['birthdate' => '1990-05-12', 'id_number_masked' => '900512 **** ***'];
         $renderer = \CattoLearning\Application\CliBootstrap::boot()['container']->get(\CattoLearning\View\ThemeRenderer::class);
         $html = $renderer->renderFragment('partials/account/profile', RenderHarness::hiveWith(['profile' => $profile, 'profile_image_size' => 256, 'profile_image_url' => '/example.png']));
         $dom = self::dom($html);

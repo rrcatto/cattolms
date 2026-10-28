@@ -9,6 +9,7 @@ Validates the Catto Learning release contract (written for v0.5.8, kept current)
 Changelog:
 2026/10/19 SAST
 - 101 permissions with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE.
+- 103 with PLATFORM.MAILING.VIEW/MANAGE (mailing, step 2; owner, 2026-10-26).
 2026/10/08 SAST
 - 92 permissions with PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (the financial document design).
 2026/10/17 SAST
@@ -63,7 +64,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.9.11', 'composer.json version must be 0.9.11.');
+$need(($composer['version'] ?? '') === '1.0.0', 'composer.json version must be 1.0.0.');
 // PHP 8.5.12 or later (owner, 2026-10-22): 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution.
 $need(($composer['require']['php'] ?? '') === '>=8.5.12 <9.0', 'PHP runtime target must be >=8.5.12 <9.0.');
 $need(($composer['config']['platform']['php'] ?? '') === '8.5.12', 'Composer must resolve packages for PHP 8.5.12 (config.platform.php).');
@@ -113,11 +114,12 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // (COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW, PLATFORM.WALLET.VIEW/MANAGE). 92 with PLATFORM.DOCUMENT.VIEW
 // and PLATFORM.DOCUMENT.MANAGE: the design of invoices, receipts and credit notes. 101 with CERTIFICATE.ISSUED.VIEW/MANAGE
 // (issued certificates, revoking one) and PLATFORM.IDENTITY.VIEW/MANAGE (identity verification).
-$need(count($permissionKeys) === 101, 'PermissionCatalog must define exactly 101 reserved/current secure actions for this release.');
+// 103 with PLATFORM.MAILING.VIEW and PLATFORM.MAILING.MANAGE (mailing, step 2; owner, 2026-10-26).
+$need(count($permissionKeys) === 103, 'PermissionCatalog must define exactly 103 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 91, 'ACL catalogue must contain 10 SYSTEM and 91 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 93, 'ACL catalogue must contain 10 SYSTEM and 93 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -189,7 +191,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.9.11'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '1.0.0'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

@@ -259,6 +259,14 @@ final class ContactService
         return $row === null ? null : $this->view($row);
     }
 
+    public function markUnanswered(int $id, int $actorId): void
+    {
+        $this->transactions->run(function () use ($id, $actorId): void {
+            if ($this->messages->find($id) === null) throw new InvalidArgumentException('That message does not exist.');
+            if ($this->messages->markUnanswered($id)) $this->audit->record($actorId, 'contact.message_reopened', ['message_id' => $id]);
+        });
+    }
+
     public function markAnswered(int $id, int $actorId): void
     {
         $this->transactions->run(function () use ($id, $actorId): void {

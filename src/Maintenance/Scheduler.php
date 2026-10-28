@@ -18,6 +18,8 @@ The status of each job, and whether the commerce job has stopped, is read by Set
 and the ADMIN dashboard.
 
 Changelog:
+2026/10/27 SAST
+- The log archive (owner, 2026-10-27), just after midnight; whether a job is due is the job's own rule (isDue).
 2026/10/19 SAST
 - Created.
 */
@@ -28,6 +30,7 @@ namespace CattoLearning\Maintenance;
 
 use CattoLearning\Commerce\Application\CommerceMaintenance;
 use CattoLearning\Course\Popularity\CoursePopularityCalculator;
+use CattoLearning\Support\Duration;
 use DateTimeImmutable;
 use Symfony\Component\Clock\ClockInterface;
 use Throwable;
@@ -40,6 +43,9 @@ final class Scheduler
         private readonly CoursePopularityCalculator $popularity,
         private readonly RetentionCleanup $cleanup,
         private readonly ClockInterface $clock,
+        private readonly ?\CattoLearning\Auth\Signup\SignupLists $signupLists = null,
+        private readonly ?\CattoLearning\Mailing\MailingJob $mailing = null,
+        private readonly ?LogArchive $logs = null,
     ) {}
 
     /**
@@ -64,9 +70,8 @@ final class Scheduler
     private function due(ScheduledJob $job, ?array $record): bool
     {
         $last = $record['last_started_at'] ?? null;
-        if ($last === null || $last === '') return true;
-        // Five seconds of slack, so a job started a moment late last time is not skipped this time.
-        return $this->now()->getTimestamp() - (new DateTimeImmutable((string) $last))->getTimestamp() >= $job->interval() - 5;
+
+        return $job->isDue($this->now(), $last === null || $last === '' ? null : new DateTimeImmutable((string) $last));
     }
 
     /** @return array{ok:bool,summary:string} */
@@ -78,6 +83,9 @@ final class Scheduler
                 ScheduledJob::Commerce => $this->commerce(),
                 ScheduledJob::Popularity => $this->popularity(),
                 ScheduledJob::Cleanup => $this->cleanup(),
+                ScheduledJob::SignupLists => $this->signupLists(),
+                ScheduledJob::Mailing => $this->mailing?->run() ?? 'Not available here.',
+                ScheduledJob::LogArchive => $this->logArchive(),
             };
         } catch (Throwable $failed) {
             $this->runs->failed($job, $this->now(), $failed->getMessage());
@@ -102,8 +110,30 @@ final class Scheduler
     private function cleanup(): string
     {
         $deleted = $this->cleanup->run();
-        return sprintf('Deleted %d activity log entries, %d analytics events and %d contact messages older than %d years, %d expired sign-in links, %d expired sign-in sessions and %d expired browser sessions.',
-            $deleted['activity_log'], $deleted['analytics_events'], $deleted['contact_messages'], RetentionCleanup::YEARS, $deleted['login_tokens'], $deleted['auth_sessions'], $deleted['web_sessions']);
+        return sprintf('Deleted %d activity log entries, %d analytics events, %d contact messages, %d sign-up attempts and %d news email records older than %d years, %d expired sign-in links, %d expired sign-in sessions and %d expired browser sessions.',
+            $deleted['activity_log'], $deleted['analytics_events'], $deleted['contact_messages'], $deleted['signup_attempts'], $deleted['mailing_copies'], RetentionCleanup::YEARS, $deleted['login_tokens'], $deleted['auth_sessions'], $deleted['web_sessions']);
+    }
+
+    /** The application log, archived and started afresh (owner, 2026-10-27). */
+    private function logArchive(): string
+    {
+        if ($this->logs === null) return 'Not available here.';
+        $done = $this->logs->run($this->now());
+        $archived = $done['archived'] === [] ? 'The logs were empty, so nothing was archived.'
+            : 'Archived ' . implode(', ', array_map(static fn(string $log, array $one): string => LogArchive::size($one['bytes']) . ' of ' . $log . ' as ' . $one['archive'], array_keys($done['archived']), $done['archived'])) . ', each started afresh.';
+
+        return $archived . ' Deleted ' . $done['deleted'] . ' archive' . ($done['deleted'] === 1 ? '' : 's') . ' older than ' . Duration::parse($this->logs->keep())->words() . '.';
+    }
+
+    /** The sign-up check's published lists (owner, 2026-10-26): each fetched when it is due. */
+    private function signupLists(): string
+    {
+        if ($this->signupLists === null) return 'Not available here.';
+        $done = $this->signupLists->update();
+        $failed = array_filter($done, static fn(string $what): bool => str_starts_with($what, 'not fetched'));
+        if (count($failed) === count($done)) throw new \RuntimeException('No list could be fetched: ' . implode('; ', $failed));
+
+        return implode('. ', array_map(static fn(string $name, string $what): string => \CattoLearning\Auth\Signup\SignupLists::LISTS[$name]['label'] . ': ' . $what, array_keys($done), $done)) . '.';
     }
 
     private function now(): DateTimeImmutable

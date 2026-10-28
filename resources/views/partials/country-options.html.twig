@@ -1,0 +1,5 @@
+{# Every country by name, never its code (owner, 2026-10-27: "South Africa at the top, the default choice. I don't want to
+   see ZA in that field"): South Africa first, then all the rest A to Z. Expects countries (Support\Countries::options())
+   and selected, a country code (empty for South Africa). #}
+{% set chosen = selected|default('') ?: 'ZA' %}
+{% for option in countries %}{% if loop.first %}<option value="{{ option.code }}"{% if option.code == chosen %} selected{% endif %}>{{ option.name }}</option><optgroup label="All countries">{% else %}<option value="{{ option.code }}"{% if option.code == chosen %} selected{% endif %}>{{ option.name }}</option>{% endif %}{% if loop.last %}</optgroup>{% endif %}{% endfor %}

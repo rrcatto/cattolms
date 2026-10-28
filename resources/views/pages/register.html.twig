@@ -7,11 +7,17 @@
     <section class="cl-page-section">
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
         {% block surface_body %}
+            {# A follow asked for before an account existed (owner, 2026-10-28, decision 8B): carried out once it is made. #}
+            {% if follow|default('') and follow_name|default('') %}{% set fa_verb = follow starts with 'list:' ? 'join' : 'follow' %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'You will ' ~ fa_verb ~ ' ' ~ follow_name})} %}{% block body %}<p>Before you can {{ fa_verb }} {{ follow_name }}, we need to create an account for you. Once your account is made, you {{ fa_verb }} {{ follow_name }} straight away and its news comes to you by email.</p>{% endblock %}{% endembed %}{% endif %}
             <form action="/register" method="post" novalidate>
-                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}"><input type="hidden" name="follow" value="{{ follow|default('') }}">
+                {# The sign-up check (owner, 2026-10-26): when the form was opened (signed), the browser's time zone (filled in
+                   below when JavaScript runs) and a field people never see, which only a bot fills in. #}
+                <input type="hidden" name="signup_opened" value="{{ signup_opened|default('') }}"><input type="hidden" name="signup_time_zone" value="" data-signup-time-zone>
+                <div class="cl-honeypot" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
                 {# The account type as feature cards (owner, 2026-10-20): an icon, a bold title and what the choice means. #}
                 {% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
-                {{ ui('form.picture-choice', {name: 'account_type', legend: 'Account type', id: 'account-type', selected: 'individual', items: [
+                {{ ui('form.picture-choice', {name: 'account_type', legend: 'Account type', id: 'account-type', selected: draft.account_type|default('') == 'company' ? 'company' : 'individual', items: [
                     {value: 'individual', label: 'Individual learner',
                         icon: '<svg ' ~ icon_attributes ~ '><circle cx="12" cy="7" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/><path d="M12 13l1.5 3-1.5 4-1.5-4z"/></svg>',
                         note: 'For yourself. Buy courses, learn at your own pace and earn certificates in your own name.'},
@@ -19,13 +25,20 @@
                         icon: '<svg ' ~ icon_attributes ~ '><path d="M3 21h18"/><path d="M5 21V5l7-2v18"/><path d="M12 9h7v12"/><path d="M8 8h1M8 11h1M8 14h1M8 17h1M15 12h1M15 15h1M15 18h1"/></svg>',
                         note: 'For a business. Buy course credits, give your staff the courses they need and follow their progress.'},
                 ]}) }}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'first-name', required: true})} %}{% block control %}<input id="first-name" name="first_name" required>{% endblock %}{% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'middle-names'})} %}{% block control %}<input id="middle-names" name="middle_names">{% endblock %}{% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'last-name', required: true})} %}{% block control %}<input id="last-name" name="last_name" required>{% endblock %}{% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'company-name', help: 'Required for a company account.'})} %}{% block control %}<input id="company-name" name="company_name" data-registration-company>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'first-name', required: true})} %}{% block control %}<input id="first-name" name="first_name" value="{{ draft.first_name|default('') }}" autocomplete="given-name" required>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'middle-names'})} %}{% block control %}<input id="middle-names" name="middle_names" value="{{ draft.middle_names|default('') }}" autocomplete="additional-name">{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'last-name', required: true})} %}{% block control %}<input id="last-name" name="last_name" value="{{ draft.last_name|default('') }}" autocomplete="family-name" required>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'company-name', help: 'Required for a company account.'})} %}{% block control %}<input id="company-name" name="company_name" value="{{ draft.company_name|default('') }}" data-registration-company>{% endblock %}{% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'registration-email', required: true})} %}{% block control %}<input type="email" id="registration-email" name="email" value="{{ email|default('') }}" autocomplete="email" required>{% endblock %}{% endembed %}
-                {# Adults only (owner, 2026-10-20): someone under 18 is refused, and nothing they typed is kept. #}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', for: 'date-of-birth', required: true, help: 'You must be 18 or older. For example 14 March 1990.'})} %}{% block control %}<input type="date" id="date-of-birth" name="date_of_birth" value="{{ date_of_birth|default('') }}" max="{{ 'now'|date_modify('-18 years')|date('Y-m-d') }}" autocomplete="bday" required>{% endblock %}{% endembed %}
+                {# Where they live, preset to the country their IP address shows, and their South African ID number (owner,
+                   2026-10-27: "only people with a valid South African ID can register"); the ID number gives their date of
+                   birth, and someone under 18 is refused with nothing kept (adults only, 2026-10-20). #}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Country you live in', for: 'registration-country', required: true, help: 'Registration is open to people living in South Africa for now.'})} %}{% block control %}<select id="registration-country" name="country" autocomplete="country" required {{ ui_field_attrs(props) }}>{% include '@platform/partials/country-options.html.twig' with {selected: country} %}</select>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'South African ID number', for: 'registration-id-number', required: true, help: 'The 13 digits on your green ID book or smart ID card. It shows that you are 18 or older, and each person has one account. It is kept encrypted.'})} %}{% block control %}<input type="text" id="registration-id-number" name="id_number" inputmode="numeric" autocomplete="off" maxlength="16" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                {# News and Updates, unticked: the person's own choice, kept with when and where (mailing, step 1; owner, 2026-10-26). #}
+                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me News and Updates by email: new courses, offers and news about the site. You can stop at any time.'})} %}{% block control %}<input type="checkbox" name="news" value="1"{% if draft.news|default('') == '1' %} checked{% endif %}>{% endblock %}{% endembed %}
+                {# On a demo site, before anyone registers (owner, 2026-10-26: "nothing told me that my registration would wait for approval"). #}
+                {% if hold_notice|default('') %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Your account will be held for approval'})} %}{% block body %}<p>{{ hold_notice }}</p>{% endblock %}{% endembed %}{% endif %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit', icon: 'action-email'}) }}{% endblock %}{% endembed %}
             </form>
             <p class="small cl-text-secondary mt-5 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
@@ -34,4 +47,5 @@
     </section>
     {# The company name shows only for a company account; without JavaScript it always shows, saying when it is needed. #}
     <script>(()=>{const types=document.querySelectorAll('input[name=account_type]');const company=document.querySelector('[data-registration-company]');if(!types.length||!company)return;const sync=()=>{const chosen=document.querySelector('input[name=account_type]:checked')?.value;company.required=chosen==='company';company.closest('.cl-ui-field')?.toggleAttribute('hidden',chosen!=='company');};types.forEach((type)=>type.addEventListener('change',sync));sync();})();</script>
+    <script>(()=>{const zone=document.querySelector('[data-signup-time-zone]');if(!zone)return;try{zone.value=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){}})();</script>
 {% endblock %}

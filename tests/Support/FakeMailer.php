@@ -36,6 +36,11 @@ final class FakeMailer implements MailerInterface
         $this->record('magic_link', compact('email', 'url', 'ttlSeconds'));
     }
 
+    public function sendRegistrationLink(string $email, string $url, int $ttlSeconds, string $notice = ''): void
+    {
+        $this->record('registration_link', compact('email', 'url', 'ttlSeconds', 'notice'));
+    }
+
     public function sendSecondaryEmailVerification(string $email, string $url, int $ttlSeconds): void
     {
         $this->record('secondary_email', compact('email', 'url', 'ttlSeconds'));

@@ -16,7 +16,7 @@ Each variable is shown with the comment above it in .env.example and a default: 
 there is one, a value worked out from what was already answered (the site's address from its domain, the mail
 sender from the domain), a newly generated key or password, or the example's value. Enter keeps the default.
 Secrets are typed hidden. A value is checked before it is accepted (an email address, an address starting
-https://, a yes/no, a number). The code path and the site mode are set by the install, not asked. How the program
+https://, a yes/no, a number, a length of time written the one way, such as 30m or 1d). The code path and the site mode are set by the install, not asked. How the program
 runs (APP_ENV) is never chosen by the install: it keeps the site's existing value, and a new site starts with the
 example's, development; only the site's owner changes a site to production. The file is
 written with the example's comments, in its order.
@@ -28,6 +28,11 @@ written with the example's comments, in its order.
 install.
 
 Changelog:
+2026/10/26 SAST
+- Every length of time is written the one way (owner, 2026-10-26; Support\Duration, loaded on its own: no Composer
+  packages): the sign-in link, session, session touch, request window and PHP session lifetimes (30m, 1d, 5m, 15m,
+  1d) and the commerce periods are checked with Duration and refused with how to write one; an older site's value
+  in seconds is offered written the one way (86400 as 1d).
 2026/10/24 SAST
 - APP_DEBUG is gone: debugging follows APP_ENV (owner, 2026-10-24, option 1). AUTH_SIGNIN is checked (ADMIN or
   EVERYONE).
@@ -40,6 +45,13 @@ Changelog:
 */
 
 declare(strict_types=1);
+
+// The one way a length of time is written: a plain PHP class with no packages behind it.
+require_once dirname(__DIR__) . '/src/Support/Duration.php';
+
+/** The settings that are lengths of time. */
+const LENGTHS_OF_TIME = ['AUTH_MAGIC_LINK_TTL', 'AUTH_SESSION_TTL', 'AUTH_SESSION_TOUCH_INTERVAL', 'AUTH_REQUEST_WINDOW', 'PHP_SESSION_TTL', 'LOG_ARCHIVES_KEPT_FOR',
+    'COMMERCE_WALLET_EXPIRY', 'COMMERCE_WALLET_REMINDER', 'COMMERCE_REFUND_WINDOW', 'COMMERCE_PAYMENT_DUE', 'COMMERCE_PAYMENT_LINK_LIFETIME'];
 
 $options = getopt('', ['example:', 'output:', 'codebase:', 'mode:', 'username:', 'existing::', 'answers::']);
 foreach (['example', 'output', 'codebase', 'mode', 'username'] as $required) {
@@ -111,7 +123,10 @@ function refuse(string $key, string $value): ?string
         in_array($key, ['APP_CURRENCY'], true) && preg_match('/^[A-Z]{3}$/', $value) !== 1 => 'Enter a three-letter currency code, such as ZAR.',
         in_array($key, ['APP_COUNTRY'], true) && preg_match('/^[A-Z]{2}$/', $value) !== 1 => 'Enter a two-letter country code, such as ZA.',
         in_array($key, ['AUTH_COOKIE_SECURE', 'PHP_SESSION_SECURE'], true) && !in_array($value, ['true', 'false'], true) => 'Enter true or false.',
-        in_array($key, ['DB_PORT', 'AUTH_MAGIC_LINK_TTL', 'AUTH_SESSION_TTL', 'AUTH_SESSION_TOUCH_INTERVAL', 'AUTH_REQUEST_WINDOW', 'AUTH_REQUEST_LIMIT_EMAIL', 'AUTH_REQUEST_LIMIT_IP', 'PHP_SESSION_TTL'], true)
+        in_array($key, LENGTHS_OF_TIME, true) && !\CattoLearning\Support\Duration::isValid($value) => \CattoLearning\Support\Duration::HOW,
+        in_array($key, ['SIGNUP_ALLOWED_COUNTRIES', 'SIGNUP_BLOCKED_COUNTRIES'], true) && $value !== '' && preg_match('/^[A-Za-z]{2}(\s*,\s*[A-Za-z]{2})*$/', $value) !== 1
+            => 'Enter two-letter country codes separated by commas, such as ZA, or nothing.',
+        in_array($key, ['DB_PORT', 'AUTH_REQUEST_LIMIT_EMAIL', 'AUTH_REQUEST_LIMIT_IP'], true)
             && preg_match('/^[0-9]+$/', $value) !== 1 => 'Enter a whole number.',
         in_array($key, ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'], true) && $value === '' => 'This cannot be empty.',
         $key === 'APP_ENV' && !in_array(strtolower($value), ['development', 'production'], true) => 'Enter development or production.',
@@ -156,6 +171,8 @@ foreach ($lines as $line) {
     $domain = $answers['APP_DOMAIN'] ?? '';
     $default = match (true) {
         $key === 'APP_KEY' => ($old !== null && preg_match('/^[0-9a-f]{64}$/', $old) === 1) ? $old : $generated['APP_KEY'],
+        // A length of time an older site wrote in seconds is offered written the one way (86400 as 1d).
+        $old !== null && in_array($key, LENGTHS_OF_TIME, true) && preg_match('/^[1-9][0-9]{0,9}$/', $old) === 1 => \CattoLearning\Support\Duration::ofSeconds((int) $old)->text,
         $old !== null && !str_contains($old, 'example.test') && !str_starts_with($old, 'replace-with-') && $old !== 'change-me' => $old,
         $key === 'APP_URL' && $domain !== '' => 'https://' . $domain,
         in_array($key, ['MAIL_FROM_ADDRESS'], true) && $domain !== '' => 'learning@' . $domain,

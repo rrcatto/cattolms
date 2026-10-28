@@ -1,0 +1,18 @@
+{#
+	How a person gets updates (owner, 2026-10-28, round two 2A and 4C: "choose to receive updates as they occur, or each
+	list collated into its own digest, or one big digest containing all their subscriptions, sent out according to a
+	frequency they choose: daily, weekly or monthly"), for My Subscriptions and the first Follow. Weekly is chosen when
+	nothing was. mh: {delivery, frequency, deliveries, frequencies, days, id}.
+#}
+<fieldset class="cl-mailing-lists">
+	<legend class="h6">Send me updates</legend>
+	{% for value, label in mh.deliveries %}
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label, help: value == 'instant' ? 'An email whenever there is news, within our sending hours.' : (value == 'per_list' ? 'A separate digest for each course, category, tag or list you follow.' : 'Everything you follow together, in one email.')})} %}{% block control %}<input type="radio" name="delivery" value="{{ value }}"{{ value == mh.delivery ? ' checked' : '' }}>{% endblock %}{% endembed %}
+	{% endfor %}
+</fieldset>
+<fieldset class="cl-mailing-lists">
+	<legend class="h6">How often a digest comes</legend>
+	{% for value, label in mh.frequencies %}
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label, help: mh.days[value] is defined ? 'It comes ' ~ mh.days[value] ~ '.' : ''})} %}{% block control %}<input type="radio" name="frequency" value="{{ value }}"{{ value == mh.frequency ? ' checked' : '' }}>{% endblock %}{% endembed %}
+	{% endfor %}
+</fieldset>

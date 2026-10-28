@@ -1,0 +1,56 @@
+{#
+	Mailing › Templates (owner, 2026-10-27: "How am I supposed to design the look and feel of what goes out?"; decision 5B,
+	2026-10-28; the approved mockup "Mailing system plan", page 3): every template as a card, drawn in its own colours,
+	the defaults first, each opening its designer; a new one starts from one of the six sample designs (owner,
+	2026-10-28: "6 sample email template designs that I can select and customise") or a copy of the default for messages.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Templates' %}
+	{% set ph_lead = 'A template is the look of an email: its logo, colours, fonts, header and footer. Every message and every digest is drawn in one. The unsubscribe link, why the person gets the email and your business\'s name and address are always at its foot.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	{% if can_manage %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'new'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Make a new template', summary: 'Start from one of six sample designs, or from a copy of the default for messages. You then change anything you like, or write it in HTML.'}) }}
+		<form action="/mailing/templates" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{{ ui('form.picture-choice', {name: 'sample', legend: 'Start from', id: 'template-samples', selected: 'sunset', columns: 4, items: samples}) }}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', help: 'For you only, such as "Newsletter" or "Course news". Readers never see it. Empty uses the sample\'s name.'})} %}{% block control %}<input class="cl-input" id="template-name" name="name" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the template', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'templates'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Your templates', summary: templates|length == 1 ? '1 template.' : templates|length ~ ' templates. Open one to change its look, see it with a sample, or send yourself a proof.'}) }}
+		{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Templates'})} %}{% block body %}
+			{% for t in templates %}
+			{% embed ui_template('data.card') with {props: ui_props('data.card', {title: t.name, href: '/mailing/templates/' ~ t.id, picture: 'wide'})} %}
+			{% block picture %}
+				{% set c = t.design.colours %}
+				<svg viewBox="0 0 160 100" role="img" aria-label="The colours of {{ t.name }}"><rect width="160" height="100" fill="{{ c.page }}"/><rect x="24" y="10" width="112" height="90" fill="{{ c.email }}"/><rect x="24" y="10" width="112" height="20" fill="{{ c.header }}"/><rect x="34" y="17" width="34" height="6" fill="{{ c.header_text }}"/><rect x="34" y="40" width="70" height="7" fill="{{ c.headings }}"/><rect x="34" y="53" width="92" height="4" fill="{{ c.text }}"/><rect x="34" y="61" width="84" height="4" fill="{{ c.text }}"/><rect x="34" y="76" width="40" height="12" fill="{{ c.button }}"/></svg>
+			{% endblock %}
+			{% block details %}
+				<p class="cl-ui-card-line">{% if t.default_for_messages %}{{ ui('feedback.badge', {label: 'Default for messages', tone: 'success'}) }} {% endif %}{% if t.default_for_digest %}{{ ui('feedback.badge', {label: 'Default for the digest', tone: 'success'}) }} {% endif %}{{ ui('feedback.badge', {label: t.mode == 'html' ? 'Written in HTML' : 'Designed', tone: 'neutral'}) }}</p>
+				<p class="cl-ui-card-line cl-ui-card-quiet">{{ t.used == 0 ? 'No message has chosen it' : (t.used == 1 ? '1 message or digest uses it' : t.used ~ ' messages and digests use it') }} · Changed {{ t.updated_at|date('j M Y') }}</p>
+			{% endblock %}
+			{% block actions %}
+				{{ ui('action.link', {label: 'Open', variant: 'primary', size: 'small', href: '/mailing/templates/' ~ t.id, icon: 'action-open'}) }}
+				{% if can_manage %}
+				{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'More for ' ~ t.name})} %}
+				{% block body %}
+					<form action="/mailing/templates/{{ t.id }}/copy" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Copy it', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-copy'}) }}</form>
+					{% if not t.default_for_messages %}<form action="/mailing/templates/{{ t.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="messages">{{ ui('action.button', {label: 'Make it the default for messages', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
+					{% if not t.default_for_digest %}<form action="/mailing/templates/{{ t.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="digest">{{ ui('action.button', {label: 'Make it the default for the digest', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
+					{% if not t.default_for_messages and not t.default_for_digest %}<form action="/mailing/templates/{{ t.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete it', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete ' ~ t.name ~ '? Messages that chose it will use the default for messages.', icon: 'action-remove'}) }}</form>{% endif %}
+				{% endblock %}
+				{% endembed %}
+				{% endif %}
+			{% endblock %}
+			{% endembed %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

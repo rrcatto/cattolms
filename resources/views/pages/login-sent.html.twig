@@ -11,6 +11,8 @@
 				<p>
 					If the address can receive email, a secure one-time link has been sent. Opening that link completes registration or signs you in.
 				</p>
+				{# After a registration on a demo site (owner, 2026-10-26). #}
+				{% if hold_notice|default('') %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Your account will be held for approval'})} %}{% block body %}<p>{{ hold_notice }}</p>{% endblock %}{% endembed %}{% endif %}
 				{{ ui('action.link', {label: 'Send another link', variant: 'secondary', size: 'normal', href: '/login', icon: 'action-email'}) }}
 
 {% endblock %}

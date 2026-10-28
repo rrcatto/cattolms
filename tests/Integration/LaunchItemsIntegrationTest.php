@@ -162,7 +162,7 @@ final class LaunchItemsIntegrationTest extends TestCase
         self::assertStringStartsWith('Order emails have not been sent since ', (string) $status->commerceWarning());
         $this->db->executeStatement("UPDATE scheduled_jobs SET last_succeeded_at = NOW() WHERE job_key = 'commerce'");
         self::assertNull($status->commerceWarning(), 'A running commerce job raises no warning.');
-        self::assertSame(['commerce', 'popularity', 'cleanup'], array_column($status->jobs(), 'key'));
+        self::assertSame(['commerce', 'popularity', 'cleanup', 'signup_lists', 'mailing', 'log_archive'], array_column($status->jobs(), 'key'));
     }
 
     public function testThePaymentMethodsSettingRefusesWhatCannotBeOfferedAndLogsAChange(): void
@@ -189,7 +189,8 @@ final class LaunchItemsIntegrationTest extends TestCase
     }
 
     /** Through the kernel: an account someone else made gives its date of birth at its first sign-in, before anything else (adults only, 2026-10-20). */
-    public function testAnAccountSomeoneElseMadeGivesItsDateOfBirthBeforeAnyOtherPage(): void
+    /** An account without a South African ID number gives it before any other page (owner, 2026-10-27, 4A). */
+    public function testAnAccountWithoutAnIdNumberGivesItBeforeAnyOtherPage(): void
     {
         $this->db->rollBack();
         $container = CliBootstrap::boot()['container'];
@@ -207,10 +208,10 @@ final class LaunchItemsIntegrationTest extends TestCase
         try {
             $response = $this->send('/account', false);
             self::assertSame(303, $response->getStatusCode());
-            self::assertSame('/account/confirm-age?return=%2Faccount', $response->headers->get('Location'));
+            self::assertSame('/account/id-number?return=%2Faccount', $response->headers->get('Location'));
             self::assertSame(200, $this->send('/terms', false)->getStatusCode(), 'The legal pages are never held up.');
             self::assertSame(200, $this->send('/contact', false)->getStatusCode(), 'Nor is the contact form.');
-            $users->updateProfile((int) $user['id'], ['birthdate' => '1990-05-12']);
+            \CattoLearning\Tests\Support\CheckIdNumbers::give($db, (int) $user['id']);
             $after = $this->send('/account', false);
             self::assertNotSame(303, $after->getStatusCode(), 'Once given, never asked again.');
             self::assertNull($after->headers->get('Location'));

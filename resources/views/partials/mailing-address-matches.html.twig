@@ -1,0 +1,22 @@
+{#
+	The addresses that match what is typed in Never email an address (owner, 2026-10-28: "when I start typing an email
+	address in the input field, you can show me all the emails that match as I type (debounced)"): each with its person's
+	name, and whether it is never emailed already; choosing one puts it in the field (platform-overrides.js,
+	[data-fill-into]). typed, matches.
+#}
+{% if typed|length < 2 %}
+{% elseif matches %}
+	<ul class="cl-address-matches-list">
+		{% for match in matches %}
+		<li>
+			<button type="button" class="cl-address-match" data-fill-into="sx-email" data-fill-value="{{ match.email }}"{{ match.never_emailed ? ' disabled' : '' }}>
+				<span class="cl-address-match-email">{{ match.email }}</span>
+				{% if match.name %}<span class="cl-address-match-name">{{ match.name }}</span>{% endif %}
+				{% if match.never_emailed %}{{ ui('feedback.badge', {label: 'Never emailed already', tone: 'neutral'}) }}{% endif %}
+			</button>
+		</li>
+		{% endfor %}
+	</ul>
+{% else %}
+	<p class="small cl-text-secondary">No address on the site contains "{{ typed }}". You can still write one in full.</p>
+{% endif %}

@@ -134,7 +134,7 @@ final class CompanyCreditPurchaseService
         if ($offer === null) throw new RuntimeException('This pending request has no current exact-match paid offer.');
         $existing = $this->records->activeCompanyOrderForRequest($requestId, $companyId);
         if ($existing !== null) {
-            if ((int)$existing['purchaser_user_id'] !== $actor->id) throw new RuntimeException('Another company administrator is already purchasing this credit. Ask them to complete their order.');
+            // Any of the company's administrators opens and pays it (2026-10-26): the order another started is theirs too.
             return (int) $existing['id'];
         }
         $basket = $this->basket($actor, $companyId);

@@ -208,7 +208,9 @@ final class BankPayments
         $words = array_values(array_filter(preg_split('/[\s,;:\/]+/', strtoupper($typed)) ?: [], static fn(string $w): bool => $w !== ''));
         $mistyped = false;
         foreach ($words as $start => $_) {
-            for ($length = 1; $length <= 5 && $start + $length <= count($words); $length++) {
+            // Longest first: "CL 20261027 30492 Z" read three words at a time could make another, valid-looking
+            // reference (CL-20261027-3049-2) before reaching the whole one (2026-10-27).
+            for ($length = min(5, count($words) - $start); $length >= 1; $length--) {
                 $candidate = implode('', array_slice($words, $start, $length));
                 try {
                     return [AccountReference::parse($candidate), false];

@@ -1,0 +1,319 @@
+{#
+	A company's page in Administration, as the owner approved its mockup (2026-10-27: "the mockup is approved, build it.
+	just remember to retain the identity band of the logged in user"; the request: "that page should be an overview of all
+	the pertinent info about that company on one page ... Make the UI a delight for a human being to use"). The head with
+	its logo and badges, then the reader's identity band (partials/page-head draws both); what waits for an administrator
+	about it; its figures, each opening its part; its people and the courses it provides, each a table or a grid of
+	cards; its staff's learning, its credits and its orders; and beside them its details and administrators, wallet,
+	billing details, logo, recent activity and Disable. Application\CompanyOverview gathers it.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set co = admin_company %}
+	{% set co_base = '/admin/companies/' ~ co.id %}
+	{% set ph_back_href = '/admin/companies' %}{% set ph_back_label = 'Companies' %}
+	{% set ph_kicker = 'Company' %}{% set ph_title = co.name %}
+	{% if company_logo %}{% set ph_media %}<img src="{{ company_logo.url }}" alt="Logo of {{ co.name }}" width="112" height="112">{% endset %}{% endif %}
+	{% set ph_badges %}{% for badge in company_badges %}{{ ui('feedback.badge', {label: badge.label, tone: badge.tone}) }}{% endfor %}{% endset %}
+	{% set ph_actions %}
+		{% if can_select_company and co.status == 'active' %}<form action="/company/context" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="company_id" value="{{ co.id }}">{{ ui('action.button', {label: 'Manage in the Company workspace', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-switch'}) }}</form>{% endif %}
+		{% if can_manage_companies %}{{ ui('action.link', {label: 'Edit details', variant: 'secondary', size: 'normal', href: co_base ~ '?edit=1#company-details', icon: 'action-edit'}) }}{% endif %}
+	{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	{# What waits for an administrator about this company, as the dashboard's Needs your attention lists it. #}
+	{% if company_attention %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'attention'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Needs your attention', summary: company_attention|length == 1 ? '1 thing about ' ~ co.name ~ ' is waiting for you.' : company_attention|length ~ ' things about ' ~ co.name ~ ' are waiting for you.'}) }}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+			{% for entry in company_attention %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+			{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: entry.kind == 'money' ? 'warning' : 'info'}) }} {% if entry.subject %}{{ ui('data.person', entry.person) }} {% endif %}<strong>{{ entry.title }}</strong><br><span class="small cl-text-secondary">{{ entry.summary }}</span>{% endblock %}
+			{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'primary', size: 'small', icon: entry.icon, href: entry.href}) }}{% endblock %}
+			{% endembed %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	{# Its figures, each opening its part of this page. #}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'figures'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'At a glance', heading_level: 2}) }}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{% for figure in company_figures %}{{ ui('data.stat-card', figure) }}{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side', section_spacing: false})} %}
+{% block body %}
+		<div>
+		{# Its people, a table or a grid of cards (owner: "it always displays as list, no grid view, which it needs"). #}
+		{% if company_people_section %}
+		{% set cp = company_people_section %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'people'})} %}{% block surface_body %}
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', summary: cp.all == 0 ? 'Nobody belongs to ' ~ co.name ~ ' yet. A person whose address is at ' ~ cp.domain ~ ' becomes its staff.' : (cp.all == 1 ? '1 person' : cp.all ~ ' people') ~ ' at ' ~ cp.domain ~ ': ' ~ (company_admins|length == 1 ? '1 Company Administrator' : company_admins|length ~ ' Company Administrators') ~ '.'})} %}{% block section_actions %}{% if can_manage_people %}{{ ui('action.button', {label: 'Add a person', variant: 'primary', size: 'small', type: 'button', modal: 'company-add-person', icon: 'action-add'}) }}{% endif %}{% endblock %}{% endembed %}
+			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'company_people', pagination: cp.pagination, search: {ds_name: 'company_people', ds_label: 'Search its people', ds_value: cp.search, ds_action: co_base ~ '#people'}})} %}
+			{% block toolbar %}{% if cp.all > 0 %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: cp.view_switch} %}</div>{% endif %}{% endblock %}
+			{% block results %}
+				{% if cp.people %}
+					{% if cp.view == 'grid' %}
+					{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'People'})} %}{% block body %}
+						{% for person in cp.people %}
+						{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: '/admin/people/' ~ person.id, picture: 'round'})} %}
+{% block picture %}{% if person.picture_url %}<img src="{{ person.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
+{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference, href: '/admin/people/' ~ person.id}) }}{% endblock %}
+{% block details %}
+							<div class="role-list">{{ ui('feedback.badge', {label: person.role, tone: person.role_tone}) }}{% if person.status != 'active' %}{{ ui('feedback.badge', {label: person.status|replace({'_': ' '})|capitalize, tone: 'warning'}) }}{% endif %}</div>
+							<p class="cl-ui-card-line cl-ui-card-quiet">{{ person.course_count }} {{ person.course_count == 1 ? 'course' : 'courses' }} · {{ person.last_login_at ? 'Last sign-in ' ~ person.last_login_at : 'Never signed in' }}</p>
+{% endblock %}
+{% block actions %}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/admin/people/' ~ person.id, icon: 'action-open'}) }}{% endblock %}
+						{% endembed %}
+						{% endfor %}
+					{% endblock %}{% endembed %}
+					{% else %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Role in the company'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Courses'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Last signed in'}} %}</tr>{% endblock %}
+					{% block body %}{% for person in cp.people %}<tr>
+						<td class="cell-text">{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.id}) }}</td>
+						<td>{{ ui('feedback.badge', {label: person.role, tone: person.role_tone}) }}</td>
+						<td>{{ person.course_count }}</td>
+						<td>{{ person.last_login_at ?: 'Never' }}</td>
+					</tr>{% endfor %}{% endblock %}
+					{% endembed %}
+					{% endif %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: cp.search ? 'Nobody matches' : 'Nobody yet', summary: cp.search ? 'Try another name, email address or account reference.' : 'Add a person at ' ~ cp.domain ~ ' to make them its staff.'}) }}
+				{% endif %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% endif %}
+
+		{# The courses it provides (owner: "it also needs a list/grid view of its courses"). #}
+		{% if company_courses_section %}
+		{% set cc = company_courses_section %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'provided'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Courses it provides', summary: (cc.figures.total == 1 ? '1 course' : cc.figures.total ~ ' courses') ~ ': ' ~ cc.figures.published ~ ' published, ' ~ cc.figures.draft ~ ' draft' ~ (cc.figures.retired > 0 ? ', ' ~ cc.figures.retired ~ ' retired' : '') ~ '. ' ~ (cc.figures.learners == 1 ? '1 learner is' : cc.figures.learners ~ ' learners are') ~ ' on them.'}) }}
+			<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: cc.view_switch} %}</div>
+			{% if cc.view == 'grid' %}
+			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Courses'})} %}{% block body %}
+				{% for course in cc.courses %}
+				{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: '/admin/courses/' ~ course.id, picture: 'wide'})} %}
+{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
+{% block details %}
+					{% if course.code %}<p class="cl-ui-card-line"><code class="cl-course-code">{{ course.code }}</code></p>{% endif %}
+					{% if course.price %}<p class="cl-ui-card-line"><strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %}</p>{% endif %}
+					<div class="role-list">{{ ui('feedback.badge', {label: course.status|capitalize, tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}</div>
+					<p class="cl-ui-card-line cl-ui-card-quiet">{{ course.learner_count }} {{ course.learner_count == 1 ? 'learner' : 'learners' }}</p>
+{% endblock %}
+{% block actions %}{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id, icon: 'action-manage'}) }}{% endblock %}
+				{% endembed %}
+				{% endfor %}
+			{% endblock %}{% endembed %}
+			{% else %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Learners'}} %}</tr>{% endblock %}
+			{% block body %}{% for course in cc.courses %}<tr>
+				<td class="cell-text"><a href="/admin/courses/{{ course.id }}">{{ course.title }}</a></td>
+				<td>{{ course.code }}</td>
+				<td>{{ ui('feedback.badge', {label: course.status|capitalize, tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}</td>
+				<td>{{ course.price ? course.price.price_label : 'No price' }}</td>
+				<td>{{ course.learner_count }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% endif %}
+			{% if cc.more > 0 %}<p class="small">And {{ cc.more }} more. <a href="/admin/courses?courses_q={{ co.name|url_encode }}">All its courses</a></p>{% endif %}
+		{% endblock %}{% endembed %}
+		{% endif %}
+
+		{# How its staff are doing on their courses. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'learning'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Its staff\'s learning', summary: 'The courses its people are on, how far they are and how they did.'}) }}
+			{% if company_learning %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Not started'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'In progress'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Completed'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Average result'}} %}</tr>{% endblock %}
+			{% block body %}{% for row in company_learning %}<tr>
+				<td class="cell-text"><a href="/admin/courses/{{ row.id }}">{{ row.title }}</a></td>
+				<td>{{ row.on }}</td><td>{{ row.not_started }}</td><td>{{ row.in_progress }}</td><td>{{ row.completed }}</td><td>{{ row.average }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'No courses yet', summary: 'When its people are given courses, how they are doing shows here.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+
+		{# Its course credits, with what can be done with each here. #}
+		{% if company_credits %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'credits'})} %}{% block surface_body %}
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course credits', summary: company_credits.places.held == 0 ? 'It holds no places on courses for its staff.' : 'Places on courses it holds for its staff: ' ~ company_credits.places.left ~ ' of ' ~ company_credits.places.held ~ ' left.'})} %}{% block section_actions %}{% if can_manage_credits %}{{ ui('action.button', {label: 'Give credits', variant: 'secondary', size: 'small', type: 'button', modal: 'company-give-credits', icon: 'action-grant'}) }}{% endif %}{% if can_select_company and co.status == 'active' and company_credits.places.left > 0 %}<form action="/company/context" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="company_id" value="{{ co.id }}"><input type="hidden" name="next" value="/company/credits">{{ ui('action.button', {label: 'Assign places', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-switch'}) }}</form>{% endif %}{% endblock %}{% endembed %}
+			{% if company_credits.credits %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Places'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Length'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'From'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: ''}} %}</tr>{% endblock %}
+			{% block body %}{% for credit in company_credits.credits %}<tr>
+				<td class="cell-text"><a href="/admin/courses/{{ credit.course_id }}">{{ credit.course_title }}</a></td>
+				<td>{{ ui('feedback.progress', {value: credit.held > 0 ? (100 * credit.used / credit.held)|round : 0, label: credit.left ~ ' of ' ~ credit.held ~ ' left', show_value: false}) }}<span class="small">{{ credit.left }} of {{ credit.held }} left</span></td>
+				<td>{{ credit.length }}</td>
+				<td class="cell-text">{% if credit.order_id %}<a href="/admin/commerce/orders/{{ credit.order_id }}">{{ credit.source }}</a>{% else %}{{ credit.source }}{% endif %}</td>
+				<td class="cell-actions">{% if can_manage_credits and credit.can_take_back %}
+					{{ ui('action.button', {label: 'Take back', variant: 'secondary', size: 'small', type: 'button', modal: 'company-take-back-' ~ credit.id, icon: 'action-revoke'}) }}
+					{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-take-back-' ~ credit.id, title: 'Take back unused places', action: '/admin/course/credits/' ~ credit.id ~ '/take-back', method: 'post'})} %}
+{% block modal_body %}
+						<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ co_base }}#credits">
+						<p>{{ credit.course_title }}, {{ credit.length }}. {{ credit.left }} of its places are free. Places already assigned or used are never taken back.</p>
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Places to take back', for: 'co-take-back-places-' ~ credit.id, required: true})} %}{% block control %}<input type="number" id="co-take-back-places-{{ credit.id }}" name="places" min="1" max="{{ credit.left }}" value="{{ credit.left }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'co-take-back-reason-' ~ credit.id, required: true, help: 'Kept on the credit and in the activity log.'})} %}{% block control %}<input id="co-take-back-reason-{{ credit.id }}" name="reason" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}
+{% block modal_actions %}
+						{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+						{{ ui('action.button', {label: 'Take back', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-revoke'}) }}
+{% endblock %}
+					{% endembed %}
+				{% endif %}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% if company_credits.total > company_credits.credits|length %}<p class="small"><a href="/admin/course/credits?credits_q={{ co.name|url_encode }}">All {{ company_credits.total }} of its credits</a></p>{% endif %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'No credits yet', summary: 'It holds credits when it buys places on courses, or when you give it some.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% endif %}
+
+		{# Its orders, newest first. #}
+		{% if company_orders_section %}
+		{% set cs = company_orders_section %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'orders'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Orders', summary: cs.total == 0 ? 'It has placed no orders.' : (cs.total == 1 ? '1 order' : cs.total ~ ' orders') ~ ': ' ~ cs.paid ~ ' paid' ~ (cs.due_minor > 0 ? ', ' ~ cs.due ~ ' waiting for payment' : '') ~ '.'}) }}
+			{% if cs.orders %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Order'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Placed'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'What'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Amount'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Status'}} %}</tr>{% endblock %}
+			{% block body %}{% for order in cs.orders %}<tr>
+				<td><a href="/admin/commerce/orders/{{ order.id }}">{{ order.number }}</a></td>
+				<td>{{ order.placed }}</td>
+				<td class="cell-text">{{ order.what }}{% if order.buyer %}<br><span class="small cl-text-secondary">By {{ order.buyer.name }}</span>{% endif %}</td>
+				<td>{{ order.amount }}</td>
+				<td>{{ ui('feedback.badge', {label: order.state, tone: order.tone}) }}{% if order.due %}<br><span class="small">{{ order.due }} to pay</span>{% endif %}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% if cs.total > cs.orders|length %}<p class="small"><a href="/admin/commerce/orders?q={{ co.name|url_encode }}">All {{ cs.total }} of its orders</a></p>{% endif %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'No orders yet', summary: 'Its Company Administrators order places on courses in the Company workspace.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% endif %}
+		</div>
+
+		<div>
+		{# Who it is, and the edit form, open when asked for (Edit details in the head). #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'company-details'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Details'}) }}
+			{% set co_admin_links %}{% for person in company_admins %}{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.user_id}) }}{% if not loop.last %}<br>{% endif %}{% else %}None yet{% endfor %}{% endset %}
+			<dl class="cl-company-facts">
+				<dt>Name</dt><dd>{{ co.name }}</dd>
+				<dt>Domain</dt><dd>{{ co.domain ?: 'None' }}</dd>
+				<dt>Account reference</dt><dd>{{ co.account_reference|default('') ? co.account_reference|account_reference : 'None' }}</dd>
+				<dt>Created</dt><dd>{{ co.created_at|default('') ? co.created_at|date('j F Y') : '' }}</dd>
+				<dt>Company Administrators</dt><dd>{{ co_admin_links }}</dd>
+			</dl>
+			{% if can_manage_companies %}
+			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'company-edit', heading: 'Edit the name or domain', open: editing})} %}{% block body %}
+				<form action="{{ co_base }}" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="page">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'company-page-name', required: true, full_width: true})} %}{% block control %}<input id="company-page-name" name="name" value="{{ co.name }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Domain', for: 'company-page-domain', required: true, full_width: true, help: 'Its own email domain, such as example.co.za. Changing it moves every staff address to the new one, after a warning.'})} %}{% block control %}<input id="company-page-domain" name="domain" value="{{ co.domain }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+				</form>
+			{% endblock %}{% endembed %}
+			{% endif %}
+		{% endblock %}{% endembed %}
+
+		{# Its wallet: what it holds, what expires first, and its latest movements. #}
+		{% if company_wallet %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'wallet'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Wallet'}) }}
+			{{ ui('data.stat-card', {value: company_wallet.balance, label: 'Credit it can spend', note: company_wallet.expiring ? company_wallet.expiring.amount_label ~ ' expires on ' ~ company_wallet.expiring.expires_label : 'Nothing expires soon', icon: 'figure-wallet-held', href: company_wallet.href, size: 'large'}) }}
+			{% if company_wallet.movements %}
+			<ul class="cl-company-movements">
+				{% for move in company_wallet.movements %}<li><span>{{ move.label }}<br><span class="small cl-text-secondary">{{ move.when }}</span></span><strong>{{ move.in ? '+ ' ~ move.in : '− ' ~ move.out }}</strong></li>{% endfor %}
+			</ul>
+			{% endif %}
+			<p class="small"><a href="{{ company_wallet.href }}">The whole statement{{ company_wallet.entries > 0 ? ' (' ~ company_wallet.entries ~ ' entries)' : '' }}</a></p>
+		{% endblock %}{% endembed %}
+		{% endif %}
+
+		{# Who its invoices are made out to. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'billing'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Billing details'}) }}
+			{% if company_billing %}<p class="cl-company-billing">{% for line in company_billing %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% else %}<p class="small">None yet. Its invoices are made out to it once its Company Administrator gives them.</p>{% endif %}
+			{% if can_select_company and co.status == 'active' %}<form action="/company/context" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="company_id" value="{{ co.id }}"><input type="hidden" name="next" value="/company/billing">{{ ui('action.button', {label: 'Change billing details', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-edit'}) }}</form>{% endif %}
+		{% endblock %}{% endembed %}
+
+		{% if company_logo %}
+		{% include '@platform/partials/company-logo-manager.html.twig' with {lm_logo: company_logo, lm_name: co.name, lm_upload: co_base ~ '/logo', lm_remove: co_base ~ '/logo/remove', lm_can_manage: can_manage_companies} %}
+		{% endif %}
+
+		{% if company_activity is not null %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'activity'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Recent activity'}) }}
+			{% if company_activity %}
+			<ul class="cl-company-activity">
+				{% for event in company_activity %}<li>{{ event.event_label }}{% if event.subject and event.subject != co.name and event.subject != 'Platform' %}: {{ event.subject }}{% endif %}<br><span class="small cl-text-secondary">{{ event.actor_person.name }} · {{ event.created_at|date('j M Y \\a\\t H:i') }}</span></li>{% endfor %}
+			</ul>
+			<p class="small"><a href="/admin/activity?company_id={{ co.id }}">All its activity</a></p>
+			{% else %}
+				<p class="small">Nothing recorded yet.</p>
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% endif %}
+
+		{% if can_manage_companies and co.status in ['active', 'disabled'] %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'status'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: co.status == 'active' ? 'Disable the company' : 'Enable the company'}) }}
+			<p class="small">{{ co.status == 'active' ? 'Its people cannot open the Company workspace and it cannot buy, until you enable it again. Nothing is deleted.' : 'It is disabled. Enabling it gives its people the Company workspace again.' }}</p>
+			<form action="{{ co_base }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="page"><input type="hidden" name="status" value="{{ co.status == 'active' ? 'disabled' : 'active' }}">{{ ui('action.button', {label: co.status == 'active' ? 'Disable company' : 'Enable company', variant: co.status == 'active' ? 'danger' : 'secondary', size: 'normal', type: 'submit', icon: co.status == 'active' ? 'action-disable' : 'action-enable', confirm: co.status == 'active' ? 'Disable ' ~ co.name ~ '?' : ''}) }}</form>
+		{% endblock %}{% endembed %}
+		{% endif %}
+		</div>
+{% endblock %}
+{% endembed %}
+
+	{# Add a person: an address at its domain makes them its staff (the company domain rule). The two windows sit inside
+	   the last section, so it stays the page's last, as a theme's spacing above the footer expects. #}
+	{% if can_manage_people and company_people_section %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-add-person', title: 'Add a person to ' ~ co.name, action: '/admin/people', method: 'post'})} %}
+{% block modal_body %}
+		<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ co_base }}#people">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'co-add-first', required: true})} %}{% block control %}<input id="co-add-first" name="first_name" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'co-add-last', required: true})} %}{% block control %}<input id="co-add-last" name="last_name" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'co-add-email', required: true, full_width: true, help: 'At ' ~ company_people_section.domain ~ ', such as name@' ~ company_people_section.domain ~ '. That makes them its staff, a student to start with.'})} %}{% block control %}<input type="email" id="co-add-email" name="email" required placeholder="name@{{ company_people_section.domain }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role on the site', for: 'co-add-role', full_width: true})} %}{% block control %}<select id="co-add-role" name="role" {{ ui_field_attrs(props) }}>{% for role in assignable_roles %}<option value="{{ role.role_key }}"{{ role.role_key == 'STUDENT' ? ' selected' : '' }}>{{ role.role_name|role_label(role.role_key) }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+{% endblock %}
+{% block modal_actions %}
+		{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+		{{ ui('action.button', {label: 'Add the person', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+{% endblock %}
+	{% endembed %}
+	{% endif %}
+
+	{# Give it credits, the company already chosen. #}
+	{% if can_manage_credits and company_credits %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-give-credits', title: 'Give ' ~ co.name ~ ' credits', action: '/admin/course/credits', method: 'post'})} %}
+{% block modal_body %}
+		<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ co_base }}#credits"><input type="hidden" name="company_id" value="{{ co.id }}">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course_id', lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: 0} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Length of access', for: 'co-credit-length', help: 'The lengths the course is sold for.'})} %}{% block control %}<select name="access_period_seconds" required id="co-credit-length" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course_id-value" hx-include="#course_id-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: [], course_chosen: false, empty_words: 'Choose the course first'} %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Places', for: 'co-credit-quantity'})} %}{% block control %}<input type="number" id="co-credit-quantity" name="quantity" min="1" value="1" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'co-credit-reason'})} %}{% block control %}<select id="co-credit-reason" name="reason" {{ ui_field_attrs(props) }}><option value="administrator">Manual grant</option><option value="replacement">Replacement credit</option><option value="correction">Correction</option></select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Note for the record', for: 'co-credit-note', full_width: true})} %}{% block control %}<textarea id="co-credit-note" name="note" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+{% endblock %}
+{% block modal_actions %}
+		{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+		{{ ui('action.button', {label: 'Give the credits', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}
+{% endblock %}
+	{% endembed %}
+	{% endif %}
+	</section>
+{% endblock %}

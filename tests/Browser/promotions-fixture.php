@@ -33,84 +33,48 @@ $session = static function (int $user, string $email) use ($container): string {
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Promotions browser', $email);
     return $token;
 };
-$person = static function (string $key, string $first, string $last, array $roleKeys, string $suffix) use ($fixture, $db, $container): array {
-    $email = 'promo-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($first . ' ' . $last, $email);
-    $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $id]);
-    foreach ($roleKeys as $role) $container->get(RoleRepository::class)->assign($id, $role);
-    return ['id' => $id, 'email' => $email];
-};
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous promotions fixture first.');
-    $suffix = $fixture->suffix();
-    $provider = $person('provider', 'Course', 'Provider', ['STUDENT'], $suffix);
-    $company = $fixture->createCompany($provider['id'], 'Promotions browser provider ' . $suffix, 'promo-browser-' . $suffix . '.example.test');
+    // A course provider made with its founding administrator, two of its courses on sale, an administrator and four
+    // promo codes as a shop writes them, every name one nobody on the site has (owner, 2026-10-27).
+    $provider = $fixture->company();
+    $company = $provider['id'];
     $courses = [];
     foreach (['a' => 12345, 'b' => 5000] as $key => $price) {
-        $slug = 'promo-browser-' . $key . '-' . $suffix;
-        $course = $fixture->createCourse($provider['id'], $company, $slug, 'Promotions browser course ' . strtoupper($key) . ' ' . $suffix, 'published');
-        $db->executeStatement('UPDATE courses SET published_at = NOW() WHERE id = :id', ['id' => $course]);
-        $courses[$key] = ['id' => $course, 'slug' => $slug, 'variant' => $fixture->createPriceVariant($course, $provider['id'], 2592000, $price, true)];
+        $made = $fixture->course($provider['founder']['id'], $company, 'published');
+        $courses[$key] = ['id' => $made['id'], 'slug' => $made['slug'], 'title' => $made['title'], 'variant' => $fixture->createPriceVariant($made['id'], $provider['founder']['id'], 2592000, $price, true)];
     }
-    $admin = $person('admin', 'Promotions', 'Administrator', ['ADMIN'], $suffix);
+    $admin = $fixture->person('ADMIN');
     $promotions = new PromotionRepository($db);
-    $code = 'SAVE' . strtoupper($suffix);
-    $expired = 'OLD' . strtoupper($suffix);
+    [$code, $expired, $adminCode, $auto] = (new \CattoLearning\Tests\Support\CheckNames($db))->promotions(4);
     $now = new DateTimeImmutable();
-    $base = ['name' => 'Browser ten off', 'description' => null, 'discount_type' => 'percentage', 'discount_value' => 1000, 'currency' => null, 'starts_at' => null, 'ends_at' => null,
+    $base = ['name' => 'Ten percent off', 'description' => null, 'discount_type' => 'percentage', 'discount_value' => 1000, 'currency' => null, 'starts_at' => null, 'ends_at' => null,
         'active' => true, 'minimum_order_minor' => null, 'maximum_total_uses' => null, 'maximum_uses_per_customer' => null, 'course_scope' => 'all', 'bundle_scope' => 'none'];
     $promotions->create(['code' => $code] + $base, [], $admin['id'], $now->format(DATE_ATOM));
-    $promotions->create(['code' => $expired, 'name' => 'Browser expired offer', 'starts_at' => $now->modify('-2 days')->format(DATE_ATOM), 'ends_at' => $now->modify('-1 day')->format(DATE_ATOM)] + $base, [], $admin['id'], $now->format(DATE_ATOM));
-    $state = ['suffix' => $suffix, 'company' => $company, 'courses' => $courses, 'code' => $code, 'expired_code' => $expired,
-        'users' => ['provider' => $provider['id'], 'admin' => $admin['id']], 'learners' => [], 'admin_token' => $session($admin['id'], $admin['email'])];
+    $promotions->create(['code' => $expired, 'name' => 'Last week\'s offer', 'starts_at' => $now->modify('-2 days')->format(DATE_ATOM), 'ends_at' => $now->modify('-1 day')->format(DATE_ATOM)] + $base, [], $admin['id'], $now->format(DATE_ATOM));
+    $state = ['company' => $company, 'courses' => $courses, 'code' => $code, 'expired_code' => $expired, 'admin_code' => strtolower($adminCode), 'auto_code' => $auto, 'scrub' => $fixture->seeds(),
+        'users' => ['provider' => $provider['founder']['id'], 'admin' => $admin['id']], 'learners' => [], 'admin_token' => $session($admin['id'], $admin['email'])];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created promotions fixture.\n";
 } elseif ($action === 'learner') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    $key = 'learner' . (count($state['learners']) + 1);
-    $learner = $person($key, 'Naledi', 'Mokoena', ['STUDENT'], $state['suffix']);
+    $learner = $fixture->person('STUDENT');
     $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
-    (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Naledi Mokoena', 'address_line_1' => '5 Promo Lane', 'city' => 'Johannesburg', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
+    (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => $learner['name'], 'address_line_1' => '5 Jan Smuts Avenue', 'city' => 'Johannesburg', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
+    $state['scrub']['users'][] = $learner['id'];
     $state['learners'][] = $learner['id'];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     echo json_encode(['id' => $learner['id'], 'token' => $session($learner['id'], $learner['email'])], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    $users = [...array_values($state['users']), ...$state['learners']];
-    $ids = '{' . implode(',', array_map('intval', $users)) . '}';
-    $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
-    $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
-    // An automatic promotion the check made applies to every cart while it is active: whatever an order
-    // keeps of it, it is switched off (owner, 2026-10-20).
-    $db->executeStatement('UPDATE promotions p SET active = FALSE WHERE p.applies_automatically AND (p.code LIKE :suffix OR p.created_by = ANY(CAST(:ids AS BIGINT[])))',
-        ['suffix' => '%' . strtoupper($state['suffix']) . '%', 'ids' => $ids]);
-    // The fixture's promotions and any the ADMIN pass created, unless an order used them.
-    $db->executeStatement('DELETE FROM promotions p WHERE (p.code LIKE :suffix OR p.created_by = ANY(CAST(:ids AS BIGINT[]))) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.promotion_id = p.id)',
-        ['suffix' => '%' . strtoupper($state['suffix']) . '%', 'ids' => $ids]);
-    $ordered = (bool) $db->fetchOne('SELECT 1 FROM commerce_order_items WHERE course_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => '{' . implode(',', array_column($state['courses'], 'id')) . '}']);
-    if (!$ordered) {
-        foreach ($state['courses'] as $course) {
-            $db->executeStatement('DELETE FROM course_price_variants WHERE course_id = :c', ['c' => $course['id']]);
-            $db->executeStatement('DELETE FROM courses WHERE id = :c', ['c' => $course['id']]);
-        }
-        $db->executeStatement('DELETE FROM company_users WHERE company_id = :c', ['c' => $state['company']]);
-        $db->executeStatement('DELETE FROM companies WHERE id = :c', ['c' => $state['company']]);
-    } else {
-        foreach ($state['courses'] as $course) $db->executeStatement("UPDATE courses SET status='retired' WHERE id = :c", ['c' => $course['id']]);
-    }
-    foreach ($users as $user) {
-        if ($db->fetchOne('SELECT 1 FROM commerce_orders WHERE purchaser_user_id = :u', ['u' => $user]) || $db->fetchOne('SELECT 1 FROM promotions WHERE created_by = :u OR updated_by = :u', ['u' => $user])) continue;
-        if ($db->fetchOne('SELECT 1 FROM courses WHERE owner_user_id = :u', ['u' => $user])) continue;
-        $db->executeStatement('DELETE FROM analytics_events WHERE user_id = :u', ['u' => $user]);
-        $db->executeStatement('DELETE FROM audit_log WHERE user_id = :u', ['u' => $user]);
-        $db->executeStatement('DELETE FROM user_billing_profiles WHERE user_id = :u', ['u' => $user]);
-        $db->executeStatement("DELETE FROM users WHERE id = :u AND EXISTS (SELECT 1 FROM user_emails WHERE user_id = users.id AND email LIKE 'promo-browser-%@example.test')", ['u' => $user]);
-    }
+    // Everything the check made, the promotions its administrator created through the pages and the orders that used them
+    // included (owner, 2026-10-27).
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
-    echo "Removed what the promotions fixture could; orders and what they refer to remain.\n";
+    echo "Removed everything the promotions check made.\n";
 } else {
     throw new RuntimeException('Usage: php tests/Browser/promotions-fixture.php create|learner|cleanup [state-path]');
 }

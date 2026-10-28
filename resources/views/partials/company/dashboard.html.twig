@@ -3,9 +3,11 @@
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: (company.name), eyebrow: 'Dashboard', summary: (company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.')})} %}
 {% block section_actions %}
-{{ ui('feedback.badge', {label: (company.domain), tone: 'info'}) }}
+{# The company's logo, large, beside its name (owner, 2026-10-26), opening its profile. #}
+{% if company_logo|default(null) %}<a class="cl-company-dashboard-logo" href="/company/profile" aria-label="The company profile"><img src="{{ company_logo.url }}" alt="{{ company_logo.uploaded ? 'The logo of ' ~ company.name : '' }}" width="96" height="96"></a>{% endif %}
 {% endblock %}
 {% endembed %}
+		{% if company.domain|default('') %}<p class="cl-company-dashboard-domain">{{ company.domain }}</p>{% endif %}
 		{% if company.account_reference|default('') %}<p>Company account reference: <strong>{{ company.account_reference|account_reference }}</strong>. Quote it when the company pays by EFT or writes to us.</p>{% endif %}
 		{# The figures sit in the card they summarise, five to a row, each with its icon and opening what it counts (owner,
 		   2026-10-21: "Dashboard cards also need svg icons"). #}

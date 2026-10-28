@@ -33,7 +33,9 @@ final class CompanyWorkspaceContractTest extends TestCase
         // see, so they have the same report scoped to their own staff.
         // Billing details joined them in Phase F: who the company's invoices are made out to,
         // company-owned data with its own capability.
-        self::assertSame(['dashboard','people','requests','enrolments','credits','courses','training','favourites','performance','billing'], array_column($sections, 'key'));
+        // The Company Profile joined them on 2026-10-26: the company itself, its logo first (owner: the logo had been
+        // buried at the end of Billing).
+        self::assertSame(['dashboard','profile','people','requests','enrolments','credits','orders','courses','training','favourites','performance','billing'], array_column($sections, 'key'));
         foreach ($sections as $section) {
             self::assertStringStartsWith('/company/', $section['route']);
             self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -135,8 +137,9 @@ final class CompanyWorkspaceContractTest extends TestCase
     /** A company-assigned access period starts on Start course (grantCourse without an expiry), and the form says so. */
     public function testTheAssignFormSaysTheAccessPeriodStartsWhenTheLearnerStarts(): void
     {
-        $form = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/company/enrolments.html.twig');
-        self::assertStringContainsString("help: 'The period starts when the staff member presses Start course, not when you assign the course.'", $form);
+        // The form is shared by Enrolments and Credits since 2026-10-26.
+        $form = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/company/assign-course.html.twig');
+        self::assertStringContainsString('It starts when the staff member presses Start course, not when you assign the course.', $form);
         self::assertStringNotContainsString('The period starts now', $form);
         $service = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/PlatformAdministrationService.php');
         self::assertStringContainsString('$this->courses->grantCourse($userId, $courseId, $accessPeriodSeconds, $actorUserId);', $service, 'The assignment grants the course without an expiry from the grant date.');

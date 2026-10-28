@@ -73,10 +73,10 @@ final class FinancialDocumentsTest extends TestCase
         self::assertSame([
             'description' => 'Bundle: Workplace Safety Essentials',
             'detail' => 'Includes: First Aid Level 1, Incident Reporting, Fire Marshal Basics',
-            'quantity' => 1, 'access_period' => '365 days',
+            'quantity' => 1, 'access_period' => '1 year',
             'price' => ['minor' => 179000, 'currency' => 'ZAR'], 'discount' => ['minor' => 17900, 'currency' => 'ZAR'], 'paid' => ['minor' => 161100, 'currency' => 'ZAR'],
         ], $data['items'][1], 'A bundle is the item bought, at its own price, with the courses it included when it was sold.');
-        self::assertSame(['Fire Safety for Workplace Supervisors', null, '180 days'], [$data['items'][0]['description'], $data['items'][0]['detail'], $data['items'][2]['access_period']]);
+        self::assertSame(['Fire Safety for Workplace Supervisors', null, '6 months'], [$data['items'][0]['description'], $data['items'][0]['detail'], $data['items'][2]['access_period']]);
     }
 
     public function testAnOrderWithoutAPromotionPrintsNoPromotionAndACompanyOrderNamesTheCompanyAndItsCredits(): void
@@ -209,7 +209,7 @@ final class FinancialDocumentsTest extends TestCase
     public function testADesignIsRefusedWithAnUnknownTypefaceABadColourOrALongNote(): void
     {
         $problems = (new FinancialDocumentDesign(null, 'comic', 'red', ['invoice' => str_repeat('x', FinancialDocumentDesign::NOTE_LIMIT + 1)]))->problems();
-        self::assertSame(['Choose one of the typefaces offered.', 'Choose the accent colour with the colour picker.', 'The invoice note can be at most 600 characters.'], $problems);
+        self::assertSame(['Choose one of the typefaces offered.', 'Accent colour: write it as # and six hex digits, such as #9A3F12.', 'The invoice note can be at most 600 characters.'], $problems);
         $design = FinancialDocumentDesign::fromArray(['typeface' => 'plex-sans', 'colour' => '#abcdef', 'notes' => ['receipt' => 'Paid with thanks.']]);
         self::assertSame(['plex-sans', '#ABCDEF', 'Paid with thanks.', FinancialDocumentDesign::STANDARD_NOTES['invoice']], [$design->typeface, $design->colour, $design->note(DocumentType::Receipt), $design->note(DocumentType::Invoice)]);
         self::assertEquals($design, FinancialDocumentDesign::fromArray($design->toArray()), 'A stored design reads back as it was saved.');

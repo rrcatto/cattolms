@@ -19,7 +19,7 @@
 {# Each review has its own anchor, which the dashboard's Needs your attention opens (owner, 2026-10-21); the learner's name and account reference open their account. #}
 <li class="cl-review" id="review-{{ review.id }}">
 	<div class="cl-review-head">
-		<strong><a href="/courses/{{ review.course_slug }}">{{ review.course_title }}</a></strong>
+		<strong><a href="/admin/courses/{{ review.course_id }}">{{ review.course_title }}</a></strong>
 		{{ ui('feedback.badge', {label: review.status == 'pending' ? 'Pending' : (review.status == 'approved' ? 'Approved' : 'Rejected'), tone: review.status == 'pending' ? 'warning' : (review.status == 'approved' ? 'success' : 'danger')}) }}
 	</div>
 	<p class="cl-review-byline">{{ ui('data.person', {name: review.learner_name, reference: review.learner_reference, href: '/admin/people/' ~ review.user_id}) }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>

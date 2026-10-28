@@ -293,6 +293,8 @@ SQL);
         'status' => 'u.status',
         'created' => 'u.created_at',
         'last_login' => 'u.last_login_at',
+        // The score of the sign-up check the account registered with (owner, 2026-10-26); none for an account made here.
+        'risk' => '(SELECT sa.score FROM signup_attempts sa WHERE sa.user_id=u.id ORDER BY sa.completed_at DESC NULLS LAST, sa.id DESC LIMIT 1)',
     ];
 
     /**
@@ -450,6 +452,33 @@ SQL;
     }
 
     /**
+     * A company's row with its figures, as the Companies list shows it (owner, 2026-10-26: its own page in Administration).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function company(int $companyId): ?array
+    {
+        $row = $this->db->fetchAssociative('SELECT ' . self::COMPANY_COLUMNS . ' FROM companies c WHERE c.id = :id', ['id' => $companyId]);
+
+        return $row === false ? null : $row;
+    }
+
+    /** A company and its figures: one relationship counted per sub-select (see companies()). */
+    private const COMPANY_COLUMNS = <<<'SQL'
+c.*,
+       (SELECT COUNT(*)::int FROM company_users cu
+         WHERE cu.company_id=c.id AND cu.status='active') AS people_count,
+       (SELECT COUNT(*)::int FROM courses co
+         WHERE co.owner_company_id=c.id) AS owned_course_count,
+       (SELECT COUNT(*)::int FROM course_enrolments ce
+          JOIN company_users lcu ON lcu.user_id=ce.user_id AND lcu.company_id=c.id AND lcu.status='active'
+         WHERE ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')) AS enrolment_count,
+       EXISTS (SELECT 1 FROM courses pc WHERE pc.owner_company_id=c.id) AS is_course_provider,
+       (EXISTS (SELECT 1 FROM course_credits cc WHERE cc.company_id=c.id)
+        OR EXISTS (SELECT 1 FROM company_users ccu WHERE ccu.company_id=c.id AND ccu.status='active')) AS is_client
+SQL;
+
+    /**
      * One page of the Administration Companies list. This was the project's reference
      * pagination implementation and keeps its established behaviour and view-variable names;
      * only the shared limit/offset handling and the unique ordering tiebreaker changed.
@@ -475,21 +504,7 @@ SQL;
         // Each sub-select counts one relationship on its own, so the cost is the sum of the three
         // rather than their product, and no DISTINCT is needed to undo a fan-out that never
         // happens. The membership rules are unchanged, which is why the counts are identical.
-        $detail = <<<'SQL'
-SELECT c.*,
-       (SELECT COUNT(*)::int FROM company_users cu
-         WHERE cu.company_id=c.id AND cu.status='active') AS people_count,
-       (SELECT COUNT(*)::int FROM courses co
-         WHERE co.owner_company_id=c.id) AS owned_course_count,
-       (SELECT COUNT(*)::int FROM course_enrolments ce
-          JOIN company_users lcu ON lcu.user_id=ce.user_id AND lcu.company_id=c.id AND lcu.status='active'
-         WHERE ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')) AS enrolment_count,
-       EXISTS (SELECT 1 FROM courses pc WHERE pc.owner_company_id=c.id) AS is_course_provider,
-       (EXISTS (SELECT 1 FROM course_credits cc WHERE cc.company_id=c.id)
-        OR EXISTS (SELECT 1 FROM company_users ccu WHERE ccu.company_id=c.id AND ccu.status='active')) AS is_client
-FROM page
-JOIN companies c ON c.id=page.id
-SQL;
+        $detail = 'SELECT ' . self::COMPANY_COLUMNS . ' FROM page JOIN companies c ON c.id=page.id';
         [$where, $bindings] = self::searchFilter('c', $search, self::COMPANY_SEARCH);
         $where = self::companyAudienceWhere($where, $audience);
 
@@ -840,6 +855,7 @@ SQL;
 
         $detail = 'SELECT cc.id, cc.public_id, cc.company_id, cc.user_id, cc.course_id, cc.access_period_seconds,
                     cc.quantity, cc.refunded_quantity, cc.source_type, cc.note, cc.created_at,
+                    (cc.commerce_order_item_id IS NULL) AS given_by_hand,
                     c.title AS course_title,
                     COALESCE(co.name, NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS holder_name,
                     u.account_reference AS holder_reference,
@@ -959,6 +975,7 @@ SQL;
         return $this->db->fetchAllAssociative(
             'SELECT ce.id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,ce.access_removed_at,
                     c.id AS course_id,c.title AS course_title,c.slug,
+                    (EXISTS (SELECT 1 FROM course_credit_allocations a JOIN course_credits cr ON cr.id = a.credit_id WHERE a.enrolment_id = ce.id AND cr.company_id = :company_id) OR c.owner_company_id = :company_id) AS company_funded,
                     assessment_progress.submitted_assessment_count,assessment_progress.assessment_count
              FROM course_enrolments ce
              JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id AND cu.status=\'active\'
@@ -1123,7 +1140,7 @@ SQL;
              WHERE cc.company_id=:company_id' . '' . $match;
 
         $detail = 'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.refunded_quantity,cc.source_type,cc.note,cc.created_at,
-                    c.title AS course_title,
+                    c.title AS course_title, c.slug AS course_slug, c.status AS course_status,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
                     GREATEST(cc.quantity-cc.refunded_quantity-COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
@@ -1131,7 +1148,7 @@ SQL;
              JOIN course_credits cc ON cc.id=page.id
              JOIN courses c ON c.id=cc.course_id
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
-             GROUP BY cc.id,c.title';
+             GROUP BY cc.id,c.title,c.slug,c.status';
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -1160,10 +1177,14 @@ SQL;
     public function enrolmentBelongsToCompany(int $enrolmentId, int $companyId): bool
     {
         $rows = $this->db->fetchAllAssociative(
+            // Only a course the company paid for or owns is the company's to remove or restore (2026-10-26 audit: a
+            // Company Administrator could remove a course a member bought themselves or was given by the site).
             'SELECT EXISTS(
                 SELECT 1 FROM course_enrolments ce
                 JOIN company_users cu ON cu.user_id=ce.user_id AND cu.status=\'active\'
+                JOIN courses c ON c.id = ce.course_id
                 WHERE ce.id=:enrolment_id AND cu.company_id=:company_id AND ce.is_preview=FALSE
+                  AND (EXISTS (SELECT 1 FROM course_credit_allocations a JOIN course_credits cr ON cr.id = a.credit_id WHERE a.enrolment_id = ce.id AND cr.company_id = :company_id) OR c.owner_company_id = :company_id)
             ) AS allowed',
             ['enrolment_id' => $enrolmentId, 'company_id' => $companyId]
         );
@@ -1957,17 +1978,115 @@ SQL;
         return (int) ($rows[0]['id'] ?? 0);
     }
 
-    /** @return list<int> */
-    public function activeCompanyUserEnrolmentIds(int $companyId, int $userId): array
+    /**
+     * Unused places of a credit ADMIN gave by hand taken back (owner, 2026-10-26: "Unused places only"): never a place
+     * assigned or used, never a bought credit (its places go back through a refund). The credit then holds fewer places;
+     * one with nothing left and nothing ever assigned is gone. The reason goes on its note.
+     *
+     * @return array{places:int,left:int}
+     */
+    public function takeBackCreditPlaces(int $creditId, int $places, string $reason): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT ce.id
-             FROM course_enrolments ce
-             JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id
-             WHERE ce.user_id=:user_id AND ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')",
-            ['company_id' => $companyId, 'user_id' => $userId]
+        $credit = $this->db->fetchAssociative('SELECT id, quantity, refunded_quantity, commerce_order_item_id, note FROM course_credits WHERE id = :id FOR UPDATE', ['id' => $creditId]);
+        if ($credit === false) throw new RuntimeException('That credit does not exist.');
+        if ($credit['commerce_order_item_id'] !== null) throw new RuntimeException('The company bought this credit, so its places go back through a refund of its order.');
+        $used = (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_credit_allocations WHERE credit_id = :id AND status IN ('assigned', 'consumed')", ['id' => $creditId]);
+        $free = (int) $credit['quantity'] - (int) $credit['refunded_quantity'] - $used;
+        if ($places < 1 || $places > $free) throw new RuntimeException($free < 1 ? 'Every place of this credit is assigned or used.' : 'It has ' . $free . ' free ' . ($free === 1 ? 'place' : 'places') . ' to take back.');
+        $left = (int) $credit['quantity'] - $places;
+        if ($left > 0) {
+            $this->db->executeStatement('UPDATE course_credits SET quantity = :q, note = trim(both from note || :line) WHERE id = :id', ['q' => $left, 'line' => "\n" . gmdate('j M Y') . ': took back ' . $places . ' ' . ($places === 1 ? 'place' : 'places') . '. ' . $reason, 'id' => $creditId]);
+        } else {
+            $allocations = (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_credit_allocations WHERE credit_id = :id', ['id' => $creditId]);
+            if ($allocations > 0) throw new RuntimeException('Leave it one place: its earlier places are on record.');
+            $this->db->executeStatement('DELETE FROM course_credits WHERE id = :id', ['id' => $creditId]);
+        }
+
+        return ['places' => $places, 'left' => max(0, $left)];
+    }
+
+    /**
+     * The access lengths a course is sold for, shortest first (its active price options): the lengths a credit for it can
+     * have (owner, 2026-10-26: "The course's own lengths").
+     *
+     * @return list<int>
+     */
+    public function courseSaleLengths(int $courseId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT DISTINCT access_period_seconds FROM course_price_variants WHERE course_id = :c AND is_active ORDER BY 1', ['c' => $courseId]));
+    }
+
+    /**
+     * The lengths of a company's credits for a course that still have a free place, shortest first.
+     *
+     * @return list<int>
+     */
+    public function companyFreeCreditLengths(int $companyId, int $courseId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn(
+            "SELECT DISTINCT cc.access_period_seconds FROM course_credits cc
+             WHERE cc.company_id = :co AND cc.course_id = :c
+               AND cc.quantity - cc.refunded_quantity > (SELECT COUNT(*) FROM course_credit_allocations a WHERE a.credit_id = cc.id AND a.status IN ('assigned', 'consumed'))
+             ORDER BY 1",
+            ['co' => $companyId, 'c' => $courseId]
+        ));
+    }
+
+    /**
+     * A company's orders, newest first, with who placed each and what is still owed (owner, 2026-10-26).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function companyOrders(int $companyId, int $limit, int $offset): array
+    {
+        return $this->db->fetchAllAssociative(
+            "SELECT o.id, o.state, o.total_minor, o.currency, o.placed_at, o.payment_due_at, o.purchaser_user_id,
+                    COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS purchaser_name, u.account_reference AS purchaser_reference,
+                    CASE WHEN o.state IN ('placed', 'awaiting_payment')
+                         THEN GREATEST(o.total_minor - COALESCE((SELECT SUM(p.amount_minor) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid', 'partially_refunded', 'refunded')), 0), 0)
+                         ELSE 0 END AS due_minor
+             FROM commerce_orders o JOIN users u ON u.id = o.purchaser_user_id
+             WHERE o.company_id = :c ORDER BY o.placed_at DESC, o.id DESC LIMIT :limit OFFSET :offset",
+            ['c' => $companyId, 'limit' => $limit, 'offset' => $offset]
         );
-        return array_map(static fn(array $row): int => (int) $row['id'], $rows);
+    }
+
+    public function companyOrdersCount(int $companyId): int
+    {
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_orders WHERE company_id = :c', ['c' => $companyId]);
+    }
+
+    /**
+     * A company's active staff whose primary address is at a domain, by name (a domain change moves them).
+     *
+     * @return list<array{user_id:int,name:string,email:string}>
+     */
+    public function companyStaffAddresses(int $companyId, string $domain): array
+    {
+        return array_map(static fn(array $row): array => ['user_id' => (int) $row['user_id'], 'name' => trim((string) $row['name']), 'email' => (string) $row['email']], $this->db->fetchAllAssociative(
+            "SELECT cu.user_id, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, e.email) AS name, e.email
+             FROM company_users cu JOIN users u ON u.id = cu.user_id JOIN user_emails e ON e.user_id = u.id AND e.is_primary
+             WHERE cu.company_id = :c AND cu.status = 'active' AND lower(split_part(e.email, '@', 2)) = lower(:d)
+             ORDER BY lower(COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, e.email))",
+            ['c' => $companyId, 'd' => $domain]
+        ));
+    }
+
+    /**
+     * The figures under a person's name on their page (the approved page, 2026-10-26): the orders they placed and their
+     * certificates still in force.
+     *
+     * @return array{orders:int,certificates:int}
+     */
+    public function personFigures(int $userId): array
+    {
+        $row = $this->db->fetchAssociative(
+            'SELECT (SELECT COUNT(*) FROM commerce_orders WHERE purchaser_user_id = :u) AS orders,
+                    (SELECT COUNT(*) FROM certificates cert JOIN course_enrolments ce ON ce.id = cert.enrolment_id WHERE ce.user_id = :u AND cert.revoked_at IS NULL) AS certificates',
+            ['u' => $userId]
+        ) ?: [];
+
+        return ['orders' => (int) ($row['orders'] ?? 0), 'certificates' => (int) ($row['certificates'] ?? 0)];
     }
 
     public function removeEnrolmentAccess(int $enrolmentId, int $actorUserId, string $reason): void
@@ -2030,6 +2149,28 @@ SQL;
         );
         if ($duplicates > 0) {
             throw new RuntimeException('This learner already has active access to the course. Remove the duplicate access before restoring this enrolment.');
+        }
+        // Access a refund ended is not given back here (2026-10-26 audit: it said "restored" while every source stayed
+        // revoked and the learner was still refused): the course is granted again instead.
+        $sources = $this->db->fetchAssociative(
+            "SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE state <> 'revoked') AS live FROM commerce_entitlements WHERE enrolment_id = :id",
+            ['id' => $enrolmentId]
+        ) ?: ['total' => 0, 'live' => 0];
+        if ((int) $sources['total'] > 0 && (int) $sources['live'] === 0) {
+            throw new RuntimeException('A refund ended this access, so it cannot be restored. Grant the course again instead.');
+        }
+        // A company's seat given back when access was removed may have gone to someone else since (2026-10-26 audit: the
+        // credit was then used more often than it holds): the credit must still have a free place.
+        $returned = $this->db->fetchAssociative(
+            "SELECT credit_id FROM course_credit_allocations WHERE enrolment_id = :id AND status = 'returned' AND consumed_at IS NULL LIMIT 1",
+            ['id' => $enrolmentId]
+        );
+        if ($returned !== false) {
+            $credit = $this->db->fetchAssociative('SELECT quantity - refunded_quantity AS places FROM course_credits WHERE id = :c FOR UPDATE', ['c' => (int) $returned['credit_id']]) ?: ['places' => 0];
+            $taken = (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_credit_allocations WHERE credit_id = :c AND status IN ('assigned','consumed')", ['c' => (int) $returned['credit_id']]);
+            if ($taken >= (int) $credit['places']) {
+                throw new RuntimeException('The course credit has no free place now: the place went to someone else after this access was removed. Assign another credit instead.');
+            }
         }
 
         $startedAt = $enrolment['started_at'] ?? null;

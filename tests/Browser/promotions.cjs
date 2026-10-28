@@ -165,10 +165,10 @@ async function applyCode(page, code, keyboard = true) {
 
     await scenario('ADMIN creates, edits, deactivates, reactivates and deletes a promotion', 'chromium', async () => {
         const {ctx, page} = await open(chromium, fixture.admin_token);
-        const adminCode = `admin${fixture.suffix}`;
+        const adminCode = fixture.admin_code;
         await page.goto(`${base}/admin/promotions/new`);
         await page.locator('#promotion-code').fill(adminCode);
-        await page.locator('#promotion-name').fill('Browser ADMIN offer');
+        await page.locator('#promotion-name').fill('Fifteen percent off your first course');
         await page.locator('#promotion-value').fill('15');
         await page.locator('#promotion-max-customer').fill('1');
         await submit(page, page.getByRole('button', {name: 'Create promotion'}));
@@ -246,10 +246,10 @@ async function applyCode(page, code, keyboard = true) {
         assert.equal(await flash(admin.page), 'The course price option was updated.');
         assert.equal(clean(await admin.page.locator('tbody .cl-price').first().innerText()), `Was ${rand(20000)} now ${rand(12345)}`, 'the pricing tab shows the markdown');
 
-        const auto = `AUTO${fixture.suffix}`.toUpperCase();
+        const auto = fixture.auto_code;
         await admin.page.goto(`${base}/admin/promotions/new`);
         await admin.page.locator('#promotion-code').fill(auto);
-        await admin.page.locator('#promotion-name').fill('Browser automatic offer');
+        await admin.page.locator('#promotion-name').fill('Twenty percent off every course');
         await admin.page.locator('#promotion-value').fill('20');
         await admin.page.locator('input[name=applies_automatically]').check();
         await submit(admin.page, admin.page.getByRole('button', {name: 'Create promotion'}));
@@ -264,7 +264,7 @@ async function applyCode(page, code, keyboard = true) {
         assert.equal(clean(await box.locator('.cl-price').first().innerText()), `Was ${rand(20000)} now ${rand(12345)} Save ${rand(7655)} (38%)`, 'the course page strikes the was price through and says what is saved');
         assert.equal(await box.locator('s.cl-price-was').count(), 1);
         assert.equal(clean(await box.locator('.cl-promotion-announcement').innerText()), `${auto} 20% off, applied automatically in your cart: you pay ${rand(9876)} instead of ${rand(12345)}.`);
-        await page.goto(`${base}/courses?catalogue_q=${encodeURIComponent('Promotions browser course A')}`);
+        await page.goto(`${base}/courses?catalogue_q=${encodeURIComponent(fixture.courses.a.title)}`);
         assert.equal(clean(await page.locator('.cl-course-card s.cl-ui-key-value-was').first().innerText()), `Was ${rand(20000)}`, 'the catalogue card strikes it through too');
 
         await toReview(page, fixture);
@@ -285,7 +285,7 @@ async function applyCode(page, code, keyboard = true) {
         const orderId = new URL(page.url()).pathname.split('/').pop();
         await ctx.close();
         await admin.page.goto(`${base}/admin/commerce/orders/${orderId}`);
-        assert.match(clean(await admin.page.locator('main').innerText()), new RegExp(`Promotion ${auto} \\(Browser automatic offer\\), applied automatically by the cart, took 20% off`), 'ADMIN\'s order page says the cart applied it');
+        assert.match(clean(await admin.page.locator('main').innerText()), new RegExp(`Promotion ${auto} \\(Twenty percent off every course\\), applied automatically by the cart, took 20% off`), 'ADMIN\'s order page says the cart applied it');
 
         // A learner who has not bought the course yet sees the announcement in every theme.
         const viewer = await open(chromium, learner().token);

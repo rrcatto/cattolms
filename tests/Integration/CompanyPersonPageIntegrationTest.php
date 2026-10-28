@@ -70,7 +70,7 @@ final class CompanyPersonPageIntegrationTest extends TestCase
         self::assertSame(200, $page->getStatusCode(), substr(strip_tags((string) $page->getContent()), 0, 300));
         $html = (string) $page->getContent();
         $reference = AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $member]));
-        foreach (['Lerato Member' . $suffix, $reference, 'person-member-' . $suffix . '@seed.test', '>Courses<', '>Course requests<', 'Remove from the company'] as $text) {
+        foreach (['Lerato Member' . $suffix, $reference, 'person-member-' . $suffix . '@seed.test', '>Courses<', '>Course requests<', '/company/people/' . $member . '/delete'] as $text) {
             self::assertStringContainsString($text, $html);
         }
         self::assertStringNotContainsString('+02</dd>', $html, 'Dates are written out, not raw timestamps.');

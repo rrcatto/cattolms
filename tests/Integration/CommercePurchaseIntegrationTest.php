@@ -349,10 +349,11 @@ final class CommercePurchaseIntegrationTest extends TestCase
 
     public function testCheckoutAdvancesWithoutAnIdentityNumberAndNeverStoresOne(): void
     {
-        $fields = $this->profileFields() + ['identification_number' => '9001015009087'];
+        $before = $this->db->fetchOne('SELECT id_number_hash FROM users WHERE id=:id', ['id'=>$this->actor->id]);
+        $fields = $this->profileFields() + ['id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free($this->db)];
         $this->checkoutService()->saveProfile($this->actor, $fields);
         self::assertTrue($this->checkoutService()->state($this->actor)['profile_confirmed']);
-        self::assertNull($this->db->fetchOne('SELECT identification_number FROM users WHERE id=:id', ['id'=>$this->actor->id]), 'Checkout does not collect an identity number, even when one is posted.');
+        self::assertSame($before, $this->db->fetchOne('SELECT id_number_hash FROM users WHERE id=:id', ['id'=>$this->actor->id]), 'Checkout does not collect or change an ID number, even when one is posted.');
     }
 
     public function testDeclineCanSwitchToEftThenRetryWithoutReplacingInvoice(): void

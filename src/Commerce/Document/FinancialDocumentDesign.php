@@ -82,7 +82,7 @@ final class FinancialDocumentDesign
             $problems[] = 'Choose one of the typefaces offered.';
         }
         if (preg_match('/^#[0-9A-F]{6}$/D', $this->colour) !== 1) {
-            $problems[] = 'Choose the accent colour with the colour picker.';
+            $problems[] = 'Accent colour: write it as # and six hex digits, such as #9A3F12.';
         }
         foreach (self::types() as $type) {
             if (mb_strlen($this->note($type)) > self::NOTE_LIMIT) {

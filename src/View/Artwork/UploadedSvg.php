@@ -44,6 +44,8 @@ final class UploadedSvg
     public const ICON_BYTES = 20000;
     /** The largest cover accepted: a cover is drawn on every catalogue card. */
     public const COVER_BYTES = 200000;
+    /** A company's logo (2026-10-26): as large as a cover, and never recoloured, which only icons are. */
+    public const LOGO_BYTES = 200000;
 
     private const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
     /** Elements that run, load or embed something: never part of a picture here. */

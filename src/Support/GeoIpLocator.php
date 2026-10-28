@@ -11,6 +11,10 @@ Description:
 Resolves public audit IP addresses to human-readable locations through Geocoder PHP's GeoIP2 provider and a local MaxMind GeoLite2/GeoIP2 database.
 
 Changelog:
+2026/10/26 SAST
+- Reads GEOIP_DATABASE itself when it is given no path: the container built it with none, so every lookup had said
+  "GeoIP unavailable" since the Symfony move (found 2026-10-26, when the owner asked to see sign-ins' countries).
+  countryCode() for the sign-up check.
 2026/08/18 23:37 SAST
 - Added an ISO-country flag glyph immediately before the country name in Activity GeoIP labels.
 2026/08/18 22:47 SAST
@@ -38,17 +42,37 @@ final class GeoIpLocator
 {
     private ?GeoIP2 $geocoder = null;
 
+    private ?Reader $reader = null;
+
     public function __construct(string $databasePath = '')
     {
+        $databasePath = $databasePath !== '' ? $databasePath : Env::string('GEOIP_DATABASE');
         if ($databasePath === '' || !is_file($databasePath) || !is_readable($databasePath)) {
             return;
         }
 
         try {
-            $reader = new Reader($databasePath, ['en']);
-            $this->geocoder = new GeoIP2(new GeoIP2Adapter($reader));
+            $this->reader = new Reader($databasePath, ['en']);
+            $this->geocoder = new GeoIP2(new GeoIP2Adapter($this->reader));
         } catch (Throwable) {
             $this->geocoder = null;
+            $this->reader = null;
+        }
+    }
+
+    /** The two-letter country of a public address, or '' when it is private, unknown or there is no database. */
+    public function countryCode(string $ipAddress): string
+    {
+        if ($this->reader === null || filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return '';
+        }
+        try {
+            $type = $this->reader->metadata()->databaseType;
+            $code = str_contains($type, 'City') ? $this->reader->city($ipAddress)->country->isoCode : $this->reader->country($ipAddress)->country->isoCode;
+
+            return is_string($code) ? strtoupper($code) : '';
+        } catch (Throwable) {
+            return '';
         }
     }
 

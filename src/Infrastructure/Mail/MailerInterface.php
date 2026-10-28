@@ -39,6 +39,13 @@ interface MailerInterface
 {
     public function sendMagicLink(string $email, string $url, int $ttlSeconds): void;
 
+    /**
+     * The link that finishes a registration (owner, 2026-10-26: the person was "just sent a normal sign in link, nothing
+     * told me that my registration would wait for approval"). $notice, when given, is said in its own paragraph: on a
+     * demo site, that the account will be held pending approval.
+     */
+    public function sendRegistrationLink(string $email, string $url, int $ttlSeconds, string $notice = ''): void;
+
     public function sendSecondaryEmailVerification(string $email, string $url, int $ttlSeconds): void;
 
     public function sendStaffAddedNotice(string $email, string $companyName): void;

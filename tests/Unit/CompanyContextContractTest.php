@@ -248,14 +248,15 @@ final class CompanyContextContractTest extends TestCase
             'company_context_name' => 'Table Bay Logistics',
             'company_context_id' => 7,
             'company_context_universe' => 'real',
+            'company_context_logo' => ['url' => '/company/logo?v=abc', 'uploaded' => true],
         ]));
 
-        // The file's own header comment still renders - F3 emits HTML comments, and they are
-        // stripped later in the response - so the test is that no control is emitted, not that
-        // the output is byte-empty.
+        // Their own company's band, with its logo (owner, 2026-10-26: the logo "in the company band on every Company
+        // page"): naming the company they work for discloses nothing. The control to switch is what they never get.
+        self::assertStringContainsString('Table Bay Logistics', $html, 'Their own company is named.');
+        self::assertStringContainsString('src="/company/logo?v=abc"', $html, 'With its logo.');
         self::assertStringNotContainsString('Switch company', $html);
         self::assertStringNotContainsString('/company/context', $html);
-        self::assertStringNotContainsString('Table Bay Logistics', $html, 'No company name is disclosed by the control.');
         self::assertStringNotContainsString('<form', $html, 'A Company Administrator gets no switcher to submit.');
         self::assertStringNotContainsString('<button', $html);
     }

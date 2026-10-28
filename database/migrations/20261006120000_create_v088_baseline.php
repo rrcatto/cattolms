@@ -11,6 +11,39 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/28 SAST (updates and lists)
+- mailing_lists gains own lists (name, words, shown, join link), each list's sender, template and welcome email and
+  closing; mailing_preferences, mailing_updates, mailing_update_deliveries, mailing_course_prices and mailing_forwards;
+  mailing_course_notices (the new-course digest) removed.
+2026/10/28 SAST (landing pages)
+- The "Instructor" section type removed (owner, 2026-10-28: "Remove it"; there are no lecturers, the system presents the courses).
+2026/10/28 SAST (mailing templates)
+- mailing_templates (designed or HTML, the defaults for messages and the digest) and mailing_campaigns.template_id;
+  mailing_campaigns.from_name, reply_to, exclude_list_ids, max_recipients and plain_text.
+2026/10/27 SAST (South African ID numbers)
+- users.id_number_encrypted, id_number_hash (unique) and residence_country in place of identification_number, the free
+  text no page checked; signup_attempts.home_country.
+2026/10/27 SAST (a company always has its administrator)
+- company_keeps_an_administrator(): a company (unless deleted by its administrator) always has an active Company
+  Administrator, checked when the transaction ends (owner, 2026-10-27).
+2026/10/26 SAST (mailing, step 2)
+- mailing_campaigns, mailing_deliveries, mailing_links, mailing_link_clicks, mailing_suppressions, mailing_assets,
+  mailing_course_notices, mailing_transport_events: what is sent, each person's copy and what became of it; the
+  PLATFORM.MAILING.VIEW and PLATFORM.MAILING.MANAGE permissions.
+2026/10/26 SAST (mailing, step 1)
+- mailing_lists, mailing_subscriptions, mailing_subscription_events: who agreed to be emailed about what.
+2026/10/26 SAST (company departures)
+- company_departures: a staff member asked before their account goes (the company domain rule, owner 2026-10-26);
+  companies.deleted_at: a company its administrator deleted, hidden and kept for review.
+2026/10/26 SAST (sign-up checks)
+- signup_attempts: every registration attempt with its IP address, country, network, browser, signals, score and band
+  and what became of it (owner, 2026-10-26: "assign some kind of risk factor to them so I can see at a glance who
+  the problems are"); an attempt that became an account is deleted with it.
+2026/10/26 SAST (company logos)
+- company_logos: one logo per company, an SVG or a PNG fitted into 512 by 512 (owner, 2026-10-26).
+2026/10/26 SAST (drawn avatars)
+- users.avatar_seed: the seed of a person's drawn avatar after "Show me another" (owner, 2026-10-26); NULL draws it
+  from public_id.
 2026/10/23 SAST (course codes)
 - Course codes (owner, 2026-10-23: "Surely we need to introduce a course code instead so that small changes to the title don't throw things off?"): courses.code, unique, capital letters and digits joined by hyphens (GDN-101), searched in Administration -> Courses (courses_code_trgm_idx). Every import matches a course by it.
 2026/10/20 SAST (marked-down prices and automatic promotions)
@@ -309,15 +342,24 @@ CREATE TABLE users (
             NULLIF(btrim(COALESCE(display_name,'')),'')
         )
     ) STORED,
-    identification_number VARCHAR(120) NULL,
-    -- The date of birth (owner, 2026-10-20: adults only): given at registration, or at the first
-    -- sign-in of an account someone else made, and 18 or older then (AdultAge). NULL until given.
+    -- The South African ID number (owner, 2026-10-27: "only people with a valid South African ID can register"):
+    -- given at registration, or at the next sign-in of an account someone else made, checked by SouthAfricanIdNumber,
+    -- kept encrypted (SecretCipher), with a keyed fingerprint so no two accounts hold the same number. NULL until given.
+    id_number_encrypted TEXT NULL,
+    id_number_hash CHAR(64) NULL UNIQUE CHECK (id_number_hash ~ '^[0-9a-f]{64}$'),
+    -- The country the person says they live in, chosen at registration (it may differ from where they are).
+    residence_country CHAR(2) NULL CHECK (residence_country ~ '^[A-Z]{2}$'),
+    -- The date of birth (owner, 2026-10-20: adults only; 2026-10-27: taken from the ID number), 18 or older (AdultAge).
+    -- NULL until the ID number is given.
     birthdate DATE NULL,
     gender VARCHAR(40) NULL,
     mobile_number VARCHAR(60) NULL,
     -- Declined identity checks before this moment no longer count towards the three tries: set when
     -- ADMIN allows another try.
     identity_attempts_reset_at TIMESTAMPTZ NULL,
+    -- The drawn avatar shown when a person has uploaded no picture (owner, 2026-10-26: DiceBear's Lorelei, Sunset
+    -- Fade preset) is drawn from public_id; "Show me another" saves a random seed here instead. NULL: the first one.
+    avatar_seed CHAR(16) NULL CHECK (avatar_seed ~ '^[0-9a-f]{16}$'),
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -459,6 +501,8 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('CERTIFICATE.ISSUED.MANAGE','ManageIssuedCertificates','Courses','Revoke an issued certificate and its transcript, with a written reason.'),
     ('PLATFORM.IDENTITY.VIEW','ViewIdentityVerification','Platform','See each person''s identity verification status and history.'),
     ('PLATFORM.IDENTITY.MANAGE','ManageIdentityVerification','Platform','Revoke an identity verification with a reason, and allow another try after three declined checks.'),
+    ('PLATFORM.MAILING.VIEW','ViewMailing','Platform','See the mailing lists, their followers, the campaigns and what became of each email.'),
+    ('PLATFORM.MAILING.MANAGE','ManageMailing','Platform','Write, approve, send and stop campaigns, and change the mailing settings.'),
     ('PLATFORM.DOCUMENT.VIEW','ViewFinancialDocumentDesign','Commerce · Platform','See the design of invoices, receipts and credit notes and preview it when Commerce is installed.'),
     ('PLATFORM.DOCUMENT.MANAGE','ManageFinancialDocumentDesign','Commerce · Platform','Change the design of invoices, receipts and credit notes when Commerce is installed.');
 
@@ -744,8 +788,25 @@ CREATE TABLE companies (
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- When its Company Administrator deleted it (status 'deleted'): hidden, its records kept for review (owner, 2026-10-26).
+    deleted_at TIMESTAMPTZ NULL
 );
+
+-- A company's logo (owner, 2026-10-26: "We need to allow companies to upload their logo"), uploaded by its Company
+-- Administrator or ADMIN: an SVG, cleaned as every uploaded SVG is, or a PNG fitted into 512 by 512. One per company.
+-- Without one a drawn picture is shown (DiceBear Shapes, animated), never stored.
+CREATE TABLE company_logos (
+    company_id BIGINT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    mime_type VARCHAR(32) NOT NULL CHECK (mime_type IN ('image/svg+xml','image/png')),
+    byte_size INTEGER NOT NULL CHECK (byte_size > 0 AND byte_size <= 2097152),
+    width INTEGER NULL CHECK (width BETWEEN 1 AND 512),
+    height INTEGER NULL CHECK (height BETWEEN 1 AND 512),
+    data BYTEA NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX company_logos_updated_by_fk_idx ON company_logos (updated_by_user_id);
 
 CREATE TABLE company_users (
     company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -756,6 +817,48 @@ CREATE TABLE company_users (
     PRIMARY KEY (company_id, user_id)
 );
 CREATE UNIQUE INDEX company_users_one_company_per_user ON company_users(user_id) WHERE status = 'active';
+-- A company always has its Company Administrator (owner, 2026-10-27: "It is IMPOSSIBLE for a company to be created and
+-- have ZERO people attached and it is IMPOSSIBLE for a company admin to leave his company, orphaning the record"):
+-- checked when the transaction ends, so a company and its founder are made together and the last administrator can
+-- never be removed, deactivated or deleted. Only a company its administrator deleted (status 'deleted') is exempt.
+CREATE FUNCTION company_keeps_an_administrator() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE
+    v_company BIGINT;
+BEGIN
+    -- Two statements, not one CASE: PL/pgSQL plans every branch of a CASE, and a companies row has no company_id.
+    IF TG_TABLE_NAME = 'companies' THEN v_company := NEW.id; ELSE v_company := OLD.company_id; END IF;
+    IF EXISTS (SELECT 1 FROM companies c WHERE c.id = v_company AND c.status <> 'deleted')
+       AND NOT EXISTS (SELECT 1 FROM company_users cu WHERE cu.company_id = v_company AND cu.status = 'active' AND cu.company_role IN ('owner', 'administrator')) THEN
+        RAISE EXCEPTION 'A company always has an active Company Administrator (company %).', v_company USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END
+$fn$;
+CREATE CONSTRAINT TRIGGER companies_have_an_administrator AFTER INSERT OR UPDATE OF status ON companies
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION company_keeps_an_administrator();
+CREATE CONSTRAINT TRIGGER company_users_keep_an_administrator AFTER UPDATE OR DELETE ON company_users
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION company_keeps_an_administrator();
+
+-- Asking a staff member what they want before their account goes (owner, 2026-10-26: "We need to communicate with the
+-- people involved first"): one busy with a course whom their Company Administrator deletes (staff_deleted), or the
+-- staff of a deleted company (company_deleted). The link in the email (token_hash) lets them keep their account as a
+-- private one, at a new private address, or (staff_deleted) delete it. With no answer by answer_by (3 days), a
+-- staff_deleted account may be deactivated by the Company Administrator; a company_deleted one stays deactivated.
+-- Everything is kept, so ADMIN can restore an account at a private address later.
+CREATE TABLE company_departures (
+    id BIGSERIAL PRIMARY KEY,
+    company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(24) NOT NULL CHECK (reason IN ('staff_deleted', 'company_deleted')),
+    requested_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    asked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    answer_by TIMESTAMPTZ NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'went_private', 'deleted', 'deactivated')),
+    private_email VARCHAR(320) NULL,
+    decided_at TIMESTAMPTZ NULL
+);
+CREATE UNIQUE INDEX company_departures_one_waiting ON company_departures(user_id) WHERE status = 'waiting';
 
 CREATE TABLE audit_log (
     id BIGSERIAL PRIMARY KEY,
@@ -1654,6 +1757,246 @@ CREATE UNIQUE INDEX commerce_order_bundle_idx ON commerce_order_items (order_id,
 CREATE INDEX commerce_order_items_company_idx ON commerce_order_items(company_id,order_id) WHERE company_id IS NOT NULL;
 CREATE INDEX commerce_order_items_bundle_idx ON commerce_order_items (bundle_id, order_id) WHERE bundle_id IS NOT NULL;
 
+-- Mailing, step 1 (owner, 2026-10-25/26): who agreed to be emailed about what, and nothing sent yet. One News and
+-- Updates list, and a list for each category, course and tag, made when its first person follows it. Each person's answer
+-- per list (mailing_subscriptions) is kept with when and where it was given, and every change is history
+-- (mailing_subscription_events), so consent can always be shown.
+-- An 'own' list is one ADMIN makes (owner, 2026-10-28, decision 7A): its name and words, whether My Subscriptions shows
+-- it, its join link, and (any list) its sender, template and welcome email (decision 9A). A closed list sends nothing.
+CREATE TABLE mailing_lists (
+    id BIGSERIAL PRIMARY KEY,
+    kind VARCHAR(16) NOT NULL CHECK (kind IN ('news', 'category', 'course', 'tag', 'own')),
+    subject_id BIGINT NULL,
+    name VARCHAR(120) NULL,
+    description VARCHAR(500) NULL,
+    shown BOOLEAN NOT NULL DEFAULT TRUE,
+    join_token CHAR(32) NULL UNIQUE CHECK (join_token IS NULL OR join_token ~ '^[0-9a-f]{32}$'),
+    from_name VARCHAR(120) NULL,
+    reply_to VARCHAR(320) NULL,
+    template_id BIGINT NULL,
+    welcome_campaign_id BIGINT NULL,
+    closed_at TIMESTAMPTZ NULL,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((kind IN ('news', 'own')) = (subject_id IS NULL)),
+    CHECK (kind <> 'own' OR (name IS NOT NULL AND join_token IS NOT NULL))
+);
+CREATE UNIQUE INDEX mailing_lists_one_per_subject ON mailing_lists (kind, COALESCE(subject_id, 0)) WHERE kind <> 'own';
+CREATE TABLE mailing_subscriptions (
+    list_id BIGINT NOT NULL REFERENCES mailing_lists(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(16) NOT NULL CHECK (status IN ('subscribed', 'unsubscribed')),
+    source VARCHAR(32) NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (list_id, user_id)
+);
+CREATE INDEX mailing_subscriptions_user ON mailing_subscriptions (user_id, status);
+CREATE TABLE mailing_subscription_events (
+    id BIGSERIAL PRIMARY KEY,
+    list_id BIGINT NOT NULL REFERENCES mailing_lists(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(16) NOT NULL CHECK (status IN ('subscribed', 'unsubscribed')),
+    source VARCHAR(32) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX mailing_subscription_events_user ON mailing_subscription_events (user_id, created_at DESC);
+-- How each person hears about updates (owner, 2026-10-28, round two: 2A one choice for everything, 4C asked at their
+-- first follow): as they occur, a digest for each list, or one digest with everything, daily, weekly or monthly.
+CREATE TABLE mailing_preferences (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    delivery VARCHAR(12) NOT NULL CHECK (delivery IN ('instant', 'per_list', 'combined')),
+    frequency VARCHAR(8) NOT NULL DEFAULT 'weekly' CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+    chosen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_digest_at TIMESTAMPTZ NULL
+);
+
+-- Mailing, step 2 (owner, 2026-10-26): what is sent. A campaign is an email ADMIN writes, the new-course digest or the
+-- sleeping-address question; each person gets their own copy (mailing_deliveries, with the token its stop, open and
+-- click links carry) and what became of it. mailing_links and mailing_link_clicks count the clicks on each link. An
+-- address in mailing_suppressions (a hard bounce, a spam complaint, or ADMIN's) is never emailed news again.
+-- mailing_assets holds the pictures an email shows, served from the news address. mailing_transport_events keeps each
+-- event cattomail reports, once. A campaign's kind: a message ADMIN writes, a digest (one per frequency and per list for
+-- people who chose a digest for each list), the updates released at once to people who chose them as they occur, the
+-- sleeping-address question, or a list's welcome email.
+-- Mailing templates (owner, 2026-10-27/28, decision 5B: "How am I supposed to design the look and feel of what goes
+-- out?"): the look of an email, designed in a form (design: logo, header, colours, fonts, width, corners, buttons,
+-- footer and social links) or written in HTML around {content}; one is the default for messages and one for the digest.
+CREATE TABLE mailing_templates (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    mode VARCHAR(8) NOT NULL DEFAULT 'design' CHECK (mode IN ('design', 'html')),
+    design JSONB NOT NULL DEFAULT '{}'::jsonb,
+    html TEXT NOT NULL DEFAULT '',
+    text_mode VARCHAR(8) NOT NULL DEFAULT 'made' CHECK (text_mode IN ('made', 'own')),
+    text_part TEXT NOT NULL DEFAULT '',
+    default_for_messages BOOLEAN NOT NULL DEFAULT FALSE,
+    default_for_digest BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX mailing_templates_one_for_messages ON mailing_templates (default_for_messages) WHERE default_for_messages;
+CREATE UNIQUE INDEX mailing_templates_one_for_digest ON mailing_templates (default_for_digest) WHERE default_for_digest;
+CREATE TABLE mailing_campaigns (
+    id BIGSERIAL PRIMARY KEY,
+    template_id BIGINT NULL REFERENCES mailing_templates(id) ON DELETE SET NULL,
+    -- A message's own sender name and reply-to (decision 9A), the lists whose people it leaves out, the most it sends to,
+    -- and its own plain-text copy in place of the one made from it (owner, 2026-10-28).
+    from_name VARCHAR(120) NULL,
+    reply_to VARCHAR(320) NULL,
+    exclude_list_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    max_recipients INTEGER NULL CHECK (max_recipients IS NULL OR max_recipients > 0),
+    plain_text TEXT NULL,
+    kind VARCHAR(16) NOT NULL DEFAULT 'message' CHECK (kind IN ('message', 'digest', 'updates', 'sleeping', 'welcome')),
+    name VARCHAR(160) NOT NULL,
+    subject VARCHAR(200) NOT NULL DEFAULT '',
+    preheader VARCHAR(200) NOT NULL DEFAULT '',
+    blocks JSONB NOT NULL DEFAULT '[]'::jsonb,
+    list_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'awaiting_approval', 'scheduled', 'sending', 'paused', 'sent', 'cancelled')),
+    status_note VARCHAR(500) NULL,
+    send_at TIMESTAMPTZ NULL,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    approved_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TIMESTAMPTZ NULL,
+    started_at TIMESTAMPTZ NULL,
+    finished_at TIMESTAMPTZ NULL,
+    -- ADMIN resumed it after it paused itself: the bounce and complaint rates no longer pause it.
+    checks_overridden BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX mailing_campaigns_status ON mailing_campaigns (status, send_at);
+CREATE TABLE mailing_deliveries (
+    id BIGSERIAL PRIMARY KEY,
+    campaign_id BIGINT NOT NULL REFERENCES mailing_campaigns(id) ON DELETE CASCADE,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    email VARCHAR(320) NOT NULL,
+    token CHAR(32) NOT NULL UNIQUE,
+    list_id BIGINT NULL REFERENCES mailing_lists(id) ON DELETE SET NULL,
+    reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
+    content JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status VARCHAR(16) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'handed', 'delivered', 'deferred', 'soft_bounced', 'bounced', 'complained', 'failed', 'suppressed', 'skipped')),
+    status_detail VARCHAR(500) NULL,
+    attempts SMALLINT NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    transport VARCHAR(16) NULL,
+    transport_job_id VARCHAR(100) NULL,
+    transport_message_id VARCHAR(200) NULL,
+    handed_at TIMESTAMPTZ NULL,
+    checked_at TIMESTAMPTZ NULL,
+    resolved_at TIMESTAMPTZ NULL,
+    first_opened_at TIMESTAMPTZ NULL,
+    last_opened_at TIMESTAMPTZ NULL,
+    open_count INTEGER NOT NULL DEFAULT 0 CHECK (open_count >= 0),
+    first_clicked_at TIMESTAMPTZ NULL,
+    click_count INTEGER NOT NULL DEFAULT 0 CHECK (click_count >= 0),
+    unsubscribed_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (campaign_id, user_id)
+);
+CREATE INDEX mailing_deliveries_queue ON mailing_deliveries (campaign_id, status, id);
+CREATE INDEX mailing_deliveries_user ON mailing_deliveries (user_id, created_at DESC);
+CREATE INDEX mailing_deliveries_job ON mailing_deliveries (transport_job_id) WHERE transport_job_id IS NOT NULL;
+CREATE TABLE mailing_links (
+    id BIGSERIAL PRIMARY KEY,
+    campaign_id BIGINT NOT NULL REFERENCES mailing_campaigns(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    UNIQUE (campaign_id, url)
+);
+CREATE TABLE mailing_link_clicks (
+    link_id BIGINT NOT NULL REFERENCES mailing_links(id) ON DELETE CASCADE,
+    delivery_id BIGINT NOT NULL REFERENCES mailing_deliveries(id) ON DELETE CASCADE,
+    clicks INTEGER NOT NULL DEFAULT 1 CHECK (clicks > 0),
+    first_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (link_id, delivery_id)
+);
+CREATE TABLE mailing_suppressions (
+    email VARCHAR(320) PRIMARY KEY CHECK (email = LOWER(email)),
+    reason VARCHAR(16) NOT NULL CHECK (reason IN ('hard_bounce', 'complaint', 'manual')),
+    detail VARCHAR(500) NULL,
+    delivery_id BIGINT NULL REFERENCES mailing_deliveries(id) ON DELETE SET NULL,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE mailing_assets (
+    sha256 CHAR(64) PRIMARY KEY,
+    media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('image/png', 'image/jpeg', 'image/gif')),
+    bytes BYTEA NOT NULL,
+    width INTEGER NOT NULL CHECK (width > 0),
+    height INTEGER NOT NULL CHECK (height > 0),
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Updates (owner, 2026-10-27/28, decisions 1A, 4B and round two 1A): news about what people follow, recorded when a
+-- course changes or written by ADMIN, held until ADMIN releases it at a time ADMIN chooses, then delivered as each person
+-- chose. A recorded update is about a course and reaches the followers of the course, its category and those above it,
+-- and its tags (and the list it was posted to, such as News and Updates); a written one reaches its list's followers.
+-- Recorded changes of one kind to one course merge while held (count). mailing_update_deliveries says which update
+-- reached whom, so nobody gets one twice; mailing_course_prices keeps each course's lowest price last seen.
+CREATE TABLE mailing_updates (
+    id BIGSERIAL PRIMARY KEY,
+    origin VARCHAR(10) NOT NULL CHECK (origin IN ('recorded', 'written')),
+    event VARCHAR(24) NOT NULL CHECK (event IN ('first_published', 'content_added', 'price_lowered', 'promotion', 'landing_published', 'retired', 'written')),
+    course_id BIGINT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    list_id BIGINT NULL REFERENCES mailing_lists(id) ON DELETE CASCADE,
+    headline VARCHAR(200) NOT NULL,
+    body VARCHAR(2000) NOT NULL DEFAULT '',
+    link_url VARCHAR(500) NOT NULL DEFAULT '',
+    change_count INTEGER NOT NULL DEFAULT 1 CHECK (change_count >= 1),
+    status VARCHAR(10) NOT NULL DEFAULT 'held' CHECK (status IN ('held', 'releasing', 'released', 'closed', 'deleted')),
+    release_at TIMESTAMPTZ NULL,
+    released_at TIMESTAMPTZ NULL,
+    status_note VARCHAR(300) NULL,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (origin = 'written' OR course_id IS NOT NULL),
+    CHECK (origin = 'recorded' OR list_id IS NOT NULL)
+);
+CREATE INDEX mailing_updates_status ON mailing_updates (status, release_at);
+CREATE TABLE mailing_update_deliveries (
+    update_id BIGINT NOT NULL REFERENCES mailing_updates(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    delivery_id BIGINT NULL REFERENCES mailing_deliveries(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (update_id, user_id)
+);
+CREATE INDEX mailing_update_deliveries_user ON mailing_update_deliveries (user_id);
+-- Forward to a friend (owner, 2026-10-28, decision 11A: "Forwarding is part of our marketing strategy"): each copy a
+-- person forwarded, to whom, with their note; the friend gets one copy and is put on no list. Its token is the friend's
+-- "Never email me" link.
+CREATE TABLE mailing_forwards (
+    id BIGSERIAL PRIMARY KEY,
+    delivery_id BIGINT NOT NULL REFERENCES mailing_deliveries(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_email VARCHAR(320) NOT NULL,
+    to_name VARCHAR(120) NOT NULL DEFAULT '',
+    note VARCHAR(500) NOT NULL DEFAULT '',
+    token CHAR(32) NOT NULL UNIQUE CHECK (token ~ '^[0-9a-f]{32}$'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (delivery_id, to_email)
+);
+CREATE INDEX mailing_forwards_user ON mailing_forwards (user_id, created_at DESC);
+CREATE TABLE mailing_course_prices (
+    course_id BIGINT PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    price_minor_units BIGINT NOT NULL CHECK (price_minor_units >= 0),
+    seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE mailing_lists ADD CONSTRAINT mailing_lists_template FOREIGN KEY (template_id) REFERENCES mailing_templates(id) ON DELETE SET NULL;
+ALTER TABLE mailing_lists ADD CONSTRAINT mailing_lists_welcome FOREIGN KEY (welcome_campaign_id) REFERENCES mailing_campaigns(id) ON DELETE SET NULL;
+CREATE TABLE mailing_transport_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_id VARCHAR(100) NOT NULL UNIQUE,
+    event_type VARCHAR(60) NOT NULL,
+    payload JSONB NOT NULL,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ NULL,
+    outcome VARCHAR(500) NULL
+);
+
 -- Messages sent through the contact form (owner, 2026-10-20: one form whose fields follow the reason
 -- chosen, each message kept on the site, listed in Administration and acknowledged to its sender with
 -- its reference). user_id is the signed-in sender: their account reference then comes from the
@@ -1682,6 +2025,37 @@ CREATE TABLE contact_messages (
 );
 CREATE INDEX contact_messages_unanswered_idx ON contact_messages (created_at) WHERE answered_at IS NULL;
 CREATE INDEX contact_messages_created_idx ON contact_messages (created_at DESC);
+
+CREATE TABLE signup_attempts (
+    id BIGSERIAL PRIMARY KEY,
+    public_id UUID NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    email VARCHAR(254) NOT NULL,
+    first_name VARCHAR(120) NOT NULL DEFAULT '',
+    last_name VARCHAR(120) NOT NULL DEFAULT '',
+    account_type VARCHAR(20) NOT NULL DEFAULT 'individual',
+    ip_address INET NULL,
+    country_code CHAR(2) NULL CHECK (country_code ~ '^[A-Z]{2}$'),
+    -- The country the person says they live in (owner, 2026-10-27), beside the one the IP address shows.
+    home_country CHAR(2) NULL CHECK (home_country ~ '^[A-Z]{2}$'),
+    network_asn BIGINT NULL,
+    network_name VARCHAR(200) NOT NULL DEFAULT '',
+    user_agent VARCHAR(500) NOT NULL DEFAULT '',
+    browser_time_zone VARCHAR(64) NOT NULL DEFAULT '',
+    form_seconds INTEGER NULL CHECK (form_seconds >= 0),
+    score SMALLINT NOT NULL CHECK (score BETWEEN 0 AND 100),
+    band VARCHAR(10) NOT NULL CHECK (band IN ('low','medium','high')),
+    signals JSONB NOT NULL DEFAULT '[]'::jsonb,
+    hold_reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
+    outcome VARCHAR(20) NOT NULL CHECK (outcome IN ('link_sent','refused','trapped','completed')),
+    refusal VARCHAR(300) NULL,
+    held BOOLEAN NULL,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE CASCADE,
+    completed_at TIMESTAMPTZ NULL
+);
+CREATE INDEX signup_attempts_created_idx ON signup_attempts (created_at DESC);
+CREATE INDEX signup_attempts_ip_idx ON signup_attempts (ip_address, created_at DESC);
+CREATE INDEX signup_attempts_user_idx ON signup_attempts (user_id) WHERE user_id IS NOT NULL;
 
 CREATE TABLE commerce_order_preferences (
     order_id BIGINT PRIMARY KEY REFERENCES commerce_orders(id) ON DELETE RESTRICT,
@@ -2395,7 +2769,7 @@ CREATE UNIQUE INDEX course_landing_pages_one_per_course ON course_landing_pages 
 CREATE TABLE course_landing_sections (
     id BIGSERIAL PRIMARY KEY,
     landing_page_id BIGINT NOT NULL REFERENCES course_landing_pages(id) ON DELETE CASCADE,
-    section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','instructor','reviews','pricing','faq','cta')),
+    section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','reviews','pricing','faq','cta')),
     position INTEGER NOT NULL CHECK (position >= 0),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     data JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(data) = 'object'),
@@ -2406,7 +2780,7 @@ CREATE TABLE course_landing_sections (
 );
 -- Sections a page can hold only once. Benefits, FAQ and call-to-action sections may repeat.
 CREATE UNIQUE INDEX course_landing_sections_once ON course_landing_sections (landing_page_id, section_type)
-    WHERE section_type IN ('hero','audience','outcomes','contents','instructor','reviews','pricing');
+    WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing');
 
 -- The stored course popularity snapshot, replaced whole by popularity:recalculate. Pages read it
 -- and never calculate on a request.
@@ -2751,7 +3125,10 @@ DROP TABLE IF EXISTS
     commerce_attention_dismissals, commerce_attention_emails, commerce_unmatched_payments,
     commerce_manual_payment_evidence, commerce_order_items, commerce_order_preferences,
     commerce_orders, commerce_outbox, commerce_payment_events, commerce_payments, commerce_refunds,
-    companies, company_billing_profiles, company_favourites, company_users, course_categories,
+    mailing_lists, mailing_subscriptions, mailing_subscription_events, mailing_campaigns, mailing_deliveries, mailing_links,
+    mailing_link_clicks, mailing_suppressions, mailing_assets, mailing_templates, mailing_preferences, mailing_updates,
+    mailing_update_deliveries, mailing_course_prices, mailing_forwards, mailing_course_notices, mailing_transport_events,
+    companies, company_billing_profiles, company_departures, company_favourites, company_users, course_categories,
     course_credit_allocations, course_credits, course_edit_history, course_editors,
     course_enrolments, course_favourites, course_grade_bands, course_item_assessments, course_landing_pages, course_landing_sections,
     course_item_placements, course_item_references, course_items, course_popularity,

@@ -209,7 +209,7 @@ final class WalletRepository
     {
         $rows = $owner->isCompany()
             ? $this->db->fetchAllAssociative("SELECT ue.email, COALESCE(NULLIF(u.display_name, ''), ue.email) AS name FROM company_users cu JOIN users u ON u.id = cu.user_id JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
-                WHERE cu.company_id = :owner AND cu.company_role = 'administrator' AND cu.status = 'active' AND u.status = 'active' ORDER BY u.id", ['owner' => $owner->companyId])
+                WHERE cu.company_id = :owner AND cu.company_role IN ('owner', 'administrator') AND cu.status = 'active' AND u.status = 'active' ORDER BY u.id", ['owner' => $owner->companyId])
             : $this->db->fetchAllAssociative("SELECT ue.email, COALESCE(NULLIF(u.display_name, ''), ue.email) AS name FROM users u JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE WHERE u.id = :owner", ['owner' => $owner->userId]);
 
         return array_map(static fn(array $row): array => ['email' => (string) $row['email'], 'name' => (string) $row['name']], $rows);

@@ -1,0 +1,40 @@
+{#
+	One held update on Mailing › Digest (owner, 2026-10-28, decision 1A: "you keep, reword or delete each one"): its
+	tick for the release form (by its form attribute), headline, words, where it came from, who it reaches and when it is
+	to go; Hold it again, Post it to News and Updates (one nobody follows, 4B) and Delete; Change the words, open when
+	the page was opened to correct it. update, group ('held' or 'nobody'), csrf, can_manage, editing.
+#}
+<article class="cl-mailing-update" id="update-{{ update.id }}">
+	<div class="cl-mailing-update-main">
+		{% if can_manage and group == 'held' %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Release it'})} %}{% block control %}<input type="checkbox" name="updates[]" value="{{ update.id }}" form="release-form"{{ update.release_at ? '' : ' checked' }}>{% endblock %}{% endembed %}
+		{% endif %}
+		<div>
+			<p class="cl-mailing-update-headline">{{ update.headline }}</p>
+			{% if update.body %}<p class="small">{{ update.body|nl2br }}</p>{% endif %}
+			<p class="small cl-text-secondary">{{ update.source }}{{ update.course_title ? ': ' ~ update.course_title : '' }} · {{ update.when }}{{ update.merged ? ' · ' ~ update.merged : '' }}{{ update.posted ? ' · ' ~ update.posted : '' }}</p>
+			<div class="cl-mailing-badges">
+				{{ ui('feedback.badge', {label: update.reach == 0 ? 'Reaches nobody yet' : (update.reach == 1 ? 'Reaches 1 person' : 'Reaches ' ~ update.reach ~ ' people'), tone: update.reach == 0 ? 'warning' : 'info'}) }}
+				{% if update.release_label %}{{ ui('feedback.badge', {label: update.release_label, tone: 'success'}) }}{% endif %}
+			</div>
+		</div>
+	</div>
+	{% if can_manage %}
+	<div class="cl-mailing-update-actions">
+		{% if update.release_label %}<form action="/mailing/digest/updates/{{ update.id }}/hold" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Hold it again', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-pause'}) }}</form>{% endif %}
+		{% if group == 'nobody' %}<form action="/mailing/digest/updates/{{ update.id }}/news" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Post it to News and Updates', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-send'}) }}</form>{% endif %}
+		<form action="/mailing/digest/updates/{{ update.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Delete "' ~ update.headline ~ '"? Nobody will get it.'}) }}</form>
+	</div>
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'reword-' ~ update.id, heading: 'Change the words', open: editing == update.id})} %}
+{% block body %}
+		<form action="/mailing/digest/updates/{{ update.id }}/reword" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Headline', for: 'h-' ~ update.id, full_width: true})} %}{% block control %}<input class="cl-input" id="h-{{ update.id }}" name="headline" maxlength="200" required value="{{ update.headline }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'A few words', for: 'b-' ~ update.id, full_width: true})} %}{% block control %}<textarea class="cl-input" id="b-{{ update.id }}" name="body" rows="3" maxlength="2000" {{ ui_field_attrs(props) }}>{{ update.body }}</textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Link to', for: 'l-' ~ update.id, full_width: true})} %}{% block control %}<input class="cl-input" type="url" id="l-{{ update.id }}" name="link_url" maxlength="500" value="{{ update.link_url }}" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the words', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+		</form>
+{% endblock %}
+{% endembed %}
+	{% endif %}
+</article>

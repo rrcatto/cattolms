@@ -9,12 +9,15 @@ Version: 0.9.6
 
 Description:
 The site is for adults only (owner, 2026-10-20: "For now, for the launch, let's accept only adult
-learners"). A person gives their date of birth when they register, or at the first sign-in of an account
-someone else made. Someone under 18 is refused and nothing they typed is kept. An identity document that
+learners"). The date of birth comes from the person's South African ID number (2026-10-27, SouthAfricanIdNumber), given
+when they register or at the next sign-in of an account without one. Someone under 18 is refused and nothing they typed
+is kept. An identity document that
 Didit verified and that shows its holder under 18 stops the account at the adults-only page
 (AuthService::accountStep). Verifying a parent and letting them consent and pay is on the roadmap.
 
 Changelog:
+2026/10/27 SAST
+- The date of birth comes from the ID number: the typed-date checks are gone.
 2026/10/20 SAST
 - Created, in place of the tick "I am 18 or older, or my parent or guardian has consented".
 */
@@ -24,7 +27,6 @@ declare(strict_types=1);
 namespace CattoLearning\Auth;
 
 use DateTimeImmutable;
-use InvalidArgumentException;
 
 final class AdultAge
 {
@@ -33,34 +35,6 @@ final class AdultAge
 
     /** What someone under 18 is told, at registration and at a first sign-in. */
     public const REFUSED = 'You must be 18 or older to use this site. Its courses are for adults.';
-
-    /**
-     * A date of birth as a form sends it (YYYY-MM-DD, as a date field does), checked: a real date, not in
-     * the future, not more than 120 years ago, and 18 or older today.
-     */
-    public static function fromInput(mixed $value, DateTimeImmutable $today): string
-    {
-        $value = trim(is_string($value) ? $value : '');
-        if ($value === '') throw new InvalidArgumentException('Enter your date of birth.');
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts) !== 1 || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
-            throw new InvalidArgumentException('Enter your date of birth as a real date, for example 1990-03-14.');
-        }
-        $born = new DateTimeImmutable($value);
-        $day = $today->setTime(0, 0);
-        if ($born > $day) throw new InvalidArgumentException('A date of birth cannot be in the future.');
-        if ($born < $day->modify('-120 years')) throw new InvalidArgumentException('Check the year of your date of birth.');
-        if (self::under18($value, $today)) throw new InvalidArgumentException(self::REFUSED);
-        return $value;
-    }
-
-    /**
-     * A profile form's date of birth: empty clears it (the person is asked again at their next sign-in),
-     * anything else is checked as at registration.
-     */
-    public static function optionalInput(mixed $value, DateTimeImmutable $today): string
-    {
-        return trim(is_string($value) ? $value : '') === '' ? '' : self::fromInput($value, $today);
-    }
 
     /** Whether someone born on this date (YYYY-MM-DD…) is under 18 today. No date is not under 18. */
     public static function under18(mixed $dateOfBirth, DateTimeImmutable $today): bool

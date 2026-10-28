@@ -1,0 +1,10 @@
+{#
+	A list's choice of view (owner, 2026-10-26: "So ADMIN can choose between list view and grid view"): its table or its
+	grid of cards, remembered for the reader (Support\ListView). Plain links, so it works without JavaScript; the view shown
+	now is the filled button and says so to a screen reader.
+	vs: the list's <dataset>_view_switch.
+#}
+<div class="cl-view-switch" role="group" aria-label="Show as">
+	{{ ui('action.link', {label: 'List', variant: vs.view == 'list' ? 'primary' : 'secondary', size: 'small', href: vs.list_href, icon: 'action-view-list', aria_label: vs.view == 'list' ? 'List, shown now' : 'Show as a list'}) }}
+	{{ ui('action.link', {label: 'Grid', variant: vs.view == 'grid' ? 'primary' : 'secondary', size: 'small', href: vs.grid_href, icon: 'action-view-grid', aria_label: vs.view == 'grid' ? 'Grid, shown now' : 'Show as a grid of cards'}) }}
+</div>

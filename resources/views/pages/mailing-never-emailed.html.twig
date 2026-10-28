@@ -1,0 +1,43 @@
+{#
+	The addresses never emailed news (mailing, step 2; owner, 2026-10-26): hard bounces and spam complaints by themselves,
+	and any an administrator adds with the reason. Emails about a person's own orders, payments and courses are not news
+	and still go.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Addresses Never Emailed' %}
+	{% set ph_lead = 'News never goes to these. An address bounced as not existing, its person marked an email as spam, or an administrator added it.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if can_manage %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'add'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Add an address', summary: 'For someone who asked, some other way, never to be emailed news.'}) }}
+		<form action="/mailing/never-emailed" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'sx-email', help: 'As you type, the addresses that match show below. Choose one, or write any address in full.'})} %}{% block control %}<input class="cl-input" type="email" id="sx-email" name="email" required autocomplete="off" aria-controls="sx-matches" hx-get="/mailing/never-emailed/matches" hx-trigger="input changed delay:300ms, search" hx-target="#sx-matches" hx-swap="innerHTML" {{ ui_field_attrs(props) }}><div class="cl-address-matches" id="sx-matches" role="region" aria-live="polite" aria-label="Addresses that match"></div>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'sx-detail', help: 'For the record, such as "Asked by phone never to be emailed".'})} %}{% block control %}<input class="cl-input" id="sx-detail" name="detail" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Never email it news', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-disable'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Addresses', summary: 'Newest first.'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'suppressions', pagination: suppressions_pagination, search: {ds_name: 'suppressions', ds_label: 'Search addresses', ds_value: suppressions_search, ds_action: '/mailing/never-emailed'}})} %}{% block results %}
+			{% if suppressions %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Address'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Why'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Since'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+			{% block body %}{% for row in suppressions %}<tr>
+				<td class="cell-text">{% if row.user_id %}<a href="/admin/people/{{ row.user_id }}">{{ row.email }}</a>{% else %}{{ row.email }}{% endif %}</td>
+				<td class="cell-text">{{ reasons[row.reason] }}{% if row.detail %}<br><span class="small cl-text-secondary">{{ row.detail }}</span>{% endif %}</td>
+				<td>{{ row.created_at|date('j M Y') }}</td>
+				<td class="cell-actions">{% if can_manage %}<form action="/mailing/never-emailed/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="email" value="{{ row.email }}">{{ ui('action.button', {label: 'Allow again', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-enable', confirm: row.reason == 'complaint' ? 'This person marked an email as spam. Allow news to ' ~ row.email ~ ' again only if they asked for it.' : 'Allow news to ' ~ row.email ~ ' again?'}) }}</form>{% endif %}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: suppressions_search ? 'No address matches' : 'None yet', summary: suppressions_search ? 'Try another part of the address.' : 'An address appears here after a hard bounce or a spam complaint.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -61,12 +61,12 @@ final class ViewIdentity
             $data['identity_email'] = $currentUser->authenticatedEmail !== '' ? $currentUser->authenticatedEmail : ($card['email'] !== '' ? $card['email'] : $currentUser->primaryEmail);
             $data['identity_status'] = $card['status'];
             $data['identity_reference'] = $card['reference'];
-            // No fingerprint in the address: this is rendered on every page, and computing one
-            // would mean loading the stored bytes on every page to hash them. The route already
-            // answers with a private, week-long cache, and a changed picture is a changed row that
-            // the browser re-requests when that week is out.
-            $data['identity_image'] = $card['has_image'] ? '/account/profile/image' : '';
-            $data['identity_roles'] = $currentUser->roles;
+            // Their upload or their drawn avatar (owner, 2026-10-26), at an address carrying its version (read without
+            // loading any image), so a new picture or "Show me another" shows at once despite the week-long cache.
+            $data['identity_image'] = $card['picture_version'] !== '' ? '/account/profile/image?v=' . $card['picture_version'] : '';
+            // Each role by its name, as the person's page names it ("Company Administrator", not COMPANY_ADMIN; 2026-10-26).
+            $roleNames = array_column(RoleCatalog::all(), 'name', 'key');
+            $data['identity_roles'] = array_map(static fn(string $key): string => \CattoLearning\View\Twig\PlatformExtension::roleLabel($roleNames[$key] ?? null, $key), $currentUser->roles);
             // For anywhere only one badge fits - a navigation bar, a compact chip. Which role is
             // senior is an ACL question, so the catalogue answers it rather than each theme.
             $data['identity_role'] = RoleCatalog::mostSenior($currentUser->roles);
@@ -98,6 +98,8 @@ final class ViewIdentity
             'can_manage_company_favourites' => 'COMPANY.COURSE.MANAGE',
             'can_manage_companies' => 'PLATFORM.COMPANY.MANAGE',
             'can_manage_enrolments' => 'PLATFORM.ENROLMENT.MANAGE',
+            // The Company workspace's Assign a course (2026-10-26: a Company Administrator never saw it, as it read the platform permission).
+            'can_manage_company_enrolments' => 'COMPANY.ENROLMENT.MANAGE',
             // The Courses tab strip shows a tab only where the operator can actually go, so it
             // needs the view permissions and not only the manage ones.
             'can_view_enrolments' => 'PLATFORM.ENROLMENT.VIEW',

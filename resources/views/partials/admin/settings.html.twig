@@ -72,6 +72,48 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {# Mailing (owner, 2026-10-26): how news is sent, through what, and the sending discipline. #}
+    {# Sign-up checks (owner, 2026-10-26): the countries registrations are judged by, and what the check reads. #}
+    {% if signup_checks|default(null) %}
+    {% set sc = signup_checks %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Sign-up checks', summary: 'Allowed: ' ~ sc.allowed_names ~ '. Blocked: ' ~ (sc.blocked_count == 0 ? 'none' : (sc.blocked_count == 1 ? '1 country' : sc.blocked_count ~ ' countries')) ~ '.', id: 'settings-signup-checks', open: settings_open_section|default('') == 'signup-checks'})} %}
+{% block body %}
+			<p>Every registration is checked: where it comes from, its network, its email address, its browser and how the form was filled in. Each attempt is listed at People &amp; Companies, Sign-up Attempts, with its risk.</p>
+			<p>The countries are those of the visitor's IP address. A registration from a blocked country may register like anyone else and is held for your approval without being told why, and is marked high risk. One from outside the allowed countries is a warning sign on Sign-up Attempts, not a hold: someone abroad who lives in South Africa may register. On a live site a high-risk registration is held too. A throwaway email address is refused.</p>
+			<p>{% if sc.source == 'database' %}These lists are saved here and override <span class="mono">SIGNUP_ALLOWED_COUNTRIES</span> and <span class="mono">SIGNUP_BLOCKED_COUNTRIES</span> in <span class="mono">.env</span>, which say: {{ sc.environment }}.{% else %}These lists come from <span class="mono">SIGNUP_ALLOWED_COUNTRIES</span> and <span class="mono">SIGNUP_BLOCKED_COUNTRIES</span> in <span class="mono">.env</span>. Saving them here overrides <span class="mono">.env</span>.{% endif %}</p>
+			<form action="/admin/settings/signup-checks" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Allowed countries', for: 'allowed-countries', full_width: true, help: 'Two-letter country codes separated by commas, such as ZA. Empty allows every country. Now: ' ~ sc.allowed_names ~ '.'})} %}
+{% block control %}<input class="cl-input" id="allowed-countries" name="allowed_countries" value="{{ sc.allowed }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Blocked countries', for: 'blocked-countries', full_width: true, help: 'Two-letter country codes separated by commas. Now: ' ~ sc.blocked_names ~ '.'})} %}
+{% block control %}<textarea class="cl-input" id="blocked-countries" name="blocked_countries" rows="3" {{ ui_field_attrs(props) }}>{{ sc.blocked }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save the country lists', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% endembed %}
+			</form>
+			{% if sc.source == 'database' %}
+			<form action="/admin/settings/signup-checks/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset the country lists to .env', variant: 'danger', size: 'small', confirm: 'Remove the lists saved here and follow SIGNUP_ALLOWED_COUNTRIES and SIGNUP_BLOCKED_COUNTRIES in .env?', icon: 'action-reset'}) }}
+			</form>
+			{% endif %}
+			<h3 class="h5 cl-mt-3">What the check reads</h3>
+			{% set sc_items = [
+				{label: 'Country database (GeoLite2)', value: sc.geo ? 'Present' : 'Missing: set GEOIP_DATABASE in .env to a GeoLite2 City or Country database'},
+				{label: 'Network database (GeoLite2 ASN)', value: sc.network ? 'Present' : 'Missing: put GeoLite2-ASN.mmdb beside the country database'}
+			] %}
+			{% for list in sc.lists %}{% set sc_items = sc_items|merge([{label: list.label, value: list.entries ~ ' entries, fetched ' ~ list.fetched}]) %}{% endfor %}
+			{{ ui('data.key-value-list', {items: sc_items}) }}
+			<form action="/admin/settings/signup-checks/lists" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Fetch the lists now', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-refresh'}) }}
+			</form>
+			<p class="small cl-text-secondary">The scheduler fetches the Tor list every day and the others every week.</p>
+{% endblock %}
+{% endembed %}
+    {% endif %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'The platform name.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
 {% block body %}
 
@@ -280,7 +322,7 @@
     {% endif %}
     {# Identity verification (owner, 2026-10-19): through Didit's hosted page; the keys come from .env only. #}
     {% if identity_settings|default(null) %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? 'Connected to Didit.' : 'Not available: keys missing from .env.', id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity'})} %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? 'Connected to Didit.' : 'Not available: keys missing from .env.', id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity-verification'})} %}
 {% block body %}
 
 			<p>Learners verify on Didit's hosted page: they photograph their ID or passport and take a live selfie, and Didit matches them. This site keeps no images. Verification is needed only before a certificate and transcript are issued. Nothing is asked before a purchase.</p>
@@ -356,6 +398,36 @@
 			{% endfor %}
 {% endblock %}
 {% endembed %}
+		{% endif %}
+		{# The application log and its archives (owner, 2026-10-27: "I don't want to burn space on keeping unnecessary logs"). #}
+		{% if log_archive|default(null) %}
+		{% set la = log_archive %}
+		<h3 class="h5 mt-7">The application log</h3>
+		<p>Every request and error is written to the application log. Just after midnight each day the Log archive job moves it, and any other log beside it, into the archive folder, compressed, and starts each afresh, then deletes the archives older than {{ la.keep_words }}.</p>
+		{% set la_items = [{label: 'The log', value: la.log ~ ' (' ~ la.log_size ~ ')'}] %}
+		{% for other in la.others %}{% set la_items = la_items|merge([{label: 'Beside it', value: other.path ~ ' (' ~ other.size ~ ')'}]) %}{% endfor %}
+		{{ ui('data.key-value-list', {items: la_items|merge([
+			{label: 'Its archives', value: la.folder},
+			{label: 'Archives kept', value: la.archives == 0 ? 'None yet' : (la.archives == 1 ? '1 archive, ' ~ la.archive_size ~ ': ' ~ la.newest : la.archives ~ ' archives, ' ~ la.archive_size ~ ', from ' ~ la.oldest ~ ' to ' ~ la.newest)}
+		])}) }}
+		<p>{% if la.source == 'database' %}This period is saved here and overrides <span class="mono">LOG_ARCHIVES_KEPT_FOR</span> in <span class="mono">.env</span>, which says {{ la.environment }}.{% else %}This period comes from <span class="mono">LOG_ARCHIVES_KEPT_FOR</span> in <span class="mono">.env</span>. Saving it here overrides <span class="mono">.env</span>.{% endif %}</p>
+		<form action="/admin/settings/log-archives" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep the log archives for', for: 'log-archives-keep', help: la.how ~ ' At least a day.'})} %}
+{% block control %}<input class="cl-input" id="log-archives-keep" name="keep" value="{{ la.keep }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save how long archives are kept', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% endembed %}
+		</form>
+		{% if la.source == 'database' %}
+		<form action="/admin/settings/log-archives/reset" method="post" class="cl-mt-2">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{{ ui('action.button', {label: 'Reset how long archives are kept to .env', variant: 'danger', size: 'small', confirm: 'Remove the period saved here and follow LOG_ARCHIVES_KEPT_FOR in .env?', icon: 'action-reset'}) }}
+		</form>
+		{% endif %}
+		{% endif %}
+		{% if scheduled_jobs|default(null) %}
 		<h3 class="h5 mt-7">Expired records</h3>
 		{% endif %}
 

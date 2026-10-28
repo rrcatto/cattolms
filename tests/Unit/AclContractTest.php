@@ -67,8 +67,9 @@ final class AclContractTest extends TestCase
         // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE for certificate designs. 82 with
         // PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE for the financial document design. 87
         // with COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW and PLATFORM.WALLET.VIEW/MANAGE.
-        // 91 with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE (owner, 2026-10-19).
-        self::assertCount(91, $catalog->businessKeys());
+        // 91 with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE (owner, 2026-10-19). 93 with
+        // PLATFORM.MAILING.VIEW/MANAGE for mailing lists and campaigns (owner, 2026-10-26).
+        self::assertCount(93, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {

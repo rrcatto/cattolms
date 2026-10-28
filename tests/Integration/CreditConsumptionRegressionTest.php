@@ -43,11 +43,15 @@ final class CreditConsumptionRegressionTest extends TestCase
                 'INSERT INTO users (public_id,display_name,status) VALUES (:id,:name,\'active\') RETURNING id',
                 ['id' => Uuid::v4(), 'name' => 'QA learner ' . $suffix]
             )[0]['id'];
+            // A company is made with its Company Administrator, never empty (the database checks it when the transaction ends).
+            $db->beginTransaction();
             $companyId = (int) $db->fetchAllAssociative(
                 "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
                  VALUES (:public_id,:name,:domain,'active',:user_id) RETURNING id",
                 ['public_id' => Uuid::v4(), 'name' => 'QA Company ' . $suffix, 'domain' => 'qa-' . $suffix . '.example', 'user_id' => $adminId]
             )[0]['id'];
+            $db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:c,:u,'owner','active',NOW())", ['c' => $companyId, 'u' => $adminId]);
+            $db->commit();
             $courseId = (int) $db->fetchAllAssociative(
                 "INSERT INTO courses
                     (public_id,slug,title,owner_user_id,owner_company_id,created_by_user_id,updated_by_user_id)

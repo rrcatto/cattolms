@@ -1,0 +1,52 @@
+{#
+	Company → Company Profile (owner, 2026-10-26): the company itself, its logo first, then its name, web address and
+	account reference. The Company Administrator changes the logo here; Billing Details holds only who invoices go to.
+#}
+{% if company_logo|default(null) %}
+	{% include '@platform/partials/company-logo-manager.html.twig' with {lm_logo: company_logo, lm_name: company.name, lm_upload: '/company/logo', lm_remove: '/company/logo/remove', lm_can_manage: can_manage_logo|default(false)} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'company-details'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Company details', summary: can_manage_company|default(false) ? 'Who the company is on this site. Change its name or web address here.' : 'Who the company is on this site. Its Company Administrator changes them.'}) }}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Account reference', value: company.account_reference|default('') ? company.account_reference|account_reference : 'None'},
+			{label: 'Status', value: (company.status|default('active'))|capitalize}
+		] }) }}
+		{% if can_manage_company|default(false) %}
+		<form action="/company/profile" method="post" class="cl-mt-3">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'profile-company-name', required: true})} %}{% block control %}<input id="profile-company-name" name="name" value="{{ company.name }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{# The domain stays: every staff address is at it (owner's rule, restated 2026-10-26). #}
+				<div class="cl-ui-field--full"><p class="help">Domain: <strong>{{ company.domain|default('') }}</strong>. Every staff address is at it, so it does not change here.</p></div>
+			{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save company details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{% if is_platform_administrator|default(false) %}{{ ui('action.link', {label: 'Open its page in Administration', variant: 'secondary', size: 'small', href: '/admin/companies/' ~ company.id, icon: 'action-open'}) }}{% endif %}{% endblock %}
+{% endembed %}
+		</form>
+		{% else %}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Company name', value: company.name},
+			{label: 'Web address', value: company.domain|default('') ?: 'None'}
+		]}) }}
+		{% endif %}
+{% endblock %}
+{% endembed %}
+{% if can_manage_company|default(false) %}
+{# Deleting the company (owner, 2026-10-26: "If they want to delete their company, they can. We just hide it and retain all
+   the records"): every staff member, its administrators too, is deactivated and has 3 days to keep their account as a
+   private one at a private address. Typing the name confirms it. #}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'delete-company'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Delete the company', summary: 'It is hidden and its records are kept. Every staff account, yours included, is deactivated, and each person is emailed: they have 3 days to keep their account as a private one, with all their courses and certificates, at a private address of their own.'}) }}
+	<form action="/company/profile/delete" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Type the company\'s name to confirm', for: 'delete-company-name', required: true, help: company.name})} %}{% block control %}<input id="delete-company-name" name="confirm_name" required autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Delete the company', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Delete ' ~ company.name ~ '? Every staff account is deactivated and emailed, and you are signed out if you are one of its staff.', icon: 'action-remove'}) }}{% endblock %}{% endembed %}
+	</form>
+{% endblock %}
+{% endembed %}
+{% endif %}
+{% else %}
+	{{ ui('feedback.empty', {heading: 'Choose a company first', summary: 'A company profile belongs to one company. Choose the company to administer.'}) }}
+{% endif %}

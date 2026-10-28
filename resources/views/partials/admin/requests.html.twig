@@ -34,10 +34,10 @@
 											{{ ui('data.person', {name: request.learner_name, reference: request.learner_reference, href: '/admin/people/' ~ request.user_id}) }}
 										</td>
 										<td title="{{ request.course_title }}">
-											{{ request.course_title }}
+											{% if request.course_id|default(0) %}<a href="/admin/courses/{{ request.course_id }}">{{ request.course_title }}</a>{% else %}{{ request.course_title }}{% endif %}
 										</td>
 										<td>
-											{{ request.company_name ?: 'No company' }}
+											{% if request.company_id|default(null) %}<a href="/admin/companies/{{ request.company_id }}">{{ request.company_name }}</a>{% else %}No company{% endif %}
 										</td>
 										<td class="small">
 											{{ request.requested_at }}
@@ -82,7 +82,7 @@
 					{% if requests_preview_has_more %}
 						<div class="pagination-row">
 							<span class="pagination-summary">Showing the first {{ preview_page_size }} requests.</span>
-							{{ ui('action.link', {label: 'View all requests', variant: 'secondary', size: 'small', href: '/admin/requests', icon: 'action-view-all'}) }}
+							{{ ui('action.link', {label: 'View all requests', variant: 'secondary', size: 'small', href: '/admin/course/requests', icon: 'action-view-all'}) }}
 						</div>
 					{% endif %}
 

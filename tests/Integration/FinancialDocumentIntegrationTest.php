@@ -322,7 +322,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         self::assertStringStartsWith('%PDF-', $posted['body']);
         $refused = InProcessPage::run($manager, FinancialDocumentDesignController::class, 'save', [], ['colour' => 'not a colour'] + $form);
         self::assertSame(422, $refused['status']);
-        self::assertStringContainsString('Choose the accent colour with the colour picker.', $refused['body']);
+        self::assertStringContainsString('Accent colour: write it as # and six hex digits, such as #9A3F12.', $refused['body']);
         $saved = InProcessPage::run($manager, FinancialDocumentDesignController::class, 'save', [], $form);
         self::assertSame('/admin/commerce/documents?document=invoice&sample=learner', $saved['location']);
         $design = IntegrationContainer::get()->get(FinancialDocumentDesignService::class)->design();

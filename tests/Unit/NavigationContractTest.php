@@ -102,9 +102,9 @@ final class NavigationContractTest extends TestCase
         // three more siblings in a menu of six, which is the shape the owner asked to be rid of.
         // Billing Address comes straight after Personal Particulars (owner instruction, 2026/10/06).
         self::assertSame(
-            ['account-profile', 'account-billing', 'account-emails', 'account-social'],
+            ['account-profile', 'account-billing', 'account-emails', 'account-subscriptions', 'account-social'],
             array_map(static fn(array $child): string => (string) $child['key'], (array) ($accountChildren['account-profile-group']['children'] ?? [])),
-            'Profile must hold Personal Particulars, Billing Address, Email Addresses and Social Media, in that order.'
+            'Profile must hold Personal Particulars, Billing Address, Email Addresses, My Subscriptions and Social Media, in that order.'
         );
 
         // The Company menu is three levels since v0.6, for the reason Administration is: eight flat
@@ -461,7 +461,7 @@ final class NavigationContractTest extends TestCase
 
         // Third place is only correct while Profile is still a pop-out; flattened, it would be
         // three more siblings sitting between the dashboard and the library.
-        self::assertCount(4, (array) ($account[2]['children'] ?? []));
+        self::assertCount(5, (array) ($account[2]['children'] ?? []));
     }
 
     public function testNavigationDocumentationDefinesAccountCompanyAndAdministrationMenus(): void

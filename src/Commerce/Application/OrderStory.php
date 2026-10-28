@@ -121,7 +121,7 @@ final class OrderStory
             'summary_parts' => $summaryParts,
             'status' => MoneyRecords::orderStatus($order + ['paid_minor' => $paid, 'refunded_minor' => $refunded, 'payment_method' => $this->records->paymentMethod($orderId),
                 'bought' => self::bought($items)]),
-            'next' => $this->next($order, $refunds, $method, $due, $currency, $accountReference, $buyer, $buyerPerson),
+            'next' => $this->next($order, $refunds, $method, $due, $currency, $accountReference, $buyer, $buyerPerson, array_values(array_filter($this->records->refundRequestsForOrder($orderId), static fn(array $r): bool => $r['status'] === 'requested'))),
             'timeline' => array_map(static fn(array $e): array => ['when' => self::when((string) $e['created_at']), 'text' => MoneyRecords::trailSentence($e),
                 'text_parts' => MoneyRecords::trailSentenceParts($e), 'by_person' => MoneyRecords::actorPerson($e, false),
                 'by' => trim((string) ($e['actor_name'] ?? '')) !== '' ? (string) $e['actor_name'] : 'The system', 'href' => '/admin/commerce/trail/' . (int) $e['id']], $trail),
@@ -146,10 +146,17 @@ final class OrderStory
      * @param array<string,mixed> $order
      * @param list<array<string,mixed>> $refunds
      * @param array<string,string> $buyerPerson
+     * @param list<array<string,mixed>> $openRequests
      * @return array{tone:string,heading:string,text:string,parts:list<array<string,mixed>>}
      */
-    private function next(array $order, array $refunds, string $method, int $due, string $currency, string $reference, string $buyer, array $buyerPerson): array
+    private function next(array $order, array $refunds, string $method, int $due, string $currency, string $reference, string $buyer, array $buyerPerson, array $openRequests = []): array
     {
+        // A refund request waiting on this order comes first (2026-10-26 audit: the page said "Nothing to do").
+        if ($openRequests !== []) {
+            $asked = 'asked for a refund on ' . self::when((string) $openRequests[0]['requested_at']) . '. Decide it under Refund Requests, or refund the line below, which answers it.';
+            return ['tone' => 'warning', 'heading' => 'A refund request is waiting', 'text' => $buyer . ' ' . $asked,
+                'parts' => [['person' => $buyerPerson], ['text' => ' ' . $asked]]];
+        }
         foreach ($refunds as $refund) {
             if ($refund['destination'] === 'money_back' && (int) $refund['net_minor'] > 0 && $refund['payout_paid_at'] === null) {
                 $pay = 'Pay ' . self::money((int) $refund['net_minor'], $currency) . ' back to ';

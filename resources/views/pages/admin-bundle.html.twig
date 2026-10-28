@@ -24,7 +24,7 @@
 	<ol class="cl-bundle-courses">
 		{% for course in bundle.courses %}
 		<li>
-			<span><strong>{{ course.title }}</strong> <small>{{ course.slug }}</small>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: 'warning', size: 'small'}) }}{% endif %}</span>
+			<span><strong><a href="/admin/courses/{{ course.course_id }}">{{ course.title }}</a></strong> <small>{{ course.slug }}</small>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: 'warning', size: 'small'}) }}{% endif %}</span>
 			{% if can_manage %}
 			<span class="cl-bundle-course-actions">
 				{% if not loop.first %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' up', icon: 'action-move-up'}) }}</form>{% endif %}

@@ -9,13 +9,16 @@ Version: 0.9.4
 
 Description:
 An access period as an offer states it: a number of days, weeks, months or years, held as seconds of
-whole days. A year is 365 days and a month a twelfth of a year, rounded to the day (owner, 2026-10-19:
-"fix 12 months to give 365 days of access, and check every other period for the same mistake"): 1 month
-is 30 days, 3 months 91, 6 months 183, 12 months 365 and 24 months 730, so 12 months and 1 year are the
-same period. Course price variants, bundle offers, company credits and the learner's pages all state
-periods through this class.
+whole days. A year is 365 days and a month 30 days, each whole year of months counted as a year (owner,
+2026-10-26: "if we need to express a month in days, use the convention of a 30 day month and 1 year is 365
+days"; 2026-10-19: "fix 12 months to give 365 days of access"): 1 month is 30 days, 3 months 90, 6 months
+180, 12 months 365, 18 months 545 and 24 months 730, so 12 months and 1 year are the same period. Course
+price variants, bundle offers, company credits and the learner's pages all state periods through this class.
 
 Changelog:
+2026/10/26 SAST
+- A month is 30 days and each whole year of months 365 (6 months 180 days, 18 months 545), in place of a twelfth of
+  a year (6 months 183 days).
 2026/10/19 SAST
 - A month is a twelfth of a year (12 months = 365 days), not 30 days (12 months gave 360 days). One
   label for every page.
@@ -32,6 +35,8 @@ final class AccessPeriod
     /** The units an offer is written in, smallest first. */
     public const UNITS = ['days' => 'days', 'weeks' => 'weeks', 'months' => 'months', 'years' => 'years'];
     public const DAY = 86400;
+    /** The days of a month that is not part of a whole year (owner, 2026-10-26). */
+    public const MONTH_DAYS = 30;
     private const LIMITS = ['days' => 3650, 'weeks' => 520, 'months' => 120, 'years' => 10];
 
     /** Seconds from a typed value and unit. */
@@ -48,13 +53,13 @@ final class AccessPeriod
         return self::days($count, $unit) * self::DAY;
     }
 
-    /** The whole days a number of units gives: a year is 365 days, a month a twelfth of a year, rounded. */
+    /** The whole days a number of units gives: a year is 365 days, a month 30, each whole year of months 365. */
     public static function days(int $count, string $unit): int
     {
         return match ($unit) {
             'days' => $count,
             'weeks' => $count * 7,
-            'months' => (int) round($count * 365 / 12),
+            'months' => intdiv($count, 12) * 365 + ($count % 12) * self::MONTH_DAYS,
             'years' => $count * 365,
             default => throw new InvalidArgumentException('Choose a valid access-period unit.'),
         };
@@ -69,8 +74,9 @@ final class AccessPeriod
     {
         $days = max(1, (int) round($seconds / self::DAY));
         if ($days % 365 === 0) return [intdiv($days, 365), 'years'];
-        $months = (int) round($days * 12 / 365);
-        if ($months >= 1 && self::days($months, 'months') === $days) return [$months, 'months'];
+        // Whole years and then 30-day months: 180 days is 6 months, 545 is 18 months; 360 is no number of months.
+        $rest = $days % 365;
+        if ($rest % self::MONTH_DAYS === 0 && intdiv($rest, self::MONTH_DAYS) < 12) return [intdiv($days, 365) * 12 + intdiv($rest, self::MONTH_DAYS), 'months'];
         if ($days % 7 === 0) return [intdiv($days, 7), 'weeks'];
 
         return [$days, 'days'];

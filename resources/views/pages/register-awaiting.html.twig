@@ -1,6 +1,7 @@
 {% extends layout %}
 {% block page_body %}
-	{# A demo site's new account waits for the site's approval before it can sign in (owner, 2026-10-21). #}
+	{# A new account held for the site's approval: every one on a demo site (owner, 2026-10-21), and on a live site one the
+	   sign-up check held (2026-10-26), which is not told why. Nothing promises it will be approved. #}
 	{% set ph_kicker = 'Register' %}
 	{% set ph_title = 'Waiting for approval' %}
 	{% set ph_lead = 'Your email address is confirmed.' %}
@@ -9,7 +10,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 			<h2 class="h4">What happens next</h2>
-			<p>This is a demo site, so every new account is approved by the site's administrator before it can be used. You will receive an email as soon as yours is approved, and you can then sign in with your email address.</p>
+			<p>{{ demo_site|default(false) ? demo_notice : 'Your account is held pending approval. Its status will be processed by the site\'s administrator.' }}</p>
 			{{ ui('action.link', {label: 'Browse the catalogue', variant: 'secondary', size: 'normal', href: '/courses', icon: 'nav-catalogue'}) }}
 {% endblock %}
 {% endembed %}

@@ -13,6 +13,8 @@
 {# Starting begins the access period and cannot be undone, so the learner confirms it first (owner, 2026-10-17). #}
 <form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand that starting begins my access period of ' ~ course.access_period_label ~ ', which then runs to its end, and that a started course can no longer be refunded.'})} %}{% block control %}<input type="checkbox" name="confirm_start" value="yes" required>{% endblock %}{% endembed %}
+{# Asked once, here, whether they want the updates written about the course (mailing, step 1; owner, 2026-10-26). #}
+{% if ask_follow|default(false) %}<input type="hidden" name="course_id" value="{{ course.id }}">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me the updates written about this course by email. I can stop at any time.'})} %}{% block control %}<input type="checkbox" name="follow_course" value="1">{% endblock %}{% endembed %}{% endif %}
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit', icon: 'action-start'}) }}{% endblock %}{% endembed %}</form>
 {% elseif course.structure|default([])|length %}
 <nav class="cl-course-item-paging" aria-label="Course content">

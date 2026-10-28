@@ -1,0 +1,172 @@
+{#
+	Mailing › Templates › one template (owner, 2026-10-27/28, decision 5B; the approved mockup "Mailing system plan",
+	page 3): its form beside a live preview of a sample message or digest at a computer's or a phone's width. The form
+	designs the look (header, colours, fonts, layout, buttons, footer, social links) or holds the template's HTML around
+	{content}; the plain-text copy is made from the email or written around {content}. "Update the preview" posts the
+	unsaved form into the preview, and the certificate-preview controller presses it a moment after each change, so the
+	preview follows the form with JavaScript and still works without it. The logo and the header picture have their own
+	uploads; a proof goes to any address.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set d = template.design %}
+	{% set ph_kicker = 'Mailing · Templates' %}
+	{% set ph_title = template.name %}
+	{% set ph_lead = 'Change the look on the left and see it on the right with a sample. Messages and digests drawn in this template look like this once it is saved.' %}
+	{% set ph_badges %}{% if template.default_for_messages %}{{ ui('feedback.badge', {label: 'Default for messages', tone: 'success'}) }} {% endif %}{% if template.default_for_digest %}{{ ui('feedback.badge', {label: 'Default for the digest', tone: 'success'}) }} {% endif %}{{ ui('feedback.badge', {label: template.mode == 'html' ? 'Written in HTML' : 'Designed', tone: 'neutral'}) }} {{ ui('feedback.badge', {label: template.used == 1 ? 'Used by 1 message or digest' : 'Used by ' ~ template.used ~ ' messages and digests', tone: 'neutral'}) }}{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{{ importmap() }}
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'design'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'The template', summary: can_manage ? 'Save it when it looks right. The preview follows what you change.' : 'You can see this template. Changing it needs the mailing manage permission.'}) }}
+			<form id="template-form" action="/mailing/templates/{{ template.id }}" method="post" data-controller="certificate-preview" data-certificate-preview-button-value="template-preview-button">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="sample" value="{{ sample }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', help: 'For you only. Readers never see it.'})} %}{% block control %}<input class="cl-input" id="template-name" name="name" value="{{ template.name }}" maxlength="120" required data-certificate-preview-ignore {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">How this template is made</legend>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Design it here, with the choices below'})} %}{% block control %}<input type="radio" name="mode" value="design"{{ template.mode == 'design' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Write it in HTML, for full control'})} %}{% block control %}<input type="radio" name="mode" value="html"{{ template.mode == 'html' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">Header</legend>
+					<p class="help">Used when the template is designed here. The logo and the header picture are uploaded below.</p>
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Logo size', for: 'design-logo-size'})} %}{% block control %}<select class="cl-input" id="design-logo-size" name="design[logo_size]" {{ ui_field_attrs(props) }}>{% for key, px in logo_sizes %}<option value="{{ key }}"{{ d.logo_size == key ? ' selected' : '' }}>{{ key|capitalize }} ({{ px }} pixels wide at most)</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Logo sits', for: 'design-align'})} %}{% block control %}<select class="cl-input" id="design-align" name="design[align]" {{ ui_field_attrs(props) }}>{% for key, label in alignments %}<option value="{{ key }}"{{ d.align == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">Colours</legend>
+					<p class="help">Write each as # and six hex digits, such as #9A3F12. The swatch beside it shows the colour as you type, and the preview follows.</p>
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+						{% for key, label in colours %}
+						{% include '@platform/partials/hex-colour-field.html.twig' with {hc: {id: 'design-colour-' ~ key, name: 'design[colours][' ~ key ~ ']', value: d.colours[key], label: label, help: 'none'}} %}
+						{% endfor %}
+					{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">Fonts and text</legend>
+					<p class="help">Most email apps have only the common fonts. A theme font is shown where an app has it, and the font named beside it everywhere else.</p>
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Headings', for: 'design-heading-font'})} %}{% block control %}<select class="cl-input" id="design-heading-font" name="design[heading_font]" {{ ui_field_attrs(props) }}>{% for key, label in fonts %}<option value="{{ key }}"{{ d.heading_font == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Text', for: 'design-body-font'})} %}{% block control %}<select class="cl-input" id="design-body-font" name="design[body_font]" {{ ui_field_attrs(props) }}>{% for key, label in fonts %}<option value="{{ key }}"{{ d.body_font == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Text size', for: 'design-text-size'})} %}{% block control %}<select class="cl-input" id="design-text-size" name="design[text_size]" {{ ui_field_attrs(props) }}>{% for size in text_sizes %}<option value="{{ size }}"{{ d.text_size == size ? ' selected' : '' }}>{{ size }} pixels</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">Layout and buttons</legend>
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Width', for: 'design-width', help: 'Phones show it narrower whatever you choose.'})} %}{% block control %}<select class="cl-input" id="design-width" name="design[width]" {{ ui_field_attrs(props) }}>{% for width in widths %}<option value="{{ width }}"{{ d.width == width ? ' selected' : '' }}>{{ width }} pixels</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Corners', for: 'design-corners'})} %}{% block control %}<select class="cl-input" id="design-corners" name="design[corners]" {{ ui_field_attrs(props) }}>{% for key, label in corners %}<option value="{{ key }}"{{ d.corners == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Spacing', for: 'design-spacing'})} %}{% block control %}<select class="cl-input" id="design-spacing" name="design[spacing]" {{ ui_field_attrs(props) }}>{% for key, label in spacings %}<option value="{{ key }}"{{ d.spacing == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Button shape', for: 'design-button-shape'})} %}{% block control %}<select class="cl-input" id="design-button-shape" name="design[button_shape]" {{ ui_field_attrs(props) }}>{% for key, label in button_shapes %}<option value="{{ key }}"{{ d.button_shape == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">Footer</legend>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your words at the foot', for: 'design-footer-words', full_width: true, help: 'Optional, such as a short sign-off. Always added after them: why the person gets the email, the unsubscribe link, Show my subscriptions, and the Site Owner\'s name and address.'})} %}{% block control %}<textarea class="cl-input" id="design-footer-words" name="design[footer_words]" rows="3" maxlength="1000" {{ ui_field_attrs(props) }}>{{ d.footer_words }}</textarea>{% endblock %}{% endembed %}
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+						{% for key, label in social %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: label, for: 'design-social-' ~ key, help: 'Your profile\'s address, or empty to leave it out.'})} %}{% block control %}<input class="cl-input" type="url" id="design-social-{{ key }}" name="design[social][{{ key }}]" value="{{ d.social[key]|default('') }}" placeholder="https://" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% endfor %}
+					{% endblock %}{% endembed %}
+				</fieldset>
+
+				<fieldset class="cl-template-group" id="html">
+					<legend class="h6">The template in HTML</legend>
+					<p class="help">Used when the template is written in HTML. Put {content} where the message goes. It must hold {content}, {unsubscribe_link} and {site_owner_address}, and cannot hold a script.</p>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML', for: 'template-html', full_width: true})} %}{% block control %}<textarea class="cl-input cl-code-input" id="template-html" name="html" rows="14" spellcheck="false" {{ ui_field_attrs(props) }}>{{ template.html }}</textarea>{% endblock %}{% endembed %}
+					{% set ph_items = [] %}{% for placeholder, meaning in placeholders %}{% set ph_items = ph_items|merge([{label: placeholder, value: meaning}]) %}{% endfor %}
+					{{ ui('data.key-value-list', {items: ph_items}) }}
+				</fieldset>
+
+				<fieldset class="cl-template-group">
+					<legend class="h6">The plain-text copy</legend>
+					<p class="help">Every email also goes as plain text, for email apps that show no pictures or colours.</p>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Made from the email'})} %}{% block control %}<input type="radio" name="text_mode" value="made"{{ template.text_mode == 'made' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Written by me, around {content}'})} %}{% block control %}<input type="radio" name="text_mode" value="own"{{ template.text_mode == 'own' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'My plain-text copy', for: 'template-text', full_width: true, help: 'Used when written by you. It must hold {content} and {unsubscribe_link}.'})} %}{% block control %}<textarea class="cl-input cl-code-input" id="template-text" name="text_part" rows="6" spellcheck="false" {{ ui_field_attrs(props) }}>{{ template.text_part }}</textarea>{% endblock %}{% endembed %}
+				</fieldset>
+
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+				{% block primary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Save the template', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endif %}{% endblock %}
+				{% block secondary_actions %}{{ ui('action.button', {label: 'Update the preview', variant: 'secondary', size: 'normal', type: 'submit', id: 'template-preview-button', form_action: '/mailing/templates/' ~ template.id ~ '/preview', form_target: 'template-preview', icon: 'action-refresh'}) }}{% endblock %}
+				{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+		</div>
+		<div>
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'preview'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Live preview', summary: 'A sample drawn in this template. Its links go nowhere and nothing is recorded.'}) }}
+			<div class="cl-mailing-choices">
+				{{ ui('action.link', {label: 'Sample message', variant: sample == 'message' ? 'primary' : 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ (phone ? '?width=phone' : '') ~ '#preview', icon: 'action-email'}) }}
+				{{ ui('action.link', {label: 'Sample digest', variant: sample == 'digest' ? 'primary' : 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ '?sample=digest' ~ (phone ? '&width=phone' : '') ~ '#preview', icon: 'action-view-list'}) }}
+				{{ ui('action.link', {label: phone ? 'As on a computer' : 'As on a phone', variant: 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ '?sample=' ~ sample ~ (phone ? '' : '&width=phone') ~ '#preview', icon: 'action-preview'}) }}
+			</div>
+			<iframe class="cl-mailing-preview{{ phone ? ' cl-mailing-preview--phone' : '' }}" name="template-preview" src="/mailing/templates/{{ template.id }}/preview?sample={{ sample }}" title="Preview of {{ template.name }} with a sample {{ sample }}" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'pictures'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Logo and header picture', summary: 'PNG, JPEG or GIF. Without a logo, the site\'s name is shown in the header\'s text colour.'}) }}
+			{% for slot, label in {logo: 'Logo', header_picture: 'Header picture'} %}
+				{% set url = slot == 'logo' ? logo_url : header_picture_url %}
+				<h3 class="h6">{{ label }}</h3>
+				{% if url %}<p><img class="cl-mailing-picture" src="{{ url }}" alt="The template's {{ label|lower }}" width="240"></p>{% else %}<p class="small cl-text-secondary">{{ slot == 'logo' ? 'None: the site\'s name stands in its place.' : 'None.' }}</p>{% endif %}
+				{% if can_manage %}
+				<form action="/mailing/templates/{{ template.id }}/picture" method="post" enctype="multipart/form-data">
+					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="slot" value="{{ slot }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: url ? 'Replace it with' : 'Upload a ' ~ label|lower, for: 'picture-' ~ slot})} %}{% block control %}<input class="cl-input" type="file" id="picture-{{ slot }}" name="picture" accept="image/png,image/jpeg,image/gif" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the ' ~ label|lower, variant: 'secondary', size: 'small', type: 'submit', icon: 'action-upload'}) }}{% endblock %}{% endembed %}
+				</form>
+				{% if url %}<form action="/mailing/templates/{{ template.id }}/picture" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="slot" value="{{ slot }}"><input type="hidden" name="remove" value="1">{{ ui('action.button', {label: 'Take the ' ~ label|lower ~ ' off', variant: 'danger', size: 'small', type: 'submit', icon: 'action-remove'}) }}</form>{% endif %}
+				{% endif %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+
+		{% if can_manage %}
+		{% if can_manage %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'samples'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Use a sample\'s look', summary: 'Its colours, fonts, sizes and shapes replace this template\'s. The logo, header picture, footer words and social links stay.'}) }}
+			<form action="/mailing/templates/{{ template.id }}/sample" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {name: 'sample', legend: 'Sample designs', id: 'designer-samples', selected: '', columns: 4, items: samples}) }}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Use this look', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-switch', confirm: 'Replace this template\'s colours, fonts and shapes with the sample\'s?'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+		{% endif %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'proof'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Send a proof', summary: 'The saved template with a sample, to any address, to see it in a real inbox.'}) }}
+			<form action="/mailing/templates/{{ template.id }}/proof" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send it to', for: 'proof-to'})} %}{% block control %}<input class="cl-input" type="email" id="proof-to" name="email" value="{{ proof_to }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'With', for: 'proof-sample'})} %}{% block control %}<select class="cl-input" id="proof-sample" name="sample" {{ ui_field_attrs(props) }}><option value="message"{{ sample == 'message' ? ' selected' : '' }}>A sample message</option><option value="digest"{{ sample == 'digest' ? ' selected' : '' }}>A sample digest</option></select>{% endblock %}{% endembed %}
+				{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send the proof', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'use'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Where it is used', summary: 'One template is the default for messages and one for the digest. A message may choose another.'}) }}
+			<div class="cl-mailing-choices">
+				{% if not template.default_for_messages %}<form action="/mailing/templates/{{ template.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="messages">{{ ui('action.button', {label: 'Make it the default for messages', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
+				{% if not template.default_for_digest %}<form action="/mailing/templates/{{ template.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="digest">{{ ui('action.button', {label: 'Make it the default for the digest', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
+				<form action="/mailing/templates/{{ template.id }}/copy" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Copy this template', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-copy'}) }}</form>
+				{% if not template.default_for_messages and not template.default_for_digest %}<form action="/mailing/templates/{{ template.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete this template', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete ' ~ template.name ~ '? Messages that chose it will use the default for messages.', icon: 'action-remove'}) }}</form>{% endif %}
+			</div>
+		{% endblock %}{% endembed %}
+		{% endif %}
+		</div>
+	{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

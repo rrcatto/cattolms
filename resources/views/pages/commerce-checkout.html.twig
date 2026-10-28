@@ -93,6 +93,19 @@
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
                 <p>An order that is not paid within {{ payment_due_words }} is cancelled automatically. Every course starts as soon as your payment is confirmed (for an EFT, when we confirm we have received it), and its access period then runs to its end.</p>
                 <p>No VAT is charged. Once a course has started, its content has been supplied and it cannot be cancelled for a refund. This does not affect your rights if a course is faulty, is not as described or cannot be provided. Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
+                {# Keep me informed (mailing, step 1; owner, 2026-10-26: a private buyer is asked at checkout): News and Updates and
+                   each course bought, unticked, leaving out what they have already. #}
+                {% set ki_courses = [] %}
+                {% for item in cart.items %}{% if item.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: item.course_id, title: item.title}]) %}{% endif %}{% endfor %}
+                {% for bundle in cart.bundles %}{% for course in bundle.courses %}{% if course.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: course.course_id, title: course.title}]) %}{% endif %}{% endfor %}{% endfor %}
+                {% if not news_subscribed|default(false) or ki_courses %}
+                <fieldset class="cl-keep-informed">
+                    <legend class="h6">Keep me informed by email</legend>
+                    {% if not news_subscribed|default(false) %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me News and Updates: new courses, offers and news about the site'})} %}{% block control %}<input type="checkbox" name="news" value="1">{% endblock %}{% endembed %}{% endif %}
+                    {% for course in ki_courses %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me the updates written about ' ~ course.title})} %}{% block control %}<input type="checkbox" name="follow_course[]" value="{{ course.id }}">{% endblock %}{% endembed %}{% endfor %}
+                    <p class="help">You can stop at any time under Account › My Subscriptions.</p>
+                </fieldset>
+                {% endif %}
                 {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
                 {% include '@platform/partials/commerce-start-acceptance.html.twig' %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}

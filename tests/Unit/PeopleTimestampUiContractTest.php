@@ -50,6 +50,6 @@ final class PeopleTimestampUiContractTest extends TestCase
         self::assertStringContainsString('profile.created_at', $template);
         self::assertStringContainsString('profile.last_login_at', $template);
         self::assertStringContainsString('Created', $template);
-        self::assertStringContainsString('Last login', $template);
+        self::assertStringContainsString('Last sign-in', $template);
     }
 }

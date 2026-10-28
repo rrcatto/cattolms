@@ -184,7 +184,7 @@ final class App
             'samesite' => 'Lax',
         ]);
         session_set_save_handler(
-            new DatabaseSessionHandler($db, Env::int('PHP_SESSION_TTL', 86400)),
+            new DatabaseSessionHandler($db, Env::seconds('PHP_SESSION_TTL', '1d')),
             true
         );
         session_start();

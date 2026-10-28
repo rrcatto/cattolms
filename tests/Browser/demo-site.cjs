@@ -105,6 +105,13 @@ async function toReview(page, fixture, course, method) {
             const options = await toReview(page, fixture, 'b', 'eft');
             assert.deepEqual(options, ['eft', 'dummy'], 'the simulated card is offered on a demo site, after EFT (Settings > Payment methods order)');
             assert.ok((await text(page)).includes(SIMULATION), 'the review says the purchase is a simulation');
+            // Keep me informed (mailing, step 1; owner, 2026-10-26): News and the course bought, both unticked, kept when ticked.
+            const keep = page.locator('.cl-keep-informed');
+            assert.equal(await keep.locator('input[name=news]').isChecked(), false, 'News and Updates is not ticked for the buyer');
+            const followBox = keep.locator(`input[name="follow_course[]"][value="${fixture.courses.b.id}"]`);
+            assert.equal(await followBox.isChecked(), false, 'nor is the course bought');
+            await keep.locator('input[name=news]').check();
+            await followBox.check();
             await page.locator('input[name=accept_terms]').check();
             await page.locator('input[name=accept_start]').check();
             await submit(page, page.getByRole('button', {name: 'Place my order'}));
@@ -113,6 +120,7 @@ async function toReview(page, fixture, course, method) {
             assert.ok(shown.includes('These bank details are fake: this is a demo site. Do not pay.'), 'the bank details are labelled as fake');
             assert.ok(shown.includes('FAKE BANK (demo site, do not pay)') && shown.includes('0000000000 (fake)'), 'and are fake');
             assert.ok(shown.includes(`Use your account reference as the payment reference: ${fixture.learner.reference}.`), 'the EFT reference is the account reference');
+            assert.deepEqual(JSON.parse(php('follows', fixture.learner.id)), [['course', fixture.courses.b.id, 'checkout'], ['news', null, 'checkout']], 'what they ticked is kept, given at checkout');
             const placed = JSON.parse(php('order', fixture.learner.id));
             order = placed.id;
             assert.deepEqual([placed.simulation, placed.invoice_simulation, placed.invoice_fake_bank, placed.invoice_reference], [true, true, true, true], 'the order and its invoice are a simulation, with fake bank details and the account reference');

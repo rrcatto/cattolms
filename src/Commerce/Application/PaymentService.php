@@ -76,7 +76,8 @@ final class PaymentService
         $this->transactions->run(function() use($actor,$orderId): void {
             $this->records->lockPurchaser($actor->id);
             $order=$this->records->order($orderId,true);
-            if ((int)$order['purchaser_user_id']!==$actor->id) throw new RuntimeException('This order belongs to another purchaser.');
+            // The buyer, or any Company Administrator of the order's company (2026-10-26).
+            if ((int)$order['purchaser_user_id']!==$actor->id && !(($order['company_id'] ?? null)!==null && $this->records->isCompanyAdministrator((int)$order['company_id'],$actor->id))) throw new RuntimeException('This order belongs to another purchaser.');
             if ($order['state']!=='awaiting_payment' || (int)$order['total_minor']!==0) throw new RuntimeException('This order has an amount to pay.');
             $order['state']=$this->transitions->apply('order','awaiting_payment','confirm_paid');
             $this->records->setOrderState((int)$order['id'],(string)$order['state']);
@@ -95,7 +96,8 @@ final class PaymentService
         $this->transactions->run(function() use($actor,$orderId): void {
             $this->records->lockPurchaser($actor->id);
             $order=$this->records->order($orderId,true);
-            if ((int)$order['purchaser_user_id']!==$actor->id) throw new RuntimeException('This order belongs to another purchaser.');
+            // The buyer, or any Company Administrator of the order's company (2026-10-26).
+            if ((int)$order['purchaser_user_id']!==$actor->id && !(($order['company_id'] ?? null)!==null && $this->records->isCompanyAdministrator((int)$order['company_id'],$actor->id))) throw new RuntimeException('This order belongs to another purchaser.');
             if ($order['state']!=='awaiting_payment' || $this->records->paidTotal($orderId)<(int)$order['total_minor']) throw new RuntimeException('This order has an amount to pay.');
             $order['state']=$this->transitions->apply('order','awaiting_payment','confirm_paid');
             $this->records->setOrderState($orderId,(string)$order['state']);

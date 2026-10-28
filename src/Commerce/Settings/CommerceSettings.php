@@ -19,10 +19,13 @@ changes a purchase: the payment due time is fixed when the order is placed, a wa
 when the credit is issued, and the refund window and fees when the refund is worked out from the
 order.
 
-Durations use one format (Duration): 3y, 4w2d, 1h. Fees are a percentage plus a fixed amount
+Durations are lengths of time written the one way (Duration): 3y, 4w2d, 1h30m, 90s. Fees are a percentage plus a fixed amount
 (ProcessorFee) or fixed amounts by size (FeeTiers).
 
 Changelog:
+2026/10/26 SAST
+- Durations may use m (minutes) and s (seconds) too (Duration, owner 2026-10-26); a wrong one is explained with
+  Duration::HOW.
 2026/10/17 SAST
 - Created.
 */

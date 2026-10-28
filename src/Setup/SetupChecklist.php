@@ -81,9 +81,11 @@ final class SetupChecklist
         $schedulerDone = $commerceRan !== null && $commerceRan['last_success'] !== 'Never' && !$commerceRan['overdue'];
         $demo = $this->site->isDemo();
 
+        // Mark done and Mark not done only where the mark decides (2026-10-26 audit: a step the site itself found done offered
+        // Mark not done, which changed nothing).
         $step = static fn(string $key, string $group, string $title, string $summary, string $state, bool $done, string $href, string $link, string $action = ''): array =>
             ['key' => $key, 'title' => $title, 'group' => $group, 'summary' => $summary, 'state' => $state, 'done' => $done,
-                'manual' => in_array($key, self::MANUAL, true), 'href' => $href, 'link' => $link, 'action' => $action];
+                'manual' => in_array($key, self::MANUAL, true) && (!$done || isset($marked[$key])), 'href' => $href, 'link' => $link, 'action' => $action];
         $manual = static fn(string $key): bool => isset($marked[$key]);
 
         return [
@@ -103,11 +105,11 @@ final class SetupChecklist
                 $paymentsDone, '/admin/settings?section=payment-methods#settings-payment-methods', 'Open Payment methods'),
             $step('fees', 'Selling', 'Fees, periods and account references',
                 'The payment provider\'s fees, the EFT refund fee, how long a buyer has to pay, the refund window, how long wallet credit lasts and the letters that start every account reference. The legal pages print these.',
-                'Check each, then mark this step done.', $manual('fees'), '/admin/settings?section=commerce-fees#commerce-settings-fees', 'Open Commerce settings'),
+                'Check each, then mark this step done.', $manual('fees'), '/admin/settings?section=commerce#commerce-settings-fees', 'Open Commerce settings'),
             $step('identity', 'Selling', 'Identity verification',
                 'Certificates and transcripts are issued only to learners whose identity Didit has verified. Put DIDIT_API_KEY, DIDIT_WORKFLOW_ID and DIDIT_WEBHOOK_SECRET in .env and enter the webhook address in the Didit console. Until then certificates wait.',
                 $this->identity->available() ? 'Didit is configured.' : 'Not configured yet: certificates wait until it is.',
-                $this->identity->available() || $manual('identity'), '/admin/settings?section=identity#settings-identity-verification', 'Open Identity verification'),
+                $this->identity->available() || $manual('identity'), '/admin/settings?section=identity-verification#settings-identity-verification', 'Open Identity verification'),
             $step('theme', 'Look', 'Theme',
                 'Choose how the site looks. Six themes are installed.',
                 'Choose one, then mark this step done.', $manual('theme'), '/admin/themes', 'Open Themes'),

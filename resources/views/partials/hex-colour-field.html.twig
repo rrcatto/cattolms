@@ -1,0 +1,7 @@
+{#
+	A colour, typed as a hex code with its swatch beside it (owner, 2026-10-28: "I do not want a colour picker. I want to
+	input a hex code and see a colour swatch, without having to submit the form", an instruction given months before):
+	the swatch follows the code as it is typed (platform-overrides.js, [data-hex-colour]); without JavaScript it shows the
+	saved colour. The server checks the code. hc: {id, name, value, label, help ('none' for none, when the group says it)}.
+#}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: hc.label, for: hc.id, help: hc.help|default('') == 'none' ? '' : (hc.help|default('') ?: 'Write it as # and six hex digits, such as #9A3F12.')})} %}{% block control %}<span class="cl-hex-colour"><svg class="cl-hex-colour-swatch" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="0.5" y="0.5" width="23" height="23" rx="4" fill="{{ hc.value matches '/^#[0-9A-Fa-f]{6}$/' ? hc.value : 'none' }}" stroke="currentColor" stroke-opacity="0.35"/></svg><input class="cl-input cl-code-input" type="text" id="{{ hc.id }}" name="{{ hc.name }}" value="{{ hc.value }}" maxlength="7" pattern="#[0-9A-Fa-f]{6}" autocomplete="off" spellcheck="false" required data-hex-colour {{ ui_field_attrs(props) }}></span>{% endblock %}{% endembed %}

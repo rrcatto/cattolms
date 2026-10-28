@@ -13,6 +13,8 @@
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
         "ext-zip": "*",
+        "dicebear/core": "^10.7",
+        "dicebear/styles": "^10.6",
         "doctrine/dbal": "^4.0",
         "doctrine/doctrine-bundle": "^3.0",
         "dompdf/dompdf": "^3",
@@ -117,7 +119,7 @@
         "themes:install": "php tools/install-bundled-themes.php",
         "themes:package": "php tools/package-bundled-themes.php",
         "seeds:publish": "php tools/publish-seed-names.php",
-        "seeds:generate": "php tools/seed-generate.php",
+        "seeds:generate": "php bin/console seed:run",
         "smoke:install": [
             "php tools/reset-development-database.php --force",
             "@migrate",
@@ -136,7 +138,7 @@
             "role": "Project creator and maintainer"
         }
     ],
-    "version": "0.9.11",
+    "version": "1.0.0",
     "extra": {
         "public-dir": "public_html"
     }

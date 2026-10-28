@@ -1,0 +1,26 @@
+{#
+	The unsubscribe page an email's unsubscribe link opens (mailing, step 2; owner, 2026-10-26; "it's always referred to as
+	an unsubscribe link", 2026-10-28). Opening it changes nothing: it asks, with one button for the email's list and one
+	for everything. No sign-in is needed; the link's own token is enough.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'My Subscriptions' %}
+	{% set ph_title = stopped ? 'Unsubscribed' : 'Unsubscribe' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% if stopped %}
+			{{ ui('layout.section-head', {heading: everything ? 'You will get no more news from us' : 'You will get no more emails about ' ~ list_name}) }}
+			<p>{{ everything ? 'You are unsubscribed from every list you followed.' : 'Anything else you follow still comes, and you can unsubscribe from it the same way.' }} Emails about your own orders, payments and courses still come, because they are not news.</p>
+			<p>You can start again at any time under <a href="/account/subscriptions">Account, My Subscriptions</a>.</p>
+		{% else %}
+			{{ ui('layout.section-head', {heading: 'Unsubscribe from ' ~ list_name ~ '?'}) }}
+			<p>Choose what to unsubscribe from. Emails about your own orders, payments and courses still come.</p>
+			<div class="cl-mailing-choices">
+				<form action="/m/u/{{ token }}" method="post"><input type="hidden" name="what" value="list">{{ ui('action.button', {label: 'Unsubscribe from ' ~ list_name, variant: 'primary', size: 'normal', type: 'submit', icon: 'action-disable'}) }}</form>
+				<form action="/m/u/{{ token }}" method="post"><input type="hidden" name="what" value="all">{{ ui('action.button', {label: 'Unsubscribe from everything', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-disable'}) }}</form>
+			</div>
+			<p class="small">To choose list by list, sign in and open <a href="/account/subscriptions">Account, My Subscriptions</a>.</p>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -1,0 +1,46 @@
+{#
+	The Follow window's words as a page, for a browser without JavaScript. Signed out, an account is needed first (owner,
+	2026-10-28, decision 8B): "Yes, create an account" opens Register, which carries the follow (or the list to join);
+	"Sign in" carries it too; "No, I changed my mind" goes back. Signed in for the first follow, how the person would like
+	their updates, weekly chosen (round two 4C).
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set fa_verb = follow_kind == 'list' ? 'join' : 'follow' %}
+	{% set ph_kicker = follow_kind == 'list' ? 'Join a list' : 'Follow' %}
+	{% if signed_in %}
+		{% set ph_title = 'Follow ' ~ follow_name %}
+		{% set ph_lead = 'How would you like to hear about ' ~ follow_name ~ ' and everything else you follow?' %}
+	{% else %}
+		{% set ph_title = 'Create an account to ' ~ fa_verb ~ ' ' ~ follow_name %}
+		{% set ph_lead = 'Before you can ' ~ fa_verb ~ ' ' ~ follow_name ~ ', we need to create an account for you on the site.' %}
+	{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+	{% if signed_in %}
+		{{ ui('layout.section-head', {heading: 'How you get updates', summary: 'You choose once, for everything you follow. You can change it at any time on My Subscriptions.'}) }}
+		<form action="/account/follow" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="kind" value="{{ follow_kind }}">
+			<input type="hidden" name="subject_id" value="{{ follow_id }}">
+			<input type="hidden" name="follow" value="1">
+			<input type="hidden" name="source" value="follow_button">
+			<input type="hidden" name="return" value="{{ return_path }}">
+			{% include '@platform/partials/mailing-how-choice.html.twig' with {mh: how|merge({id: 'follow-page'})} %}
+			<div class="cl-mailing-choices">
+				{{ ui('action.button', {label: 'Follow ' ~ follow_name, variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+				{{ ui('action.link', {label: 'Not now', variant: 'secondary', size: 'normal', href: return_path, icon: 'action-cancel'}) }}
+			</div>
+		</form>
+	{% else %}
+		{{ ui('layout.section-head', {heading: 'Would you like an account?'}) }}
+		{% if list_description|default('') %}<p>{{ list_description }}</p>{% endif %}
+		<p>Once you have signed in, you {{ fa_verb }} {{ follow_name }} straight away and its news comes to you by email. You can unsubscribe at any time.</p>
+		<div class="cl-mailing-choices">
+			{{ ui('action.link', {label: 'Yes, create an account', variant: 'primary', size: 'normal', href: '/register?follow=' ~ follow|url_encode ~ '&return=' ~ return_path|url_encode, icon: 'action-register'}) }}
+			{{ ui('action.link', {label: 'No, I changed my mind', variant: 'secondary', size: 'normal', href: follow_kind == 'list' ? '/' : return_path, icon: 'action-cancel'}) }}
+		</div>
+		<p class="small">Already have an account? <a href="/login?follow={{ follow|url_encode }}&amp;return={{ return_path|url_encode }}">Sign in</a>, and you {{ fa_verb }} it straight away.</p>
+	{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

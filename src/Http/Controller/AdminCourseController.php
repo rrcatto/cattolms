@@ -82,7 +82,8 @@ final class AdminCourseController extends BaseController
         private readonly CoursePortabilityService $portability,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages,
-        private readonly \CattoLearning\Course\CourseCatalogueSettings $catalogueSettings
+        private readonly \CattoLearning\Course\CourseCatalogueSettings $catalogueSettings,
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -165,21 +166,15 @@ final class AdminCourseController extends BaseController
             $data['related_options'] = $this->courses->relatedCourseOptions($courseId);
         }
         if ($activeTab === 'people') {
-            // People and companies are loaded only for this tab; the development dataset is large.
-            $peopleData = $this->platformAdministration->sectionData('people', $user->id);
-            $companyData = $this->platformAdministration->sectionData('companies', $user->id);
-            $editorIds = array_map(static fn(array $editor): int => (int) $editor['id'], (array) ($course['editors'] ?? []));
-            $people = (array) ($peopleData['people'] ?? []);
-            foreach ($people as &$person) {
-                $person['selected_editor'] = in_array((int) $person['id'], $editorIds, true);
-            }
-            unset($person);
-            $data['owner_people'] = $people;
-            $data['owner_companies'] = (array) ($companyData['companies'] ?? []);
+            // The owner and company as the lookups show them, chosen already: never a page of a list.
+            $data['owner_person_selected'] = $this->platformAdministration->describeEntity('people', (int) ($course['owner_user_id'] ?? 0)) ?? 0;
+            $data['owner_company_selected'] = $this->platformAdministration->describeEntity('companies', (int) ($course['owner_company_id'] ?? 0)) ?? 0;
         }
         if ($activeTab === 'test-access') {
             $data['test_grants'] = $this->courses->courseTestGrants($courseId);
         }
+        // Its followers, and writing to them (mailing, step 2; owner, 2026-10-26).
+        $data['followers'] = $this->mailingLists->followersOf('course', $courseId) + ['name' => (string) $course['title']];
         return $this->render('admin-course-edit', $data);
     }
 

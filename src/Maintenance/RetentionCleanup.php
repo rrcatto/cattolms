@@ -42,6 +42,8 @@ final class RetentionCleanup
         private readonly MaintenanceService $maintenance,
         private readonly ClockInterface $clock,
         private readonly ContactMessageRepository $contactMessages,
+        private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signupAttempts = null,
+        private readonly ?\CattoLearning\Mailing\CampaignRepository $mailingCopies = null
     ) {}
 
     /** The oldest moment kept: anything recorded before it is deleted. */
@@ -50,12 +52,16 @@ final class RetentionCleanup
         return DateTimeImmutable::createFromInterface($this->clock->now())->modify('-' . self::YEARS . ' years');
     }
 
-    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
+    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
     public function run(): array
     {
         $before = $this->cutoff();
         return ['activity_log' => $this->audit->deleteBefore($before), 'analytics_events' => $this->analytics->deleteBefore($before),
-            'contact_messages' => $this->contactMessages->deleteBefore($before)]
+            'contact_messages' => $this->contactMessages->deleteBefore($before),
+            // Sign-up attempts that never became an account (owner, 2026-10-26); an account's goes with the account.
+            'signup_attempts' => $this->signupAttempts?->deleteUnclaimedBefore($before) ?? 0,
+            // The record of each news email a person was sent, opened or clicked (mailing, step 2; owner, 2026-10-26).
+            'mailing_copies' => $this->mailingCopies?->deleteBefore($before) ?? 0]
             + $this->maintenance->prune();
     }
 }

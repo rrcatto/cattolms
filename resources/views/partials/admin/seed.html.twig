@@ -1,33 +1,50 @@
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-	{{ ui('layout.section-head', {heading: 'Generate data', eyebrow: 'Seed Database', summary: 'Companies, people, courses, modules, assessments, enrolments, results and certificates, generated as one coherent graph so every screen has something on it.'}) }}
-	{% if can_manage_seed %}
+	{{ ui('layout.section-head', {heading: 'The last run', eyebrow: 'Seed Database'}) }}
+	{% include '@platform/partials/admin/seed-status.html.twig' %}
+
+{% endblock %}
+{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+	{{ ui('layout.section-head', {heading: 'Make test data', eyebrow: 'Seed Database', summary: 'Companies with their Company Administrators and staff, and private learners, each made the way the site makes them: registered or added, buying credits or courses, paying by the simulated card or by EFT recorded from the bank statement, working through their courses, reviewing them and asking for refunds. Every name is a real one nobody on the site has, and no email is sent.'}) }}
+	{% if seed_unavailable %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>{{ seed_unavailable }}</p>{% endblock %}{% endembed %}
+	{% elseif can_manage_seed %}
 		<form action="/admin/seed/generate" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Approximate number of rows', full_width: false, for: 'seed-volume', required: true, help: 'Between ' ~ (seed_volume.minimum|number_format) ~ ' and ' ~ (seed_volume.maximum|number_format) ~ '. The figure is the total across every table, not the number of people.'})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Companies', full_width: false, for: 'seed-companies', required: true, help: 'From ' ~ seed_bounds.companies.minimum ~ ' to ' ~ seed_bounds.companies.maximum ~ '. Each has 3 to 12 staff.'})} %}
 {% block control %}
 
-				<input id="seed-volume" name="volume" type="number" value="{{ seed_volume.default }}"
-				       min="{{ seed_volume.minimum }}" max="{{ seed_volume.maximum }}" required {{ ui_field_attrs(props) }}>
+				<input id="seed-companies" name="companies" type="number" value="{{ seed_bounds.companies.default }}" min="{{ seed_bounds.companies.minimum }}" max="{{ seed_bounds.companies.maximum }}" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What this set is for', full_width: false, for: 'seed-description', help: 'Recorded in the activity log so a later reader knows why the data appeared.'})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Private learners', full_width: false, for: 'seed-learners', required: true, help: 'From ' ~ seed_bounds.learners.minimum ~ ' to ' ~ seed_bounds.learners.maximum ~ '. People who buy for themselves.'})} %}
 {% block control %}
 
-				<input id="seed-description" name="description" type="text" maxlength="500" placeholder="Catalogue screenshots" {{ ui_field_attrs(props) }}>
+				<input id="seed-learners" name="learners" type="number" value="{{ seed_bounds.learners.default }}" min="{{ seed_bounds.learners.minimum }}" max="{{ seed_bounds.learners.maximum }}" required {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What this data is for', full_width: false, for: 'seed-description', help: 'Recorded in the activity log, so a later reader knows why the data appeared.'})} %}
+{% block control %}
+
+				<input id="seed-description" name="description" type="text" maxlength="500" placeholder="Testing the company pages" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Generate', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Generate this data now? A large volume can take a while.', icon: 'action-generate'}) }}
+				{{ ui('action.button', {label: 'Start seeding', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-generate'}) }}
 				<div class="help">
-					Generation runs in one transaction: if it fails, nothing is left behind. No email is sent, whatever the volume.
+					It takes a few minutes and carries on after this page answers; the card above shows how far it has got.
 				</div>
 
 {% endblock %}
@@ -37,7 +54,7 @@
 {% endembed %}</form>
 	{% else %}
 		<p class="help">
-			Generating data needs the Seed Database management permission.
+			Making test data needs the Seed Database management permission.
 		</p>
 	{% endif %}
 

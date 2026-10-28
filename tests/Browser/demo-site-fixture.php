@@ -21,6 +21,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\AccountReference;
 use CattoLearning\Support\Token;
+use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\View\ThemeManager;
 
@@ -41,39 +42,33 @@ $session = static function (int $user, string $email) use ($container): string {
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Demo site browser', $email);
     return $token;
 };
-$person = static function (string $key, string $first, string $last, string $role, string $suffix) use ($fixture, $db, $container): array {
-    $email = 'demo-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($first . ' ' . $last, $email);
-    $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $id]);
-    $container->get(RoleRepository::class)->assign($id, $role);
-    return ['id' => $id, 'email' => $email];
-};
-
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous demo site fixture first.');
     // The check starts from the .env site mode; a site mode the owner saved in Settings is put back by cleanup.
     $savedMode = $db->fetchAssociative('SELECT option_key, option_value, updated_at, updated_by_user_id FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]) ?: null;
     $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
-    $suffix = $fixture->suffix();
-    $provider = $person('provider', 'Course', 'Provider', 'STUDENT', $suffix);
-    $company = $fixture->createCompany($provider['id'], 'Demo browser provider ' . $suffix, 'demo-browser-' . $suffix . '.example.test');
+    // A believable course provider (a company made with its founding administrator), two of its courses on sale, an
+    // administrator and a private learner, every name one nobody on the site has (owner, 2026-10-27).
+    $provider = $fixture->company();
     $courses = [];
     foreach (['a' => 30000, 'b' => 20000] as $key => $price) {
-        $slug = 'demo-browser-' . $key . '-' . $suffix;
-        $course = $fixture->createCourse($provider['id'], $company, $slug, 'Demo browser course ' . strtoupper($key) . ' ' . $suffix, 'published');
-        $db->executeStatement('UPDATE courses SET published_at = NOW() WHERE id = :id', ['id' => $course]);
-        $fixture->createPriceVariant($course, $provider['id'], 2592000, $price, true);
-        $courses[$key] = ['id' => $course, 'slug' => $slug];
+        $course = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
+        $fixture->createPriceVariant($course['id'], $provider['founder']['id'], 2592000, $price, true);
+        $courses[$key] = ['id' => $course['id'], 'slug' => $course['slug']];
     }
-    $admin = $person('admin', 'Demo', 'Administrator', 'ADMIN', $suffix);
-    $learner = $person('learner', 'Thandi', 'Nkosi', 'STUDENT', $suffix);
+    $admin = $fixture->person('ADMIN');
+    $learner = $fixture->person('STUDENT');
     $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
-    (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Thandi Nkosi', 'address_line_1' => '7 Demo Street', 'city' => 'Cape Town', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
+    (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => $learner['name'], 'address_line_1' => '7 Bree Street', 'city' => 'Cape Town', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
     $reference = (string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner['id']]);
-    $writeState(['suffix' => $suffix, 'saved_mode' => $savedMode, 'courses' => $courses, 'users' => ['provider' => $provider['id'], 'admin' => $admin['id'], 'learner' => $learner['id']],
+    $writeState(['saved_mode' => $savedMode, 'courses' => $courses, 'users' => ['provider' => $provider['founder']['id'], 'admin' => $admin['id'], 'learner' => $learner['id']], 'scrub' => $fixture->seeds(),
         'admin_token' => $session($admin['id'], $admin['email']),
         'learner' => ['id' => $learner['id'], 'email' => $learner['email'], 'token' => $session($learner['id'], $learner['email']), 'reference' => AccountReference::format($reference)]]);
     echo "Created the demo site fixture.\n";
+} elseif ($action === 'follows') {
+    // What the learner agreed to be emailed about (mailing, step 1): [kind, subject id, source] of each yes.
+    $learner = (int) ($argv[3] ?? 0);
+    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, l.subject_id, s.source FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id WHERE s.user_id = :u AND s.status = 'subscribed' ORDER BY l.kind, l.subject_id", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'order') {
     $learner = (int) ($argv[3] ?? 0);
     $records = $container->get(CommerceRepository::class);
@@ -111,12 +106,11 @@ if ($action === 'create') {
             ['k' => $state['saved_mode']['option_key'], 'v' => $state['saved_mode']['option_value'], 'at' => $state['saved_mode']['updated_at'], 'by' => $state['saved_mode']['updated_by_user_id']]);
     }
     if (isset($state['active_theme'])) $container->get(ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
-    $ids = '{' . implode(',', array_map('intval', array_values($state['users']))) . '}';
-    $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
-    $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
-    foreach ($state['courses'] as $course) $db->executeStatement("UPDATE courses SET status='retired' WHERE id = :c", ['c' => $course['id']]);
+    // Everything the check made, its orders and their money records included (owner, 2026-10-27: "you can remove the data
+    // without worrying about the rules").
+    (new CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
-    echo "Removed the sessions, carts and saved site mode; orders and their documents remain.\n";
+    echo "Removed everything the demo site check made and put the site mode back.\n";
 } else {
     throw new RuntimeException('Usage: php tests/Browser/demo-site-fixture.php create|order|theme|restore|cleanup [state-path] [learner-id]');
 }

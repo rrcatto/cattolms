@@ -14,10 +14,15 @@ final class CompanySectionRegistry
     {
         return [
             $this->s('dashboard','Dashboard','dashboard','/company/dashboard','partials/company/dashboard.html.twig','Company enrolments and account overview.'),
+            // The company's own identity, its logo first (owner, 2026-10-26: the logo had been "buried" at the end of Billing).
+            $this->s('profile','Company Profile','settings','/company/profile','partials/company/profile.html.twig','The company\'s logo, name and web address.'),
             $this->s('people','People','people','/company/people','partials/company/people.html.twig','People belonging to this company.'),
             $this->s('requests','Course Requests','requests','/company/requests','partials/company/requests.html.twig','Incoming learner course requests.'),
             $this->s('enrolments','Enrolments','enrolments','/company/enrolments','partials/company/enrolments.html.twig','Company learner enrolments and progress.'),
             $this->s('credits','Credits','credits','/company/credits','partials/company/credits.html.twig','Course and access-period credit pools.'),
+            // The company's orders, for every Company Administrator of it (owner, 2026-10-26: "A company admin sees only its
+            // own company's orders").
+            $this->s('orders','Orders','credits','/company/orders','partials/company/orders.html.twig','The credits the company bought: paid, or waiting for payment.'),
             // The labels say what each screen is rather than what it is called internally. "Company
             // Courses" and "Training Courses" were indistinguishable from each other on a menu:
             // both are courses and both belong to the company, and neither name said which was the

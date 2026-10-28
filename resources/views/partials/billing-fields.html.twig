@@ -6,16 +6,44 @@
 	rules, which is what actually decides.
 
 	Expects billing (values and whether they are saved), billing_fields, and billing_prefix to keep
-	ids unique when a page shows more than one form.
+	ids unique when a page shows more than one form. The country and the province are drop-downs (owner, 2026-10-27).
 #}
 {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
+	{% set country_value = billing.values.country_code|default('') ?: 'ZA' %}
 	{% for field in billing_fields %}
-		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: billing_prefix ~ '-' ~ field.name|replace({'_': '-'}), required: field.required, full_width: field.full_width, help: field.help})} %}
+		{% set field_id = billing_prefix ~ '-' ~ field.name|replace({'_': '-'}) %}
+		{% if field.name == 'country_code' %}
+		{# Every country by name, South Africa first and chosen (owner, 2026-10-27: "I don't want to see ZA in that field"). #}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: field_id, required: field.required, full_width: field.full_width, help: field.help})} %}
 {% block control %}
-<input id="{{ billing_prefix }}-{{ field.name|replace({'_': '-'}) }}" name="{{ field.name }}" value="{{ billing.values[field.name]|default('') }}" maxlength="{{ field.limit }}" autocomplete="{{ field.autocomplete }}"{% if field.name == 'country_code' %} pattern="[A-Za-z]{2}" size="4"{% endif %}{% if field.required %} required{% endif %} {{ ui_field_attrs(props) }}>
+<select id="{{ field_id }}" name="country_code" autocomplete="{{ field.autocomplete }}" data-billing-country required {{ ui_field_attrs(props) }}>{% include '@platform/partials/country-options.html.twig' with {countries: field.options, selected: country_value} %}</select>
 {% endblock %}
 {% endembed %}
+		{% elseif field.name == 'region' %}
+		{# The province: South Africa's nine, or typed for another country. Without JavaScript both show, each saying when it
+		   is used; with it, only the one for the chosen country. The server reads the one that fits the country. #}
+		<div class="cl-region-field" data-region-for="ZA">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Province', for: field_id, full_width: field.full_width, help: 'For an address in South Africa.'})} %}
+{% block control %}
+<select id="{{ field_id }}" name="region" autocomplete="{{ field.autocomplete }}" {{ ui_field_attrs(props) }}><option value="">Choose a province</option>{% for province in field.options %}<option{% if country_value == 'ZA' and province == billing.values.region|default('') %} selected{% endif %}>{{ province }}</option>{% endfor %}</select>
+{% endblock %}
+{% endembed %}
+		</div>
+		<div class="cl-region-field" data-region-for="other">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Province, state or region', for: field_id ~ '-other', full_width: field.full_width, help: 'For an address in another country.'})} %}
+{% block control %}
+<input id="{{ field_id }}-other" name="region_other" value="{{ country_value != 'ZA' ? billing.values.region|default('') : '' }}" maxlength="{{ field.limit }}" autocomplete="{{ field.autocomplete }}" {{ ui_field_attrs(props) }}>
+{% endblock %}
+{% endembed %}
+		</div>
+		{% else %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: field_id, required: field.required, full_width: field.full_width, help: field.help})} %}
+{% block control %}
+<input id="{{ field_id }}" name="{{ field.name }}" value="{{ billing.values[field.name]|default('') }}" maxlength="{{ field.limit }}" autocomplete="{{ field.autocomplete }}"{% if field.required %} required{% endif %} {{ ui_field_attrs(props) }}>
+{% endblock %}
+{% endembed %}
+		{% endif %}
 	{% endfor %}
 {% endblock %}
 {% endembed %}

@@ -159,7 +159,10 @@ final class PaymentAdministrationController extends BaseController
         return $this->handle(function () use ($actor,$id): void {
             $amount=$this->posted('amount')==='' ? 0 : EftForm::amount($this->posted('amount'));
             $destination=$this->posted('destination')==='money_back' ? 'money_back' : 'wallet';
-            $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination);
+            // A refund given from the order page answers the buyer's open request for that line too (2026-10-26 audit: it
+            // stayed on the queue, and refusing it later told the buyer no after the money went back).
+            $open=$this->records->openRefundRequestForItem((int)$this->posted('item_id'));
+            $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination,$open===null ? null : (int)$open['id']);
             $this->flash('success',$destination==='money_back' ? 'Refund approved and documented with a credit note. Pay it as shown under Approved refunds, then record its reference.' : 'Refund approved, credited to the wallet and documented with a credit note.');
             $this->redirect('/admin/commerce/orders/'.$id);
         },'/admin/commerce/orders/'.$id);

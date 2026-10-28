@@ -180,12 +180,14 @@ final class CompanyManagementContractTest extends TestCase
     // --- Company People actions --------------------------------------------------------------------
 
     /** Disable and Remove are separate actions with separate destinations. */
-    public function testDisableAndRemoveAreSeparateActions(): void
+    public function testDisableAndDeleteAreSeparateActions(): void
     {
         $markup = self::source('resources/views/partials/company/people.html.twig');
 
         self::assertStringContainsString('/status', $markup);
-        self::assertStringContainsString('/remove', $markup);
+        // There is no removal from a company (owner, 2026-10-26: "the whole profile should be deleted").
+        self::assertStringContainsString('/delete', $markup);
+        self::assertStringNotContainsString('/remove', $markup);
         self::assertStringContainsString('name="status" value="disabled"', $markup);
         self::assertStringContainsString('name="status" value="active"', $markup);
     }
@@ -202,19 +204,21 @@ final class CompanyManagementContractTest extends TestCase
 
         self::assertStringContainsString('signed out', $markup, 'Disabling must say the person is signed out.');
         self::assertStringContainsString('learning history are kept', $markup, 'Disabling must say nothing is deleted.');
-        self::assertStringContainsString('does not stop them signing in', $markup, 'Removal must say it is not an account ban.');
+        self::assertStringContainsString('we email them first to choose', $markup, 'Delete must say a busy person is asked first.');
+        self::assertStringContainsString('completed a course is never deleted', $markup, 'Delete must say who is never deleted.');
     }
 
-    /** Editing a person is offered, and does not pretend to manage identity or roles. */
-    public function testPersonEditIsOfferedAndScopedToProfileFields(): void
+    /** Editing a person asks what adding them asks (owner, 2026-10-26: "surely they should both reflect the same info?"). */
+    public function testPersonEditAsksWhatAddPersonAsks(): void
     {
         $markup = self::source('resources/views/partials/company/people.html.twig');
+        $edit = substr($markup, (int) strpos($markup, "id: 'company-person-'"), 6000);
 
         // A certificate carries the verified name (owner, 2026-10-19): there is no certificate name to edit.
         self::assertStringNotContainsString('name="certificate_name"', $markup);
-        self::assertStringContainsString('name="mobile_number"', $markup);
+        foreach (['name="first_name"', 'name="last_name"', 'name="email"', 'name="role"'] as $field) self::assertStringContainsString($field, $edit);
+        self::assertStringNotContainsString('name="mobile_number"', $markup, 'Add person does not ask for it.');
         self::assertStringNotContainsString('name="roles[]"', $markup, 'Company administration does not grant platform roles.');
-        self::assertStringNotContainsString('name="primary_email"', $markup, 'Email is part of the sign-in identity.');
     }
 
     // --- rendering -------------------------------------------------------------------------------

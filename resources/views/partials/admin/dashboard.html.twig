@@ -25,7 +25,7 @@
 		{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 		{# The person, their name linked to their profile as a listing names them (owner, 2026-10-21), is the title's subject
 		   ("<person> reviewed …"), or for money is named in front of the summary. #}
-		{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: entry.kind == 'money' ? 'warning' : 'info'}) }} {% if entry.subject %}{{ ui('data.person', entry.person) }} {% endif %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{% if entry.person and not entry.subject %}{{ ui('data.person', entry.person) }} · {% endif %}{{ entry.summary }}</p>{% endblock %}
+		{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: entry.kind == 'money' ? 'warning' : 'info'}) }} {% if entry.risk|default(null) %}{{ ui('feedback.badge', {label: entry.risk.label, tone: entry.risk.tone}) }} {% endif %}{% if entry.subject %}{{ ui('data.person', entry.person) }} {% endif %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{% if entry.person and not entry.subject %}{{ ui('data.person', entry.person) }} · {% endif %}{{ entry.summary }}</p>{% endblock %}
 		{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'primary', size: 'small', icon: entry.icon, href: entry.href}) }}{% endblock %}
 		{% endembed %}
 		{% endfor %}

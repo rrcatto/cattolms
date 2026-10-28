@@ -1,0 +1,15 @@
+{#
+	Who follows a category, course or tag, and writing to them (mailing, step 2; owner, 2026-10-26: "a course's followers
+	get updates only when ADMIN writes them"). followers: {list_id, followers, name}.
+#}
+{% if followers|default(null) %}
+<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'followers'})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Followers', summary: followers.followers == 0 ? 'Nobody follows ' ~ followers.name ~ ' yet. People follow it with the Follow button on its page.' : (followers.followers == 1 ? '1 person follows ' ~ followers.name ~ '.' : followers.followers ~ ' people follow ' ~ followers.name ~ '.')}) }}
+	{% if followers.list_id > 0 %}
+	<div class="cl-mailing-choices">
+		{% if 'PLATFORM.MAILING.MANAGE' in permissions %}{{ ui('action.link', {label: 'Write to its followers', variant: 'primary', size: 'normal', href: '/mailing/messages?list=' ~ followers.list_id ~ '#new', icon: 'action-email'}) }}{% endif %}
+		{% if 'PLATFORM.MAILING.VIEW' in permissions %}{{ ui('action.link', {label: 'See who follows it', variant: 'secondary', size: 'normal', href: '/mailing/lists/' ~ followers.list_id, icon: 'action-view-list'}) }}{% endif %}
+	</div>
+	{% endif %}
+{% endblock %}{% endembed %}</section>
+{% endif %}

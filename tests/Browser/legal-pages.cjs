@@ -61,10 +61,15 @@ async function open(browser, token = null, options = {}) {
 const sideScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const served = (page, theme) => page.locator(`link[href*="/${theme.slug}-v${theme.version}/"]`).count();
 async function fill(page, prefix, values) {
-    for (const [field, value] of Object.entries(values)) await page.locator(`#${prefix}-${field.replaceAll('_', '-')}`).fill(value);
+    for (const [field, value] of Object.entries(values)) {
+        // The country and a South African province are drop-downs (2026-10-27).
+        const control = page.locator(`#${prefix}-${field.replaceAll('_', '-')}`);
+        if ((await control.evaluate((element) => element.tagName)) === 'SELECT') await control.selectOption(value); else await control.fill(value);
+    }
 }
-const person = {billing_name: 'Lerato Dlamini', address_line_1: '12 Kerk Street', locality: 'Brooklyn', city: 'Pretoria', region: 'Gauteng', postal_code: '0181', country_code: 'ZA'};
-const company = {billing_name: 'Legal Browser (Pty) Ltd', address_line_1: '1 Harbour Road', locality: 'Foreshore', city: 'Cape Town', region: 'Western Cape', postal_code: '8001', country_code: 'ZA'};
+// The learner's and the company's own names, as they would type them (owner, 2026-10-27: never made-up names).
+const person = () => ({billing_name: state.learner_name, address_line_1: '12 Kerk Street', locality: 'Brooklyn', city: 'Pretoria', region: 'Gauteng', postal_code: '0181', country_code: 'ZA'});
+const company = () => ({billing_name: `${state.company_name} (Pty) Ltd`, address_line_1: '1 Harbour Road', locality: 'Foreshore', city: 'Cape Town', region: 'Western Cape', postal_code: '8001', country_code: 'ZA'});
 
 /* The learner's cart at the review step; the steps are kept in this browser's session. */
 async function toReview(page) {
@@ -72,10 +77,10 @@ async function toReview(page) {
     await Promise.all([page.waitForURL(/\/checkout/), page.locator('form[action="/cart/add"] button[value="buy_now"]').first().click()]);
     assert.equal(await page.locator('[name=identification_number]').count(), 0, 'the details step has no identity number field');
     assert.equal(await page.getByText('ID number').count(), 0, 'and does not mention one');
-    await page.locator('#first-name').fill('Lerato');
-    await page.locator('#last-name').fill('Dlamini');
+    await page.locator('#first-name').fill(state.learner_first);
+    await page.locator('#last-name').fill(state.learner_last);
     await page.locator('#mobile-number').fill('0821234567');
-    await fill(page, 'checkout-billing', person);
+    await fill(page, 'checkout-billing', person());
     await Promise.all([page.waitForURL(/\/checkout\/payment/), page.getByRole('button', {name: 'Continue to payment'}).click()]);
     await page.locator('#payment-method').selectOption('eft');
     await Promise.all([page.waitForURL(/\/checkout\/review/), page.getByRole('button', {name: 'Review my order'}).click()]);
@@ -255,7 +260,7 @@ function assertAcceptance(facts, label) {
             await check(`${name}: a company order is not placed without accepting`, async () => {
                 const {ctx, page} = await open(browser, state.company_admin_token, {width: 1280});
                 await toCompanyCheckout(page);
-                await fill(page, 'company-checkout-billing', company);
+                await fill(page, 'company-checkout-billing', company());
                 await page.locator('#payment-method').selectOption('dummy');
                 const submit = page.getByRole('button', {name: 'Place company order'});
                 await submit.click();

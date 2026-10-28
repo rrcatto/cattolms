@@ -26,4 +26,5 @@
 {% endembed %}
 		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: tag.icon_svg|default(''), ic_kind: 'tag', ic_choice: icon_choice, ic_save: '/admin/courses/tags/' ~ tag.id ~ '/icon'} %}
 	</section>
+	{% include '@platform/partials/admin/followers-card.html.twig' %}
 {% endblock %}

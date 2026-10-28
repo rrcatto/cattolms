@@ -1324,6 +1324,9 @@ final class CourseService
         if (!is_array($editorIds)) {
             $editorIds = [$editorIds];
         }
+        // The ticked editors are those already on the course; another is added by search (2026-10-26).
+        if ((int) ($input['editor_add_id'] ?? 0) > 0) $editorIds[] = (int) $input['editor_add_id'];
+        $editorIds = array_values(array_unique(array_map('intval', $editorIds)));
         $this->transactions->run(function () use ($courseId, $ownerCompanyId, $ownerUserId, $editorIds, $actorUserId): void {
             $this->courses->setCourseOwnership($courseId, $ownerCompanyId, $ownerUserId, $actorUserId);
             $this->courses->replaceCourseEditors($courseId, array_map('intval', $editorIds), $actorUserId);
@@ -1876,6 +1879,11 @@ final class CourseService
         }
         $slugInput = trim((string) ($input['slug'] ?? $existing['slug'] ?? ''));
         $slug = $slugInput !== '' ? Slug::validate($slugInput) : Slug::from($title);
+        // A web address another course uses is refused in words (2026-10-26 audit: the database refused it with an error page).
+        $holder = $this->courses->findBySlug($slug);
+        if ($holder !== null && (int) $holder['id'] !== (int) ($existing['id'] ?? 0)) {
+            throw new InvalidArgumentException('The web address ' . $slug . ' is used by the course ' . $holder['title'] . '. Choose another.');
+        }
         $code = $this->courseCode((string) ($input['code'] ?? $existing['code'] ?? ''), $title, (int) ($existing['id'] ?? 0));
         $period = array_key_exists('access_days', $input)
             ? max(1, (int) $input['access_days']) * 86400

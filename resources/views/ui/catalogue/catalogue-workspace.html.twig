@@ -6,7 +6,8 @@
 		<div id="catalogue-results">
 			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
 				{% block surface_body %}
-					{{ ui('layout.section-head', {heading: workspace.heading, summary: workspace.summary}) }}
+					{# A category or tag shown here can be followed (mailing, step 1; owner, 2026-10-26). #}
+					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: workspace.heading, summary: workspace.summary})} %}{% block section_actions %}{% if workspace.follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: workspace.follow} %}{% endif %}{% endblock %}{% endembed %}
 					{# Where the reader is in the category tree (owner, 2026-10-19): a light trail up to All courses. The
 					   categories beneath are short feature cards, four to a row (owner, 2026-10-20): choosing one opens it at
 					   once with JavaScript (data-choose-submits), or with Show courses without it. The next page opens with
@@ -27,8 +28,39 @@
 							{% endif %}
 						</div>
 					{% endif %}
+					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
+					{% if courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch} %}</div>{% endif %}
 					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
-					{% if courses %}
+					{% if courses and workspace.view|default('grid') == 'list' %}
+						{# One row per course, in the catalogue's order, on one line like every table's (the summary and rating
+						   are on the cards): its cover, small, and title; its category, level and price; and View course with
+						   the favourite star. #}
+						{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}<tr><th scope="col">Course</th><th scope="col">Category</th><th scope="col">Level</th><th scope="col">Price</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>{% endblock %}
+{% block body %}
+							{% for course in courses %}
+								{% set course_href = course.href|default('/courses/' ~ course.slug) %}
+								<tr>
+									<td class="cell-text">
+										<span class="cl-catalogue-row">
+											<a class="cl-catalogue-row-cover" href="{{ course_href }}" tabindex="-1" aria-hidden="true">{% if course.cover_svg is defined and course.cover_svg starts with '<svg' %}{{ course.cover_svg|raw }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ course.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
+											<a class="cl-catalogue-row-title" href="{{ course_href }}">{{ course.title }}</a>
+										</span>
+									</td>
+									<td>{% if course.category_path is defined and course.category_path %}{% set course_category = course.category_path|last %}<a href="/courses/category/{{ course_category.slug }}">{{ course_category.name }}</a>{% endif %}</td>
+									<td>{{ course.level|default('') }}</td>
+									<td>{% if course.default_price_label|default('') %}<strong class="cl-price-now">{{ course.default_price_label }}</strong>{% if course.default_was_label|default('') %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.default_was_label }}</s>{% endif %}{% endif %}</td>
+									<td class="cell-actions">
+										<span class="cl-catalogue-row-actions">
+											{{ ui('action.link', {label: course.link_label|default('View course'), variant: 'primary', size: 'small', href: course_href, icon: 'action-view'}) }}
+											{% if can_favourite is defined and can_favourite %}{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}{% endif %}
+										</span>
+									</td>
+								</tr>
+							{% endfor %}
+{% endblock %}
+{% endembed %}
+					{% elseif courses %}
 						{{ ui('catalogue.course-grid', {courses: courses}) }}
 					{% else %}
 						{{ ui('feedback.empty', {heading: workspace.empty_heading, summary: workspace.empty_summary}) }}

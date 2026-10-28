@@ -11,6 +11,14 @@ Description:
 Handles web requests for admin operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/26 SAST
+- Grid views (owner, 2026-10-26): each list's view comes from the address or the reader's remembered choice
+  (Support\ListView) and is remembered when asked for; People rows carry their picture's address.
+- Drawn avatars and company logos (owner, 2026-10-26): a person's picture through ProfilePictures (uploaded or drawn);
+  a company's logo served, uploaded and removed (PLATFORM.COMPANY.VIEW, MANAGE), its address on Companies rows.
+2026/10/25 SAST
+- The person page knows when it shows the reader's own account (is_own_account): no Disable, and the Platform
+  Administrator role cannot be removed there.
 2026/10/17 SAST
 - No course_group or company_group: the group tab strips are gone and the menu leads to each page.
 2026/09/09 02:10 SAST
@@ -72,7 +80,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use CattoLearning\Seed\SeedGenerationPlan;
+use CattoLearning\Seed\SeedDatabaseService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
@@ -131,9 +139,20 @@ final class AdminController extends BaseController
         private readonly \CattoLearning\Setup\SetupChecklist $setup,
         private readonly \CattoLearning\Identity\IdentityVerificationService $identity,
         private readonly \CattoLearning\Maintenance\ScheduledJobStatus $scheduledJobs,
-        private readonly \CattoLearning\Infrastructure\Persistence\UserProfileRepository $profiles,
+        private readonly \CattoLearning\Application\ProfilePictures $pictures,
+        private readonly \CattoLearning\Application\CompanyLogos $logos,
         private readonly \CattoLearning\Auth\SignInRestriction $signIn,
-        private readonly \CattoLearning\Infrastructure\Persistence\AuditRepository $auditLog
+        private readonly \CattoLearning\Infrastructure\Persistence\AuditRepository $auditLog,
+        private readonly \CattoLearning\Auth\Signup\SignupCountries $signupCountries,
+        private readonly \CattoLearning\Auth\Signup\SignupLists $signupLists,
+        private readonly \CattoLearning\Auth\Signup\NetworkLookup $network,
+        private readonly \CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signupAttempts,
+        private readonly \CattoLearning\Auth\Signup\SignInHistory $signInHistory,
+        private readonly \CattoLearning\Company\CompanyDepartures $departures,
+        private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
+        private readonly \CattoLearning\Application\CompanyOverview $companyOverview,
+        private readonly SeedDatabaseService $seedDatabase,
+        private readonly \CattoLearning\Maintenance\LogArchive $logArchive
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -167,9 +186,8 @@ final class AdminController extends BaseController
 
         $data = $this->platformAdministration->workspacePreview($keys, $user->id, $capabilities)
             // The Seed Database section is a form rather than a dataset, so the section loader has
-            // nothing to give it. Its bounds are constants, so the consolidated workspace can state
-            // them without reaching for the service.
-            + ['seed_volume' => SeedGenerationPlan::bounds()];
+            // nothing to give it: its bounds, and where the last run stands.
+            + ['seed_bounds' => $this->seedDatabase->bounds(), 'seed_run' => $this->seedDatabase->status(), 'seed_unavailable' => $this->seedDatabase->unavailable()];
         return $this->render('admin-control-centre', $this->withAdministrationPresentation($data, true, null, $sections) + [
             'title' => 'Administration',
             'page_kicker' => 'Complete permitted platform administration workspace',
@@ -424,16 +442,13 @@ final class AdminController extends BaseController
     public function personProfileImage(): Response
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
-        $image = $this->profiles->image(max(1, (int) $this->param('id')));
-        if ($image === null) {
-            throw new NotFoundHttpException('This person has no profile picture.');
+        // Their upload, or their drawn avatar (owner, 2026-10-26).
+        try {
+            $picture = $this->pictures->picture(max(1, (int) $this->param('id')));
+        } catch (\RuntimeException) {
+            throw new NotFoundHttpException('There is no such person.');
         }
-        return new Response($image['bytes'], 200, [
-            'Content-Type' => $image['mime_type'],
-            'Content-Length' => (string) strlen($image['bytes']),
-            // Private, because it is one person's picture; immutable, because the address carries a fingerprint of it.
-            'Cache-Control' => 'private, max-age=604800, immutable',
-        ]);
+        return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
     }
 
     #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
@@ -459,13 +474,32 @@ final class AdminController extends BaseController
             : [];
         // The person's own picture, when they uploaded one (owner, 2026-10-20: "When I open a person's profile, you can show
         // me the attached image, if it has one - or a placeholder if it does not").
-        $image = $this->profiles->image($target);
+        // Their upload, or their drawn avatar when they have none (owner, 2026-10-26).
+        $picture = $this->pictures->state($target);
+        // The approved page (owner, 2026-10-26): figures under their name, and their courses as one table chosen by cards.
+        $coursesList = (string) ($_GET['courses'] ?? 'library');
+        if (!in_array($coursesList, ['library', 'favourites', 'requests'], true) || ($coursesList === 'requests' && !$companyAccount)) $coursesList = 'library';
         return $this->render('admin-person-profile', $data + [
-            'profile_image_url' => $image === null ? '' : '/admin/people/' . $target . '/profile-image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
+            // Their company under its own name: the site-wide `company` is the reader's context company.
+            'person_company' => $data['company'] ?? null,
+            'person_figures' => $this->platformAdministration->personFigures($target),
+            'wallet_balance' => $companyAccount ? '' : \CattoLearning\Support\Money::ofMinorUnits($this->wallets->balance(\CattoLearning\Commerce\Wallet\WalletOwner::person($target)))->format(),
+            'courses_list' => $coursesList,
+            'grant_open' => isset($_GET['grant']) || $courseSearch !== '',
+            'person_company_logo' => ($logo = ($data['company'] ?? null) !== null ? $this->logos->state((int) $data['company']['id']) : null) === null ? '' : '/admin/companies/' . (int) $data['company']['id'] . '/logo?v=' . $logo['version'],
+            'profile_image_url' => $picture === null ? '' : '/admin/people/' . $target . '/profile-image?v=' . $picture['version'],
+            'profile_image_drawn' => $picture !== null && $picture['drawn'],
             'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
+            // The reader's own account: no Disable button and the ADMIN role kept (2026-10-25).
+            'is_own_account' => $target === $this->requireUser()->id,
+            // How they registered and where they sign in from (owner, 2026-10-26).
+            'signup_check' => self::signupCheckView($this->signupAttempts->forUser($target)),
+            'recent_signins' => $this->signInHistory->recent($target),
+            'site_is_demo' => $this->auth->demoHoldsRegistrations(),
+            'can_manage_people' => $this->requireUser()->hasPermission('PLATFORM.PERSON.MANAGE'),
             'target_company_id' => (int) (($data['company']['id'] ?? 0)),
             'library_courses' => $library,
             'library_total' => count($libraryAll),
@@ -539,8 +573,8 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->platformAdministration->createPerson($_POST, $user->id);
             $this->flash('success', 'The person was created.');
-            $this->redirect('/admin/people');
-        }, '/admin/people');
+            $this->redirect(self::companyPageReturn('/admin/people'));
+        }, self::companyPageReturn('/admin/people'));
     }
 
     #[Route('/admin/people/{id}', name: 'admin_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -584,6 +618,23 @@ final class AdminController extends BaseController
         }, '/admin/people/' . $target);
     }
 
+    /**
+     * A deactivated account restored at a new address (owner, 2026-10-26: "Admin can restore her account, change her
+     * email to her private one and allow her to continue with the courses that her profile has access to").
+     */
+    #[Route('/admin/people/{id}/restore', name: 'admin_restore_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function restorePerson(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
+        $target = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $target): void {
+            $this->departures->restore($user->id, $target, (string) ($_POST['email'] ?? ''));
+            $this->flash('success', 'The account is restored at its new address, with every course it had. The person can sign in with it.');
+            $this->redirect('/admin/people/' . $target);
+        }, '/admin/people/' . $target);
+    }
+
     #[Route('/admin/people/{id}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function revokePersonSession(): Response
     {
@@ -620,11 +671,104 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
         $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): Response {
+            // A new domain moves every staff address, so it is shown first (owner, 2026-10-26: "it should warn about this
+            // before the change is made"); the warning page sends the same form back with confirm_domain.
+            $domain = strtolower(trim((string) ($_POST['domain'] ?? '')));
+            $moves = $this->platformAdministration->domainChangeMoves($id, $domain);
+            if ($moves !== [] && strtolower(trim((string) ($_POST['confirm_domain'] ?? ''))) !== $domain) {
+                $company = $this->platformAdministration->adminCompanyView($id)['admin_company'] ?? [];
+                return $this->render('admin-company-domain', ['title' => 'Change the domain of ' . (string) ($company['name'] ?? 'the company'), 'active_nav' => 'admin',
+                    'domain_company' => $company, 'new_name' => (string) ($_POST['name'] ?? ''), 'new_domain' => $domain, 'moves' => $moves,
+                    'moves_taken' => count(array_filter($moves, static fn(array $move): bool => $move['taken'])), 'return_to' => self::companyReturn($id)]);
+            }
+            $this->platformAdministration->updateCompany($id, $_POST + ['move_staff' => $moves !== []], $user->id);
+            $this->flash('success', $moves === [] ? 'The company was updated.' : 'The company was updated, and ' . count($moves) . ' staff ' . (count($moves) === 1 ? 'address was' : 'addresses were') . ' moved to ' . $domain . '. Each person was emailed at their old address.');
+            $this->redirect(self::companyReturn($id));
+        }, self::companyReturn($id));
+    }
+
+    /**
+     * A company's page in Administration (owner, 2026-10-26: "a page per company in Administration ... with the logo at
+     * its top"): the logo first, which is changed here, then its details with Edit and Disable, and its people.
+     */
+    #[Route('/admin/companies/{id}', name: 'admin_company', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function company(): Response
+    {
+        $user = $this->requirePermission('PLATFORM.COMPANY.VIEW');
+        $id = (int) $this->param('id');
+        // Everything about the company on one page (owner, 2026-10-27: the approved mockup).
+        $view = $this->companyOverview->view($id, $user, $this->request()->query->all(), $this->request()->cookies->all());
+        if ($view === null) throw $this->notFound('That company could not be found.');
+        $logo = $this->logos->state($id);
+
+        return $this->render('admin-company', $view + [
+            'title' => (string) $view['admin_company']['name'],
+            'active_nav' => 'admin',
+            'company_logo' => $logo === null ? null : ['url' => '/admin/companies/' . $id . '/logo?v=' . $logo['version'], 'uploaded' => $logo['uploaded']],
+            'can_manage_companies' => $user->hasPermission('PLATFORM.COMPANY.MANAGE'),
+            'can_manage_people' => $user->hasPermission('PLATFORM.PERSON.MANAGE'),
+            'can_manage_credits' => $user->hasPermission('PLATFORM.CREDIT.MANAGE'),
+            'can_select_company' => $this->companyContext->canSelect($user),
+            'editing' => $this->request()->query->get('edit') === '1',
+        ]);
+    }
+
+    /** Back to the company's own page when a form was sent from it (owner, 2026-10-27: one page for a company), else $fallback. */
+    private static function companyPageReturn(string $fallback): string
+    {
+        $return = (string) ($_POST['return'] ?? '');
+
+        return preg_match('#^/admin/companies/\d+(\#[a-z-]+)?$#', $return) === 1 ? $return : $fallback;
+    }
+
+    /** Where a company's forms return: its page when sent from there, else the Companies list. */
+    private static function companyReturn(int $id): string
+    {
+        return ($_POST['return'] ?? '') === 'page' ? '/admin/companies/' . $id : '/admin/companies';
+    }
+
+    /** A company's logo, or its drawn picture (owner, 2026-10-26). */
+    #[Route('/admin/companies/{id}/logo', name: 'admin_company_logo', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function companyLogo(): Response
+    {
+        $this->requirePermission('PLATFORM.COMPANY.VIEW');
+        try {
+            $picture = $this->logos->picture(max(1, (int) $this->param('id')));
+        } catch (\RuntimeException) {
+            throw new NotFoundHttpException('There is no such company.');
+        }
+        return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
+    }
+
+    #[Route('/admin/companies/{id}/logo', name: 'admin_upload_company_logo', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function uploadCompanyLogo(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
+        $id = max(1, (int) $this->param('id'));
         return $this->handle(function () use ($user, $id): void {
-            $this->platformAdministration->updateCompany($id, $_POST, $user->id);
-            $this->flash('success', 'The company was updated.');
-            $this->redirect('/admin/companies');
-        }, '/admin/companies');
+            $upload = $this->request()->files->get('logo');
+            if ($upload === null || !$upload->isValid()) {
+                throw new \RuntimeException('No logo was received. Please choose a file and try again.');
+            }
+            $this->logos->upload($id, (string) file_get_contents((string) $upload->getPathname()), $user->id);
+            $this->flash('success', 'The company logo was saved.');
+            $this->redirect('/admin/companies/' . $id . '#company-logo');
+        }, '/admin/companies/' . $id . '#company-logo');
+    }
+
+    #[Route('/admin/companies/{id}/logo/remove', name: 'admin_remove_company_logo', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function removeCompanyLogo(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
+            $this->logos->remove($id, $user->id);
+            $this->flash('success', 'The company logo was removed. A drawn picture is shown instead.');
+            $this->redirect('/admin/companies/' . $id . '#company-logo');
+        }, '/admin/companies/' . $id . '#company-logo');
     }
 
     #[Route('/admin/companies/{id}/status', name: 'admin_change_company_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -636,8 +780,8 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->setCompanyStatus($id, (string) ($_POST['status'] ?? 'disabled'), $user->id);
             $this->flash('success', 'The company status was updated.');
-            $this->redirect('/admin/companies');
-        }, '/admin/companies');
+            $this->redirect(self::companyReturn($id));
+        }, self::companyReturn($id));
     }
 
     #[Route('/admin/course/enrolments/{id}/remove', name: 'admin_remove_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -646,9 +790,12 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
         $id = max(1, (int) $this->param('id'));
-        $this->platformAdministration->removeEnrolment($id, $user->id, (string) ($_POST['reason'] ?? 'Removed by platform administrator'));
-        $this->flash('success', 'Course access was removed. Progress and results were retained.');
-        $this->redirect($this->enrolmentReturn());
+        // A refusal is a message on the page it came from, never an error page (2026-10-26 audit).
+        return $this->handle(function () use ($id, $user): void {
+            $this->platformAdministration->removeEnrolment($id, $user->id, (string) ($_POST['reason'] ?? 'Removed by platform administrator'));
+            $this->flash('success', 'Course access was removed. Progress and results were retained.');
+            $this->redirect($this->enrolmentReturn());
+        }, $this->enrolmentReturn());
     }
 
     #[Route('/admin/course/enrolments/{id}/restore', name: 'admin_restore_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -657,9 +804,11 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
         $id = max(1, (int) $this->param('id'));
-        $this->platformAdministration->restoreEnrolment($id, $user->id);
-        $this->flash('success', 'Course access was restored.');
-        $this->redirect($this->enrolmentReturn());
+        return $this->handle(function () use ($id, $user): void {
+            $this->platformAdministration->restoreEnrolment($id, $user->id);
+            $this->flash('success', 'Course access was restored.');
+            $this->redirect($this->enrolmentReturn());
+        }, $this->enrolmentReturn());
     }
 
     /** Where removing or restoring access goes back to: the person's page it was done from, else the enrolments list. */
@@ -667,6 +816,29 @@ final class AdminController extends BaseController
     {
         $return = (string) ($_POST['return'] ?? '');
         return preg_match('#^/admin/people/\d+$#', $return) === 1 ? $return : '/admin/course/enrolments';
+    }
+
+    /** Unused places of a credit given by hand taken back, with a reason (owner, 2026-10-26: "Unused places only"). */
+    #[Route('/admin/course/credits/{id}/take-back', name: 'admin_take_back_credit', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function takeBackCredit(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.CREDIT.MANAGE');
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
+            $this->flash('success', $this->platformAdministration->takeBackCredit($id, (int) ($_POST['places'] ?? 0), (string) ($_POST['reason'] ?? ''), $user->id));
+            $this->redirect(self::companyPageReturn('/admin/course/credits'));
+        }, self::companyPageReturn('/admin/course/credits'));
+    }
+
+    /** The lengths the chosen course is sold for, as options for the credit form (htmx, when the course is chosen). */
+    #[Route('/admin/course/credits/lengths', name: 'admin_credit_lengths', methods: ['GET'])]
+    public function creditLengthOptions(): Response
+    {
+        $this->requirePermission('PLATFORM.CREDIT.MANAGE');
+        $courseId = (int) ($_GET['course_id'] ?? 0);
+
+        return $this->renderFragment('partials/credit-length-options', ['lengths' => $this->platformAdministration->creditLengths($courseId), 'course_chosen' => $courseId > 0, 'empty_words' => 'Not sold at any length yet: give it a price first']);
     }
 
     #[Route('/admin/course/credits', name: 'admin_add_credit', methods: ['POST'])]
@@ -677,8 +849,8 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->platformAdministration->addCredit($_POST, $user->id);
             $this->flash('success', 'The course credit was added and audited.');
-            $this->redirect('/admin/course/credits');
-        }, '/admin/course/credits');
+            $this->redirect(self::companyPageReturn('/admin/course/credits'));
+        }, self::companyPageReturn('/admin/course/credits'));
     }
 
     #[Route('/admin/course/requests/{id}/decision', name: 'admin_decide_request', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -697,12 +869,14 @@ final class AdminController extends BaseController
                     $this->flash('info','A company purchase for this request is already in progress.');
                     $this->redirect('/account/orders/'.$existing);
                 }
-                $this->flash('info', 'A matching company credit is needed. Complete checkout to approve and enrol this learner.');
+                // Say which company the checkout is for: the Company workspace has just been switched to it (2026-10-26 audit).
+                $this->flash('info', 'The company has no credit for this course. You are buying one for ' . (string) ($this->platformAdministration->adminCompanyView((int) $result['company_id'])['admin_company']['name'] ?? 'the company') . ': complete checkout to approve the request and enrol the learner.');
                 $this->redirect('/company/credits/buy');
             }
+            // Back to the request on its own list (2026-10-26 audit: it landed on Enrolments).
             $this->flash('success', $approve ? 'The request was approved.' : 'The request was rejected.');
-            $this->redirect('/admin/course/enrolments');
-        }, '/admin/course/enrolments');
+            $this->redirect(self::companyPageReturn('/admin/course/requests#request-' . $id));
+        }, self::companyPageReturn('/admin/course/requests#request-' . $id));
     }
 
     #[Route('/admin/themes/resync', name: 'admin_resync_themes', methods: ['POST'])]
@@ -721,18 +895,25 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
         $theme = trim((string) ($_POST['theme'] ?? 'factory-reset'));
-        $this->themes->activate($theme, $user->id);
-        $this->flash('success', 'The selected theme is now active.');
-        $this->redirect('/admin/themes');
+        // A refusal is a message on the Themes page, never an error page (2026-10-26 audit).
+        return $this->handle(function () use ($theme, $user): void {
+            $this->themes->activate($theme, $user->id);
+            $this->flash('success', 'The selected theme is now active.');
+            $this->redirect('/admin/themes');
+        }, '/admin/themes');
     }
 
-    #[Route('/admin/themes/{slug}/delete', name: 'admin_delete_theme', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
+    // A theme's key carries its version with dots, such as saharan-sunset-v1.0.5 (2026-10-26 audit: the route refused the
+    // dots, so Uninstall was always "not found").
+    #[Route('/admin/themes/{slug}/delete', name: 'admin_delete_theme', requirements: ['slug' => '[a-z0-9][a-z0-9._-]*'], methods: ['POST'])]
     public function deleteTheme(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $slug = (string) $this->param('slug');
-        $this->themes->delete($slug, $user->id);
-        $this->flash('success', 'The theme was uninstalled.');
-        $this->redirect('/admin/themes');
+        return $this->handle(function () use ($slug, $user): void {
+            $this->themes->delete($slug, $user->id);
+            $this->flash('success', 'The theme was uninstalled.');
+            $this->redirect('/admin/themes');
+        }, '/admin/themes');
     }
 
     #[Route('/admin/themes/import', name: 'admin_import_theme', methods: ['POST'])]
@@ -833,6 +1014,101 @@ final class AdminController extends BaseController
         $this->flash('success', 'Who can sign in now follows AUTH_SIGNIN and AUTH_SIGNIN_ALLOWED_EMAILS in .env: '
             . ($this->signIn->restricted() ? 'administrators and the ' . count($this->signIn->allowedEmails()) . ' listed ' . (count($this->signIn->allowedEmails()) === 1 ? 'address' : 'addresses') . ' only.' : 'everyone.'));
         $this->redirect('/admin/settings?section=sign-in#settings-sign-in');
+    }
+
+    /**
+     * A person's sign-up check as their page shows it, or null when the account was not registered through the site.
+     *
+     * @param array<string,mixed>|null $attempt
+     * @return array<string,mixed>|null
+     */
+    private static function signupCheckView(?array $attempt): ?array
+    {
+        if ($attempt === null) return null;
+        $row = SignupAttemptsController::row($attempt);
+        $row['hold_words'] = array_map([\CattoLearning\Auth\Signup\SignupRisk::class, 'holdWords'], (array) $attempt['hold_reasons']);
+
+        return $row;
+    }
+
+    /** Marks a sign-in from a new country as seen: it leaves Needs your attention (owner, 2026-10-26). */
+    #[Route('/admin/people/{id}/sign-ins/{login}/seen', name: 'admin_signin_seen', requirements: ['id' => '\\d+', 'login' => '\\d+'], methods: ['POST'])]
+    public function signInSeen(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
+        $target = (int) $this->request()->attributes->get('id');
+        return $this->handle(function () use ($user, $target): void {
+            $this->signInHistory->markSeen($target, (int) $this->request()->attributes->get('login'), $user->id);
+            $this->flash('success', 'The sign-in is marked as seen.');
+            $this->redirect('/admin/people/' . $target . '#recent-sign-ins');
+        }, '/admin/people/' . $target . '#recent-sign-ins');
+    }
+
+    /** Settings > Sign-up checks (owner, 2026-10-26): the allowed and blocked countries. */
+    #[Route('/admin/settings/signup-checks', name: 'admin_save_signup_checks', methods: ['POST'])]
+    public function saveSignupChecks(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $saved = $this->signupCountries->save((string) ($_POST['allowed_countries'] ?? ''), (string) ($_POST['blocked_countries'] ?? ''), $user->id);
+            $this->auditLog->record($user->id, 'settings.signup_countries_saved', $saved);
+            $this->flash('success', 'Allowed countries: ' . \CattoLearning\Auth\Signup\SignupCountries::names($saved['allowed'], 'every country')
+                . '. Blocked countries: ' . \CattoLearning\Auth\Signup\SignupCountries::names($saved['blocked']) . '.');
+            $this->redirect('/admin/settings?section=signup-checks#settings-signup-checks');
+        }, '/admin/settings?section=signup-checks#settings-signup-checks');
+    }
+
+    /** Settings > Maintenance (owner, 2026-10-27): how long the application log's archives are kept. */
+    #[Route('/admin/settings/log-archives', name: 'admin_save_log_archives', methods: ['POST'])]
+    public function saveLogArchives(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $keep = $this->logArchive->saveKeep((string) ($_POST['keep'] ?? ''), $user->id);
+            $this->auditLog->record($user->id, 'settings.log_archives_saved', ['keep' => $keep]);
+            $this->flash('success', 'Log archives are now kept for ' . \CattoLearning\Support\Duration::parse($keep)->words() . '.');
+            $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
+        }, '/admin/settings?section=maintenance#settings-maintenance');
+    }
+
+    /** Removes the saved keep period: log archives follow LOG_ARCHIVES_KEPT_FOR in .env again. */
+    #[Route('/admin/settings/log-archives/reset', name: 'admin_reset_log_archives', methods: ['POST'])]
+    public function resetLogArchives(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->logArchive->resetKeep();
+        $this->auditLog->record($user->id, 'platform.setting_reset', ['setting' => 'log_archives', 'source' => '.env']);
+        $this->flash('success', 'Log archives are kept as LOG_ARCHIVES_KEPT_FOR in .env says: ' . \CattoLearning\Support\Duration::parse($this->logArchive->keep())->words() . '.');
+        $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
+    }
+
+    /** Removes the saved country lists: the site follows SIGNUP_ALLOWED_COUNTRIES and SIGNUP_BLOCKED_COUNTRIES again. */
+    #[Route('/admin/settings/signup-checks/reset', name: 'admin_reset_signup_checks', methods: ['POST'])]
+    public function resetSignupChecks(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->signupCountries->reset();
+        $this->auditLog->record($user->id, 'platform.setting_reset', ['setting' => 'signup_countries', 'source' => '.env']);
+        $this->flash('success', 'The country lists now follow SIGNUP_ALLOWED_COUNTRIES and SIGNUP_BLOCKED_COUNTRIES in .env.');
+        $this->redirect('/admin/settings?section=signup-checks#settings-signup-checks');
+    }
+
+    /** Fetches the sign-up check's published lists now, rather than waiting for the daily job. */
+    #[Route('/admin/settings/signup-checks/lists', name: 'admin_fetch_signup_lists', methods: ['POST'])]
+    public function fetchSignupLists(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $done = $this->signupLists->update(true);
+        $this->auditLog->record($user->id, 'settings.signup_lists_fetched', $done);
+        $labels = array_map(static fn(string $name, string $what): string => \CattoLearning\Auth\Signup\SignupLists::LISTS[$name]['label'] . ': ' . $what, array_keys($done), $done);
+        $this->flash('success', 'Lists fetched. ' . implode('. ', $labels) . '.');
+        $this->redirect('/admin/settings?section=signup-checks#settings-signup-checks');
     }
 
     #[Route('/admin/settings/site-mode/reset', name: 'admin_reset_site_mode', methods: ['POST'])]
@@ -962,6 +1238,23 @@ final class AdminController extends BaseController
                 $capabilities,
                 $swapping
             );
+        // Each person's picture, uploaded or drawn (owner, 2026-10-26), for their card.
+        if ($key === 'people' && isset($data['people']) && is_array($data['people']) && array_is_list($data['people'])) {
+            $data['people'] = $this->pictures->withPictures($data['people']);
+            // Each one's sign-up check, its risk at a glance (owner, 2026-10-26); none for an account made here.
+            $checks = $this->signupAttempts->forUsers(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $data['people']));
+            foreach ($data['people'] as $index => $row) {
+                $check = $checks[(int) ($row['id'] ?? 0)] ?? null;
+                $data['people'][$index]['risk'] = $check === null ? null : ['label' => \CattoLearning\Auth\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'],
+                    'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band']), 'href' => '/admin/people/signup-attempts/' . $check['id']];
+            }
+        }
+        // Each company's logo, or its drawn picture (owner, 2026-10-26), for its row and its Edit window.
+        foreach (['companies', 'company_creators'] as $companyRows) {
+            if ($key === $companyRows && isset($data[$companyRows]) && is_array($data[$companyRows]) && array_is_list($data[$companyRows])) {
+                $data[$companyRows] = $this->logos->withPictures($data[$companyRows]);
+            }
+        }
         $data = $this->withAdministrationPresentation($data, false, $definition);
 
         // Nothing but the section body is sent back for a swap. htmx still selects the results
@@ -1034,13 +1327,32 @@ final class AdminController extends BaseController
             // What is in force, where it comes from, and what .env says, which Reset returns to (owner, 2026-10-24).
             $data['sign_in'] = ['restricted' => $this->signIn->restricted(), 'emails' => implode("\n", $this->signIn->allowedEmails()), 'source' => $this->signIn->source(),
                 'environment' => $this->signIn->environmentRestricted(), 'environment_emails' => $this->signIn->environmentEmails()];
+            // The sign-up check's countries and what it reads (owner, 2026-10-26).
+            $environment = $this->signupCountries->environmentLists();
+            $data['signup_checks'] = [
+                'allowed' => implode(', ', $this->signupCountries->allowed()), 'blocked' => implode(', ', $this->signupCountries->blocked()),
+                'allowed_names' => \CattoLearning\Auth\Signup\SignupCountries::names($this->signupCountries->allowed(), 'every country'),
+                'blocked_names' => \CattoLearning\Auth\Signup\SignupCountries::names($this->signupCountries->blocked()),
+                'blocked_count' => count($this->signupCountries->blocked()),
+                'source' => $this->signupCountries->source(),
+                'environment' => \CattoLearning\Auth\Signup\SignupCountries::names($environment['allowed'], 'every country') . ' allowed, ' . \CattoLearning\Auth\Signup\SignupCountries::names($environment['blocked']) . ' blocked',
+                'lists' => array_values(array_map(static fn(array $list): array => $list + ['fetched' => $list['fetched_at'] === null ? 'not fetched yet' : date('j M Y, H:i', $list['fetched_at'])], $this->signupLists->status())),
+            ] + $this->network->available();
             $data['maintenance'] = $this->maintenance->pending();
+            // The application log and its archives (owner, 2026-10-27): where they are, how big, how long kept.
+            $logs = $this->logArchive->status();
+            $logs['others'] = array_map(static fn(array $log): array => $log + ['size' => \CattoLearning\Maintenance\LogArchive::size($log['bytes'])], $logs['others']);
+            $data['log_archive'] = $logs + ['log_size' => \CattoLearning\Maintenance\LogArchive::size($logs['log_bytes']),
+                'archive_size' => \CattoLearning\Maintenance\LogArchive::size($logs['archive_bytes']), 'keep' => $this->logArchive->keep(),
+                'keep_words' => \CattoLearning\Support\Duration::parse($this->logArchive->keep())->words(), 'source' => $this->logArchive->source(),
+                'environment' => $this->logArchive->environmentKeep(), 'how' => \CattoLearning\Support\Duration::HOW];
             // Each scheduled job's last run, the payment methods and identity verification (owner, 2026-10-19).
             $data['scheduled_jobs'] = $this->scheduledJobs->jobs();
             $data['payment_methods'] = $this->paymentMethods->settingsView();
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
                 'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
+            // How news is sent and the sending discipline (mailing, step 2; owner, 2026-10-26).
             // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
             $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);
             $data['can_manage_settings'] = $this->currentUser()?->hasPermission('SYSTEM.SETTING.MANAGE') ?? false;
@@ -1151,6 +1463,14 @@ final class AdminController extends BaseController
         // Course Requests narrows by status as well, so an operator can find the approvals that are
         // waiting on payment and have therefore put nobody on a course.
         $request['requests_status'] = $_GET['requests_status'] ?? null;
+
+        // A list shown as a table or a grid of cards, as its reader chose (owner, 2026-10-26): the address's choice is
+        // remembered, and the remembered one used when the address names none.
+        foreach (array_keys(\CattoLearning\Support\ListView::DEFAULTS) as $list) {
+            if ($list === 'catalogue') continue;
+            $request[$list . '_view'] = \CattoLearning\Support\ListView::chosen($list, $_GET, $_COOKIE);
+            if ($list === $key) \CattoLearning\Support\ListView::rememberAsked($list, $_GET);
+        }
 
         // Search terms are collected from the declaration, not from a list written out here. The
         // Companies search shipped doing nothing because this method gathered page and page size

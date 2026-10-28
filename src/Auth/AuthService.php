@@ -11,6 +11,11 @@ Description:
 Implements Catto Learning business and application logic for auth operations.
 
 Changelog:
+2026/10/26 SAST
+- The company domain rule (owner, restated 2026-10-26): registering a private account with an address at a company's
+  domain is refused ("Refused"), and a company account only with its own domain, never one already here; an account
+  never adds an address at another company's domain; making a private address primary leaves the company, drops the
+  employer's addresses and keeps every course (CompanyService::followAddress; the last Company Administrator cannot).
 2026/08/23 04:19 SAST
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
 2026/08/20 02:43 SAST
@@ -40,10 +45,12 @@ use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Support\ClientFingerprint;
+use CattoLearning\Support\Countries;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\PersonName;
 use CattoLearning\Support\Token;
+use InvalidArgumentException;
 use RuntimeException;
 
 final class AuthService
@@ -74,9 +81,15 @@ final class AuthService
         private readonly UserProfileRepository $profiles,
         private readonly ?CompanyService $companies = null,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
-        private readonly ?SignInRestriction $signIn = null
+        private readonly ?SignInRestriction $signIn = null,
+        private readonly ?Signup\SignupChecks $signups = null,
+        private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null,
+        private readonly ?IdNumbers $idNumbers = null
     ) {
     }
+
+    /** What someone who lives outside South Africa is told (owner, 2026-10-27, 5A). */
+    public const SOUTH_AFRICA_ONLY = 'Registration is open to people living in South Africa for now.';
 
     /** Whether this address belongs to an administrator: the configured one, or an account with the ADMIN role. */
     private function isAdministrator(string $email, ?int $userId): bool
@@ -101,18 +114,36 @@ final class AuthService
 
     /** Where a new account on a demo site goes once its email is confirmed: it waits for ADMIN's approval. */
     public const AWAITING_APPROVAL_PATH = '/register/awaiting-approval';
-    public const AWAITING_APPROVAL_MESSAGE = 'Your account is waiting for approval. You will receive an email as soon as it is approved.';
+    /** Said to an account that is held, when it tries to sign in or register again (owner, 2026-10-26: no promise it will be allowed). */
+    public const AWAITING_APPROVAL_MESSAGE = 'Your account is held pending approval, so it cannot be used yet. Its status will be processed by the site\'s administrator.';
+    /**
+     * Said on a demo site before and after registering, in the owner's words (2026-10-26): "I would add something like
+     * ... I don't want to promise that the account will be allowed - if it looks spammy, I will reject it."
+     */
+    public const DEMO_HOLD_NOTICE = 'After completing your registration, your account will be held pending approval because the site is currently in DEMO mode. Once the site has gone LIVE, your account status will be processed.';
 
     /**
      * On a demo site every account registered through the site waits for ADMIN's approval before it can sign in (owner,
      * 2026-10-21: "if someone logs in, in demo mode, admin still must allow them to operate. otherwise my IP will get
      * stolen"): a stranger who finds the site cannot buy courses with the simulated card and read them. Accounts ADMIN
-     * makes are approved already; a live site approves nobody by hand.
+     * makes are approved already. A live site holds a registration its sign-up check held (owner, 2026-10-26): from a
+     * blocked country, or high risk, without saying why (outside the allowed countries is a warning sign only since
+     * 2026-10-27, the owner's 6A).
+     *
+     * @param array<string,mixed> $signup the sign-up check's verdict carried by the registration link
      */
-    private function needsApproval(string $email = ''): bool
+    private function needsApproval(string $email = '', array $signup = []): bool
     {
         // An address the administrator listed under Who can sign in is approved already (owner, 2026-10-21).
         if ($email !== '' && ($this->signIn?->isListed($email) ?? false)) return false;
+        if ($this->site?->isDemo() ?? false) return true;
+
+        return ($signup['hold'] ?? false) === true;
+    }
+
+    /** Whether a registration on this site is held on the demo site's account, said before anyone registers. */
+    public function demoHoldsRegistrations(): bool
+    {
         return $this->site?->isDemo() ?? false;
     }
 
@@ -136,10 +167,10 @@ final class AuthService
      * The identity shown in the header of every page: who this is, and whether there is a picture.
      *
      * One call rather than two lookups spread across BaseController, because it runs on every
-     * render. hasImage() is an existence check and never loads the bytes - the header only needs
-     * to know whether to address the image route or draw an initial.
+     * render. hasImage() and pictureState() never load the bytes: the header needs only the picture's version
+     * for its address, an upload's or the drawn avatar's (2026-10-26), never an initial.
      *
-     * @return array{name:string,email:string,status:string,has_image:bool,reference:string}
+     * @return array{name:string,email:string,status:string,has_image:bool,picture_version:string,reference:string}
      */
     public function identityCard(int $userId): array
     {
@@ -150,12 +181,15 @@ final class AuthService
             'email' => (string) ($profile['primary_email'] ?? ''),
             'status' => (string) ($profile['status'] ?? ''),
             'has_image' => $this->profiles->hasImage($userId),
+            // Their upload's or their drawn avatar's version (owner, 2026-10-26), for the identity band's picture address.
+            'picture_version' => ($state = $this->profiles->pictureState($userId)) === null ? '' : \CattoLearning\Application\ProfilePictures::versionOf($state),
             // Shown beside the name on every page (owner, 2026-10-21: every page that names a person gives their account reference).
             'reference' => (string) ($profile['account_reference'] ?? ''),
         ];
     }
 
-    public function requestLogin(string $inputEmail, string $returnPath = '/account/courses'): void
+    /** @param string $follow a follow asked for before signing in ("course:12"), carried out when the link is used (owner, 2026-10-28) */
+    public function requestLogin(string $inputEmail, string $returnPath = '/account/courses', string $follow = ''): void
     {
         $email = EmailAddress::normalize($inputEmail);
         $known = $this->users->findByVerifiedEmail($email);
@@ -178,14 +212,14 @@ final class AuthService
             $email,
             'login',
             null,
-            ['return_path' => $this->safeReturnPath($returnPath)],
-            Env::int('AUTH_MAGIC_LINK_TTL', 1800),
+            ['return_path' => $this->safeReturnPath($returnPath)] + (($intent = \CattoLearning\Mailing\FollowIntent::fromText($follow)) !== null ? ['follow' => $intent->text()] : []),
+            Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'),
             ClientFingerprint::ipHash()
         );
 
         $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($rawToken);
         try {
-            $this->mailer->sendMagicLink($email, $url, Env::int('AUTH_MAGIC_LINK_TTL', 1800));
+            $this->mailer->sendMagicLink($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'));
         } catch (\Throwable $e) {
             $this->tokens->deleteByHash($tokenHash);
             throw new RuntimeException('The sign-in email could not be sent.', 0, $e);
@@ -238,12 +272,15 @@ final class AuthService
 
             $this->tokens->markUsed((int) $row['id']);
             $this->users->markLogin((int) $user['id']);
+            // The follow they asked for before signing in (owner, 2026-10-28: "once they've signed in, action the follow").
+            $asked = json_decode((string) ($row['context'] ?? '{}'), true);
+            if (is_array($asked) && isset($asked['follow'])) $this->mailing?->followAfterSignIn((int) $user['id'], $asked['follow']);
 
             $sessionToken = Token::generate();
             $sessionPublicId = $this->sessions->create(
                 (int) $user['id'],
                 Token::hash($sessionToken),
-                Env::int('AUTH_SESSION_TTL', 86400),
+                Env::seconds('AUTH_SESSION_TTL', '1d'),
                 ClientFingerprint::ipHash(),
                 ClientFingerprint::userAgent(),
                 $email
@@ -266,10 +303,11 @@ final class AuthService
         /** @var array<string,mixed> $user */
         $user = $state['user'];
         $this->setSessionCookie((string) $state['session_token']);
+        // The country is kept with the sign-in, so a first sign-in from another country can be flagged (owner, 2026-10-26).
         $this->audit->record(
             (int) $user['id'],
             'auth.login',
-            ['session' => (string) $state['session_public_id']]
+            ['session' => (string) $state['session_public_id'], 'country' => $this->signups?->countryOf(ClientFingerprint::ipAddress()) ?? '']
         );
         if ((bool) $state['created']) {
             $this->events->dispatch('user.registered', ['user_id' => (int) $user['id']]);
@@ -299,8 +337,8 @@ final class AuthService
         }
 
         $lastSeen = strtotime((string) $session['last_seen_at']) ?: 0;
-        if ($lastSeen < time() - Env::int('AUTH_SESSION_TOUCH_INTERVAL', 300)) {
-            $this->sessions->touch((int) $session['id'], Env::int('AUTH_SESSION_TTL', 86400));
+        if ($lastSeen < time() - Env::seconds('AUTH_SESSION_TOUCH_INTERVAL', '5m')) {
+            $this->sessions->touch((int) $session['id'], Env::seconds('AUTH_SESSION_TTL', '1d'));
             $this->setSessionCookie($rawToken);
         }
 
@@ -370,29 +408,31 @@ final class AuthService
     }
 
     /**
-     * What a signed-in person must do first (owner, 2026-10-20, adults only): give their date of birth
-     * once, unless they did at registration. A verified identity document showing them under 18 stops the
-     * account at the adults-only page for good. AccountStepListener sends them there before any other page.
+     * What a signed-in person must do first: give their South African ID number once, unless they did at registration
+     * (owner, 2026-10-27, 4A: everyone, accounts others made and those already on the site too); it gives their date of
+     * birth (adults only, 2026-10-20). A verified identity document showing them under 18 stops the account at the
+     * adults-only page for good. AccountStepListener sends them there before any other page.
      *
      * @param array<string,mixed> $session
      */
     private static function accountStep(array $session): string
     {
         if (self::isTrue($session['verified_minor'] ?? false)) return 'adults_only';
-        if (($session['birthdate'] ?? null) === null) return 'age';
+        if (!self::isTrue($session['has_id_number'] ?? false)) return 'id_number';
         return '';
     }
 
     /**
-     * The date of birth at the first sign-in of an account someone else made (owner, 2026-10-20). Someone
-     * under 18 is refused and nothing is kept (AdultAge).
+     * The ID number at the next sign-in of an account without one (4A). An invalid number, one another account holds, or
+     * someone under 18 is refused, and nothing is kept.
      */
-    public function giveDateOfBirth(CurrentUser $user, mixed $dateOfBirth): void
+    public function giveIdNumber(CurrentUser $user, mixed $input): void
     {
-        $born = AdultAge::fromInput($dateOfBirth, new \DateTimeImmutable());
-        $this->transactions->run(function () use ($user, $born): void {
-            $this->users->updateProfile($user->id, ['birthdate' => $born]);
-            $this->audit->record($user->id, 'user.date_of_birth_given', ['user_id' => $user->id, 'when' => 'first sign-in']);
+        $numbers = $this->idNumbers ?? throw new RuntimeException('ID numbers cannot be kept here.');
+        $number = $numbers->check($input, $user->id);
+        $this->transactions->run(function () use ($user, $number, $numbers): void {
+            $numbers->save($user->id, $number);
+            $this->audit->record($user->id, 'user.id_number_given', ['user_id' => $user->id, 'when' => 'sign-in']);
         });
         $this->currentUser = null;
     }
@@ -419,6 +459,10 @@ final class AuthService
         // that shows one - which is how the profile header came to print the first and last name
         // only, to a reader who had just typed their middle names into the form below it.
         $profile['full_name'] = PersonName::full($profile);
+        // The ID number masked and where they say they live (owner, 2026-10-27): shown, never changed by the person.
+        $shown = $this->idNumbers?->shown($userId) ?? ['masked' => '', 'residence_country' => ''];
+        $profile['id_number_masked'] = $shown['masked'];
+        $profile['residence_country_name'] = $shown['residence_country'] !== '' ? Countries::name($shown['residence_country']) : '';
 
         return $profile;
     }
@@ -426,13 +470,13 @@ final class AuthService
     /** @param array<string,mixed> $data */
     public function updateProfile(int $userId, array $data): void
     {
-        foreach (['first_name','last_name','identification_number','gender','mobile_number','display_name'] as $field) {
+        foreach (['first_name','last_name','gender','mobile_number','display_name'] as $field) {
             if (isset($data[$field]) && mb_strlen(trim((string) $data[$field])) > 160) {
                 throw new RuntimeException('Profile fields may not exceed 160 characters.');
             }
         }
-        // Adults only (owner, 2026-10-20): a date of birth is checked as at registration.
-        if (array_key_exists('birthdate', $data)) $data['birthdate'] = AdultAge::optionalInput($data['birthdate'], new \DateTimeImmutable());
+        // The date of birth comes from the ID number (owner, 2026-10-27, 2A): a profile form never changes it.
+        unset($data['birthdate']);
         $this->users->updateProfile($userId, $data);
         $this->audit->record($userId, 'user.profile_updated');
     }
@@ -460,6 +504,7 @@ final class AuthService
     public function requestSecondaryEmail(int $userId, string $inputEmail): void
     {
         $email = EmailAddress::normalize($inputEmail);
+        $this->companies?->assertNotAnotherCompanysAddress($email, $userId);
         if (!$this->withinRateLimits($email)) {
             return;
         }
@@ -471,12 +516,12 @@ final class AuthService
             'secondary_email',
             $userId,
             [],
-            Env::int('AUTH_MAGIC_LINK_TTL', 1800),
+            Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'),
             ClientFingerprint::ipHash()
         );
         $url = rtrim(Env::string('APP_URL'), '/') . '/account/email/verify?token=' . rawurlencode($rawToken);
         try {
-            $this->mailer->sendSecondaryEmailVerification($email, $url, Env::int('AUTH_MAGIC_LINK_TTL', 1800));
+            $this->mailer->sendSecondaryEmailVerification($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'));
         } catch (\Throwable $e) {
             $this->tokens->deleteByHash($tokenHash);
             throw new RuntimeException('The verification email could not be sent.', 0, $e);
@@ -496,6 +541,7 @@ final class AuthService
             }
 
             $userId = (int) $row['user_id'];
+            $this->companies?->assertNotAnotherCompanysAddress((string) $row['email'], $userId);
             $this->users->addVerifiedSecondaryEmail($userId, (string) $row['email']);
             $this->tokens->markUsed((int) $row['id']);
 
@@ -524,7 +570,16 @@ final class AuthService
     public function promoteSecondaryEmail(int $userId, int $emailId): void
     {
         $this->transactions->run(function () use ($userId, $emailId): void {
+            $before = $this->emails($userId);
             $this->users->promoteSecondaryEmail($userId, $emailId);
+            $promoted = array_values(array_filter($before, static fn(array $row): bool => (int) $row['id'] === $emailId))[0]['email'] ?? null;
+            $previous = array_values(array_filter($before, static fn(array $row): bool => $row['is_primary']))[0]['email'] ?? null;
+            if ($this->companies === null || !is_string($promoted)) return;
+            // Staff leave their company by making a private address primary (owner, 2026-10-26), keeping every course and
+            // certificate, and keep no address at the employer's domain ("they cannot continue using their employer's
+            // domain name").
+            $moved = $this->companies->followAddress($userId, $promoted, $userId);
+            if ($moved['left'] !== null && is_string($previous)) $this->users->removeSecondaryEmailsAt($userId, EmailAddress::domain($previous));
         });
         $this->audit->record($userId, 'user.secondary_email_promoted', ['email_id' => $emailId]);
     }
@@ -535,20 +590,48 @@ final class AuthService
         $email = EmailAddress::normalize((string) ($data['email'] ?? ''));
         if ($this->users->statusOfVerifiedEmail($email) === 'awaiting_approval') throw new RuntimeException(self::AWAITING_APPROVAL_MESSAGE);
         if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account. Sign in instead.');
-        $this->assertMaySignIn($email, null);
+        try {
+            $this->assertMaySignIn($email, null);
+        } catch (RuntimeException $refused) {
+            // Kept among the sign-up attempts, so the administrator sees who tried (owner, 2026-10-26).
+            $this->signups?->check($data, $email, $refused->getMessage());
+            throw $refused;
+        }
         $type = (string) ($data['account_type'] ?? 'individual');
         if (!in_array($type, ['individual', 'company'], true)) throw new RuntimeException('Choose an account type.');
         $first = trim((string) ($data['first_name'] ?? '')); $last = trim((string) ($data['last_name'] ?? ''));
         if ($first === '' || $last === '') throw new RuntimeException('Enter your first and last name.');
-        // Adults only (owner, 2026-10-20): someone under 18 is refused, and nothing they typed is kept.
-        $born = AdultAge::fromInput($data['date_of_birth'] ?? '', new \DateTimeImmutable());
+        // Where they live and their South African ID number (owner, 2026-10-27: "only people with a valid South African ID
+        // can register"; 5A someone living elsewhere is told so). Each refusal is kept among the sign-up attempts, except
+        // someone under 18: nothing they typed is kept (adults only, 2026-10-20).
+        try {
+            $country = Countries::code($data['country'] ?? '');
+            if ($country === null) throw new InvalidArgumentException('Choose the country you live in.');
+            if ($country !== Countries::SOUTH_AFRICA) throw new InvalidArgumentException(self::SOUTH_AFRICA_ONLY);
+            $number = ($this->idNumbers ?? throw new RuntimeException('Registration is not available here.'))->check($data['id_number'] ?? '');
+        } catch (InvalidArgumentException $refused) {
+            if ($refused->getMessage() !== AdultAge::REFUSED) $this->signups?->check($data, $email, $refused->getMessage());
+            throw $refused;
+        }
+        $born = $number->birthdate;
         $company = trim((string) ($data['company_name'] ?? ''));
         if ($type === 'company' && $company === '') throw new RuntimeException('Enter your company name.');
-        $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company,'birthdate'=>$born]];
+        // The company domain rule: a company's address is its staff's, added by its Company Administrator.
+        $this->companies?->assertMayRegister($email, $type === 'company');
+        // The sign-up check (owner, 2026-10-26): a throwaway address is refused, a bot caught by the hidden field is shown the
+        // usual page and sent nothing, and everyone else's attempt is recorded with what the check found.
+        $signup = $this->signups?->check($data, $email);
+        if ($signup !== null && $signup['risk']->refusal !== null) throw new RuntimeException($signup['risk']->refusal);
+        if ($signup !== null && $signup['risk']->trapped) return;
+        $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['news'=>(($data['news'] ?? '') === '1') ? '1' : '','account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company,'birthdate'=>$born,'id_number'=>$this->idNumbers->seal($number),'residence_country'=>$country], 'signup' => $signup === null ? [] : ['attempt_id' => $signup['id'], 'hold' => $signup['risk']->holds()]];
+        // A follow asked for before an account existed (owner, 2026-10-28), carried out when the account is made.
+        if (($intent = \CattoLearning\Mailing\FollowIntent::fromText($data['follow'] ?? '')) !== null) $context['follow'] = $intent->text();
         $raw = Token::generate(); $hash = Token::hash($raw);
-        $this->tokens->create($hash, $email, 'registration', null, $context, Env::int('AUTH_MAGIC_LINK_TTL', 1800), ClientFingerprint::ipHash());
+        $this->tokens->create($hash, $email, 'registration', null, $context, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'), ClientFingerprint::ipHash());
         $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($raw);
-        try { $this->mailer->sendMagicLink($email, $url, Env::int('AUTH_MAGIC_LINK_TTL', 1800)); }
+        // Its own email, which on a demo site says the account will be held (owner, 2026-10-26). A live site's hold is not said.
+        $notice = $this->demoHoldsRegistrations() && $this->needsApproval($email) ? self::DEMO_HOLD_NOTICE : '';
+        try { $this->mailer->sendRegistrationLink($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'), $notice); }
         catch (\Throwable $e) { $this->tokens->deleteByHash($hash); throw new RuntimeException('The registration email could not be sent.', 0, $e); }
     }
 
@@ -561,17 +644,29 @@ final class AuthService
             if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account.');
             $this->assertMaySignIn($email, null);
             $context = json_decode((string) $row['context'], true); $reg = is_array($context['registration'] ?? null) ? $context['registration'] : [];
+            $this->companies?->assertMayRegister($email, ($reg['account_type'] ?? 'individual') === 'company');
             $user = $this->users->createWithPrimaryEmail($email);
             $this->users->updateProfile((int)$user['id'], $reg);
+            // News and Updates, if they ticked it on the form (mailing, step 1; owner, 2026-10-26).
+            if (($reg['news'] ?? '') === '1') $this->mailing?->subscribe((int)$user['id'], 'news', null, 'registration');
+            // The category, course or tag they pressed Follow on before they had an account (owner, 2026-10-28, 8B).
+            if (isset($context['follow'])) $this->mailing?->followAfterSignIn((int)$user['id'], $context['follow']);
             // The date of birth given on the registration form went in with the profile.
-            if (is_string($reg['birthdate'] ?? null)) $this->audit->record((int)$user['id'], 'user.date_of_birth_given', ['user_id' => (int)$user['id'], 'when' => 'registration']);
+            // The ID number they gave, with the country they live in (a number another account took meanwhile is refused).
+            if (is_string($reg['id_number'] ?? null) && $this->idNumbers !== null) {
+                $this->idNumbers->save((int)$user['id'], $this->idNumbers->open($reg['id_number']), is_string($reg['residence_country'] ?? null) ? $reg['residence_country'] : null);
+                $this->audit->record((int)$user['id'], 'user.id_number_given', ['user_id' => (int)$user['id'], 'when' => 'registration']);
+            }
             $this->roles->assign((int)$user['id'], RoleCatalog::STUDENT);
             if (($reg['account_type'] ?? 'individual') === 'company') {
                 if ($this->companies === null) throw new RuntimeException('Company registration is unavailable.');
                 $this->companies->register((int)$user['id'], $email, (string)$reg['company_name'], EmailAddress::domain($email));
             }
-            if ($this->needsApproval($email)) {
-                // A demo site: the account waits for ADMIN, with no session, and ADMIN is told.
+            $signup = is_array($context['signup'] ?? null) ? $context['signup'] : [];
+            $held = $this->needsApproval($email, $signup);
+            if (isset($signup['attempt_id'])) $this->signups?->complete((int) $signup['attempt_id'], (int) $user['id'], $held);
+            if ($held) {
+                // A demo site, or a live site's held sign-up: the account waits for ADMIN, with no session, and ADMIN is told.
                 $this->users->setStatus((int)$user['id'], 'awaiting_approval');
                 $this->tokens->markUsed((int)$row['id']);
                 $this->audit->record((int)$user['id'], 'user.awaiting_approval', ['user_id' => (int)$user['id']]);
@@ -579,7 +674,7 @@ final class AuthService
             }
             $this->tokens->markUsed((int)$row['id']); $this->users->markLogin((int)$user['id']);
             $sessionToken = Token::generate();
-            $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::int('AUTH_SESSION_TTL',86400), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
+            $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::seconds('AUTH_SESSION_TTL', '1d'), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
             return ['user'=>$user,'token'=>$sessionToken,'session'=>$sessionId,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/courses'))];
         });
         if (($state['awaiting'] ?? false) === true) {
@@ -587,7 +682,7 @@ final class AuthService
             if ($admin !== '') {
                 try {
                     $this->mailer->sendAdministratorMessage($admin, 'An account is waiting for your approval',
-                        ($state['name'] !== '' ? $state['name'] . ' (' . $state['email'] . ')' : $state['email']) . " registered on the demo site and is waiting for your approval.\n\n"
+                        ($state['name'] !== '' ? $state['name'] . ' (' . $state['email'] . ')' : $state['email']) . ' registered' . ($this->demoHoldsRegistrations() ? ' on the demo site' : '') . " and is waiting for your approval.\n\n"
                         . 'Approve or disable the account at ' . rtrim(Env::string('APP_URL'), '/') . '/admin/people/' . (int)$state['user']['id']);
                 } catch (\Throwable) {
                     // The account still waits; ADMIN sees it on the dashboard.
@@ -635,7 +730,7 @@ final class AuthService
 
     private function withinRateLimits(string $email): bool
     {
-        $window = Env::int('AUTH_REQUEST_WINDOW', 900);
+        $window = Env::seconds('AUTH_REQUEST_WINDOW', '15m');
         return $this->tokens->recentEmailCount($email, $window) < Env::int('AUTH_REQUEST_LIMIT_EMAIL', 5)
             && $this->tokens->recentIpCount(ClientFingerprint::ipHash(), $window) < Env::int('AUTH_REQUEST_LIMIT_IP', 20);
     }
@@ -648,7 +743,7 @@ final class AuthService
     private function setSessionCookie(string $token): void
     {
         setcookie(Env::string('AUTH_SESSION_COOKIE', 'catto_learning_session'), $token, [
-            'expires' => time() + Env::int('AUTH_SESSION_TTL', 86400),
+            'expires' => time() + Env::seconds('AUTH_SESSION_TTL', '1d'),
             'path' => '/',
             'domain' => '',
             'secure' => Env::bool('AUTH_COOKIE_SECURE', true),

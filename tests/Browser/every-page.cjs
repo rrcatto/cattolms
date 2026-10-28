@@ -20,14 +20,18 @@ const SKIP = /^\/(learn\/|logout|auth\/|webhooks\/|api\/|mcp)|\/(download|export
 const {inspect, judge} = require('./page-construction.cjs');
 // Built another way on purpose: Home and course landing pages are full-width marketing pages, and the course reader and
 // its public preview are Core's reader (UX rule 1.7; the reader is never a theme's page).
-const OWN_LAYOUT = /^\/($|landing\/|learn\/|courses\/[^/]+\/preview(\/|$))/;
+// A message's, a template's and the digest's preview, and an email's web copy (/m/v/), are the email itself, as a reader
+// sees it (the Mailing menu, 2026-10-28): never a site page.
+const OWN_LAYOUT = /^\/($|landing\/|learn\/|courses\/[^/]+\/preview(\/|$)|mailing\/(messages|templates)\/\d+\/preview$|mailing\/digest\/preview$|m\/v\/)/;
 
-/** One address per page: the path, with only the tab kept from the query. */
+/** One address per page: the path, with only the tab and a preview flag kept from the query. */
 function normal(href) {
     const url = new URL(href, base);
     if (url.origin !== new URL(base).origin) return null;
-    const tab = url.searchParams.get('tab');
-    return url.pathname + (tab ? `?tab=${tab}` : '');
+    // The parameters that decide which page is drawn: a tab, and a draft course's preview for its editor.
+    const kept = new URLSearchParams();
+    for (const name of ['tab', 'preview']) if (url.searchParams.get(name)) kept.set(name, url.searchParams.get(name));
+    return url.pathname + (kept.size ? `?${kept}` : '');
 }
 /** Pages that differ only in an id share a pattern. */
 const pattern = (address) => address.replace(/\/[0-9]+(?=\/|\?|$)/g, '/{id}').replace(/\/[0-9a-f]{16,}(?=\/|\?|$)/g, '/{key}');
@@ -55,7 +59,12 @@ async function crawl(browser, who, cookie, width) {
         if (landed !== address && seen.has(landed)) continue;
         if (response.status() >= 400) { results.push({who: `${who} ${width}`, address: landed, status: response.status(), problems: [`status ${response.status()}, linked from ${from.get(address) || 'the start'}`]}); continue; }
         if (OWN_LAYOUT.test(landed.split('?')[0])) continue;
-        const facts = await page.evaluate(inspect);
+        // A page the inspection cannot read (no main, say) is a failure named with its address, never the end of the crawl.
+        let facts;
+        try { facts = await page.evaluate(inspect); } catch (error) {
+            results.push({who: `${who} ${width}`, address: landed || address, status: response.status(), problems: ['not built as a page: ' + error.message.split('\n')[0] + ', linked from ' + (from.get(address) || 'the start')]});
+            continue;
+        }
         const links = await page.evaluate(() => [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')));
         const problems = judge(facts, '').map((failure) => failure.replace(/^: /, ''));
         results.push({who: `${who} ${width}`, address: landed || address, status: response.status(), problems});

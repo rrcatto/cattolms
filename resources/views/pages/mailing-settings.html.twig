@@ -1,0 +1,77 @@
+{#
+	Mailing › Sending settings (owner, 2026-10-27: mailing is its own system, with its own menu): where news comes from
+	and how it leaves (MAILING_*, CATTOMAIL_*), the sending discipline and the emails' logo, each overriding .env with a
+	Reset. Moved from Administration › Settings; rebuilt to the approved mockup in a later step.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}
+	{% set ph_title = 'Sending settings' %}
+	{% set ph_lead = 'Who news comes from, how it leaves, and the discipline that keeps your sending trusted. Each value starts from .env, and what you save here overrides it, with a Reset back to .env.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set ms = mailing_settings %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sending'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'How news is sent', summary: 'News from ' ~ ms.sender ~ ', through ' ~ ms.transports[ms.transport] ~ '.'}) }}
+			<p>News goes only to people who asked for it, from its own address (for example news@news.example.test), with its links on the news address too. Order, payment and sign-in emails keep coming from the site's own address.</p>
+			<h2 class="h5">Where it comes from and how it leaves</h2>
+			<p>{% if ms.source == 'database' %}Some of these are saved here and override <span class="mono">.env</span>.{% else %}These come from <span class="mono">.env</span>. Saving here overrides them.{% endif %} The links go to <span class="mono">{{ ms.link_base }}</span>. catto-mail is connected on <a href="/mailing/cattomail">Mailing, catto-mail</a>.</p>
+			<form action="/mailing/settings" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+				{% for key, field in ms.fields %}
+					{% if key == 'transport' %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'ms-' ~ key, help: field.env ~ (field.source == 'database' ? ', saved here' : ', from .env')})} %}{% block control %}<select class="cl-input" id="ms-{{ key }}" name="{{ key }}" {{ ui_field_attrs(props) }}>{% for value, label in ms.transports %}<option value="{{ value }}"{{ value == ms.transport ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% else %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'ms-' ~ key, help: field.env ~ (field.secret ? (field.set ? ', saved. Leave it empty to keep it.' : ', not set.') : (field.source == 'database' ? ', saved here' : ', from .env'))})} %}{% block control %}<input class="cl-input" id="ms-{{ key }}" name="{{ key }}" type="{{ field.secret ? 'password' : 'text' }}" autocomplete="off" value="{{ field.value }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% endif %}
+				{% endfor %}
+				{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save how news is sent', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% if ms.source == 'database' %}
+			<form action="/mailing/settings/reset" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset how news is sent to .env', variant: 'danger', size: 'small', confirm: 'Remove what is saved here and follow MAILING_* and CATTOMAIL_* in .env?', icon: 'action-reset'}) }}</form>
+			{% endif %}
+
+			<h2 class="h5 cl-mt-3">Sending discipline</h2>
+			{% set r = ms.rules %}
+			<form action="/mailing/settings/rules" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Record who opens each email'})} %}{% block control %}<input type="checkbox" name="track_opens" value="1"{{ r.track_opens ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Record the links each person clicks'})} %}{% block control %}<input type="checkbox" name="track_clicks" value="1"{{ r.track_clicks ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Emails an hour, at most', for: 'mr-hourly'})} %}{% block control %}<input class="cl-input" id="mr-hourly" name="hourly_limit" inputmode="numeric" value="{{ r.hourly_limit }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Emails on the first day of sending', for: 'mr-first', help: 'Doubling each day after, a gentle start for a new sending address. 0 starts at the hourly limit.'})} %}{% block control %}<input class="cl-input" id="mr-first" name="first_day_limit" inputmode="numeric" value="{{ r.first_day_limit }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Pause a sending at bounces of (%)', for: 'mr-bounce', help: 'Addresses that do not exist. Inbox providers start to distrust a sender at about 2%.'})} %}{% block control %}<input class="cl-input" id="mr-bounce" name="pause_bounce_percent" inputmode="decimal" value="{{ r.pause_bounce_percent }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Pause a sending at spam complaints of (%)', for: 'mr-complaint', help: 'Gmail asks bulk senders to stay under 0.3%, better under 0.1%.'})} %}{% block control %}<input class="cl-input" id="mr-complaint" name="pause_complaint_percent" inputmode="decimal" value="{{ r.pause_complaint_percent }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Judge a sending after this many emails', for: 'mr-judge'})} %}{% block control %}<input class="cl-input" id="mr-judge" name="judge_after" inputmode="numeric" value="{{ r.judge_after }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Ask a sleeping address after', for: 'mr-sleep', help: 'Nothing opened or clicked for this long. ' ~ ms.duration_how})} %}{% block control %}<input class="cl-input" id="mr-sleep" name="sleeping_after" value="{{ r.sleeping_after }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Stop it if there is no answer within', for: 'mr-answer', help: ms.duration_how})} %}{% block control %}<input class="cl-input" id="mr-answer" name="sleeping_answer_within" value="{{ r.sleeping_answer_within }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% endblock %}{% endembed %}
+				{# The sending hours and the digests' days (owner, 2026-10-28, round two 6A), and what becomes an update (1A). #}
+				<fieldset class="cl-mailing-lists" id="hours">
+					<legend class="h6">When email goes</legend>
+					<p class="help">Everything the mailing system sends waits for these hours: messages, digests, updates as they happen and the automatic emails. Account and order emails are the site's own and always go at once.</p>
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send from', for: 'mr-from', help: 'The site\'s time, such as 07:00.'})} %}{% block control %}<input class="cl-input" type="time" id="mr-from" name="send_from" required value="{{ r.send_from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send until', for: 'mr-until', help: 'The same as the start sends around the clock. An end before the start runs through midnight.'})} %}{% block control %}<input class="cl-input" type="time" id="mr-until" name="send_until" required value="{{ r.send_until }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The weekly digest goes on', for: 'mr-weekday'})} %}{% block control %}<select class="cl-input" id="mr-weekday" name="digest_weekday" {{ ui_field_attrs(props) }}>{% for value, label in ms.days %}<option value="{{ value }}"{{ value == r.digest_weekday ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The monthly digest goes on day', for: 'mr-monthday', help: 'From 1 to 28, so that every month has it.'})} %}{% block control %}<input class="cl-input" id="mr-monthday" name="digest_month_day" inputmode="numeric" value="{{ r.digest_month_day }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+					<p class="help">Each digest goes at the start of the sending hours on its day: {{ ms.digest_days.daily }} for the daily one, {{ ms.digest_days.weekly }} for the weekly one and {{ ms.digest_days.monthly }} for the monthly one. Each person chooses which, or updates as they happen, on My Subscriptions.</p>
+				</fieldset>
+				<fieldset class="cl-mailing-lists" id="recorded">
+					<legend class="h6">What becomes an update</legend>
+					<p class="help">The site records these course changes as updates and holds them on the Digest page until you release them.</p>
+					{% for key, label in ms.recorded %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label})} %}{% block control %}<input type="checkbox" name="{{ key }}" value="1"{{ r[key] ? ' checked' : '' }}>{% endblock %}{% endembed %}
+					{% endfor %}
+				</fieldset>
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the sending discipline', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% if ms.rules_source == 'database' %}
+			<form action="/mailing/settings/rules/reset" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset the sending discipline', variant: 'danger', size: 'small', confirm: 'Go back to the starting values?', icon: 'action-reset'}) }}</form>
+			{% endif %}
+
+			<p class="small cl-mt-3">The look of every email, its logo included, is its template's: see <a href="/mailing/templates">Templates</a>.</p>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

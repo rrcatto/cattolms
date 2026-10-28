@@ -1,0 +1,53 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		What a staff member wants before their account goes (owner, 2026-10-26: "We need to communicate with the people
+		involved first"), reached from the emailed link: keep the account as a private one at a private address of their
+		own, or, when their Company Administrator deleted them, delete it. A deleted company's staff can only keep theirs.
+	#}
+	{% set ph_kicker = departure.company_name %}
+	{% set ph_title = 'Your account' %}
+	{% set ph_lead = departure.open ? 'Choose what happens to it by ' ~ departure.answer_by_words ~ '.' : 'This link has expired or has been used.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+	{% if not departure.open %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Nothing to choose now'}) }}
+			<p>{% if departure.status == 'went_private' %}Your account is a private one already. Sign in with your private address.{% elseif departure.status == 'deleted' %}Your account was deleted.{% else %}The time to choose has passed. Contact the site if you still need your account: it can be restored for you.{% endif %}</p>
+			{{ ui('action.link', {label: 'Sign in', variant: 'secondary', size: 'normal', href: '/login', icon: 'action-next'}) }}
+		{% endblock %}{% endembed %}
+	{% else %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: departure.reason == 'company_deleted' ? departure.company_name ~ ' has closed its account' : departure.company_name ~ ' is removing your staff account', eyebrow: departure.name}) }}
+			{% if departure.reason == 'company_deleted' %}
+				<p>Your staff account is deactivated. You can keep it as a private one, with all your courses and certificates, by giving a private email address of your own, not one at {{ departure.company_domain }}. If you do not by {{ departure.answer_by_words }}, it stays deactivated.</p>
+			{% else %}
+				<p>You are busy with {{ departure.busy|join(', ') ?: 'a course' }}. Choose what happens by {{ departure.answer_by_words }}. If you have not chosen by then, {{ departure.company_name }} may deactivate your account. It is kept, and the site can restore it for you later at a private address.</p>
+			{% endif %}
+		{% endblock %}{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'keep-it'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Keep my account as a private one', summary: 'You keep every course, finished or not, and every certificate.'}) }}
+			{% if sent_to %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'Check ' ~ sent_to})} %}{% block body %}<p>Open the link we sent to {{ sent_to }} to confirm it is yours. Your account becomes a private one at it then.</p>{% endblock %}{% endembed %}
+			{% endif %}
+			<form action="/leaving/{{ token }}/private" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your private email address', for: 'leaving-private-email', required: true, help: 'Not one at ' ~ departure.company_domain ~ '. We send a link there to confirm it is yours.'})} %}{% block control %}<input type="email" id="leaving-private-email" name="email" required value="{{ departure.private_email|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Keep it at this address', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-email'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+
+		{% if departure.reason == 'staff_deleted' %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'delete-it'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Delete my account', summary: 'Your courses and progress go with it.'}) }}
+			<form action="/leaving/{{ token }}/delete" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand my courses and progress go too'})} %}{% block control %}<input type="checkbox" id="leaving-understood" name="understood" value="1" required>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Delete my account', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove'}) }}{% endblock %}{% endembed %}
+			</form>
+		{% endblock %}{% endembed %}
+		{% endif %}
+	{% endif %}
+	</section>
+{% endblock %}

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7fb6147e80b39cab6fcc71995ccb703a",
+    "content-hash": "70120a099530daeda32caaf58b521286",
     "packages": [
         {
             "name": "cakephp/chronos",
@@ -602,6 +602,108 @@
                 }
             ],
             "time": "2026-10-05T13:12:12+00:00"
+        },
+        {
+            "name": "dicebear/core",
+            "version": "v10.7.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/dicebear/dicebear-php.git",
+                "reference": "f1dfa9dfe2395f8c1357607bcfce3af572d462bc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/dicebear/dicebear-php/zipball/f1dfa9dfe2395f8c1357607bcfce3af572d462bc",
+                "reference": "f1dfa9dfe2395f8c1357607bcfce3af572d462bc",
+                "shasum": ""
+            },
+            "require": {
+                "dicebear/schema": "^1.5.1",
+                "ext-mbstring": "*",
+                "opis/json-schema": "^2.6",
+                "php": ">=8.2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.0",
+                "phpstan/phpstan": "^2.0",
+                "phpunit/phpunit": "^11.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "DiceBear\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Unique avatars from dozens of styles — deterministic, customizable, vector-based.",
+            "keywords": [
+                "DiceBear",
+                "avatar",
+                "svg"
+            ],
+            "support": {
+                "source": "https://github.com/dicebear/dicebear-php/tree/v10.7.0"
+            },
+            "time": "2026-08-26T20:29:07+00:00"
+        },
+        {
+            "name": "dicebear/schema",
+            "version": "v1.6.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/dicebear/schema.git",
+                "reference": "c43a5f2c9a2f7feb04b48b83b9cd6a877cda76fb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/dicebear/schema/zipball/c43a5f2c9a2f7feb04b48b83b9cd6a877cda76fb",
+                "reference": "c43a5f2c9a2f7feb04b48b83b9cd6a877cda76fb",
+                "shasum": ""
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "JSON Schema definitions for DiceBear avatar styles and options",
+            "homepage": "https://github.com/dicebear/schema",
+            "keywords": [
+                "DiceBear",
+                "avatar",
+                "json-schema",
+                "schema"
+            ],
+            "support": {
+                "issues": "https://github.com/dicebear/schema/issues",
+                "source": "https://github.com/dicebear/schema"
+            },
+            "time": "2026-08-30T19:19:03+00:00"
+        },
+        {
+            "name": "dicebear/styles",
+            "version": "v10.6.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/dicebear/styles.git",
+                "reference": "22a9abebc54ed68275da811573204ad83db646b8"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/dicebear/styles/zipball/22a9abebc54ed68275da811573204ad83db646b8",
+                "reference": "22a9abebc54ed68275da811573204ad83db646b8",
+                "shasum": ""
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "description": "Official DiceBear avatar styles.",
+            "support": {
+                "issues": "https://github.com/dicebear/styles/issues",
+                "source": "https://github.com/dicebear/styles/tree/v10.6.0"
+            },
+            "time": "2026-08-26T20:01:26+00:00"
         },
         {
             "name": "doctrine/dbal",

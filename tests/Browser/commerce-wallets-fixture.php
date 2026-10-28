@@ -61,38 +61,29 @@ $signedIn = static function (int $id) use ($db, $container): CurrentUser {
     return new CurrentUser($id, (string) $db->fetchOne('SELECT public_id FROM users WHERE id = :id', ['id' => $id]), $email, (string) $db->fetchOne('SELECT display_name FROM users WHERE id = :id', ['id' => $id]),
         $roles, $container->get(AclService::class)->permissionsForUser($id, $roles), Uuid::v4(), $email);
 };
-$person = static function (string $key, string $first, string $last, string $role, string $suffix) use ($fixture, $db, $container): array {
-    $email = 'wallet-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($first . ' ' . $last, $email);
-    $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $id]);
-    $container->get(RoleRepository::class)->assign($id, $role);
-    return ['id' => $id, 'email' => $email];
-};
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous commerce wallets fixture first.');
-    $suffix = $fixture->suffix();
-    $provider = $person('provider', 'Course', 'Provider', 'STUDENT', $suffix);
-    $company = $fixture->createCompany($provider['id'], 'Wallet browser provider ' . $suffix, 'wallet-browser-' . $suffix . '.example.test');
+    // A course provider made with its founding administrator, three of its courses on sale and an administrator, every
+    // name one nobody on the site has (owner, 2026-10-27).
+    $provider = $fixture->company();
     $courses = [];
     foreach (['a' => 50000, 'b' => 30000, 'c' => 10000] as $key => $price) {
-        $slug = 'wallet-browser-' . $key . '-' . $suffix;
-        $course = $fixture->createCourse($provider['id'], $company, $slug, 'Wallet browser course ' . strtoupper($key) . ' ' . $suffix, 'published');
-        $db->executeStatement('UPDATE courses SET published_at = NOW() WHERE id = :id', ['id' => $course]);
-        $courses[$key] = ['id' => $course, 'slug' => $slug, 'variant' => $fixture->createPriceVariant($course, $provider['id'], 2592000, $price, true)];
+        $course = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
+        $courses[$key] = ['id' => $course['id'], 'slug' => $course['slug'], 'variant' => $fixture->createPriceVariant($course['id'], $provider['founder']['id'], 2592000, $price, true)];
     }
-    $admin = $person('admin', 'Wallets', 'Administrator', 'ADMIN', $suffix);
+    $admin = $fixture->person('ADMIN');
     // The check runs on the commerce settings' defaults; the owner's saved settings (such as a 3% Stitch
     // fee) are kept in the state and put back by cleanup.
     $saved = $db->fetchAllAssociative("SELECT option_key, option_value, updated_at, updated_by_user_id FROM app_options WHERE option_key LIKE 'commerce.%'");
     $db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'commerce.%'");
-    $writeState(['suffix' => $suffix, 'company' => $company, 'courses' => $courses, 'users' => ['provider' => $provider['id'], 'admin' => $admin['id']], 'saved_settings' => $saved,
+    $writeState(['company' => $provider['id'], 'courses' => $courses, 'users' => ['provider' => $provider['founder']['id'], 'admin' => $admin['id']], 'saved_settings' => $saved, 'scrub' => $fixture->seeds(),
         'learners' => [], 'admin_token' => $session($admin['id'], $admin['email'])]);
     echo "Created the commerce wallets fixture.\n";
 } elseif ($action === 'learner') {
     $state = $readState();
-    $key = 'learner' . (count($state['learners']) + 1);
-    $learner = $person($key, 'Thandi', 'Nkosi', 'STUDENT', $state['suffix']);
+    $learner = $fixture->person('STUDENT');
+    $reference = AccountReference::format((string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner['id']]));
     $buyer = $signedIn($learner['id']);
     $admin = $signedIn((int) $state['users']['admin']);
     // The learner buys course C by EFT, giving their details at checkout, as the checkout pages do.
@@ -100,32 +91,37 @@ if ($action === 'create') {
     $orders = $container->get(OrderService::class);
     $checkout = $container->get(CheckoutService::class);
     $orders->changeCart($buyer, (int) $state['courses']['c']['variant']);
-    $checkout->saveProfile($buyer, ['first_name' => 'Thandi', 'last_name' => 'Nkosi', 'mobile_number' => '0821234567', 'billing_name' => 'Thandi Nkosi',
-        'address_line_1' => '7 Wallet Street', 'city' => 'Cape Town', 'country_code' => 'ZA']);
+    $checkout->saveProfile($buyer, ['first_name' => $learner['first'], 'last_name' => $learner['last'], 'mobile_number' => '0821234567', 'billing_name' => $learner['name'],
+        'address_line_1' => '7 Long Street', 'city' => 'Cape Town', 'country_code' => 'ZA']);
     $checkout->selectMethod($buyer, 'eft', '', false);
     $cart = $orders->cart($buyer);
     $paid = (int) $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
     // ADMIN records R300.00 from the bank against that R100.00 order: the course starts and R200.00 goes
     // to the learner's wallet. ADMIN marks that overpayment dealt with, so the check finds only its own.
     $container->get(PaymentAdministrationService::class)->confirmBank($admin, $paid, Uuid::v4(), 30000, (new DateTimeImmutable('-1 minute'))->format(DATE_ATOM),
-        'BROWSER-' . $state['suffix'] . '-' . $learner['id'], 'Browser check: R300.00 paid for a R100.00 course.');
+        $reference . ' ' . substr(Uuid::v4(), 0, 4), 'R300.00 paid for a R100.00 course.');
     $overpayment = (string) $db->fetchOne("SELECT id FROM commerce_ledger_entries WHERE order_id = :o AND kind = 'overpayment_to_wallet'", ['o' => $paid]);
-    $container->get(TransactionAttention::class)->dismiss($admin, 'overpaid', $overpayment, 'Browser check: the learner keeps the credit.');
+    $container->get(TransactionAttention::class)->dismiss($admin, 'overpaid', $overpayment, 'The learner keeps the credit in their wallet.');
     // ADMIN assigns course A from the person's page.
     $container->get(CourseService::class)->grantToPerson((int) $state['courses']['a']['id'], $learner['id'], 30, $admin->id);
     $state['learners'][] = $learner['id'];
+    $state['scrub']['users'][] = $learner['id'];
     $writeState($state);
-    $reference = (string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner['id']]);
-    echo json_encode(['id' => $learner['id'], 'email' => $learner['email'], 'token' => $session($learner['id'], $learner['email']), 'reference' => AccountReference::format($reference)], JSON_THROW_ON_ERROR) . "\n";
+    echo json_encode(['id' => $learner['id'], 'email' => $learner['email'], 'name' => $learner['name'], 'token' => $session($learner['id'], $learner['email']), 'reference' => $reference], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'company-learner') {
     $state = $readState();
-    $key = 'staff' . (count($state['learners']) + 1);
-    $learner = $person($key, 'Lerato', 'Mokoena', 'STUDENT', $state['suffix']);
-    $company = $fixture->createCompany((int) $state['users']['admin'], 'Wallet browser client ' . $key . ' ' . $state['suffix'], 'wallet-client-' . $key . '-' . $state['suffix'] . '.example.test');
-    $fixture->addCompanyMember($company, $learner['id']);
+    // A member of a client company's staff: the company made with its founding administrator, the learner at its domain.
+    $client = $fixture->company();
+    $learner = $fixture->staff($client);
     $state['learners'][] = $learner['id'];
+    $state['scrub']['users'] = [...$state['scrub']['users'], $client['founder']['id'], $learner['id']];
+    $state['scrub']['companies'][] = $client['id'];
     $writeState($state);
     echo json_encode(['id' => $learner['id'], 'token' => $session($learner['id'], $learner['email'])], JSON_THROW_ON_ERROR) . "\n";
+} elseif ($action === 'follows') {
+    // What the learner agreed to be emailed about (mailing, step 1): [kind, subject id, source] of each yes.
+    $learner = (int) ($argv[3] ?? 0);
+    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, l.subject_id, s.source FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id WHERE s.user_id = :u AND s.status = 'subscribed' ORDER BY l.kind, l.subject_id", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'order') {
     $learner = (int) ($argv[3] ?? 0);
     $records = $container->get(CommerceRepository::class);
@@ -160,18 +156,10 @@ if ($action === 'create') {
             ['k' => $row['option_key'], 'v' => $row['option_value'], 'at' => $row['updated_at'], 'by' => $row['updated_by_user_id']]);
     }
     if (isset($state['active_theme'])) $container->get(\CattoLearning\View\ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
-    $users = [...array_values($state['users']), ...$state['learners']];
-    $ids = '{' . implode(',', array_map('intval', $users)) . '}';
-    $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
-    $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
-    // A company learner's course request still waiting is declined, as an administrator would, so it does not wait on
-    // the ADMIN dashboard's Needs your attention after the check (owner, 2026-10-21).
-    foreach ($db->fetchFirstColumn("SELECT id FROM course_requests WHERE status = 'pending' AND user_id = ANY(CAST(:ids AS BIGINT[]))", ['ids' => $ids]) as $request) {
-        $container->get(PlatformAdministrationService::class)->decideRequest((int) $request, false, 'The browser check has finished.', (int) $state['users']['admin']);
-    }
-    foreach ($state['courses'] as $course) $db->executeStatement("UPDATE courses SET status='retired' WHERE id = :c", ['c' => $course['id']]);
+    // Everything the check made, its orders, ledger, wallets and requests included (owner, 2026-10-27).
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
-    echo "Removed the sessions, carts and setting overrides and declined the course requests left waiting; orders, the ledger and what they refer to remain.\n";
+    echo "Removed everything the commerce wallets check made and put the settings back.\n";
 } else {
     throw new RuntimeException('Usage: php tests/Browser/commerce-wallets-fixture.php create|learner|company-learner|order|request|wallet|theme|restore|cleanup [state-path] [learner-id]');
 }

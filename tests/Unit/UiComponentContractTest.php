@@ -96,6 +96,8 @@ final class UiComponentContractTest extends TestCase
             'cl-ui-table' => 'ui/data/data-table',
             'cl-ui-stat-card' => 'ui/data/stat-card',
             'cl-ui-stat-grid' => 'ui/data/stat-grid',
+            'cl-ui-card-grid' => 'ui/data/card-grid',
+            'cl-ui-card' => 'ui/data/card',
             'cl-ui-list' => 'ui/data/item-list',
             'cl-ui-list-item' => 'ui/data/list-item',
             'cl-ui-key-value-list' => 'ui/data/key-value-list',

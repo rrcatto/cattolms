@@ -1,0 +1,19 @@
+{#
+	A forwarded email's "Never email me", for the friend it was forwarded to (owner, 2026-10-28, decision 11A). Opening the
+	link changes nothing; the button puts the address on Addresses never emailed.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Email from us' %}
+	{% set ph_title = done ? 'We will never email you' : 'Never email me' %}
+	{% set ph_lead = done ? email ~ ' will never get news from us, even if someone forwards an email to it.' : 'A friend forwarded one of our emails to ' ~ email ~ '. You are on none of our lists.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% if done %}
+			{{ ui('layout.section-head', {heading: 'Done', summary: 'Nothing more is needed.'}) }}
+		{% else %}
+			{{ ui('layout.section-head', {heading: 'Never email this address?', summary: 'We will not send it news again, even if a friend forwards an email to it.'}) }}
+			<form action="/m/n/{{ token }}" method="post">{{ ui('action.button', {label: 'Never email me', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove'}) }}</form>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

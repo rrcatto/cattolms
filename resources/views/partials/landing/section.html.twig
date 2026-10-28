@@ -35,12 +35,6 @@
 					</li>
 				{% endfor %}
 			</ol>
-		{% elseif section.type == 'instructor' %}
-			{% set provider_rows = [] %}
-			{% if section.provider %}{% set provider_rows = provider_rows|merge([{label: 'Provided by', value: section.provider}]) %}{% endif %}
-			{% if section.accreditation %}{% set provider_rows = provider_rows|merge([{label: 'Accreditation', value: section.accreditation}]) %}{% endif %}
-			{% if section.certificate %}{% set provider_rows = provider_rows|merge([{label: 'Certificate', value: 'A certificate when you complete every assessment'}]) %}{% endif %}
-			{% if provider_rows %}{{ ui('data.key-value-list', {items: provider_rows}) }}{% endif %}
 		{% elseif section.type == 'reviews' %}
 			{% include '@platform/partials/course-rating-summary.html.twig' with {rating: section.rating} %}
 			{% include '@platform/partials/course-review-list.html.twig' with {reviews: section.reviews} %}

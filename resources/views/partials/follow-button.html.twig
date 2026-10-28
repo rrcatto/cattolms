@@ -1,0 +1,58 @@
+{#
+	Follow or Unfollow a category, course or tag (mailing, step 1; owner, 2026-10-26): one press when signed in, except the
+	first time, when a window asks how the person would like their updates, weekly chosen (owner, 2026-10-28, round two 4C).
+	Signed out, a window says an account is needed first, with "Yes, create an account" and "No, I changed my mind" (owner,
+	2026-10-28); the follow is carried out once they have signed in. Without JavaScript either window's link opens the same
+	words on a page. fb: {kind, id, name, following, signed_in, return, choose_how, how}.
+#}
+<div class="cl-follow" id="follow">
+	{% if fb.signed_in and fb.choose_how|default(false) and not fb.following %}
+		{% set fb_window = 'follow-how-' ~ fb.kind ~ '-' ~ fb.id %}
+		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: '/follow/' ~ fb.kind ~ '/' ~ fb.id ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add', title: 'Get news about ' ~ fb.name ~ ' by email.'}) }}
+		<p class="small cl-follow-note">{{ fb.kind == 'course' ? 'Follow for the updates written about this course.' : 'Follow to hear about new courses here.' }}</p>
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: fb_window, title: 'Follow ' ~ fb.name, action: '/account/follow'})} %}
+		{% block modal_body %}
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="kind" value="{{ fb.kind }}">
+			<input type="hidden" name="subject_id" value="{{ fb.id }}">
+			<input type="hidden" name="follow" value="1">
+			<input type="hidden" name="source" value="follow_button">
+			<input type="hidden" name="return" value="{{ fb.return }}">
+			<p>How would you like to hear about {{ fb.name }} and everything else you follow? You can change this at any time on My Subscriptions.</p>
+			{% include '@platform/partials/mailing-how-choice.html.twig' with {mh: fb.how|merge({id: fb_window})} %}
+		{% endblock %}
+		{% block modal_actions %}
+			{{ ui('action.button', {label: 'Follow ' ~ fb.name, variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+			{{ ui('action.button', {label: 'Not now', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+		{% endblock %}
+		{% endembed %}
+	{% elseif fb.signed_in %}
+		<form action="/account/follow" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="kind" value="{{ fb.kind }}">
+			<input type="hidden" name="subject_id" value="{{ fb.id }}">
+			<input type="hidden" name="follow" value="{{ fb.following ? '0' : '1' }}">
+			<input type="hidden" name="source" value="follow_button">
+			<input type="hidden" name="return" value="{{ fb.return }}">
+			{{ ui('action.button', {label: fb.following ? 'Unfollow' : 'Follow', variant: 'secondary', size: 'small', type: 'submit', icon: fb.following ? 'action-remove' : 'action-add', title: fb.following ? 'You get news about ' ~ fb.name ~ ' by email. Unfollow it to unsubscribe.' : 'Get news about ' ~ fb.name ~ ' by email.'}) }}
+		</form>
+		<p class="small cl-follow-note">{{ fb.following ? 'You follow it: news about it comes by email.' : (fb.kind == 'course' ? 'Follow for the updates written about this course.' : 'Follow to hear about new courses here.') }}</p>
+	{% else %}
+		{# Following needs an account (owner, 2026-10-28, decision 8B: "pop up a modal window which explains this, and let them
+		   choose YES, create an account or NO, I changed my mind"). Without JavaScript the link opens the same words on a page. #}
+		{% set fb_to = fb.kind ~ ':' ~ fb.id %}
+		{% set fb_window = 'follow-' ~ fb.kind ~ '-' ~ fb.id %}
+		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: '/follow/' ~ fb.kind ~ '/' ~ fb.id ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add'}) }}
+		<p class="small cl-follow-note">Follow it to hear about it by email. You need an account first.</p>
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: fb_window, title: 'Create an account to follow ' ~ fb.name})} %}
+		{% block modal_body %}
+			<p>Before you can follow {{ fb.name }}, we need to create an account for you on the site. Once you have signed in, you follow {{ fb.name }} straight away and its news comes to you by email.</p>
+			<p class="small">Already have an account? <a href="/login?follow={{ fb_to|url_encode }}&amp;return={{ fb.return|url_encode }}">Sign in</a>, and you follow it straight away.</p>
+		{% endblock %}
+		{% block modal_actions %}
+			{{ ui('action.link', {label: 'Yes, create an account', variant: 'primary', size: 'normal', href: '/register?follow=' ~ fb_to|url_encode ~ '&return=' ~ fb.return|url_encode, icon: 'action-register'}) }}
+			{{ ui('action.button', {label: 'No, I changed my mind', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+		{% endblock %}
+		{% endembed %}
+	{% endif %}
+</div>

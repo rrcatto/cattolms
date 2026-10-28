@@ -35,6 +35,10 @@
 		<form action="/admin/messages/{{ message.id }}/answered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as answered', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}{% endblock %}{% endembed %}
 		</form>
+		{% elseif can_manage %}
+		<form action="/admin/messages/{{ message.id }}/unanswered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as not answered', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-restore'}) }}{% endblock %}{% endembed %}
+		</form>
 		{% endif %}
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

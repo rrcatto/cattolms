@@ -1,0 +1,31 @@
+{#
+	Step 3 of setting up catto-mail (owner, 2026-10-28, page 9): whether catto-mail can send from the domain news comes
+	from, its proof of ownership and its signing key (DKIM), a link to catto-mail's DNS steps for it, and Ask catto-mail
+	now. While it cannot send yet, the card asks again by itself every 30 seconds (htmx); without JavaScript, Ask catto-mail
+	now does.
+#}
+{% set cd_ready = domain and domain.can_send|default(false) %}
+<div id="step-domain"{% if steps.connected and not cd_ready %} hx-get="/mailing/cattomail/domain" hx-trigger="every 30s" hx-swap="outerHTML"{% endif %}>
+	{% if not steps.connected %}
+		<p class="small">Connect this site first. catto-mail then tells it which domains it can send from.</p>
+	{% elseif not sending_domain %}
+		<p class="small">Sending settings give no sender address, so there is no domain to send from yet.</p>
+	{% else %}
+		<p>News comes from <strong>{{ sending_domain }}</strong>. catto-mail sends from it only once your DNS proves the domain is yours and publishes its signing key.</p>
+		{% if domain %}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Proof that it is yours', value: domain.status == 'verified' ? 'Found' : (domain.status == 'disabled' ? 'Switched off at catto-mail' : 'Not found yet: a TXT record at _smarthost-verification.' ~ sending_domain)},
+			{label: 'Its signing key (DKIM)', value: domain.dkim_status|default('') == 'active' ? 'Published and in use' : (domain.dkim_status|default('') == 'pending_dns' ? 'Not found yet: a TXT record at its selector under _domainkey' : (domain.dkim_status|default('') == 'disabled' ? 'Switched off at catto-mail' : 'Not set up yet'))},
+			{label: 'DMARC', value: 'Recommended, starting at p=none'}
+		]}) }}
+		{% else %}
+			<p class="small">catto-mail does not know {{ sending_domain }} yet. Open its DNS steps to add it.</p>
+		{% endif %}
+		{{ ui('feedback.notice', {tone: cd_ready ? 'success' : 'warning', heading: cd_ready ? 'Mail from ' ~ sending_domain ~ ' can be sent.' : 'News waits until catto-mail can send from ' ~ sending_domain ~ '. This card asks again every 30 seconds.'}) }}
+		<div class="cl-mailing-choices">
+			{% if domain and domain.setup_url|default('') %}{{ ui('action.link', {label: 'Open the DNS steps at catto-mail', variant: 'secondary', size: 'small', href: domain.setup_url ~ (domain.setup_url matches '/\\?/' ? '&' : '?') ~ 'back=' ~ (site_url ~ '/mailing/cattomail#domain')|url_encode, icon: 'action-open', new_window: true}) }}{% endif %}
+			{% if can_manage %}<form action="/mailing/cattomail/domains" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Ask catto-mail now', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>{% endif %}
+		</div>
+		{% if cm.domains_checked_at %}<p class="small cl-text-secondary">Last asked {{ cm.domains_checked_at|date('j M Y \\a\\t H:i') }}.</p>{% endif %}
+	{% endif %}
+</div>

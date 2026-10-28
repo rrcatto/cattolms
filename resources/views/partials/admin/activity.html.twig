@@ -52,6 +52,8 @@
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'activity', pagination: activity_pagination})} %}
 {% block results %}
 
+			{# The table when there is activity, else the empty notice, never both (2026-10-26 audit). #}
+			{% if activity_events %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 
@@ -98,6 +100,7 @@
 
 {% endblock %}
 {% endembed %}
+			{% else %}
 			{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
 {% block body %}
 
@@ -110,6 +113,7 @@
 
 {% endblock %}
 {% endembed %}
+			{% endif %}
 
 {% endblock %}
 {% block preview %}

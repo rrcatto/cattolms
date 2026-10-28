@@ -11,13 +11,17 @@ Description:
 What a signed-in person must do first (AccountStepListener sends them here; adults only, owner,
 2026-10-20):
 
-- /account/confirm-age: anyone whose account someone else created (Add person, a Company Administrator
-  adding staff) gives their date of birth once, at their first sign-in, before they can continue.
-  Someone under 18 is refused and nothing is kept. A person who gave it at registration is never asked.
+- /account/id-number: anyone whose account has no South African ID number yet (an account someone else made, Add person
+  or a Company Administrator adding staff, and every account made before 2026-10-27) gives it once, at their next
+  sign-in, before they can continue (owner, 2026-10-27, 4A). It gives their date of birth (2A). An invalid number, one
+  another account holds, or someone under 18 is refused and nothing is kept. A person who gave it at registration is
+  never asked.
 - /account/adults-only: an account whose verified identity document shows its holder under 18 goes no
   further. The page says so and offers the contact form and signing out.
 
 Changelog:
+2026/10/27 SAST
+- The South African ID number at /account/id-number in place of the date of birth at /account/confirm-age.
 2026/10/20 SAST
 - The date of birth in place of the age tick; the adults-only page in place of a parent's consent.
 2026/10/19 SAST
@@ -41,28 +45,29 @@ final class AccountStepController extends BaseController
         parent::__construct($auth, $view, $requests);
     }
 
-    #[Route('/account/confirm-age', name: 'account_confirm_age', methods: ['GET'])]
+    /** The South African ID number, once, before any other page (owner, 2026-10-27, 4A). */
+    #[Route('/account/id-number', name: 'account_id_number', methods: ['GET'])]
     public function show(): Response
     {
         $user = $this->requireUser();
-        if ($user->accountStep !== 'age') $this->redirect($this->returnPath((string) $this->request()->query->get('return', '')));
+        if ($user->accountStep !== 'id_number') $this->redirect($this->returnPath((string) $this->request()->query->get('return', '')));
         return $this->render('account-step', [
             'title' => 'Before you continue',
-            'step' => 'age',
+            'step' => 'id_number',
             'return_path' => $this->returnPath((string) $this->request()->query->get('return', '')),
         ]);
     }
 
-    #[Route('/account/confirm-age', name: 'account_confirm_age_save', methods: ['POST'])]
+    #[Route('/account/id-number', name: 'account_id_number_save', methods: ['POST'])]
     public function save(): Response
     {
         $this->requireCsrf();
         $user = $this->requireUser();
         $return = $this->returnPath($this->posted('return_path'));
         return $this->handle(function () use ($user, $return): void {
-            $this->auth->giveDateOfBirth($user, $this->posted('date_of_birth'));
+            $this->auth->giveIdNumber($user, $this->posted('id_number'));
             $this->redirect($return);
-        }, '/account/confirm-age?return=' . rawurlencode($return));
+        }, '/account/id-number?return=' . rawurlencode($return));
     }
 
     #[Route('/account/adults-only', name: 'account_adults_only', methods: ['GET'])]
@@ -79,6 +84,6 @@ final class AccountStepController extends BaseController
 
     private function returnPath(string $path): string
     {
-        return str_starts_with($path, '/') && !str_starts_with($path, '//') && !str_starts_with($path, '/account/confirm-age') && strlen($path) <= 300 ? $path : '/account';
+        return str_starts_with($path, '/') && !str_starts_with($path, '//') && !str_starts_with($path, '/account/id-number') && strlen($path) <= 300 ? $path : '/account';
     }
 }

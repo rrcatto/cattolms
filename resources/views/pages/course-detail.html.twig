@@ -102,6 +102,8 @@
 							Course access
 						</h2>
 						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full'} %}
+						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
+						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
 						{#
 							Reviewing is offered to anyone who has held access to the course, including a
 							learner whose access has expired, so it does not depend on has_access.

@@ -1,6 +1,8 @@
-{# Server-validated company context, with a canonical picker and a plain GET fallback. #}
-{% if can_select_company %}
+{# Server-validated company context, with a canonical picker and a plain GET fallback. The band names the company, with
+   its logo (owner, 2026-10-26), on every Company page for everyone working in it; Switch company only for those who can. #}
+{% if can_select_company or company_context_name|default('') %}
 	<div class="company-context" data-company-context="{{ company_context_mode }}">
+		{% if company_context_logo|default(null) %}<img class="company-context-logo" src="{{ company_context_logo.url }}" alt="{{ company_context_logo.uploaded ? 'The logo of ' ~ company_context_name : '' }}" width="56" height="56">{% endif %}
 		<div>
 			<h2>
 				{{ company_context_name }}
@@ -9,14 +11,17 @@
 				Administering this company. Every action on this page applies to it.
 			</p>
 		</div>
-		{{ ui('feedback.badge', {label: (company_context_domain), tone: 'info'}) }}
+		{% if company_context_domain|default('') %}{{ ui('feedback.badge', {label: (company_context_domain), tone: 'info'}) }}{% endif %}
+		{% if can_select_company %}
 		<div class="company-context-actions">
 			{{ ui('action.button', {label: 'Switch company', variant: 'secondary', size: 'small', type: 'button', modal: 'company-switch', icon: 'action-switch'}) }}
 			<noscript>
 				{{ ui('action.link', {label: 'Switch company', variant: 'secondary', size: 'small', href: '/company/picker', icon: 'action-switch'}) }}
 			</noscript>
 		</div>
+		{% endif %}
 	</div>
+	{% if can_select_company %}
 	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-switch', title: 'Switch company', size: 'wide'})} %}
 {% block modal_body %}
 
@@ -29,4 +34,5 @@
 
 {% endblock %}
 {% endembed %}
+	{% endif %}
 {% endif %}

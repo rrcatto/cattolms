@@ -25,12 +25,26 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\UnknownLoginEmailException;
+use CattoLearning\Support\ClientFingerprint;
+use CattoLearning\Support\Countries;
+use CattoLearning\Support\GeoIpLocator;
+use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class AuthController extends BaseController
 {
+    /** What a refused registration keeps to fill the form in again: never the ID number. */
+    private const DRAFT = ['account_type', 'first_name', 'middle_names', 'last_name', 'company_name', 'country', 'news'];
+
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly GeoIpLocator $geoIp, private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null)
+    {
+        parent::__construct($auth, $view, $requests);
+    }
+
     #[Route('/login', name: 'auth_login_form', methods: ['GET'])]
     public function loginForm(): Response
     {
@@ -41,14 +55,23 @@ final class AuthController extends BaseController
             'title' => 'Sign in',
             'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')),
             'email' => (string) ($_GET['email'] ?? ''),
-        ]);
+        ] + $this->followAsked($_GET['follow'] ?? ''));
     }
 
     #[Route('/register', name: 'auth_register_form', methods: ['GET'])]
     public function registerForm(): Response
     {
         if ($this->currentUser() !== null) $this->redirect('/account');
-        return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses'))]);
+        // What they typed before a refusal, and the country they live in: the one their IP address shows until they choose
+        // (owner, 2026-10-27), South Africa when it shows none.
+        $draft = is_array($_SESSION['registration_draft'] ?? null) ? $_SESSION['registration_draft'] : [];
+        unset($_SESSION['registration_draft']);
+        $country = Countries::code($draft['country'] ?? '') ?? Countries::code($this->geoIp->countryCode(ClientFingerprint::ipAddress())) ?? Countries::SOUTH_AFRICA;
+        return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')),
+            'draft' => $draft, 'country' => $country, 'countries' => Countries::options(),
+            // The sign-up check's signed opening time, and the demo site's notice that the account will be held (owner, 2026-10-26).
+            'signup_opened' => \CattoLearning\Auth\Signup\SignupChecks::formStamp(),
+            'hold_notice' => $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : ''] + $this->followAsked($_GET['follow'] ?? ''));
     }
 
     #[Route('/register', name: 'auth_register', methods: ['POST'])]
@@ -59,12 +82,15 @@ final class AuthController extends BaseController
             $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses')));
         } catch (\Throwable $e) {
             $this->flash('danger', $e->getMessage());
-            $this->redirect('/register?email=' . rawurlencode((string) ($_POST['email'] ?? '')));
+            // Someone under 18 is refused and nothing they typed is kept (adults only, owner, 2026-10-20).
+            if ($e->getMessage() !== \CattoLearning\Auth\AdultAge::REFUSED) $_SESSION['registration_draft'] = array_map(static fn(mixed $value): string => mb_substr(is_scalar($value) ? (string) $value : '', 0, 200), array_intersect_key($_POST, array_flip(self::DRAFT)));
+            $follow = \CattoLearning\Mailing\FollowIntent::fromText($_POST['follow'] ?? '');
+            $this->redirect('/register?email=' . rawurlencode((string) ($_POST['email'] ?? '')) . ($follow !== null ? '&follow=' . rawurlencode($follow->text()) . '&return=' . rawurlencode($this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses'))) : ''));
         }
 
         // redirect() throws HttpRedirect by design. Keep the successful redirect outside the
         // service-call catch so the controller cannot mistake its own redirect for a failed send.
-        $this->redirect('/login/sent');
+        $this->redirect('/login/sent?registered=1');
     }
 
 
@@ -74,10 +100,11 @@ final class AuthController extends BaseController
         $this->requireCsrf();
         $email = (string) ($_POST['email'] ?? '');
         $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses'));
+        $follow = \CattoLearning\Mailing\FollowIntent::fromText($_POST['follow'] ?? '');
         try {
-            $this->auth->requestLogin($email, $returnPath);
+            $this->auth->requestLogin($email, $returnPath, $follow?->text() ?? '');
         } catch (UnknownLoginEmailException $e) {
-            $this->redirect('/register?email=' . rawurlencode($e->email) . '&return=' . rawurlencode($returnPath));
+            $this->redirect('/register?email=' . rawurlencode($e->email) . '&return=' . rawurlencode($returnPath) . ($follow !== null ? '&follow=' . rawurlencode($follow->text()) : ''));
         } catch (\InvalidArgumentException|\RuntimeException $e) {
             error_log('Magic-link request failed: ' . $e->getMessage());
             $this->flash('danger', $e->getMessage());
@@ -96,17 +123,28 @@ final class AuthController extends BaseController
 
 
 
+    /** @return array{follow?:string,follow_name?:string} the follow asked for before signing in, when it names something that can be followed */
+    private function followAsked(mixed $text): array
+    {
+        $intent = \CattoLearning\Mailing\FollowIntent::fromText($text);
+        $name = $this->mailing?->nameOf($intent);
+
+        return $intent !== null && $name !== null ? ['follow' => $intent->text(), 'follow_name' => $name] : [];
+    }
+
     /** A demo site's new account, waiting for ADMIN's approval (owner, 2026-10-21). */
     #[Route('/register/awaiting-approval', name: 'auth_awaiting_approval', methods: ['GET'])]
     public function awaitingApproval(): Response
     {
-        return $this->render('register-awaiting', ['title' => 'Waiting for approval']);
+        return $this->render('register-awaiting', ['title' => 'Waiting for approval', 'demo_site' => $this->auth->demoHoldsRegistrations(), 'demo_notice' => \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE]);
     }
 
     #[Route('/login/sent', name: 'auth_sent', methods: ['GET'])]
     public function sent(): Response
     {
-        return $this->render('login-sent', ['title' => 'Check your email']);
+        // After a registration on a demo site, the notice that the account will be held (owner, 2026-10-26).
+        return $this->render('login-sent', ['title' => 'Check your email',
+            'hold_notice' => isset($_GET['registered']) && $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : '']);
     }
 
     #[Route('/auth/consume', name: 'auth_consume_head', methods: ['HEAD'])]

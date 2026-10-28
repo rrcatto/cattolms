@@ -421,6 +421,10 @@ summary{display:list-item;cursor:pointer}
 .cl-icon-choice-current>span[aria-hidden]{margin:0}
 .cl-icon-choice .cl-ui-picture-choice--cards{margin-bottom:0}
 /* A person's picture on their page in Administration, or a plain placeholder (owner, 2026-10-20: never initials). */
+/* A long address, domain or name never pushes a page sideways on a phone: it wraps where it would overflow its line
+   (ordinary words are left alone), and a page title, which sits in a flex row, may wrap anywhere (2026-10-27). */
+.cl-main{overflow-wrap:break-word}
+.cl-page-head h1{overflow-wrap:anywhere}
 .cl-main .profile-head{display:flex;flex-wrap:wrap;align-items:center;gap:1rem 1.25rem}
 .cl-main .profile-head .profile-meta{min-width:0;flex:1 1 16rem}
 .cl-main .profile-head .profile-meta p{margin:0 0 .35rem}
@@ -1296,6 +1300,10 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
    for every enhancement. */
 
 .cl-profile-image-current{display:grid;gap:.4rem;justify-items:center;flex:0 0 auto}
+/* A company's logo card (2026-10-26): the logo, or its drawn picture, beside the upload. */
+.cl-company-logo-panel{display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start}.cl-company-logo-current{display:grid;gap:.4rem;justify-items:center;margin:0;flex:0 0 auto}.cl-company-logo-preview{width:128px;height:128px;object-fit:contain;border-radius:var(--cl-radius,.5rem);background:var(--cl-surface,#fff)}.cl-company-logo-form{flex:1 1 16rem;min-width:0}.cl-company-logo-actions{display:flex;flex-wrap:wrap;gap:.5rem}.cl-company-logo-actions form{margin:0}
+/* Show me another and Back to my first one, under a drawn avatar (2026-10-26). */
+.cl-profile-image-current .help{text-align:center;max-width:16rem}.cl-profile-avatar-actions{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}.cl-profile-avatar-actions form{margin:0}
 .cl-image-editor{display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start;margin:.9rem 0 1rem}
 .cl-image-editor-stage{position:relative;flex:0 0 auto;line-height:0}/* The frame is the crop. Everything drawn outside it is dimmed rather than hidden, so the reader
    can see what is being left out while they drag - a hard edge shows the result but not the choice. */
@@ -1407,7 +1415,9 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 @media(max-width:600px){.cl-ui-form-grid[data-columns="wide"]>.cl-ui-field,.cl-ui-form-grid[data-columns="wide"]>.cl-ui-choice{grid-column:1/-1}}
 .cl-ui-field--full,.cl-ui-form-actions{grid-column:1/-1}.cl-ui-form-grid>.cl-ui-field+.cl-ui-field{margin-top:0}
 .cl-ui-field-label{font-weight:600}.cl-ui-field-help{font-size:.875rem;opacity:.8}.cl-ui-field-error{color:#a31525}.cl-ui-required{color:inherit}
-body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice input{width:auto;flex:0 0 auto}.cl-ui-choice{min-width:0}
+/* The province field of an address (2026-10-27): its wrapper keeps the form grid, and is gone when not for the country. */
+.cl-region-field{display:contents}.cl-region-field[hidden]{display:none!important}
+body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem;overflow-wrap:anywhere}.cl-ui-choice input{width:auto;flex:0 0 auto}.cl-ui-choice{min-width:0}
 .cl-ui-compact-action{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.cl-ui-compact-action input,.cl-ui-compact-action select{width:auto;max-width:100%}
 .cl-ui-table{max-width:100%;overflow-x:auto}.cl-ui-table table{width:100%;border-collapse:collapse}.cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="5"]{grid-template-columns:repeat(auto-fill,minmax(max(calc((100% - 4rem) / 5),min(max(calc((100% - 3rem) / 4 + 1px),min(100%,10.5rem)),calc(min(100%,10.5rem) + (min(100%,10.5rem) - (100% - 4rem) / 5) * 100000))),1fr))}.cl-ui-stat-grid[data-columns="1"]{grid-template-columns:1fr}.cl-ui-stat-grid[data-columns="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.cl-ui-stat-card{padding:1.2rem;min-width:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}.cl-ui-stat-value{font-size:1.8rem;font-weight:700}.cl-ui-stat-label{font-weight:600}.cl-ui-stat-note{font-size:.85rem}
@@ -1420,7 +1430,9 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice
 .cl-ui-stat-icon{display:inline-grid;place-items:center;width:2.25rem;height:2.25rem;margin-bottom:.6rem;border-radius:var(--cl-radius,.5rem);color:var(--cl-accent,var(--cl-primary,currentColor));background:color-mix(in srgb,currentColor 12%,transparent)}
 .cl-ui-stat-icon .cl-ui-icon{width:1.25rem;height:1.25rem}
 .cl-ui-stat-card--small .cl-ui-stat-value{white-space:nowrap;overflow:hidden}
-.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block}
+/* Never animated: a theme's transition (Gilded Noir's transition:all) made the refit measure the amount's old size, so it
+   sometimes judged a too-wide amount to fit (2026-10-26). */
+.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block;transition:none!important}
 /* A stat card that opens what it counts (the dashboard's money figures): the card is the link, in the card's own colours. */
 a.cl-ui-stat-link{display:block;color:inherit;text-decoration:none}a.cl-ui-stat-link:hover{border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))}a.cl-ui-stat-link:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-offset:.2em}
 .cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;flex-wrap:wrap;align-items:start;justify-content:space-between;gap:.5rem 1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
@@ -1724,7 +1736,6 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-certificate-design{display:flex;align-items:center;gap:.75rem;min-width:0;white-space:normal}
 .cl-certificate-design-link{font-weight:700;text-decoration:none}
 .cl-certificate-design-name{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;min-width:0;white-space:normal}
-.cl-certificate-custom input[type=color]{width:5rem;min-height:2.6rem;padding:.25rem;cursor:pointer}
 .cl-certificate-design-link:hover,.cl-certificate-design-link:focus-visible{text-decoration:underline}
 .cl-ui-table .cl-certificate-design-name .cl-ui-badge{white-space:normal}
 .cl-certificate-designs-col-design{width:46%}.cl-certificate-designs-col-actions{width:8.5rem}
@@ -1741,7 +1752,6 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-document-preview-frame{display:block;width:100%;max-width:52rem;aspect-ratio:210/297;min-height:20rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
 .cl-document-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 .cl-document-logo{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
-.cl-document-design input[type=color]{width:5rem;min-height:2.6rem;padding:.25rem;cursor:pointer}
 /* Course landing pages (/landing/…): the hero in the page-head band with its picture beside the copy
    on wide screens and above nothing on narrow ones, then each section on its own card. Layout only:
    colours, type and borders come from the theme through its tokens. Decorative check marks are
@@ -1898,3 +1908,148 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-landing-picture,.cl-landing-rows{display:grid;gap:.75rem;min-width:0;margin:0;padding:0;border:0}
 .cl-landing-row{display:grid;gap:.5rem;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px)}
 .cl-landing-add{display:grid;gap:.4rem;margin:0;padding:0;border:0}
+
+/* A list shown as cards (owner, 2026-10-26: "offer a grid view and show grids of cards for each person, course, company").
+   The switch between the table and the grid, and the grid's Sort, sit above the list. The grid holds whole rows: 4 cards
+   to a row (courses) or 5 (people, companies) at full width, fewer on a narrower screen, never more. Each card: its
+   picture (a person's round, a company's square logo, a course's wide 16:10 cover), its title, details and actions. */
+.cl-list-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 .75rem}
+.cl-list-toolbar>*{min-width:0;max-width:100%}
+.cl-view-switch{display:inline-flex;flex-wrap:wrap;gap:.4rem}
+.cl-grid-sort{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0}
+.cl-grid-sort .cl-label{margin:0}
+/* A drop-down may be narrower than its longest choice on a phone, so the Sort never stands out of its card. */
+.cl-grid-sort .cl-select{width:auto;flex:0 1 auto;min-width:0;max-width:100%}
+.cl-ui-card-grid{list-style:none;margin:0;padding:0;display:grid;gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr))}
+.cl-ui-card-grid[data-columns="5"]{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1240px){.cl-ui-card-grid[data-columns="5"]{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:1040px){.cl-ui-card-grid,.cl-ui-card-grid[data-columns="5"]{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:760px){.cl-ui-card-grid,.cl-ui-card-grid[data-columns="5"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.cl-ui-card-grid[data-columns="4"]{grid-template-columns:minmax(0,1fr)}}
+/* A card never hides what it holds (2026-10-27): its ⋯ menu opens below the buttons at its foot, and a card that clipped
+   its content left only a sliver of the menu showing, so the menu seemed to do nothing. The cover rounds its own top
+   corners instead. */
+.cl-ui-card{display:flex;flex-direction:column;min-width:0;margin:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:var(--cl-radius,10px)}
+.cl-ui-card-picture{display:flex;justify-content:center;align-items:center;padding:1rem 1rem 0}
+.cl-ui-card-picture:empty{display:none}
+.cl-ui-card-picture img{display:block;width:96px;height:96px;object-fit:cover}
+.cl-ui-card[data-picture="round"] .cl-ui-card-picture img{border-radius:50%}
+.cl-ui-card[data-picture="square"] .cl-ui-card-picture img{object-fit:contain;border-radius:var(--cl-radius,10px)}
+.cl-ui-card[data-picture="wide"] .cl-ui-card-picture{padding:0;aspect-ratio:16/10;overflow:hidden;border-radius:max(0px,calc(var(--cl-radius,10px) - 1px)) max(0px,calc(var(--cl-radius,10px) - 1px)) 0 0}
+.cl-ui-card[data-picture="wide"] .cl-ui-card-picture>svg,.cl-ui-card[data-picture="wide"] .cl-ui-card-picture>img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0}
+.cl-ui-card-body{display:grid;align-content:start;gap:.35rem;flex:1 1 auto;min-width:0;padding:.75rem 1rem}
+/* Two classes, so a theme's own h3 size (Saharan Sunset's .ss-body h3) does not make a card's title a page heading. */
+.cl-ui-card .cl-ui-card-title{margin:0;font-size:1.1rem;line-height:1.3;overflow-wrap:anywhere}
+.cl-ui-card[data-picture="round"] .cl-ui-card-body,.cl-ui-card[data-picture="square"] .cl-ui-card-body{justify-items:center;text-align:center}
+.cl-ui-card-line{margin:0;font-size:.9rem;overflow-wrap:anywhere}
+.cl-ui-card-quiet{color:rgba(33,37,41,.75);font-size:.85rem}
+.cl-ui-card .role-list{display:flex;flex-wrap:wrap;gap:.25rem}
+.cl-ui-card[data-picture="round"] .role-list,.cl-ui-card[data-picture="square"] .role-list{justify-content:center}
+.cl-ui-card-actions{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:auto;padding:0 1rem 1rem}
+.cl-ui-card[data-picture="round"] .cl-ui-card-actions,.cl-ui-card[data-picture="square"] .cl-ui-card-actions{justify-content:center}
+.cl-ui-card-actions:empty{display:none}
+.cl-ui-card-actions form{margin:0}
+/* A card's menu opens under its buttons, as wide as the card, so it never runs off a phone's edge from a card in the
+   left column. */
+.cl-ui-card-actions{position:relative}
+.cl-ui-card-actions .cl-ui-row-menu{position:static!important}
+.cl-ui-card-actions .cl-ui-row-panel{left:.5rem;right:.5rem;top:calc(100% - .75rem);min-width:0;width:auto;white-space:normal}
+/* The catalogue as a list (owner, 2026-10-26): one line per course like every table row, opening with the course's
+   cover, small, beside its title. */
+.cl-catalogue-row{display:inline-flex;align-items:center;gap:.65rem;min-width:0;vertical-align:middle}
+.cl-catalogue-row-cover{flex:0 0 4.5rem;display:block;width:4.5rem;aspect-ratio:16/10;overflow:hidden;border-radius:calc(var(--cl-radius,10px) / 2);line-height:0}
+.cl-catalogue-row-cover>svg,.cl-catalogue-row-cover .cl-course-cover-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.cl-catalogue-row-title{font-weight:600}
+.cl-catalogue-row-actions{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:.4rem}
+.cl-catalogue-row-actions form{margin:0}
+/* The company's logo where the company is (owner, 2026-10-26): in its band on every Company page, large on its Dashboard
+   and its profile, small beside its name in Switch company. A logo keeps its own shape (contain), on a white ground so a
+   transparent one reads on a dark theme. */
+.company-context{align-items:center}
+.company-context-logo{flex:0 0 auto;width:56px;height:56px;object-fit:contain;background:#fff;border-radius:var(--cl-radius,10px);padding:4px}
+.cl-company-dashboard-logo{display:block;line-height:0}
+.cl-company-dashboard-logo img{width:96px;height:96px;object-fit:contain;background:#fff;border-radius:var(--cl-radius,10px);padding:6px}
+.cl-company-dashboard-domain{margin:0 0 .5rem;font-size:.9rem;opacity:.8}
+.cl-company-logo-large{display:block;width:192px;height:192px;object-fit:contain;background:#fff;border-radius:var(--cl-radius,10px);padding:8px;border:1px solid var(--cl-line,#ddd)}
+.cl-company-named{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
+.cl-company-named-logo{flex:0 0 28px;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:calc(var(--cl-radius,10px) / 2)}
+/* A person's picture on their page in the Company workspace (owner, 2026-10-26). */
+.cl-person-picture{display:block;width:128px;height:128px;object-fit:cover;border-radius:50%;margin:0 0 1rem}
+/* A main column with a side column (layout.section-grid columns 'main-side'; the person page, owner-approved 2026-10-26):
+   the side holds the account and security cards, beside the profile and never before it; on narrow screens it follows. */
+.cl-ui-section-grid[data-columns="main-side"]{grid-template-columns:minmax(0,2fr) minmax(18rem,1fr);align-items:start}
+.cl-ui-section-grid[data-columns="main-side"]>*{min-width:0;display:flex;flex-direction:column;gap:1.25rem}
+.cl-ui-section-grid[data-columns="main-side"]>*>.cl-ui-surface{margin:0}
+@media(max-width:1100px){.cl-ui-section-grid[data-columns="main-side"]{grid-template-columns:minmax(0,1fr)}}
+.cl-person-summary{display:flex;flex-wrap:wrap;gap:1.5rem 2.5rem;align-items:center}
+.cl-person-summary>.profile-head{flex:1 1 26rem;min-width:0}
+.cl-person-summary>.cl-ui-stat-grid{flex:1 1 30rem;min-width:0}
+.cl-person-company{display:flex;gap:1rem;align-items:center;border:1px solid var(--cl-border,#d9c8b2);padding:.75rem 1rem;margin:0 0 1rem}
+.cl-company-named-logo--large{width:40px;height:40px}
+.cl-person-risk-link{text-decoration:none}
+.cl-person-company-line{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .5rem}
+.cl-person-main,.cl-person-side{min-width:0}
+/* A Follow button with its line (mailing, step 1; owner, 2026-10-26). */
+.cl-follow{display:flex;flex-direction:column;gap:.25rem;margin:.75rem 0 0}
+.cl-follow form{margin:0}
+.cl-follow-note{margin:0;color:var(--cl-muted,#6b5d51)}
+/* Keep me informed at checkout (mailing, step 1; owner, 2026-10-26). */
+.cl-keep-informed{border:0;margin:1rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.cl-keep-informed legend{margin:0 0 .25rem}
+/* Mailing, step 2 (owner, 2026-10-26): the campaign page's badges, block moves, preview frame and the stop page. */
+.cl-mailing-badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 0 1rem}
+.cl-mailing-lists{border:0;margin:1rem 0;padding:0;display:flex;flex-direction:column;gap:.35rem}
+.cl-mailing-lists legend{margin:0 0 .35rem}
+.cl-mailing-block-moves{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0 0;padding:1rem 0 0;border-top:1px solid var(--cl-border,#e7e0d8)}
+.cl-mailing-block-moves form,.cl-mailing-choices form,.cl-mailing-update-actions form{margin:0}
+.cl-mailing-add{margin:1.5rem 0 0}
+.cl-mailing-send{margin:1rem 0}
+.cl-mailing-update{display:flex;flex-direction:column;gap:.5rem;padding:1rem 0;border-top:1px solid var(--cl-border,#e7e0d8)}
+.cl-mailing-update:first-of-type{border-top:0;padding-top:0}
+.cl-mailing-update-main{display:flex;align-items:flex-start;gap:.75rem}
+.cl-mailing-update-main p{margin:0 0 .25rem}
+.cl-mailing-update-headline{font-weight:700}
+.cl-mailing-update-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.cl-mailing-update .cl-mailing-badges{margin:.35rem 0 0}
+.cl-mailing-release{margin-top:1rem}
+.cl-mailing-period{margin:0 0 1rem}
+.cl-mailing-proof{margin:0 0 1rem}
+.cl-address-matches:empty{display:none}
+.cl-address-matches{margin-top:.4rem;border:1px solid var(--cl-border,#e7e0d8);border-radius:var(--cl-radius,6px);max-height:18rem;overflow:auto;background:var(--cl-surface,#fff)}
+.cl-address-matches>p{margin:0;padding:.5rem .75rem}
+.cl-address-matches-list{list-style:none;margin:0;padding:0}
+.cl-address-match{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;width:100%;padding:.5rem .75rem;border:0;border-bottom:1px solid var(--cl-border,#e7e0d8);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.cl-address-match:hover,.cl-address-match:focus-visible{background:var(--cl-surface-muted,#f6f2ec)}
+.cl-address-match:disabled{cursor:default;opacity:.7}
+.cl-address-match-email{font-weight:600;overflow-wrap:anywhere}
+.cl-address-match-name{color:var(--cl-text-secondary,#6b5d51);font-size:.9em}
+.cl-mailing-history{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.cl-mailing-preview{display:block;width:100%;height:42rem;border:1px solid var(--cl-border,#e7e0d8);background:#f3efe9}
+/* Mailing templates (owner, 2026-10-28, decision 5B): the preview at a phone's width, the form's groups, and the HTML in a monospace box. */
+.cl-mailing-preview--phone{max-width:390px;margin-inline:auto}
+.cl-template-group{border:0;margin:1.25rem 0 0;padding:1rem 0 0;border-top:1px solid var(--cl-border,#e7e0d8);min-width:0}
+.cl-template-group>legend{float:left;width:100%;margin:0 0 .5rem;padding:0}
+.cl-template-group>legend+*{clear:left}
+.cl-hex-colour{display:flex;align-items:center;gap:.5rem}
+.cl-hex-colour-swatch{flex:0 0 auto;width:2.1rem;height:2.1rem;color:var(--cl-text,#2b2420)}
+.cl-hex-colour .cl-input{max-width:9rem}
+.cl-hex-colour .cl-input[aria-invalid=true]{border-color:var(--cl-danger,#b42318)}
+.cl-code-input{font-family:var(--cl-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:.85rem;line-height:1.45}
+.cl-mailing-picture{display:block;max-width:100%;height:auto;border:1px solid var(--cl-border,#e7e0d8)}
+.cl-mailing-choices{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
+.cl-mailing-filter{display:flex;align-items:flex-end;gap:.5rem;margin:0 0 1rem}
+/* A picture before the page head's title and badges under it (owner, 2026-10-27: the company page's logo and its facts). */
+.cl-page-head-media{flex:0 0 auto;display:flex;align-items:center}
+.cl-page-head-media img{display:block;width:7rem;height:7rem;object-fit:contain;border:1px solid var(--cl-border,#e6d8c6);background:#fff}
+.cl-page-head-badges{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0 0}
+@media(max-width:700px){.cl-page-head-media img{width:4.5rem;height:4.5rem}}
+.cl-page-head-inner:has(.cl-page-head-media){align-items:center}
+/* The company page in Administration (owner-approved mockup, 2026-10-27): its facts, wallet movements and activity. */
+.cl-company-facts{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:.4rem 1rem}
+.cl-company-facts dt{color:var(--cl-muted,#6b5d51);font-weight:500}
+.cl-company-facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.cl-company-movements,.cl-company-activity{list-style:none;margin:1rem 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.6rem}
+.cl-company-movements li{display:flex;justify-content:space-between;gap:.75rem;padding-top:.6rem;border-top:1px solid var(--cl-border,#e6d8c6)}
+.cl-company-movements strong{white-space:nowrap}
+.cl-company-activity li{padding-top:.6rem;border-top:1px solid var(--cl-border,#e6d8c6)}
+.cl-company-billing{margin:0 0 1rem}

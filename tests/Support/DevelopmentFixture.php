@@ -11,6 +11,8 @@ Description:
 Provides reusable development-database fixtures for Catto Learning integration tests. The configured development database is used directly; its role is defined by the project owner, never inferred from its name.
 
 Changelog:
+2026/10/26 SAST
+- addCompanyMember() puts the member's address at the company's domain (the company domain rule).
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 2026/08/19 03:40 SAST
@@ -46,15 +48,103 @@ final class DevelopmentFixture
     /** @var list<string> */
     private array $tokenEmails = [];
 
+    /** The last analytics event before this fixture: the anonymous page views after it are the check's browsers'. */
+    private int $analyticsMark;
+
     public function __construct(private readonly Database $db)
     {
         $rows = $this->db->fetchAllAssociative('SELECT COALESCE(MAX(id), 0)::bigint AS id FROM audit_log');
         $this->auditLogHighWaterMark = (int) ($rows[0]['id'] ?? 0);
+        $this->analyticsMark = (int) $this->db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM analytics_events');
     }
 
     public function suffix(): string
     {
         return strtolower(bin2hex(random_bytes(6)));
+    }
+
+    /**
+     * A person with a believable name nobody on the site has (owner, 2026-10-27: no strings of digits, no repeated
+     * names), at a private address unless a domain is given, with a role on the site.
+     *
+     * @return array{id:int,email:string,first:string,last:string,name:string}
+     */
+    public function person(string $role = 'STUDENT', string $domain = 'inbox.test'): array
+    {
+        ['first' => $first, 'last' => $last] = (new CheckNames($this->db))->person();
+        $email = strtolower(str_replace(' ', '', $first) . '.' . str_replace(' ', '', $last)) . '@' . $domain;
+        // A name comes back once the check that had it is gone: sign-in requests an earlier check left under the address
+        // (which no account holds now) would count against this person's sign-in limit.
+        $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email) = :email AND NOT EXISTS (SELECT 1 FROM user_emails e WHERE LOWER(e.email) = :email)', ['email' => $email]);
+        $id = $this->createUser($first . ' ' . $last, $email);
+        // Its sign-in requests go with it at the clean-up.
+        $this->rememberEmail($email);
+        $this->db->executeStatement('UPDATE users SET first_name = :f, last_name = :l WHERE id = :id', ['f' => $first, 'l' => $last, 'id' => $id]);
+        $this->grant($id, 'STUDENT');
+        if ($role !== 'STUDENT') $this->grant($id, $role);
+
+        return ['id' => $id, 'email' => $email, 'first' => $first, 'last' => $last, 'name' => $first . ' ' . $last];
+    }
+
+    /**
+     * A company with a believable name and its own domain, made with its founding Company Administrator, as every
+     * company is (owner, 2026-10-27: "It is IMPOSSIBLE for a company to be created and have ZERO people attached").
+     *
+     * @return array{id:int,name:string,domain:string,founder:array{id:int,email:string,first:string,last:string,name:string}}
+     */
+    public function company(): array
+    {
+        ['name' => $name, 'domain' => $domain] = (new CheckNames($this->db))->company();
+        $founder = $this->person('COMPANY_ADMIN', $domain);
+        $this->db->beginTransaction();
+        $id = (int) $this->db->fetchOne(
+            "INSERT INTO companies (public_id,name,domain,status,created_by_user_id) VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
+            ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $founder['id']]
+        );
+        $this->db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:c,:u,'owner','active',NOW())", ['c' => $id, 'u' => $founder['id']]);
+        $this->db->commit();
+        $this->companies[] = $id;
+
+        return ['id' => $id, 'name' => $name, 'domain' => $domain, 'founder' => $founder];
+    }
+
+    /**
+     * A member of a company's staff, at its domain.
+     *
+     * @param array{id:int,domain:string} $company
+     * @return array{id:int,email:string,first:string,last:string,name:string}
+     */
+    public function staff(array $company, string $companyRole = 'student', string $role = 'STUDENT'): array
+    {
+        $person = $this->person($role, $company['domain']);
+        $this->db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:c,:u,:r,'active',NOW())", ['c' => $company['id'], 'u' => $person['id'], 'r' => $companyRole]);
+
+        return $person;
+    }
+
+    /**
+     * A course with a real course title, its address and code, owned by a person and their company (0 for the Site Owner).
+     *
+     * @return array{id:int,slug:string,title:string,code:string}
+     */
+    public function course(int $ownerUserId, int $ownerCompanyId, string $status = 'draft'): array
+    {
+        ['title' => $title, 'slug' => $slug, 'code' => $code] = (new CheckNames($this->db))->course();
+        $id = $this->createCourse($ownerUserId, $ownerCompanyId, $slug, $title, $status);
+        $this->db->executeStatement('UPDATE courses SET code = :code, published_at = CASE WHEN status = \'published\' THEN NOW() ELSE published_at END WHERE id = :id', ['code' => $code, 'id' => $id]);
+
+        return ['id' => $id, 'slug' => $slug, 'title' => $title, 'code' => $code];
+    }
+
+    /** @return array{users:list<int>,companies:list<int>,courses:list<int>,analytics_after:int} what this fixture made, for CheckScrub */
+    public function seeds(): array
+    {
+        return ['users' => $this->users, 'companies' => $this->companies, 'courses' => $this->courses, 'analytics_after' => $this->analyticsMark];
+    }
+
+    private function grant(int $userId, string $role): void
+    {
+        $this->db->executeStatement('INSERT INTO user_roles (user_id, role_id) SELECT :u, id FROM roles WHERE role_key = :r ON CONFLICT DO NOTHING', ['u' => $userId, 'r' => $role]);
     }
 
     public function createUser(string $label, ?string $email = null): int
@@ -70,9 +160,9 @@ final class DevelopmentFixture
                 ['user_id' => $id, 'email' => $email]
             );
         }
-        // The person gave their date of birth, as everyone does once (adults only, owner, 2026-10-20),
-        // as the registration form records it.
-        $this->db->executeStatement("UPDATE users SET birthdate = DATE '1990-05-12' WHERE id = :id", ['id' => $id]);
+        // The person gave their South African ID number, as everyone does once (owner, 2026-10-27): a valid one, unique on
+        // the site, for 12 May 1990, which gives their date of birth (adults only, 2026-10-20).
+        CheckIdNumbers::give($this->db, $id);
         return $id;
     }
 
@@ -88,24 +178,49 @@ final class DevelopmentFixture
         }
     }
 
-    public function createCompany(int $actorUserId, string $name, string $domain): int
+    /**
+     * A company made as every company is, with its founding Company Administrator (owner, 2026-10-27: "It is IMPOSSIBLE
+     * for a company to be created and have ZERO people attached"; the database refuses one without), a person with a
+     * real name at its domain, or the person a test names as its founder. Members the test adds come on top.
+     */
+    public function createCompany(int $actorUserId, string $name, string $domain, ?int $founderUserId = null): int
     {
-        $id = (int) $this->db->fetchAllAssociative(
-            "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
-             VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
-            ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
-        )[0]['id'];
+        $this->db->beginTransaction();
+        try {
+            $id = (int) $this->db->fetchAllAssociative(
+                "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
+                 VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
+                ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
+            )[0]['id'];
+            $founder = $founderUserId ?? $this->person('COMPANY_ADMIN', $domain)['id'];
+            if ($founderUserId !== null) $this->grant($founderUserId, 'COMPANY_ADMIN');
+            $this->db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:c,:u,'owner','active',NOW())", ['c' => $id, 'u' => $founder]);
+            $this->db->commit();
+        } catch (\Throwable $failed) {
+            $this->db->rollBack();
+            throw $failed;
+        }
         $this->companies[] = $id;
         return $id;
     }
 
     /** Makes the user an active member of the company: a company account, which never buys for itself. */
-    public function addCompanyMember(int $companyId, int $userId, string $companyRole = 'student'): void
+    /**
+     * A member of a company, at its domain as every member is (the company domain rule, owner 2026-10-26): their primary
+     * address keeps the part before the @ and takes the company's domain. Returns that address.
+     */
+    public function addCompanyMember(int $companyId, int $userId, string $companyRole = 'student'): string
     {
         $this->db->executeStatement(
             "INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:company,:user,:role,'active',NOW())",
             ['company' => $companyId, 'user' => $userId, 'role' => $companyRole]
         );
+        $this->db->executeStatement(
+            "UPDATE user_emails SET email = split_part(email, '@', 1) || '@' || (SELECT domain FROM companies WHERE id = :company) WHERE user_id = :user AND is_primary",
+            ['company' => $companyId, 'user' => $userId]
+        );
+
+        return (string) $this->db->fetchOne('SELECT email FROM user_emails WHERE user_id = :user AND is_primary', ['user' => $userId]);
     }
 
     public function createCourse(int $ownerUserId, int $ownerCompanyId, string $slug, string $title, string $status = 'draft'): int

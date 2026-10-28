@@ -152,14 +152,14 @@ const ROOTS = 4; // A, B, G and D
             await p.option('G').click();
             step = 'cancel';
             await page.getByRole('button', {name: 'Create a new category'}).click();
-            await page.locator('#category-new-name').fill(`Tree Cancelled ${state.suffix}`);
+            await page.locator('#category-new-name').fill(state.extra.cancelled);
             await page.locator('#category-new').getByRole('button', {name: 'Cancel'}).click();
             assert.equal(await page.locator('#category-new').isVisible(), false);
             assert.equal(await p.shown(), names().G, 'Cancel keeps the previous choice.');
             for (const [label, where, expected] of [['top', null, 1], ['sub', 'B', 2], ['subsub', ['B', 'B1'], 3]]) {
                 step = `create ${label}`;
                 await page.getByRole('button', {name: 'Create a new category'}).click();
-                const name = `Tree New ${label} ${state.suffix}`;
+                const name = state.extra[{top: 'new_top', sub: 'new_sub', subsub: 'new_subsub'}[label]];
                 await page.locator('#category-new-name').fill(name);
                 assert.equal(await place.shown(), 'Top level', 'The place starts at Top level.');
                 if (where !== null) {
@@ -203,7 +203,7 @@ const ROOTS = 4; // A, B, G and D
             const answer = await page.evaluate(async (parent) => {
                 const body = new FormData();
                 body.append('csrf', document.querySelector('[data-category-create-panel]').dataset.csrf);
-                body.append('name', `Forged ${Date.now()}`);
+                body.append('name', 'A fourth level');
                 body.append('parent_id', String(parent));
                 const response = await fetch('/admin/courses/categories/inline', {method: 'POST', body, credentials: 'same-origin', headers: {Accept: 'application/json'}});
                 return {status: response.status, data: await response.json()};
@@ -233,7 +233,7 @@ const ROOTS = 4; // A, B, G and D
         if (browserName === 'chromium') {
             await scenario('a course saves the category chosen at any level, and Uncategorised', browserName, async () => {
                 await fresh();
-                await page.locator('#title').fill(`Picker course ${state.suffix}`);
+                await page.locator('#title').fill(state.extra.picker_course);
                 const p = course();
                 await opened(p);
                 await p.expander('A').click();
@@ -254,9 +254,9 @@ const ROOTS = 4; // A, B, G and D
 
             await scenario('an import is filed in the category chosen, one created during the import included', browserName, async () => {
                 reset();
-                const file = path.join(os.tmpdir(), `picker-import-${state.suffix}.json`);
-                const stamp = `${state.suffix}-${Date.now()}`;
-                fs.writeFileSync(file, JSON.stringify({course: {slug: `picker-import-${stamp}`, title: `Picker import ${stamp}`}, modules: [{title: 'Only module', module_key: 'm1', assessment_required: false, content_html: '<p>Hello</p>'}]}));
+                const file = path.join(os.tmpdir(), `picker-import-${process.pid}.json`);
+
+                fs.writeFileSync(file, JSON.stringify({course: {slug: state.extra.import.slug, title: state.extra.import.title}, modules: [{title: 'Only module', module_key: 'm1', assessment_required: false, content_html: '<p>Hello</p>'}]}));
                 await page.goto(`${base}/admin/courses/import`);
                 await page.locator('#course-file').setInputFiles(file);
                 await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Analyse course'}).click()]);
@@ -268,16 +268,16 @@ const ROOTS = 4; // A, B, G and D
                 await page.keyboard.press('Escape');
                 step = '+ New in the import';
                 await page.getByRole('button', {name: 'Create a new category'}).click();
-                await page.locator('#import-category-new-name').fill(`Tree Imported ${state.suffix}`);
+                await page.locator('#import-category-new-name').fill(state.extra.imported);
                 const place = picker(page, 'import-category-new-place');
                 await opened(place);
                 await place.option('D').click();
                 await page.locator('#import-category-new').getByRole('button', {name: 'Create category'}).click();
                 await page.locator('#import-category-new').waitFor({state: 'hidden'});
-                assert.equal(await picker(page, 'import-category').shown(), `${names().D} › Tree Imported ${state.suffix}`);
+                assert.equal(await picker(page, 'import-category').shown(), `${names().D} › ${state.extra.imported}`);
                 await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Import into PostgreSQL'}).click()]);
                 assert.match(page.url(), /\/admin\/courses\/\d+/, `The import was committed (${(await page.locator('[data-flash-message]').allTextContents()).join(' ').trim()})`);
-                assert.equal(await course().shown(), `${names().D} › Tree Imported ${state.suffix}`, 'The imported course is in the new category.');
+                assert.equal(await course().shown(), `${names().D} › ${state.extra.imported}`, 'The imported course is in the new category.');
             });
 
             await scenario('the catalogue uses the same picker and goes to the category chosen', browserName, async () => {
@@ -312,7 +312,7 @@ const ROOTS = 4; // A, B, G and D
         assert.ok(await p.option('A1x').isVisible(), 'Every level is listed.');
         await p.option('A1x').click();
         await page.keyboard.press('Escape');
-        await page.locator('#title').fill(`Picker nojs ${state.suffix}`);
+        await page.locator('#title').fill(state.extra.picker_nojs);
         await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Create course'}).click()]);
         assert.equal(await picker(page, 'category').shown(), pathOf('A', 'A1', 'A1x'), 'The course was saved in it.');
         await ctx.close();

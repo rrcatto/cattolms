@@ -21,6 +21,10 @@
 
 {% endblock %}
 {% endembed %}
+						{# Its Company Administrator, made with it: a company is never empty (owner, 2026-10-27). #}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its Company Administrator: first name', for: 'company-add-admin-first', required: true})} %}{% block control %}<input name="admin_first_name" required id="company-add-admin-first" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'company-add-admin-last', required: true})} %}{% block control %}<input name="admin_last_name" required id="company-add-admin-last" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their email address', full_width: true, for: 'company-add-admin-email', required: true, help: 'At the company\'s domain, such as name@example.co.za. They manage the company in the Company workspace.'})} %}{% block control %}<input type="email" name="admin_email" required id="company-add-admin-email" placeholder="name@example.co.za" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 						<div class="cl-ui-field--full">
 							<span class="cl-inferred-label">Company type</span>
 							<p class="help">
@@ -76,6 +80,8 @@
 									Client once it holds course credits or has staff; course provider once it owns a course. A company can be both, and neither is chosen here.
 								</div>
 							</div>
+{# The logo is changed on the company's own page (owner, 2026-10-26). #}
+							<p class="cl-ui-field--full help">The logo, the people and everything else about it are on <a href="/admin/companies/{{ company.id }}">its page</a>.</p>
 
 {% endblock %}
 {% endembed %}

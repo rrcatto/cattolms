@@ -67,7 +67,8 @@ final class LearningController extends BaseController
         RequestStack $requests,
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly AnalyticsEventRecorder $analytics
+        private readonly AnalyticsEventRecorder $analytics,
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -101,6 +102,9 @@ final class LearningController extends BaseController
             return $this->render('learn-course', [
                 'title' => (string) $course['title'],
                 'course' => $course,
+                // Asked once, at Start course, whether they want the course's updates (owner, 2026-10-26: company staff
+                // are asked "Both" here and in the email giving them the course).
+                'ask_follow' => !$preview && !$this->mailing->isSubscribed($user->id, 'course', (int) $course['id']),
                 'is_preview' => $preview,
                 'preview_query' => $preview ? '?preview=1' : '',
                 'course_content_mode' => true,
@@ -120,6 +124,7 @@ final class LearningController extends BaseController
             // Starting begins the access period and ends any refund (owner, 2026-10-17): the learner ticks that first.
             if (!$preview && $this->posted('confirm_start') !== 'yes') throw new \RuntimeException('Tick the box to confirm that starting begins your access period and that a started course can no longer be refunded.');
             $this->learning->start($user->id, $slug, $preview);
+            if (!$preview && $this->posted('follow_course') === '1' && (int) $this->posted('course_id') > 0) $this->mailing->subscribe($user->id, 'course', (int) $this->posted('course_id'), 'start_course');
             $this->flash('success', 'The course has started. Your access period begins now.');
             $this->redirect('/learn/' . rawurlencode($slug) . ($preview ? '?preview=1' : ''));
         }, '/learn/' . rawurlencode($slug));

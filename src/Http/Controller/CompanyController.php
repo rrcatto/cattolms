@@ -46,6 +46,7 @@ use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\Commerce\Application\BillingProfileService;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
 use CattoLearning\Commerce\Domain\BillingDetails;
+use CattoLearning\Support\ListView;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -65,7 +66,10 @@ final class CompanyController extends BaseController
         private readonly CompanySectionRegistry $sections,
         private readonly SelectedCompanyContext $companyContext,
         private readonly CompanyCreditPurchaseService $creditPurchases,
-        private readonly BillingProfileService $billing
+        private readonly BillingProfileService $billing,
+        private readonly \CattoLearning\Application\CompanyLogos $logos,
+        private readonly \CattoLearning\Application\ProfilePictures $pictures,
+        private readonly \CattoLearning\Company\CompanyDepartures $departures,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -107,7 +111,84 @@ final class CompanyController extends BaseController
 
 
     #[Route('/company/dashboard', name: 'company_dashboard', methods: ['GET'])]
-    public function dashboard(): Response { return $this->standalone('dashboard', 'COMPANY.DASHBOARD.VIEW'); }
+    public function dashboard(): Response
+    {
+        $user = $this->requirePermission('COMPANY.DASHBOARD.VIEW');
+        return $this->standalone('dashboard', 'COMPANY.DASHBOARD.VIEW', ['company_logo' => $this->logoView((int) $this->companyContext->resolve($user)['company_id'])]);
+    }
+
+    /**
+     * The company's own page (owner, 2026-10-26): its logo first, which the Company Administrator uploads, replaces or
+     * removes, then its name, web address and account reference.
+     */
+    #[Route('/company/profile', name: 'company_profile', methods: ['GET'])]
+    public function profile(): Response
+    {
+        $user = $this->requirePermission('COMPANY.DASHBOARD.VIEW');
+        $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+        $canManage = false;
+        if ($companyId > 0 && $user->hasPermission('COMPANY.BILLING.MANAGE')) {
+            try {
+                $this->billing->requireCompanyAuthority($user, $companyId);
+                $canManage = true;
+            } catch (RuntimeException) {
+                $canManage = false;
+            }
+        }
+        return $this->standalone('profile', 'COMPANY.DASHBOARD.VIEW', ['company_logo' => $this->logoView($companyId), 'can_manage_logo' => $canManage,
+            // Whoever manages the company changes its details here: its Company Administrator, or ADMIN administering it
+            // as its own (owner, 2026-10-26: "As Admin, I should be able to edit every aspect").
+            'can_manage_company' => $canManage, 'is_platform_administrator' => $user->hasPermission('PLATFORM.COMPANY.MANAGE')]);
+    }
+
+    /** The company's name and web address, changed by whoever manages it (owner, 2026-10-26). */
+    #[Route('/company/profile', name: 'company_update_profile', methods: ['POST'])]
+    public function updateProfile(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            // The company is the one in the reader's trusted context, never one named in the form.
+            $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+            $this->billing->requireCompanyAuthority($user, $companyId);
+            // The name only: its staff's addresses are at its domain (owner's rule, restated 2026-10-26).
+            $company = $this->platformAdministration->adminCompanyView($companyId)['admin_company'] ?? [];
+            $this->platformAdministration->updateCompany($companyId, ['name' => (string) ($_POST['name'] ?? ''), 'domain' => (string) ($company['domain'] ?? '')], $user->id);
+            $this->flash('success', 'The company\'s details were saved.');
+            $this->redirect('/company/profile#company-details');
+        }, '/company/profile#company-details');
+    }
+    /** The company deleted by whoever manages it (owner, 2026-10-26); its staff are deactivated and asked, so a staff reader is shown the result at once. */
+    #[Route('/company/profile/delete', name: 'company_delete', methods: ['POST'])]
+    public function deleteCompany(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->handle(function () use ($user): Response {
+            $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+            $this->billing->requireCompanyAuthority($user, $companyId);
+            $asked = $this->departures->deleteCompany($user->id, $companyId, (string) ($_POST['confirm_name'] ?? ''));
+            if ($user->hasPermission('PLATFORM.COMPANY.MANAGE')) {
+                $this->flash('success', 'The company is deleted and hidden, its records kept. ' . $asked . ' staff ' . ($asked === 1 ? 'member was' : 'members were') . ' emailed to keep their accounts as private ones.');
+                $this->redirect('/admin/companies/' . $companyId);
+            }
+
+            return $this->render('company-deleted', ['title' => 'Company deleted', 'staff_asked' => $asked]);
+        }, '/company/profile#delete-company');
+    }
+
+    /** The lengths Assign a course offers for the chosen course, as options (htmx, when the course is chosen). */
+    #[Route('/company/assign/lengths', name: 'company_assign_lengths', methods: ['GET'])]
+    public function assignLengthOptions(): Response
+    {
+        $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
+        $courseId = (int) ($_GET['course_id'] ?? 0);
+
+        return $this->renderFragment('partials/credit-length-options', ['lengths' => $this->platformAdministration->assignLengths($this->contextCompanyId($user), $courseId), 'course_chosen' => $courseId > 0, 'empty_words' => 'No free credit for this course']);
+    }
+
+    #[Route('/company/orders', name: 'company_orders', methods: ['GET'])]
+    public function orders(): Response { return $this->standalone('orders', 'COMPANY.ORDER.VIEW'); }
     #[Route('/company/people', name: 'company_people', methods: ['GET'])]
     public function people(): Response { return $this->standalone('people', 'COMPANY.PERSON.VIEW'); }
     #[Route('/company/requests', name: 'company_requests', methods: ['GET'])]
@@ -155,6 +236,55 @@ final class CompanyController extends BaseController
         }, '/company/billing');
     }
 
+    /** The company's logo, or its drawn picture (owner, 2026-10-26), for anyone in its workspace. */
+    #[Route('/company/logo', name: 'company_logo', methods: ['GET'])]
+    public function logo(): Response
+    {
+        $user = $this->requirePermission('COMPANY.DASHBOARD.VIEW');
+        $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+        try {
+            if ($companyId < 1) throw new RuntimeException('No company is chosen.');
+            $picture = $this->logos->picture($companyId);
+        } catch (RuntimeException) {
+            throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException('There is no such company.');
+        }
+        return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
+    }
+
+    /** The Company Administrator uploads the company's logo (owner, 2026-10-26), on Company → Company Profile. */
+    #[Route('/company/logo', name: 'company_upload_logo', methods: ['POST'])]
+    public function uploadLogo(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            // The company is the one in the reader's trusted context, never one named in the form.
+            $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+            $this->billing->requireCompanyAuthority($user, $companyId);
+            $upload = $this->request()->files->get('logo');
+            if ($upload === null || !$upload->isValid()) {
+                throw new RuntimeException('No logo was received. Please choose a file and try again.');
+            }
+            $this->logos->upload($companyId, (string) file_get_contents((string) $upload->getPathname()), $user->id);
+            $this->flash('success', 'The company logo was saved.');
+            $this->redirect('/company/profile#company-logo');
+        }, '/company/profile#company-logo');
+    }
+
+    #[Route('/company/logo/remove', name: 'company_remove_logo', methods: ['POST'])]
+    public function removeLogo(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+            $this->billing->requireCompanyAuthority($user, $companyId);
+            $this->logos->remove($companyId, $user->id);
+            $this->flash('success', 'The company logo was removed. A drawn picture is shown instead.');
+            $this->redirect('/company/profile#company-logo');
+        }, '/company/profile#company-logo');
+    }
+
     /** @return array<string,mixed> */
     private function billingView(CurrentUser $user): array
     {
@@ -173,6 +303,18 @@ final class CompanyController extends BaseController
         }
         $view['company_billing'] = $this->billing->companyForm($companyId, (string) ($context['company']['name'] ?? ''));
         return $view;
+    }
+
+    /**
+     * The company's logo, or its drawn picture until one is uploaded (owner, 2026-10-26), as the Company pages show it.
+     *
+     * @return array{url:string,uploaded:bool}|null
+     */
+    private function logoView(int $companyId): ?array
+    {
+        $logo = $companyId > 0 ? $this->logos->state($companyId) : null;
+
+        return $logo === null ? null : ['url' => '/company/logo?v=' . $logo['version'], 'uploaded' => $logo['uploaded']];
     }
 
     /**
@@ -232,7 +374,11 @@ final class CompanyController extends BaseController
 
             $courseId = (int) ($_POST['course_id'] ?? 0);
             $targetUserId = (int) ($_POST['user_id'] ?? 0);
-            $days = max(1, (int) ($_POST['access_days'] ?? 365));
+            // A length of the company's credits for the course (owner, 2026-10-26), never typed.
+            $seconds = (int) ($_POST['access_period_seconds'] ?? 0);
+            if (!in_array($seconds, array_column($this->platformAdministration->assignLengths($companyId, $courseId), 'seconds'), true)) {
+                throw new RuntimeException('Choose one of the lengths shown for the course.');
+            }
             if ($courseId <= 0 || $targetUserId <= 0) {
                 throw new RuntimeException('Choose both a staff member and a course.');
             }
@@ -241,15 +387,21 @@ final class CompanyController extends BaseController
                 $companyId,
                 $courseId,
                 $targetUserId,
-                $days * 86400,
+                $seconds,
                 $user->id
             );
 
             $this->flash('success', $result['entitlement'] === 'owned'
                 ? 'Assigned. The course is owned by this company, so no credit was used.'
-                : 'Assigned, and one credit seat was used.');
-            $this->redirect('/company/enrolments');
-        }, '/company/enrolments');
+                : 'Assigned, and one place of its credit was used.');
+            $this->redirect($this->assignReturn());
+        }, $this->assignReturn());
+    }
+
+    /** Where Assign a course goes back to: Credits when it was sent from there, else Enrolments. */
+    private function assignReturn(): string
+    {
+        return (string) ($_POST['return'] ?? '') === '/company/credits' ? '/company/credits' : '/company/enrolments';
     }
 
     /** Courses the company may want for its staff but has not bought. */
@@ -325,11 +477,33 @@ final class CompanyController extends BaseController
         $user = $this->requirePermission('COMPANY.PERSON.VIEW');
         $view = $this->platformAdministration->companyPersonView($this->contextCompanyId($user), max(1, (int) $this->param('id')));
         if ($view === null) throw new NotFoundHttpException('That person is not in this company.');
+        // Their picture, uploaded or drawn (owner, 2026-10-26: "why is their profile pic not displayed?").
+        $picture = $this->pictures->state((int) $view['person']['id']);
         return $this->render('company-person', $this->companySelectorView($user) + $view + [
+            'person_picture_url' => $picture === null ? '' : '/company/people/' . (int) $view['person']['id'] . '/picture?v=' . $picture['version'],
+            'can_change_role' => $user->hasPermission('COMPANY.PERSON.MANAGE') && (int) $view['person']['id'] !== $user->id,
+            // What Delete would do, said before it is pressed (owner, 2026-10-26).
+            'delete_assessment' => $this->departures->assess($user->id, $this->contextCompanyId($user), (int) $view['person']['id']),
             'title' => (string) $view['person']['name'] . ' · Company', 'page_kicker' => 'Company', 'active_nav' => 'company',
             'can_manage_person' => $user->hasPermission('COMPANY.PERSON.MANAGE'),
             'can_decide_requests' => $user->hasPermission('COMPANY.REQUEST.MANAGE'),
         ]);
+    }
+
+    /** A member's picture, uploaded or drawn, for the Company workspace (owner, 2026-10-26); only for the company's own members. */
+    #[Route('/company/people/{id}/picture', name: 'company_person_picture', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function personPicture(): Response
+    {
+        $user = $this->requirePermission('COMPANY.PERSON.VIEW');
+        $target = max(1, (int) $this->param('id'));
+        if ($this->platformAdministration->companyPersonView($this->contextCompanyId($user), $target) === null) throw new NotFoundHttpException('That person is not in this company.');
+        try {
+            $picture = $this->pictures->picture($target);
+        } catch (RuntimeException) {
+            throw new NotFoundHttpException('That person has no picture.');
+        }
+
+        return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
     }
 
     /** Where an action on a person goes back to: their page when it was sent from there, else the list. */
@@ -339,17 +513,24 @@ final class CompanyController extends BaseController
         return preg_match('#^/company/people/\d+$#', $return) === 1 ? $return : $fallback;
     }
 
-    #[Route('/company/people/{id}/remove', name: 'company_remove_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function removePerson(): Response
+    /**
+     * Deletes a staff member (owner, 2026-10-26: "there should be no removal from the company, the whole profile should be
+     * deleted"), by the rules in Company\CompanyDepartures: never someone who completed a course, someone busy with one
+     * asked first, and no answer in 3 days deactivates them, keeping everything.
+     */
+    #[Route('/company/people/{id}/delete', name: 'company_delete_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function deletePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
         $target = max(1, (int) $this->param('id'));
         return $this->handle(function () use ($user, $target): void {
-            $this->platformAdministration->removeCompanyPerson($user->id, $this->contextCompanyId($user), $target);
-            $this->flash('success', 'The person was removed from the company. Their account and learning history remain.');
-            $this->redirect('/company/people');
-        }, '/company/people');
+            // Someone asked first is still here, on their page; anyone deleted or deactivated is gone from the company.
+            $asked = $this->departures->assess($user->id, $this->contextCompanyId($user), $target)['action'] === 'ask';
+            $done = $this->departures->delete($user->id, $this->contextCompanyId($user), $target);
+            $this->flash('success', $done);
+            $this->redirect($asked ? $this->personReturn('/company/people') : '/company/people');
+        }, $this->personReturn('/company/people'));
     }
 
 
@@ -422,6 +603,7 @@ final class CompanyController extends BaseController
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
         $target = max(1, (int) $this->param('id'));
         return $this->handle(function () use ($user, $target): void {
+            // Their names, company email and role, as Add person asks (owner, 2026-10-26).
             $this->platformAdministration->updateCompanyPerson($user->id, $this->contextCompanyId($user), $target, $_POST);
             $this->flash('success', 'The person was updated.');
             $this->redirect($this->personReturn('/company/people'));
@@ -470,7 +652,7 @@ final class CompanyController extends BaseController
         // company this administrator may take on; the company they choose then decides which
         // universe the workspace operates in. Resolving it from the request meant the modal, which
         // sends no universe, always resolved REAL - so a SEED company could not be found at all.
-        $data = $this->platformAdministration->companyPicker($_GET)
+        $data = $this->withLogos($this->platformAdministration->companyPicker($_GET))
             + ['company_context_id' => $this->contextCompanyId($user)];
 
         if ($this->isHtmxRequest()) {
@@ -482,6 +664,50 @@ final class CompanyController extends BaseController
         ]);
     }
 
+
+    /**
+     * Company People as a table or cards (owner, 2026-10-26: "a grid view on by default when there's 10 or less people.
+     * 10+ people default to list"): the reader's choice once made, else by how many people there are; each person with
+     * their picture.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function peopleView(array $data, int $readerId): array
+    {
+        // The reader's own row: they cannot change their own role (they would lose the workspace).
+        $data['current_user_id'] = $readerId;
+        // Who has been asked to choose before their account goes, and until when (owner, 2026-10-26).
+        $data['company_people_waiting'] = $this->departures->waitingForCompany($this->contextCompanyId($this->requireUser()));
+        $total = (int) ($data['people_pagination']['total'] ?? count((array) ($data['people'] ?? [])));
+        $default = $total <= ListView::COMPANY_PEOPLE_GRID_UP_TO ? ListView::GRID : ListView::LIST;
+        $view = ListView::chosen('company_people', $_GET, $_COOKIE, $default);
+        ListView::rememberAsked('company_people', $_GET);
+        $searchKey = PlatformAdministrationService::searchParam('people');
+        $filters = array_filter([$searchKey => (string) ($_GET[$searchKey] ?? '')], static fn(string $value): bool => $value !== '');
+        $data['company_people_view'] = $view;
+        $data['company_people_view_switch'] = ListView::switcher('company_people', $view, '/company/people', $filters);
+        if (isset($data['people']) && is_array($data['people']) && array_is_list($data['people'])) {
+            $data['people'] = $this->pictures->withPictures($data['people'], '/company/people/', '/picture');
+        }
+
+        return $data;
+    }
+
+    /**
+     * The Switch company list with each company's logo, so one is recognised at a glance (owner, 2026-10-26).
+     *
+     * @param array<string,mixed> $picker
+     * @return array<string,mixed>
+     */
+    private function withLogos(array $picker): array
+    {
+        if (isset($picker['picker_companies']) && is_array($picker['picker_companies']) && array_is_list($picker['picker_companies'])) {
+            $picker['picker_companies'] = $this->logos->withPictures($picker['picker_companies']);
+        }
+
+        return $picker;
+    }
 
     /**
      * The company every Company workspace write acts on.
@@ -521,6 +747,13 @@ final class CompanyController extends BaseController
                 $this->sectionRequest()
             );
         $data = $extra + $data;
+        if ($key === 'people') $data = $this->peopleView($data, $user->id);
+        // A credit's Assign link fills in its course and period (owner, 2026-10-26).
+        if (in_array($key, ['credits', 'enrolments'], true) && (int) ($_GET['assign_course'] ?? 0) > 0) {
+            $data['assign_course'] = $this->platformAdministration->describeEntity('courses', (int) $_GET['assign_course']) ?? 0;
+            $data['assign_lengths'] = $this->platformAdministration->assignLengths($this->contextCompanyId($user), (int) $_GET['assign_course']);
+            $data['assign_seconds'] = (int) ($_GET['assign_seconds'] ?? 0);
+        }
         $data['company_section'] = $definition;
         $data['company_layout'] = 'section';
         return $this->render('company-section', $data + [
@@ -581,17 +814,20 @@ final class CompanyController extends BaseController
         $canSelect = $this->companyContext->canSelect($user);
         $context = $this->companyContext->resolve($user);
 
+        $switcher = $canSelect ? $this->platformAdministration->companyPicker([]) : null;
+        if (is_array($switcher)) $switcher = $this->withLogos($switcher);
+
         return [
             'can_select_company' => $canSelect,
             'company_context_mode' => (string) $context['mode'],
             'company_context_name' => (string) ($context['company']['name'] ?? ''),
             'company_context_domain' => (string) ($context['company']['domain'] ?? ''),
             'company_context_id' => (int) $context['company_id'],
+            // The company's logo in its band on every Company page (owner, 2026-10-26).
+            'company_context_logo' => $this->logoView((int) $context['company_id']),
             // The switcher renders its first page of companies server-side so it works with no
             // JavaScript at all; htmx only replaces the same region on search and paging.
-            'company_switcher' => $canSelect
-                ? $this->platformAdministration->companyPicker([])
-                : null,
+            'company_switcher' => $switcher,
         ];
     }
 
@@ -620,7 +856,9 @@ final class CompanyController extends BaseController
             $company = $this->companyContext->select($user, $companyId);
             $this->platformAdministration->recordCompanyContextSelected($user->id, (int) $company['id']);
             $this->flash('success', 'Now administering ' . (string) $company['name'] . '.');
-            $this->redirect('/company');
+            // Straight to the part it was opened for, such as Billing Details from the company's page in Administration.
+            $next = (string) ($_POST['next'] ?? '');
+            $this->redirect(preg_match('#^/company(/[a-z-]+)?$#', $next) === 1 ? $next : '/company');
         }, '/company');
     }
 

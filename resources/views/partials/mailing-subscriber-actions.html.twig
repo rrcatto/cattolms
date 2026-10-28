@@ -1,0 +1,15 @@
+{#
+	One subscriber's Actions menu on Mailing › Subscribers (owner, 2026-10-28: "I can just click the Actions button and get
+	a list of various actions including the ability to suppress sending to them"): their subscriptions, their account, and
+	Never email this address (off every list, the address on Addresses never emailed), coming back to the list as it was.
+	row: a subscriber row; return_to: the list's address.
+#}
+{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, label: 'Actions', icon: 'action-more', aria_label: 'Actions for ' ~ row.name})} %}
+{% block body %}
+	{{ ui('action.link', {label: 'Open their subscriptions', variant: 'secondary', size: 'small', href: '/mailing/subscribers/' ~ row.user_id, icon: 'action-open'}) }}
+	{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ row.user_id, icon: 'action-manage'}) }}
+	{% if can_manage and not row.never_emailed %}
+	<form action="/mailing/subscribers/{{ row.user_id }}/stop" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ return_to }}">{{ ui('action.button', {label: 'Never email this address', variant: 'danger', size: 'small', type: 'submit', icon: 'action-disable', confirm: 'Stop all news to ' ~ row.email ~ '? ' ~ row.name ~ ' is taken off every list and the address goes on Addresses never emailed.'}) }}</form>
+	{% endif %}
+{% endblock %}
+{% endembed %}

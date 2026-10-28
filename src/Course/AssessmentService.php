@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Support\Duration;
 use CattoLearning\Course\Certificate\CertificateAwards;
 use CattoLearning\Commerce\Application\AccessService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -280,5 +281,6 @@ final class AssessmentService
     /** @param array<string,mixed> $session */
     private function elapsedSeconds(array $session): int { $start = strtotime((string) $session['started_at']) ?: time(); $end = strtotime((string) ($session['completed_at'] ?? '')) ?: time(); return max(0, $end - $start); }
     private function timerLabel(int $seconds): string { return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60); }
-    private function durationLabel(int $seconds): string { $minutes = max(1, (int) ceil($seconds / 60)); if ($minutes < 60) { return $minutes . ' mins'; } $hours = intdiv($minutes, 60); $remaining = $minutes % 60; return $remaining === 0 ? $hours . ' hr' . ($hours === 1 ? '' : 's') : $hours . ' hr' . ($hours === 1 ? '' : 's') . ' ' . $remaining . ' mins'; }
+    /** A time limit in the words every length of time is stated in (Support\Duration, owner 2026-10-26): "1 hour 30 minutes". */
+    private function durationLabel(int $seconds): string { return Duration::ofSeconds(max(1, $seconds))->words(); }
 }

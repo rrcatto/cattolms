@@ -22,6 +22,9 @@ final class AccountSectionRegistry
             $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details and profile image.'),
             $this->s('billing','Billing Address','settings','/account/billing','partials/account/billing.html.twig','Who your invoices are made out to.'),
             $this->s('emails','Email Addresses','contact','/account/emails','partials/account/emails.html.twig','The addresses you sign in with.'),
+            // What you agreed to be emailed about (mailing, step 1; owner, 2026-10-26): News and Updates, and what you follow.
+            // My Subscriptions since 2026-10-28 (round two 5A): with how and how often updates come, and the lists to join.
+            $this->s('subscriptions','My Subscriptions','contact','/account/subscriptions','partials/account/subscriptions.html.twig','The news you get by email, what you follow and how often it comes.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
             $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
             // Each certificate and transcript is private until its learner makes it public; the learner

@@ -19,6 +19,9 @@ reset wholesale when it needs to be. What it does have, and the reason it exists
 puts data on the screens so they can be judged with something in them.
 
 Changelog:
+2026/10/27 SAST
+- Companies and private learners by number, started and then carried on after the page answers, with a status card
+  that asks again while the run is under way (/admin/seed/status).
 2026/09/09 23:25 SAST
 - Rebuilt after the REAL/SEED split was removed. Generation kept; per-set listing, detail and cleanup dropped with the tokens they were keyed on.
 */
@@ -62,32 +65,26 @@ final class AdminSeedController extends BaseController
         ]);
     }
 
+    /** Where the last run stands, for the card that asks again while a run is under way. */
+    #[Route('/admin/seed/status', name: 'admin_seed_status', methods: ['GET'])]
+    public function status(): Response
+    {
+        $this->requirePermission('SYSTEM.SEED.VIEW');
+
+        return $this->renderFragment('partials/admin/seed-status', ['seed_run' => $this->seeds->status()]);
+    }
+
     /**
-     * Generates one set of data.
-     *
-     * The time limit is lifted for this request only. Generation at volume takes a while, and this
-     * is a deliberate ADMIN-only maintenance action on a disposable database rather than something
-     * an ordinary request path can reach.
+     * Starts a run: checked here, then carried on after this page has answered (SeedRunListener), because it takes minutes.
      */
     #[Route('/admin/seed/generate', name: 'admin_seed_generate', methods: ['POST'])]
     public function generate(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SEED.MANAGE');
-
         return $this->handle(function () use ($user): void {
-            set_time_limit(0);
-            $result = $this->seeds->generate(
-                $_POST['volume'] ?? null,
-                (string) ($_POST['description'] ?? ''),
-                $user->id
-            );
-
-            $this->flash('success', sprintf(
-                'Generated %s records in %.1f seconds.',
-                number_format($result['records']),
-                $result['seconds']
-            ));
+            $this->seeds->request($_POST['companies'] ?? null, $_POST['learners'] ?? null, (string) ($_POST['description'] ?? ''), $user->id);
+            $this->flash('success', 'Seeding has started. It takes a few minutes and carries on after this page: the card below shows how far it has got.');
             $this->redirect('/admin/seed');
         }, '/admin/seed');
     }
@@ -95,6 +92,6 @@ final class AdminSeedController extends BaseController
     /** @return array<string,mixed> */
     private function sectionData(): array
     {
-        return ['seed_volume' => $this->seeds->volumeBounds()];
+        return ['seed_bounds' => $this->seeds->bounds(), 'seed_run' => $this->seeds->status(), 'seed_unavailable' => $this->seeds->unavailable()];
     }
 }

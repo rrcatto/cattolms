@@ -1,0 +1,27 @@
+{# Where the last Seed Database run stands. While one is under way the card asks again every five seconds (htmx); without
+   JavaScript, Check again reloads the page. #}
+<div id="seed-status"{% if seed_run and seed_run.busy %} hx-get="/admin/seed/status" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+{% if seed_run is null %}
+	<p class="help">Nothing has been seeded on this site yet.</p>
+{% else %}
+	{% set made = seed_run.made ?? {} %}
+	{% if seed_run.busy %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Seeding is under way: ' ~ seed_run.step ~ '.'})} %}{% block body %}<p>Asked for {{ seed_run.companies }} {{ seed_run.companies == 1 ? 'company' : 'companies' }} and {{ seed_run.learners }} private {{ seed_run.learners == 1 ? 'learner' : 'learners' }}{% if seed_run.started_at is defined %}, started at {{ seed_run.started_at|date('H:i') }}{% endif %}. You can leave this page: the run carries on.</p>{% endblock %}{% endembed %}
+		{{ ui('action.link', {label: 'Check again', href: '/admin/seed', variant: 'secondary', size: 'normal', icon: 'action-refresh'}) }}
+	{% elseif seed_run.state == 'done' %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'The last run finished on ' ~ (seed_run.finished_at|date('j F Y \\a\\t H:i')) ~ '.'})} %}{% block body %}<p>It took {{ seed_run.seconds|round }} seconds{% if seed_run.description %}, for "{{ seed_run.description }}"{% endif %}.</p>{% endblock %}{% endembed %}
+	{% elseif seed_run.state == 'failed' %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'The last run stopped at: ' ~ seed_run.step ~ '.'})} %}{% block body %}<p>{{ seed_run.error }} What it made before then is kept.</p>{% endblock %}{% endembed %}
+	{% else %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'The last run stopped at: ' ~ seed_run.step ~ '.'})} %}{% block body %}<p>It has said nothing for half an hour, so it ended without finishing. What it made before then is kept, and you can start another.</p>{% endblock %}{% endembed %}
+	{% endif %}
+	{% if made is not empty %}
+		{% set items = [] %}
+		{% for what, count in made %}{% set items = items|merge([{label: what[:1]|upper ~ what[1:], value: count|number_format}]) %}{% endfor %}
+		{{ ui('data.key-value-list', {items: items}) }}
+	{% endif %}
+	{% if seed_run.refused is defined and seed_run.refused is not empty %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'What the app refused to do, and why'})} %}{% block body %}<ul>{% for refusal in seed_run.refused %}<li>{{ refusal }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+	{% endif %}
+{% endif %}
+</div>

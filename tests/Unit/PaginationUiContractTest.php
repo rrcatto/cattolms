@@ -173,7 +173,9 @@ final class PaginationUiContractTest extends TestCase
         self::assertStringContainsString("new ResizeObserver(entries => requestAnimationFrame(", $script, 'Fitted in the next frame, so resizing the amount cannot loop.');
         self::assertStringContainsString('figureWatch.observe(amount);', $script);
         self::assertStringContainsString('figureWatch.observe(amount.parentElement);', $script, 'And its card.');
-        self::assertStringContainsString('.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block}', self::read('public_html/css/catto-platform.css'), 'An inline-block, so its width can be watched.');
+        self::assertStringContainsString('.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block;transition:none!important}', self::read('public_html/css/catto-platform.css'),
+            'An inline-block, so its width can be watched, and never animated: Gilded Noir\'s transition made the refit read the old size (2026-10-26).');
+        self::assertStringContainsString('for (let pass = 0; pass < 4; pass++)', $script, 'Measured again after each shrink.');
     }
 
     /**

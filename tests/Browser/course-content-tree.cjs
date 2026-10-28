@@ -266,16 +266,16 @@ async function scenario(name, browserName, run) {
             state = reset();
             await page.goto(url());
             await insertAt(courseStart(), 'Add existing item');
-            await modalBody().locator('#insert-existing-search').fill('Item b1x');
+            await modalBody().locator('#insert-existing-search').fill(state.titles.b1x);
             await modalBody().getByRole('button', {name: 'Search items'}).click();
             // The full list already contains the item; wait for the filtered list to replace it.
             await page.waitForFunction(() => document.querySelectorAll('#insert-existing-item option').length === 2);
-            await modalBody().locator('#insert-existing-item').selectOption({label: (await modalBody().locator('#insert-existing-item option', {hasText: 'Item b1x'}).first().textContent()).trim()});
+            await modalBody().locator('#insert-existing-item').selectOption({label: (await modalBody().locator('#insert-existing-item option', {hasText: state.titles.b1x}).first().textContent()).trim()});
             await modalBody().getByRole('button', {name: 'Add to course'}).click();
             await modal().waitFor({state: 'hidden'});
             await saved(page);
             const first = page.locator('#course-content-tree > .cl-tree-list > li[data-node-id]').first();
-            assert.equal(await first.locator(':scope > .cl-tree-row .cl-tree-name').textContent(), 'Item b1x', 'The shared item is placed first.');
+            assert.equal(await first.locator(':scope > .cl-tree-row .cl-tree-name').textContent(), state.titles.b1x, 'The shared item is placed first.');
             assert.match(await savedTree(page, state), /^\d+,A\[a1,a2,a3\],B\[b1\[b1x\]\],c$/);
         });
 
@@ -298,7 +298,7 @@ async function scenario(name, browserName, run) {
             assert.match(await page.evaluate(() => { for (const [element, editor] of window.CattoLearningEditors.instances) if (element.id === 'item-source') return editor.getData(); return ''; }), /Kept lesson body/, 'The rich text is kept.');
             assert.equal(await page.locator('#course-content-insert-body textarea.cl-rich-editor').evaluateAll((all) => all.filter((e) => getComputedStyle(e).display !== 'none').length), 0, 'Each rich-text field shows its editor only.');
             await page.screenshot({path: `${output}/${browserName}-modal-error.png`});
-            await page.locator('#item-key').fill(`created-${Date.now()}`);
+            await page.locator('#item-key').fill(`case-study-${browserName}`);
             await modalBody().getByRole('button', {name: 'Create and add to course'}).click();
             await modal().waitFor({state: 'hidden'});
             await saved(page);

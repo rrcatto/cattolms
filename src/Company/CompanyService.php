@@ -11,6 +11,12 @@ Description:
 Implements Catto Learning business and application logic for company operations.
 
 Changelog:
+2026/10/26 SAST
+- The company domain rule, restated by the owner (2026-10-26: "no domain name, no company. And every person who
+  belonged to the company had to use the same domain name"): companyForAddress(), assertNotAnotherCompanysAddress()
+  and followAddress(), the one routine every change of a person's primary address calls, so membership follows the
+  address everywhere and nobody is put in or taken out of a company by hand. Leaving keeps every course (owner: "She
+  keeps both"); the last Company Administrator cannot leave.
 2026/08/20 02:43 SAST
 - Normal company registration assigns COMPANY_ADMIN; seed-company creation remains disabled until seed-tagged schema exists.
 2026/08/12 23:56 SAST
@@ -47,6 +53,86 @@ final class CompanyService
         private readonly AuditRepository $audit,
         private readonly EventDispatcher $events
     ) {
+    }
+
+    /** Refused to anyone but the company's own staff: an address at its domain. */
+    public const COMPANY_ADDRESS = 'Addresses at %s belong to a company on this site. Ask its Company Administrator to add you.';
+    public const LAST_ADMINISTRATOR_LEAVING = 'You are the company\'s only Company Administrator. Make someone else one first, then you can leave.';
+    public const LAST_ADMINISTRATOR_MOVED = 'They are their company\'s only Company Administrator. Make someone else one first.';
+
+    /** The roles that come with a company and go when a person leaves it. */
+    private const COMPANY_ROLES = [RoleCatalog::COMPANY_ADMIN, RoleCatalog::COURSE_EDITOR, RoleCatalog::COURSE_OWNER];
+
+    /**
+     * The company whose domain an address is at, if any.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function companyForAddress(string $email): ?array
+    {
+        $domain = EmailAddress::domain($email);
+
+        return $domain === '' ? null : $this->companies->findByDomain($domain);
+    }
+
+    /**
+     * Refuses an address at a company's domain to anyone but that company's staff (registering, adding an address to an
+     * account). The site's administrators place people by changing their address in Administration instead.
+     */
+    public function assertNotAnotherCompanysAddress(string $email, ?int $userId = null): void
+    {
+        $company = $this->companyForAddress($email);
+        if ($company === null) return;
+        if ($userId !== null && $this->companies->memberCompanyId($userId) === (int) $company['id']) return;
+        throw new InvalidArgumentException(sprintf(self::COMPANY_ADDRESS, (string) $company['domain']));
+    }
+
+    /**
+     * Puts a person in the company their primary address is at, and in no other: the only way anyone joins or leaves a
+     * company once it exists. Joining makes them a Student there; leaving ends the membership and the company's roles
+     * and keeps every course and certificate. Called inside the transaction that changes the address, so a refusal
+     * undoes the change.
+     *
+     * @return array{joined:?int,left:?int}
+     */
+    public function followAddress(int $userId, string $primaryEmail, int $actorUserId): array
+    {
+        return $this->transactions->run(function () use ($userId, $primaryEmail, $actorUserId): array {
+            $company = $this->companyForAddress($primaryEmail);
+            $target = $company === null ? null : (int) $company['id'];
+            $current = $this->companies->membership($userId);
+            $currentId = $current === null ? null : $current['company_id'];
+            if ($currentId === $target) return ['joined' => null, 'left' => null];
+            if ($current !== null) {
+                if (in_array($current['company_role'], CompanyRepository::ADMINISTRATOR_ROLES, true) && $this->companies->administratorCount($current['company_id']) <= 1) {
+                    throw new InvalidArgumentException($userId === $actorUserId ? self::LAST_ADMINISTRATOR_LEAVING : self::LAST_ADMINISTRATOR_MOVED);
+                }
+                $this->companies->removeUser($current['company_id'], $userId);
+                $this->roles->replaceUserRoles($userId, array_values(array_unique([...array_diff($this->roles->roles($userId), self::COMPANY_ROLES), RoleCatalog::STUDENT])));
+                $this->audit->record($actorUserId, 'company.person_left', ['company_id' => $current['company_id'], 'user_id' => $userId, 'why' => 'address']);
+            }
+            if ($target !== null) {
+                $this->companies->assignUser($target, $userId, 'student');
+                $this->audit->record($actorUserId, 'company.person_joined', ['company_id' => $target, 'user_id' => $userId, 'why' => 'address']);
+            }
+
+            return ['joined' => $target, 'left' => $currentId];
+        });
+    }
+
+    /**
+     * What registering with an address needs (owner's rule): a company's address only for the company that registers
+     * it (never a webmail domain, never one already here), and a private account never at a company's domain.
+     */
+    public function assertMayRegister(string $email, bool $asCompany): void
+    {
+        $domain = EmailAddress::domain($email);
+        if (!$asCompany) {
+            $this->assertNotAnotherCompanysAddress($email);
+            return;
+        }
+        if (PublicEmailDomains::contains($domain)) throw new InvalidArgumentException('A public webmail domain cannot be used for a company account.');
+        if ($this->companies->domainExists($domain)) throw new InvalidArgumentException('That company domain is already registered.');
     }
 
     /** @return array<string,mixed> */

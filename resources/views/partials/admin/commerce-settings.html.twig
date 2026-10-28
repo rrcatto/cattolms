@@ -1,9 +1,9 @@
 {#
 	The commerce settings, as sections of Administration > Settings (owner, 2026-10-18: one settings
 	area). Each value has a .env default; a value saved here replaces it until it is reset, and orders
-	already placed keep the values they were placed with. Durations are written with y (years), w
-	(weeks), d (days) and h (hours), in that order, such as 3y, 4w2d or 1h. commerce_fields comes from
-	CommerceSettingsController::fieldsView().
+	already placed keep the values they were placed with. Durations are lengths of time written the one
+	way (Support\Duration, owner 2026-10-26): y, w, d, h, m (minutes) and s, in that order, such as 3y,
+	4w2d, 1h30m or 90s, each field saying so. commerce_fields comes from CommerceSettingsController::fieldsView().
 #}
 {% set fields = commerce_fields %}
     {% set sections = [
@@ -13,11 +13,11 @@
         {key: 'orders', heading: 'Commerce: orders and refunds', summary: 'The refund window, unpaid order cancellation and payment links.'}
     ] %}
         {% for section in sections %}
-        {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: section.heading, summary: section.summary, id: 'commerce-settings-' ~ section.key, open: settings_open_section|default('') == 'commerce-' ~ section.key})} %}{% block body %}
+        {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: section.heading, summary: section.summary, id: 'commerce-settings-' ~ section.key, open: settings_open_section|default('') in ['commerce-' ~ section.key, 'commerce']})} %}{% block body %}
             <form action="/admin/settings/commerce/{{ section.key }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
             {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
             {% for field in fields[section.key] %}
-                {% set help = (field.words ? 'In force: ' ~ field.words ~ '. ' : '') ~ (field.source == 'database' ? 'Set here; the .env default (' ~ field.env ~ ') is ' ~ field.default ~ '.' : 'The .env default (' ~ field.env ~ ').') %}
+                {% set help = (field.words ? 'In force: ' ~ field.words ~ '. ' : '') ~ (field.source == 'database' ? 'Set here. The .env default (' ~ field.env ~ ') is ' ~ field.default ~ '.' : 'The .env default (' ~ field.env ~ ').') ~ (field.how|default('') ? ' ' ~ field.how : '') %}
                 {% if field.type == 'processor_fee' %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label ~ ': percentage', for: 'setting-' ~ field.key ~ '-percent', required: true, help: help})} %}{% block control %}<input id="setting-{{ field.key }}-percent" name="{{ field.key }}_percent" value="{{ field.percent }}" inputmode="decimal" required {{ ui_field_attrs(props) }} {{ can_manage_settings ? '' : 'disabled' }}>{% endblock %}{% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label ~ ': fixed amount (R)', for: 'setting-' ~ field.key ~ '-fixed', required: true})} %}{% block control %}<input id="setting-{{ field.key }}-fixed" name="{{ field.key }}_fixed" value="{{ field.fixed }}" inputmode="decimal" required {{ ui_field_attrs(props) }} {{ can_manage_settings ? '' : 'disabled' }}>{% endblock %}{% endembed %}

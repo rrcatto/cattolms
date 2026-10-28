@@ -1,3 +1,4 @@
+{% if section_standalone|default(false) %}{% include '@platform/partials/company/assign-course.html.twig' with {assign_return: '/company/credits'} %}{% endif %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
@@ -30,8 +31,10 @@
 
 							{% for credit in credits %}
 								<tr>
-									<td>
-										{{ credit.course_title }}
+									<td class="cell-text">
+										{# The course opens (owner, 2026-10-26: "The course name is also not clickable"). #}
+										{% if credit.course_slug|default('') and credit.course_status|default('') == 'published' %}<a href="/courses/{{ credit.course_slug }}">{{ credit.course_title }}</a>{% else %}{{ credit.course_title }}{% endif %}
+										{% if can_manage_company_enrolments|default(false) and credit.available_count > 0 %}<br>{{ ui('action.link', {label: 'Assign', variant: 'secondary', size: 'small', href: '/company/credits?assign_course=' ~ credit.course_id ~ '&assign_seconds=' ~ credit.access_period_seconds ~ '#assign-course', icon: 'action-grant'}) }}{% endif %}
 									</td>
 									<td>
 										{{ credit.access_period_label }}

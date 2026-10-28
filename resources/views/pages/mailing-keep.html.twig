@@ -1,0 +1,20 @@
+{#
+	The answer to "Do you still want our news?" (mailing, step 2; owner, 2026-10-26). Opening the link changes nothing: the
+	button keeps the news coming.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'My Subscriptions' %}
+	{% set ph_title = kept ? 'Thank you' : 'Keep the news coming' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% if kept %}
+			{{ ui('layout.section-head', {heading: 'You will keep getting our news'}) }}
+			<p>Everything you follow stays as it is. You can change it at any time under <a href="/account/subscriptions">Account, My Subscriptions</a>.</p>
+		{% else %}
+			{{ ui('layout.section-head', {heading: 'Do you still want our news?'}) }}
+			<p>Press the button to keep it coming. If you do nothing, we will stop sending you news.</p>
+			<form action="/m/k/{{ token }}" method="post">{{ ui('action.button', {label: 'Yes, keep sending me news', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}</form>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

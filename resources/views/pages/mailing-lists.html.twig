@@ -1,0 +1,46 @@
+{#
+	Mailing › Lists (mailing, step 1; owner, 2026-10-25: "ADMIN sees who follows each category and course"; lists of
+	ADMIN's own, 2026-10-28, decision 7A). A follow list is made when its first person presses Follow on a category,
+	course or tag; a list of ADMIN's own is made here, and people join it themselves, on My Subscriptions or with its join
+	link, never because ADMIN added them. Each opens its settings and the people on it.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'Lists' %}
+	{% set ph_lead = 'A list is the people who asked for email about one thing: News and Updates, a category, course or tag they follow, or a list you made.' %}
+	{% if can_manage %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Make a list', href: '#make', variant: 'secondary', icon: 'action-add'}) }}{% endset %}
+	{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set ml_kinds = {news: 'News and Updates', own: 'Your list', category: 'Category', course: 'Course', tag: 'Tag'} %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'every'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Every list', summary: lists|length == 1 ? '1 list.' : lists|length ~ ' lists. A category, course or tag has a list once someone follows it.'}) }}
+		{% if lists %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every mailing list'})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'List'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Template'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On My Subscriptions'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Since'}} %}</tr>{% endblock %}
+			{% block body %}{% for list in lists %}<tr>
+				<td class="cell-text"><a href="/mailing/lists/{{ list.id }}">{{ list.name ?: 'Removed ' ~ ml_kinds[list.kind]|lower }}</a>{% if list.own and list.own.closed_at %} {{ ui('feedback.badge', {label: 'Closed', tone: 'neutral'}) }}{% endif %}</td>
+				<td>{{ ml_kinds[list.kind] }}</td>
+				<td>{{ list.followers }}</td>
+				<td>{{ list.template ?: 'The default' }}</td>
+				<td>{{ list.own ? (list.own.shown ? 'Shown' : 'Join link only') : (list.kind == 'news' ? 'Shown' : 'To those on it') }}</td>
+				<td>{{ list.created_at|date('j M Y') }}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+		{% else %}
+			{{ ui('feedback.empty', {heading: 'No lists yet', summary: 'A list starts when someone says yes to News and Updates or follows a category, course or tag, or when you make one.'}) }}
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+	{% if can_manage %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'make'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Make a list', summary: 'People join it themselves, on My Subscriptions or with its join link. You never add anyone.'}) }}
+		<form action="/mailing/lists" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true, help: 'Such as "Early access to new courses".'})} %}{% block control %}<input class="cl-input" id="list-name" name="name" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show it on everyone\'s My Subscriptions page', help: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'})} %}{% block control %}<input type="checkbox" name="shown" value="1" checked>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

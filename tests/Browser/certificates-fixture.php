@@ -58,13 +58,12 @@ $session = static function (int $id, string $email) use ($container): string {
     return $token;
 };
 // One sign-in per browser context, as a person using several browsers has.
-$person = static function (string $key, string $name, string $role, string $suffix, int $sessions = 1) use ($fixture, $container, $session): array {
-    $email = 'certificates-browser-' . $key . '-' . $suffix . '@example.test';
-    $id = $fixture->createUser($name, $email);
-    $container->get(RoleRepository::class)->assign($id, $role);
+// A believable person nobody on the site shares a name with (owner, 2026-10-27), with a sign-in per browser context.
+$person = static function (string $role, int $sessions = 1) use ($fixture, $session): array {
+    $person = $fixture->person($role);
     $tokens = [];
-    for ($i = 0; $i < $sessions; $i++) $tokens[] = $session($id, $email);
-    return ['id' => $id, 'token' => $tokens[0], 'tokens' => $tokens];
+    for ($i = 0; $i < $sessions; $i++) $tokens[] = $session($person['id'], $person['email']);
+    return $person + ['token' => $tokens[0], 'tokens' => $tokens];
 };
 
 // Didit's answer for a learner's check: approved, with the name on their identity document.
@@ -79,14 +78,15 @@ $verify = static function (int $userId, string $first, string $last) use ($conta
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous certificates fixture first.');
-    $suffix = $fixture->suffix();
-    $admin = $person('admin', 'Certificates Administrator', 'ADMIN', $suffix, 12);
-    $first = $person('first', 'Lerato Browser Mokoena', 'STUDENT', $suffix, 2);
-    $second = $person('second', 'Pieter Browser van Wyk', 'STUDENT', $suffix);
-    $company = $fixture->createCompany($admin['id'], 'Certificates ' . $suffix, 'certificates-' . $suffix . '.example.test');
-    $slug = 'certificates-browser-' . $suffix;
-    $title = 'Certificate Browser Course ' . $suffix;
-    $course = $fixture->createCourse($admin['id'], $company, $slug, $title, 'published');
+    $admin = $person('ADMIN', 12);
+    $first = $person('STUDENT', 2);
+    $second = $person('STUDENT');
+    // The course comes from a course provider made with its founding administrator.
+    $provider = $fixture->company();
+    $made = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
+    $course = $made['id'];
+    $slug = $made['slug'];
+    $title = $made['title'];
     $db->executeStatement('UPDATE courses SET certificate_enabled = TRUE WHERE id = :id', ['id' => $course]);
     $fixture->addGradeBands($course);
     $final = $fixture->createAssessmentItem($course, $admin['id'], 'final', 3);
@@ -96,8 +96,11 @@ if ($action === 'create') {
         $container->get(CourseService::class)->grantToPerson($course, $learner['id'], 365, $admin['id']);
         $container->get(LearningService::class)->start($learner['id'], $slug);
     }
-    $verify($first['id'], 'Lerato Browser', 'Mokoena');
-    $state = ['suffix' => $suffix, 'slug' => $slug, 'course' => $course, 'course_title' => $title, 'company' => $company,
+    $verify($first['id'], $first['first'], $first['last']);
+    $designs = ['Heritage Certificate', 'Coastal Certificate', 'Executive Certificate', 'Short Course Certificate', 'Professional Development Certificate', 'Attendance Certificate'];
+    shuffle($designs);
+    $state = ['slug' => $slug, 'course' => $course, 'course_title' => $title, 'company' => $provider['id'], 'scrub' => $fixture->seeds(),
+        'first_name' => $first['name'], 'second_name' => $second['name'], 'second_first' => $second['first'], 'second_last' => $second['last'], 'design_name' => $designs[0], 'background_name' => $designs[1], 'nojs_design_name' => $designs[2],
         'assessment' => '/learn/' . $slug . '/item/' . $final['node_id'] . '/assessment/' . $final['key'],
         'admin_id' => $admin['id'], 'admin_tokens' => $admin['tokens'],
         'first_id' => $first['id'], 'first_tokens' => $first['tokens'], 'second_id' => $second['id'], 'second_token' => $second['token'],
@@ -108,37 +111,21 @@ if ($action === 'create') {
     echo "Created the certificates fixture.\n";
 } elseif ($action === 'verify') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    $verify((int) $state['second_id'], 'Pieter Browser', 'van Wyk');
+    $verify((int) $state['second_id'], (string) $state['second_first'], (string) $state['second_last']);
     echo "Verified the second learner.\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-    if (!str_starts_with((string) $state['slug'], 'certificates-browser-')) throw new RuntimeException('Unexpected fixture course.');
     $db->beginTransaction();
-    $db->executeStatement('DELETE FROM transcripts WHERE certificate_id IN (SELECT cert.id FROM certificates cert JOIN course_enrolments ce ON ce.id = cert.enrolment_id WHERE ce.course_id = :c)', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id = :c)', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM analytics_events WHERE course_id = :c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM course_enrolments WHERE course_id = :c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM courses WHERE id = :c', ['c' => $state['course']]);
-    $db->executeStatement('DELETE FROM course_items WHERE created_by_user_id = :u', ['u' => $state['admin_id']]);
-    $db->executeStatement('DELETE FROM companies WHERE id = :c', ['c' => $state['company']]);
     // The run's designs: any other course moved onto one goes back to the recorded default, which
     // is the default again; the designs are deleted as the Certificate designs page deletes them.
     $db->executeStatement("UPDATE courses SET certificate_design_id = :d WHERE certificate_design_id IN (SELECT id FROM document_templates WHERE document_type = 'certificate' AND id > :max)",
         ['d' => $state['default_design'], 'max' => $state['max_template_id']]);
     $db->executeStatement("UPDATE document_templates SET is_current = FALSE WHERE document_type = 'certificate' AND is_current");
     $db->executeStatement('UPDATE document_templates SET is_current = TRUE WHERE id = :id', ['id' => $state['default_design']]);
-    $db->executeStatement("UPDATE document_templates SET status = 'archived', name = name || ' (deleted ' || id || ')' WHERE document_type = 'certificate' AND id > :max AND status <> 'archived'",
-        ['max' => $state['max_template_id']]);
-    foreach (['admin_id', 'first_id', 'second_id'] as $key) {
-        foreach (['auth_sessions', 'audit_log', 'analytics_events', 'user_roles', 'user_emails'] as $table) {
-            $db->executeStatement('DELETE FROM ' . $table . ' WHERE user_id = :id', ['id' => $state[$key]]);
-        }
-        // The identity checks' Activity log entries name the learner in their details, not as the actor.
-        $db->executeStatement("DELETE FROM audit_log WHERE metadata->>'user_id' = :id", ['id' => (string) $state[$key]]);
-        $db->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $state[$key]]);
-    }
     $db->commit();
+    // Everything the check made, its designs (made by its administrator), certificates and transcripts included.
+    (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed the certificates fixture, restored the default design and deleted the run's designs.\n";
 } else {

@@ -89,11 +89,6 @@
 {% block control %}<input class="cl-check mt-1" type="checkbox" name="show_descriptions" value="1"{{ values.show_descriptions ? ' checked' : '' }}>{% endblock %}
 {% endembed %}
 					<p class="cl-landing-note">The outline is read from the course every time the page is shown: titles and kinds only, never what is inside a lesson or an assessment.</p>
-				{% elseif section.type == 'instructor' %}
-					{% set provider_rows = [{label: 'Provided by', value: provider ?: 'No owning company'}] %}
-					{% if accreditation %}{% set provider_rows = provider_rows|merge([{label: 'Accreditation', value: accreditation}]) %}{% endif %}
-					<p class="cl-landing-note">The page shows what the course records about who provides it:</p>
-					{{ ui('data.key-value-list', {items: provider_rows}) }}
 				{% elseif section.type == 'reviews' %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How many reviews to show', for: 'landing-limit', help: 'The latest approved reviews, from 1 to ' ~ review_limit_max ~ '. The rating counts every approved review.'})} %}
 {% block control %}<input type="number" id="landing-limit" name="limit" value="{{ values.limit }}" min="1" max="{{ review_limit_max }}" {{ ui_field_attrs(props) }}>{% endblock %}

@@ -1,0 +1,92 @@
+{#
+	Account › My Subscriptions (mailing, step 1, 2026-10-26; owner, 2026-10-28, round two 5A, opened by "Show my
+	subscriptions" in every email: "The 'Show my subscriptions' link should show a page where all their subscriptions are
+	shown"): how and how often updates come, for everything the reader follows (round two 2A); News and Updates, yes or
+	no; every category, course and tag followed, each with Unfollow; the lists ADMIN made that they may join (7A); and
+	stopping all email. Following happens on each subject's page with the Follow button.
+#}
+{# All sections shows each section without its data: this one opens its own page there. #}
+{% if mailing is not defined %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}{{ ui('layout.section-head', {heading: 'My Subscriptions', summary: 'The news you get by email, what you follow and how often it comes.'}) }}{{ ui('action.link', {label: 'Open My Subscriptions', variant: 'secondary', size: 'small', href: '/account/subscriptions', icon: 'action-open'}) }}{% endblock %}{% endembed %}
+{% else %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'how'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'How you get updates', eyebrow: 'My Subscriptions', summary: 'Updates are news about what you follow. Choose once, for everything you follow.' ~ (mailing.how.chosen ? '' : ' Until you choose, they come together in one email a week.')}) }}
+	<form action="/account/subscriptions/how" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% include '@platform/partials/mailing-how-choice.html.twig' with {mh: {delivery: mailing.how.delivery, frequency: mailing.how.frequency, deliveries: deliveries, frequencies: frequencies, days: digest_days, id: 'my'}} %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save how I get updates', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+	</form>
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'news'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'News and Updates', summary: 'New courses, offers and news about the site, now and then.'}) }}
+	<form action="/account/subscriptions/news" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me News and Updates by email'})} %}{% block control %}<input type="checkbox" name="news" value="1"{{ mailing.news ? ' checked' : '' }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+	</form>
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'following'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'What you follow', summary: 'You get the updates about what you follow: a new course in a category or tag, and news about a course. Follow more on any course, category or tag page.'}) }}
+	{% if mailing.follows %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Following'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Type'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Since'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for follow in mailing.follows %}<tr>
+			<td class="cell-text"><a href="{{ follow.href }}">{{ follow.name }}</a></td>
+			<td>{{ follow.kind_label }}</td>
+			<td>{{ follow.since|date('j M Y') }}</td>
+			<td class="cell-actions"><form action="/account/follow" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="{{ follow.kind }}"><input type="hidden" name="subject_id" value="{{ follow.subject_id }}"><input type="hidden" name="follow" value="0"><input type="hidden" name="source" value="preferences"><input type="hidden" name="return" value="/account/subscriptions#following">{{ ui('action.button', {label: 'Unfollow', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove'}) }}</form></td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+	{% else %}
+		{{ ui('feedback.empty', {heading: 'Nothing followed yet', summary: 'Press Follow on a category, course or tag to hear about it.'}) }}
+	{% endif %}
+{% endblock %}
+{% endembed %}
+{% if mailing.lists %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'lists'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Lists you can join', summary: 'Join one to get what is sent to it. You can leave at any time.'}) }}
+	{% for list in mailing.lists %}
+		<article class="cl-mailing-update">
+			<div class="cl-mailing-update-main"><div>
+				<p class="cl-mailing-update-headline">{{ list.name }}</p>
+				{% if list.description %}<p class="small">{{ list.description }}</p>{% endif %}
+				{% if list.joined %}<div class="cl-mailing-badges">{{ ui('feedback.badge', {label: 'You are on it', tone: 'success'}) }}</div>{% endif %}
+			</div></div>
+			<div class="cl-mailing-update-actions">
+				<form action="/account/subscriptions/lists/{{ list.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="join" value="{{ list.joined ? '0' : '1' }}">{{ ui('action.button', {label: list.joined ? 'Leave this list' : 'Join this list', variant: list.joined ? 'secondary' : 'primary', size: 'small', type: 'submit', icon: list.joined ? 'action-remove' : 'action-add'}) }}</form>
+			</div>
+		</article>
+	{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endif %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'sent'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Emails we sent you', summary: 'Each one as it was sent, in case you missed it. The latest 30.'}) }}
+	{% if sent %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Emails we sent you'})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Date'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'Subject'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for copy in sent %}<tr>
+			<td>{{ copy.handed_at|date('j M Y') }}</td>
+			<td class="cell-text">{{ copy.subject }}</td>
+			<td class="cell-actions">{{ ui('action.link', {label: 'View it', variant: 'secondary', size: 'small', href: web_base ~ '/m/v/' ~ copy.token, icon: 'action-view', new_window: true}) }}</td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+	{% else %}
+		<p class="small">We have not sent you any news yet.</p>
+	{% endif %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'stop'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Stop all email', summary: 'Unsubscribes you from News and Updates, everything you follow and every list. You will still get emails about your account and your orders.'}) }}
+	<form action="/account/subscriptions/stop-all" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Stop all email from us', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove', confirm: 'Unsubscribe from everything? You can follow again at any time.'}) }}</form>
+{% endblock %}
+{% endembed %}
+{% endif %}

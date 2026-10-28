@@ -127,7 +127,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->items->addExisting($this->course, $id, ['delay_days' => 2], $this->owner);
         $rows = $this->items->availability($this->course, gmdate(DATE_ATOM), false);
         self::assertSame([0,10080,10080,12960], array_column($rows, 'unlock_minutes'));
-        self::assertSame('01 weeks 02 days 00 hours 00 minutes', CourseItemService::duration(12960));
+        self::assertSame('1 week 2 days', CourseItemService::duration(12960), 'In the words every length of time is stated in.');
         self::assertFalse($rows[0]['is_locked']);
         self::assertTrue($rows[2]['is_locked']);
     }
@@ -215,7 +215,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->learning->start($this->owner, 'components-' . $this->suffix);
         $overview = $this->assessments->overview($this->owner, 'components-' . $this->suffix, $node, $assessment['key']);
         self::assertSame($assessment['item_id'], $overview['assessment']['id']);
-        self::assertSame('30 mins', $overview['time_limit_label']);
+        self::assertSame('30 minutes', $overview['time_limit_label']);
     }
     public function testAssessmentEditsPreserveQuestionAndOptionIdentityAfterSubmission(): void
     {

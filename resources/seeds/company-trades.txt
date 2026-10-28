@@ -1,0 +1,107 @@
+# The second part of a generated company's name: what the business does, as South African businesses name themselves
+# (owner, 2026-10-27: realistic names). One per line; # starts a comment.
+Accounting
+Architects
+Attorneys
+Auditors
+Auto Repairs
+Bakery
+Body Corporate Services
+Bookkeeping
+Brewery
+Builders
+Car Hire
+Catering
+Chemicals
+Civil Engineering
+Cleaning Services
+Cloud Services
+Coffee Roasters
+College
+Construction
+Consulting
+Conveyancers
+Couriers
+Cyber Security
+Data Services
+Dental Studio
+Design Studio
+Electrical
+Energy
+Engineering
+Estate Agents
+Events
+Farms
+Financial Planning
+Financial Services
+Fitness
+Florists
+Foods
+Freight
+Furniture
+Glass
+Guest House
+Hardware
+Healthcare
+Holdings
+Home Care
+Hospitality
+HR Services
+Insurance Brokers
+Interiors
+IT Solutions
+Joinery
+Kitchens
+Laboratories
+Landscaping
+Legal Services
+Lodge
+Logistics
+Marketing
+Media
+Medical Centre
+Mining Services
+Motors
+Networks
+Notaries
+Office Supplies
+Optometrists
+Packaging
+Panel Beaters
+Paving
+Payroll Services
+Pharmacy
+Physiotherapy
+Plastics
+Plumbing
+Printing
+Projects
+Property Group
+Property Management
+Quantity Surveyors
+Recruitment
+Retail
+Roofing
+Security
+Shopfitters
+Signage
+Software
+Solar
+Stationers
+Steel
+Surveyors
+Tax Consultants
+Telecoms
+Textiles
+Tours
+Training Academy
+Transport
+Travel
+Tyres
+Uniforms
+Valuers
+Veterinary Clinic
+Waste Management
+Water Solutions
+Wealth Management
+Wines

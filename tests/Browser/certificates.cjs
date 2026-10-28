@@ -42,9 +42,9 @@ const adminTokens = [...state.admin_tokens];
 const admin = () => adminTokens.shift();
 const settingsUrl = `/admin/courses/${state.course}/certificate`;
 const INSTALLED = ['Classic', 'Modern', 'Minimal', 'Legal Seal', 'Gold Frame', 'Professional CPD'];
-const DESIGN = `Browser design ${state.suffix}`;
-const UPLOADED = `Browser background ${state.suffix}`;
-const ACCREDITATION = 'Browser CPD: 3 points';
+const DESIGN = state.design_name;
+const UPLOADED = state.background_name;
+const ACCREDITATION = 'CPD: 3 points';
 let designUrl = '', uploadedUrl = '', firstCertificate = '', firstText = '';
 
 let step = '';
@@ -216,18 +216,18 @@ async function openCertificate(page) {
 
         const wording = page.locator('.cl-certificate-wording').first();
         text = await nextPreview(previews, async () => {
-            await typeAtEnd(page, wording.locator('.ck-editor__editable'), 'Browser edition one, issued ');
+            await typeAtEnd(page, wording.locator('.ck-editor__editable'), 'Awarded on ');
             await wording.getByRole('button', {name: 'Insert field'}).click();
             await page.locator('.ck-dropdown__panel-visible button', {hasText: 'Date issued'}).click();
         }, 'Insert field');
-        assert.ok(text.includes('Browser edition one, issued'), 'the typed words are previewed');
-        assert.match(await page.locator('#design-wording').inputValue(), /Browser edition one, issued(?: |&nbsp;)<span class="cl-field" data-field="certificate\.issue_date">Date issued<\/span>/, 'the field is stored as a field, not template syntax');
+        assert.ok(text.includes('Awarded on'), 'the typed words are previewed');
+        assert.match(await page.locator('#design-wording').inputValue(), /Awarded on(?: |&nbsp;)<span class="cl-field" data-field="certificate\.issue_date">Date issued<\/span>/, 'the field is stored as a field, not template syntax');
 
         text = await nextPreview(previews, async () => {
-            await page.locator('#signature-name').fill('Dr. Browser Signatory');
+            await page.locator('#signature-name').fill('Dr. Naledi Mthembu');
             await page.locator('#signature-position').fill('Head of Learning');
         }, 'signatory');
-        assert.ok(text.includes('Dr. Browser Signatory') && text.includes('Head of Learning'), 'the signatory is previewed');
+        assert.ok(text.includes('Dr. Naledi Mthembu') && text.includes('Head of Learning'), 'the signatory is previewed');
 
         step = 'name does not redraw';
         const drawn = previews.length;
@@ -242,7 +242,7 @@ async function openCertificate(page) {
         await flash(page, `The design “${DESIGN}” was saved.`);
         assert.ok(await pictureChoice(page, 'Modern').isChecked(), 'the look is kept');
         assert.ok((await page.locator('#design-wording').inputValue()).includes('data-field="certificate.issue_date"'), 'the wording is kept');
-        assert.equal(await page.locator('#signature-name').inputValue(), 'Dr. Browser Signatory');
+        assert.equal(await page.locator('#signature-name').inputValue(), 'Dr. Naledi Mthembu');
         await ctx.close();
     });
 
@@ -254,7 +254,7 @@ async function openCertificate(page) {
         assert.equal(await page.locator('textarea, .ck-editor').count(), 0, 'the course holds no wording');
         assert.ok(await pictureChoice(page, chosen).isChecked(), `the course starts with the default design (${chosen})`);
         let text = await nextPreview(previews, () => pictureChoice(page, DESIGN).check(), 'pick the design');
-        assert.ok(text.includes('Browser edition one') && text.includes(state.course_title) && text.includes('Sample Learner'), `the preview is this course in the design, for a sample learner (an issued certificate carries the verified name) (${text.slice(0, 160)})`);
+        assert.ok(text.includes('Awarded on') && text.includes(state.course_title) && text.includes('Sample Learner'), `the preview is this course in the design, for a sample learner (an issued certificate carries the verified name) (${text.slice(0, 160)})`);
         text = await nextPreview(previews, () => page.locator('#certificate-accreditation').fill(ACCREDITATION), 'accreditation');
         assert.ok(text.includes(ACCREDITATION), 'the accreditation line is previewed');
         await submit(page, 'Save');
@@ -272,12 +272,12 @@ async function openCertificate(page) {
         step = 'certificate page';
         assert.equal(await page.locator('object.cl-certificate-pdf').count(), 1, 'the certificate is shown as its PDF');
         const details = await page.locator('main').textContent();
-        for (const expected of ['Lerato Browser Mokoena', state.course_title, ACCREDITATION]) {
+        for (const expected of [state.first_name, state.course_title, ACCREDITATION]) {
             assert.ok(details.includes(expected), `the page shows ${expected}`);
         }
         assert.equal(await page.getByText('Drawn in the design').count(), 0, 'a learner does not see the design line');
         firstText = await fetchPdf(page, await page.getByRole('link', {name: 'Download PDF'}).getAttribute('href'), 'the certificate PDF');
-        for (const expected of ['Lerato Browser Mokoena', state.course_title, 'Browser edition one', ACCREDITATION, 'Dr. Browser Signatory']) {
+        for (const expected of [state.first_name, state.course_title, 'Awarded on', ACCREDITATION, 'Dr. Naledi Mthembu']) {
             assert.ok(firstText.includes(expected), `the certificate prints ${expected}`);
         }
         assert.equal(await page.getByText('Result').count(), 0, 'the certificate page shows no result');
@@ -287,11 +287,11 @@ async function openCertificate(page) {
         await Promise.all([page.waitForNavigation(), page.getByRole('link', {name: 'View transcript'}).click()]);
         assert.match(page.url(), /\/transcripts\/[0-9a-f]{32}$/);
         const transcript = await page.locator('main').textContent();
-        for (const expected of ['Lerato Browser Mokoena', 'Final assessment', '100.00%', 'Overall grade']) {
+        for (const expected of [state.first_name, 'Final assessment', '100.00%', 'Overall grade']) {
             assert.ok(transcript.includes(expected), `the transcript shows ${expected}`);
         }
         const transcriptText = await fetchPdf(page, await page.getByRole('link', {name: 'Download PDF'}).getAttribute('href'), 'the transcript PDF');
-        assert.ok(transcriptText.includes('Transcript') && transcriptText.includes('Lerato Browser Mokoena'), 'the transcript PDF names the learner');
+        assert.ok(transcriptText.includes('Transcript') && transcriptText.includes(state.first_name), 'the transcript PDF names the learner');
         await page.screenshot({path: `${output}/learner-certificate.png`, fullPage: true});
         await ctx.close();
     });
@@ -358,7 +358,7 @@ async function openCertificate(page) {
         await page.locator('.cl-certificate-wording .ck-editor').first().waitFor();
         // Type at the start of the line, on its text: typing straight after the inline Date issued
         // field at the end of the line can land on the field's boundary at Playwright's typing speed.
-        await page.locator('.cl-certificate-wording').first().locator('.ck-editor__editable p', {hasText: 'Browser edition one'}).click({position: {x: 3, y: 6}});
+        await page.locator('.cl-certificate-wording').first().locator('.ck-editor__editable p', {hasText: 'Awarded on'}).click({position: {x: 3, y: 6}});
         await page.keyboard.press('Home');
         await page.keyboard.type('Edition two: ');
         await sleep(600);
@@ -383,7 +383,7 @@ async function openCertificate(page) {
         await learner.page.goto(`${base}/learn/${state.slug}`);
         await openCertificate(learner.page);
         const text = await fetchPdf(learner.page, await learner.page.getByRole('link', {name: 'Download PDF'}).getAttribute('href'), 'the next certificate');
-        assert.ok(text.includes('Pieter Browser van Wyk') && text.includes('Edition two: Browser edition one'), `the next certificate uses the edited design (${text.slice(0, 200)})`);
+        assert.ok(text.includes(state.second_name) && text.includes('Edition two: Awarded on'), `the next certificate uses the edited design (${text.slice(0, 200)})`);
         step = 'failed transcript';
         await Promise.all([learner.page.waitForNavigation(), learner.page.getByRole('link', {name: 'View transcript'}).click()]);
         assert.ok((await learner.page.locator('main').textContent()).includes('0.00%'), 'the transcript records the failed final');
@@ -470,7 +470,7 @@ async function openCertificate(page) {
         step = 'textarea';
         assert.equal(await page.locator('.ck-editor').count(), 0);
         assert.ok(await page.locator('#design-wording').isVisible(), 'the wording is a plain text area');
-        await page.locator('#design-name').fill(`No-JS design ${state.suffix}`);
+        await page.locator('#design-name').fill(state.nojs_design_name);
         await page.locator('#design-wording').fill('Just words');
         await submit(page, 'Save');
         await flash(page, 'The design was not saved.');
@@ -481,14 +481,14 @@ async function openCertificate(page) {
         const text = await nextPreview(previews, () => page.getByRole('button', {name: 'Update preview'}).click(), 'Update preview');
         assert.ok(text.includes('Thandiwe Mokoena') && text.includes('attended Conveyancing 1 without JavaScript'), `typed [fields] are fields (${text.slice(0, 160)})`);
         await submit(page, 'Save');
-        await flash(page, `The design “No-JS design ${state.suffix}” was saved.`);
+        await flash(page, `The design “${state.nojs_design_name}” was saved.`);
         assert.ok((await page.locator('#design-wording').inputValue()).includes('data-field="learner.name"'));
 
         await page.goto(base + settingsUrl);
-        await pictureChoice(page, `No-JS design ${state.suffix}`).check();
+        await pictureChoice(page, state.nojs_design_name).check();
         await submit(page, 'Save');
         await flash(page, 'The certificate settings were saved.');
-        assert.ok(await pictureChoice(page, `No-JS design ${state.suffix}`).isChecked());
+        assert.ok(await pictureChoice(page, state.nojs_design_name).isChecked());
         await ctx.close();
     });
 

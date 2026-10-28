@@ -285,7 +285,7 @@ final class CertificateRepository
         [$where, $bindings] = self::issuedFilter($search, $state);
         return $this->db->fetchAllAssociative(
             'SELECT cert.id, cert.certificate_number, cert.learner_name, cert.course_title, cert.completed_at, cert.issued_at,
-                    cert.revoked_at, cert.is_public, tr.is_public AS transcript_is_public, tr.transcript_number, ce.user_id, lu.account_reference AS learner_reference
+                    cert.revoked_at, cert.is_public, tr.is_public AS transcript_is_public, tr.transcript_number, ce.user_id, ce.course_id, lu.account_reference AS learner_reference
                FROM certificates cert
                JOIN course_enrolments ce ON ce.id = cert.enrolment_id
                JOIN users lu ON lu.id = ce.user_id

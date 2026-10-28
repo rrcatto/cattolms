@@ -204,7 +204,7 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
 
     // --- edit person -------------------------------------------------------------------------------
 
-    /** Editing writes the profile fields and refuses a target outside the context company. */
+    /** Editing writes what Add person asks for (names, company email at the domain) and refuses anyone outside the context company. */
     public function testEditingIsScopedToTheContextCompany(): void
     {
         $user = $this->platformAdmin();
@@ -213,10 +213,19 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
 
         $this->administration->updateCompanyPerson($user->id, $companyId, $this->personInA, [
             'first_name' => 'Edited',
+            'last_name' => 'Person',
+            'email' => 'edited-' . $this->suffix . '@alpha-' . $this->suffix . '.test',
             'certificate_name' => 'Edited On Certificate',
         ]);
 
         self::assertSame('Edited', (string) $this->fixture->scalar('SELECT first_name AS value FROM users WHERE id = :id', ['id' => $this->personInA]));
+        self::assertSame('edited-' . $this->suffix . '@alpha-' . $this->suffix . '.test', (string) $this->fixture->scalar('SELECT email AS value FROM user_emails WHERE user_id = :id AND is_primary', ['id' => $this->personInA]), 'The administrator sets a staff member\'s company address.');
+        try {
+            $this->administration->updateCompanyPerson($user->id, $companyId, $this->personInA, ['first_name' => 'Edited', 'last_name' => 'Person', 'email' => 'edited-' . $this->suffix . '@example.test']);
+            self::fail('A staff address outside the company\'s domain is refused.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString('alpha-' . $this->suffix . '.test', $refused->getMessage());
+        }
 
         // A person in company B is not reachable while company A is selected.
         $this->expectExceptionMessageMatches('/not an active member/i');
@@ -293,41 +302,19 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
         );
     }
 
-    // --- remove ------------------------------------------------------------------------------------
+    // --- delete ------------------------------------------------------------------------------------
 
     /**
-     * Removal ends the membership and leaves the identity alone.
-     *
-     * The old behaviour set users.status to disabled as a side effect, so somebody moving between
-     * companies was banned from the platform with no way to reverse it from this workspace.
+     * Delete never reaches another company's person (there is no removal from a company any more: owner, 2026-10-26;
+     * the rules of Delete are in CompanyDeparturesIntegrationTest).
      */
-    public function testRemovalEndsMembershipWithoutDisablingTheAccount(): void
+    public function testDeleteRefusesAnotherCompanysPerson(): void
     {
         $user = $this->platformAdmin();
         $this->context->select($user, $this->real['a']);
 
-        $this->administration->removeCompanyPerson(
-            $user->id,
-            $this->context->contextCompanyId($user),
-            $this->personInA
-        );
-
-        self::assertSame(0, $this->companyOf($this->personInA), 'The membership must end.');
-        self::assertSame('active', $this->userStatus($this->personInA), 'Removal is not an account ban.');
-    }
-
-    /** Removal refuses a target outside the context company. */
-    public function testRemovalRefusesAnotherCompanysPerson(): void
-    {
-        $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a']);
-
-        $this->expectExceptionMessageMatches('/not an active member/i');
-        $this->administration->removeCompanyPerson(
-            $user->id,
-            $this->context->contextCompanyId($user),
-            $this->personInB
-        );
+        $this->expectExceptionMessage('That person is not in this company.');
+        IntegrationContainer::get()->get(\CattoLearning\Company\CompanyDepartures::class)->delete($user->id, $this->context->contextCompanyId($user), $this->personInB);
     }
 
     // --- company search ----------------------------------------------------------------------------

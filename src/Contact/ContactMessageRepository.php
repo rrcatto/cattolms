@@ -77,6 +77,12 @@ final class ContactMessageRepository
     }
 
     /** Marks a message answered once. False when it already was. */
+    /** A message marked answered by mistake, open again (2026-10-26 audit: there was no undo). */
+    public function markUnanswered(int $id): bool
+    {
+        return $this->db->executeStatement('UPDATE contact_messages SET answered_at = NULL, answered_by_user_id = NULL WHERE id = :id AND answered_at IS NOT NULL', ['id' => $id]) === 1;
+    }
+
     public function markAnswered(int $id, int $actorId): bool
     {
         return $this->db->executeStatement(

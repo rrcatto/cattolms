@@ -52,7 +52,8 @@ final class AdminCourseTagController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly \CattoLearning\View\Artwork\IconLibrary $icons
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -119,6 +120,7 @@ final class AdminCourseTagController extends BaseController
         $tag = $this->courses->tag((int) $this->param('id'));
         $iconQuery = trim((string) $this->request()->query->get('icon_q', ''));
         return $this->render('admin-course-tag-edit', ['title' => 'Edit tag · ' . (string) $tag['name'], 'tag' => $tag,
+            'followers' => $this->mailingLists->followersOf('tag', (int) $tag['id']) + ['name' => (string) $tag['name']],
             // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
             'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $tag['name'], $iconQuery), 'action' => '/admin/courses/tags/' . (int) $tag['id']]]);
     }

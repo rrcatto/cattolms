@@ -133,32 +133,22 @@
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', for: 'owner-company', help: 'Courses ADMIN creates or imports belong to the Site Owner, which is no company.'})} %}
-{% block control %}
-							<select class="cl-select" name="owner_company_id" id="owner-company" {{ ui_field_attrs(props) }}>
-							<option value="0" {{ course.owner_company_id is null ? 'selected' : '' }}>No company: the Site Owner</option>
-							{% for ownerCompany in owner_companies %}<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>{% endfor %}
-							</select>
-{% endblock %}
-{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning person', for: 'owner-person', required: true, help: 'Newly imported courses default to the administrator who performed the import.'})} %}
-{% block control %}
-							<select class="cl-select" name="owner_user_id" required id="owner-person" {{ ui_field_attrs(props) }}>
-							{% for ownerPerson in owner_people %}<option value="{{ ownerPerson.id }}" {{ ownerPerson.id==course.owner_user_id ? 'selected' : '' }}>{{ ownerPerson.name }} · {{ ownerPerson.email }}</option>{% endfor %}
-							</select>
-{% endblock %}
-{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Editors', full_width: true, help: (course.editors|length) ~ ' currently assigned.'})} %}
+						{# Chosen by search, never from the first page of a list (2026-10-26 audit: a course whose owner was not among
+						   the first 50 people was handed to someone else on save, and editors not shown were dropped). #}
+						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'owner_company_id', lk_type: 'companies', lk_label: 'Owning company', lk_selected: owner_company_selected, lk_required: 0, lk_empty: 'No company: the Site Owner'} %}
+						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'owner_user_id', lk_type: 'people', lk_label: 'Owning person', lk_selected: owner_person_selected, lk_required: 1, lk_empty: 'Nobody selected'} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Editors', full_width: true, help: course.editors ? 'Untick someone to take them off this course.' : 'Nobody edits this course yet.'})} %}
 {% block control %}
 							<div class="editor-choice-grid">
-								{% for editorPerson in owner_people %}
-									{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: editorPerson.name ~ ' · ' ~ editorPerson.email ~ ' · ' ~ editorPerson.company_name})} %}
-{% block control %}<input type="checkbox" name="editor_user_ids[]" value="{{ editorPerson.id }}" {{ editorPerson.selected_editor ? 'checked' : '' }}>{% endblock %}
+								{% for editorPerson in course.editors %}
+									{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: ((editorPerson.first_name ~ ' ' ~ editorPerson.last_name)|trim ?: editorPerson.display_name) ~ ' · ' ~ editorPerson.email ~ (editorPerson.company_name ? ' · ' ~ editorPerson.company_name : '')})} %}
+{% block control %}<input type="checkbox" name="editor_user_ids[]" value="{{ editorPerson.id }}" checked>{% endblock %}
 {% endembed %}
 								{% endfor %}
 							</div>
 {% endblock %}
 {% endembed %}
+						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'editor_add_id', lk_type: 'people', lk_label: 'Add a Course Editor', lk_selected: 0, lk_required: 0, lk_empty: 'Nobody to add'} %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save owner & editors', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
@@ -484,4 +474,5 @@
 {% endblock %}
 {% endembed %}
 	</section>
+	{% include '@platform/partials/admin/followers-card.html.twig' %}
 {% endblock %}

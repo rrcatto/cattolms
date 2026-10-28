@@ -1,0 +1,56 @@
+{#
+	Sign-up Attempts (owner, 2026-10-26; SignupAttemptsController): every registration form sent, newest first, with the
+	country and network of its IP address, its risk and what became of it, filtered by risk and outcome, searched, sorted
+	and paged. Each opens its own page.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Sign-up Attempts' %}
+	{% set ph_lead = 'Every registration form sent, with where it came from, its risk and what became of it. Open one to see why.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'The last 30 days', summary: month.all == 1 ? '1 sign-up attempt.' : month.all ~ ' sign-up attempts.'}) }}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{{ ui('data.stat-card', {value: month.all, label: 'Attempts', href: '/admin/people/signup-attempts', icon: 'figure-people'}) }}
+			{{ ui('data.stat-card', {value: month.high, label: 'High risk', href: '/admin/people/signup-attempts?band=high', icon: 'figure-risk-high'}) }}
+			{{ ui('data.stat-card', {value: month.medium, label: 'Medium risk', href: '/admin/people/signup-attempts?band=medium', icon: 'figure-risk-medium'}) }}
+			{{ ui('data.stat-card', {value: month.low, label: 'Low risk', href: '/admin/people/signup-attempts?band=low', icon: 'figure-risk-low'}) }}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Find attempts', summary: 'By risk, by what became of them, or by address, name, IP address, network or country code.'}) }}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{{ ui('action.link', {label: 'All', variant: filters.band == '' ? 'primary' : 'secondary', size: 'small', href: '/admin/people/signup-attempts', icon: 'action-view-all'}) }}
+			{{ ui('action.link', {label: 'High risk', variant: filters.band == 'high' ? 'primary' : 'secondary', size: 'small', href: '/admin/people/signup-attempts?band=high', icon: 'action-filter'}) }}
+			{{ ui('action.link', {label: 'Medium risk', variant: filters.band == 'medium' ? 'primary' : 'secondary', size: 'small', href: '/admin/people/signup-attempts?band=medium', icon: 'action-filter'}) }}
+			{{ ui('action.link', {label: 'Low risk', variant: filters.band == 'low' ? 'primary' : 'secondary', size: 'small', href: '/admin/people/signup-attempts?band=low', icon: 'action-filter'}) }}
+		{% endblock %}{% endembed %}
+		<form action="/admin/people/signup-attempts" method="get"><input type="hidden" name="band" value="{{ filters.band }}">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', for: 'attempts-q'})} %}{% block control %}<input id="attempts-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Address, name, IP address, network or ZA" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What became of it', for: 'attempts-outcome'})} %}{% block control %}<select id="attempts-outcome" name="outcome" {{ ui_field_attrs(props) }}><option value="">Anything</option>{% for key, label in outcomes %}<option value="{{ key }}"{{ filters.outcome == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{% if filtered %}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/people/signup-attempts', icon: 'action-clear'}) }}{% endif %}{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</form>
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: filters.band ? (filters.band|capitalize ~ ' risk') : 'Every attempt', summary: 'Newest first unless sorted otherwise.'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'attempts', pagination: attempts_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% for sh in sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: attempts_pagination.region, sort_results: attempts_pagination.results} %}{% endfor %}</tr>{% endblock %}
+			{% block body %}{% for row in rows %}
+				<tr data-attempt-id="{{ row.id }}">
+					<td>{{ row.created_at }}</td>
+					<td class="cell-text">{{ row.email }}</td>
+					<td class="cell-text">{% if row.account %}{{ ui('data.person', {name: row.name ?: row.account.name, href: row.account.href}) }}{% else %}{{ row.name }}{% endif %}</td>
+					<td>{{ row.country }}</td>
+					<td class="cell-text">{{ row.network_name }}</td>
+					<td>{{ ui('feedback.badge', {label: row.risk_label ~ ' ' ~ row.score, tone: row.risk_tone, size: 'small'}) }}</td>
+					<td>{{ row.outcome_label }}</td>
+					<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open the sign-up attempt by ' ~ row.email, icon: 'action-open'}) }}</td>
+				</tr>
+			{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filtered ? 'No sign-up attempt matches these filters.' : 'No sign-up attempts yet.'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}
