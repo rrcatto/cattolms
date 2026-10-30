@@ -80,6 +80,19 @@
 
 {% endblock %}
 {% endembed %}
+				{# The moment the learner has finished the course is when they are asked for a review, here on the page (decision 8A). #}
+				{% if review_prompt|default(null) %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+					<div id="review">
+					{{ ui('layout.section-head', {heading: 'How did you find the course?', heading_level: 2, summary: 'Your review helps other learners choose. It is published under your first name and the initial of your surname once it has been checked.'}) }}
+					<form action="/learn/{{ course.slug }}/review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ review_prompt.return }}">
+					{% include '@platform/partials/course-rating-input.html.twig' with {rating_value: 0} %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your review', for: 'review-comment', full_width: true, help: 'Optional. Up to ' ~ review_prompt.max_comment ~ ' characters.'})} %}{% block control %}<textarea class="cl-input" id="review-comment" name="comment" rows="4" maxlength="{{ review_prompt.max_comment }}" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Submit review', variant: 'primary', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
+					</form>
+					</div>
+					{% endblock %}{% endembed %}
+				{% endif %}
 				<h2 class="h3">
 					Question report
 				</h2>

@@ -257,7 +257,7 @@ final class DevelopmentFixture
     {
         $key = 'qa-assessment-' . $this->suffix();
         $item = (int) $this->db->fetchOne(
-            "INSERT INTO course_items(public_id,item_key,item_type,title,created_by_user_id,updated_by_user_id) VALUES (:public,:key,'assessment','QA assessment',:owner,:owner) RETURNING id",
+            "INSERT INTO course_items(public_id,item_key,name,item_type,title,created_by_user_id,updated_by_user_id) VALUES (:public,:key,:key,'assessment','QA assessment',:owner,:owner) RETURNING id",
             ['public' => Uuid::v4(), 'key' => $key, 'owner' => $ownerId]
         );
         $this->db->executeStatement(

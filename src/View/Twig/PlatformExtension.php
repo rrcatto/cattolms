@@ -29,6 +29,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\View\Twig;
 
+use CattoLearning\Course\CourseItemService;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 
@@ -42,6 +43,7 @@ final class PlatformExtension extends AbstractExtension
             new TwigFilter('urlencode', self::urlencode(...)),
             new TwigFilter('account_reference', self::accountReference(...)),
             new TwigFilter('role_label', self::roleLabel(...)),
+            new TwigFilter('item_type_label', self::itemTypeLabel(...)),
         ];
     }
 
@@ -54,6 +56,15 @@ final class PlatformExtension extends AbstractExtension
         $name = trim((string) $name);
         if ($name === '') return ucwords(strtolower(str_replace('_', ' ', (string) $key)));
         return trim((string) preg_replace('/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/', ' ', $name));
+    }
+
+    /**
+     * A Course Item's type as people read it (owner, 2026-10-30: the Course Item Library said "slide deck" where the
+     * editor said "Presentation"): its name in CourseItemService::TYPE_LABELS, never the stored code.
+     */
+    public static function itemTypeLabel(?string $type): string
+    {
+        return CourseItemService::TYPE_LABELS[(string) $type] ?? ucfirst(str_replace('_', ' ', (string) $type));
     }
 
     /** Upper-cases the first character and leaves the rest of the string exactly as written. */

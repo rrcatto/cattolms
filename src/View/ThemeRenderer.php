@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/30 SAST (v1.0.1)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.1.
 2026/10/23 SAST
 - Administration -> Courses -> Import & Export Catalogue, after Course Tags (owner, 2026-10-23).
 2026/10/28 SAST (v1.0.0)
@@ -128,7 +130,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.0';
+    private const PLATFORM_ASSET_VERSION = '1.0.1';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -334,6 +336,8 @@ final class ThemeRenderer
             $this->platformAsset('/css/catto-platform.css'),
         ];
         if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false) || (bool) ($data['load_mailing_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
+        // CatWalk, the presentation engine, only on a page that shows a deck (owner, 2026-10-28, decision 7A).
+        if ((bool) ($data['load_catwalk'] ?? false)) $platformStyles[] = $this->platformAsset('/css/catwalk.css');
         // htmx is a platform-owned progressive enhancement: every surface that uses it renders
         // and works server-side first, so the page degrades to plain navigation if the script
         // is absent. Supplied with the other vendor browser assets under the public root. There is
@@ -357,6 +361,9 @@ final class ThemeRenderer
             $platformScripts[] = $this->platformAsset('/js/ck-mailing.js');
         }
         if ((bool) ($data['load_question_editor'] ?? false)) $platformScripts[] = $this->platformAsset('/js/question-editor.js');
+        if ((bool) ($data['load_catwalk'] ?? false)) $platformScripts[] = $this->platformAsset('/js/catwalk.js');
+        if ((bool) ($data['load_flashcards'] ?? false)) $platformScripts[] = $this->platformAsset('/js/course-flashcards.js');
+        if ((bool) ($data['load_narration_recorder'] ?? false)) $platformScripts[] = $this->platformAsset('/js/narration-recorder.js');
         if ((bool) ($data['load_assessment_timer'] ?? false)) $platformScripts[] = $this->platformAsset('/js/assessment-timer.js');
 
         $model['app'] = ['name' => $appName, 'base_url' => $appUrl !== '' ? $appUrl : '/'];

@@ -45,6 +45,8 @@ final class ListView
         'courses' => self::LIST,
         'catalogue' => self::GRID,
         'subscribers' => self::LIST,
+        // A presentation's slides (owner, 2026-10-30): a list of their pictures, or a grid of larger ones.
+        'slides' => self::LIST,
     ];
 
     /** Cards to a row in the grid at full width. */

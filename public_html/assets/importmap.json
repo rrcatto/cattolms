@@ -4,7 +4,7 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-sv7lsxd.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-pUilQak.js",
         "type": "js"
     },
     "\/assets\/controllers\/catalogue_export_controller.js": {
@@ -39,12 +39,28 @@
         "path": "\/assets\/controllers\/popular_courses_controller-LIn23Tr.js",
         "type": "js"
     },
+    "\/assets\/controllers\/presentation_slides_controller.js": {
+        "path": "\/assets\/controllers\/presentation_slides_controller-KBsR78e.js",
+        "type": "js"
+    },
     "\/assets\/controllers\/profile_image_controller.js": {
         "path": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
         "type": "js"
     },
+    "\/assets\/controllers\/slide_editor_controller.js": {
+        "path": "\/assets\/controllers\/slide_editor_controller-j7X-g74.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/slide_strip_controller.js": {
+        "path": "\/assets\/controllers\/slide_strip_controller-lnFvWAP.js",
+        "type": "js"
+    },
     "\/assets\/controllers\/tag_cloud_controller.js": {
         "path": "\/assets\/controllers\/tag_cloud_controller-dxBxbzy.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/unsaved_changes_controller.js": {
+        "path": "\/assets\/controllers\/unsaved_changes_controller-m7vRlr1.js",
         "type": "js"
     },
     "@hotwired\/stimulus": {

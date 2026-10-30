@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\Catwalk\Narrations;
+use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\CourseItemService;
+use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\CourseStructureArrangement;
 use CattoLearning\Course\ResourceLibraryService;
@@ -19,7 +22,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /** Administration routes for reusable Course Items, course placements and the Resource Library. */
 final class AdminCourseComponentController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseItemService $items, private readonly ResourceLibraryService $resources, private readonly CourseService $courses)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseItemService $items, private readonly ResourceLibraryService $resources, private readonly CourseService $courses, private readonly Narrations $narrations, private readonly \CattoLearning\Course\CourseRestructurer $restructurer, private readonly \CattoLearning\Course\Catwalk\PresentationPages $presentations)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -69,7 +72,7 @@ final class AdminCourseComponentController extends BaseController
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = max(0, (int) ($_POST['course_id'] ?? 0));
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
-        if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
+        if (isset($_POST['question_action']) || isset($_POST['card_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
         if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->blankItem((string) ($_POST['item_type'] ?? 'downloadable_file')), $courseId, '/admin/course-items', $user->id); }
         if ($courseId > 0) {
             // Created from Course Content: create, attach and place in one transaction. A refusal
@@ -96,19 +99,26 @@ final class AdminCourseComponentController extends BaseController
     {
         $this->requirePermission('COURSE.EDIT');
         $item = $this->requireManagedItem($this->itemId());
+        // A Presentation has a page of its own, its parts each edited apart (owner, 2026-10-30, the approved mockup).
+        if ((string) $item['item_type'] === 'slide_deck') {
+            \CattoLearning\Support\ListView::rememberAsked('slides', $_GET);
+            return $this->render('admin-presentation', $this->presentations->page($item, \CattoLearning\Support\ListView::chosen('slides', $_GET, $_COOKIE), $this->editReturn()) + ['load_ckeditor' => false]);
+        }
         return $this->itemForm($item, 0, '/admin/course-items/' . $item['id']);
     }
 
     #[Route('/admin/course-items/{item_id}', name: 'admin_course_item_update', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
     public function update(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
-        if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id); }
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $item = $this->requireManagedItem($id);
+        // A Presentation's parts are each saved on its own pages (AdminPresentationController).
+        if ((string) $item['item_type'] === 'slide_deck') { $this->redirect('/admin/course-items/' . $id); }
+        if (isset($_POST['question_action']) || isset($_POST['card_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id); }
         if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->items->item($id), 0, '/admin/course-items/' . $id, $user->id); }
         // A refused save shows the form again with what was entered and where editing began.
         try {
             if (($_POST['item_action'] ?? '') === 'save_as') {
-                $input = array_replace($_POST, ['item_key' => (string) ($_POST['copy_key'] ?? ''), 'title' => (string) ($_POST['copy_title'] ?? '')]);
+                $input = array_replace($_POST, ['item_key' => (string) ($_POST['copy_key'] ?? ''), 'title' => (string) ($_POST['copy_title'] ?? ''), 'name' => (string) ($_POST['copy_name'] ?? '')]);
                 $copy = $this->items->saveAs($id, $input, $user->id);
             } else {
                 $this->items->update($id, $this->withUploadedResource($_POST, $user->id), $user->id);
@@ -120,7 +130,7 @@ final class AdminCourseComponentController extends BaseController
             $this->flash('success', 'An independent Course Item was created.');
             $this->redirect($this->editPath($copy));
         }
-        $this->flash('success', 'The shared Course Item was saved.');
+        $this->flash('success', 'The Course Item was saved.');
         $this->redirect($this->editReturn() ?? '/admin/course-items/' . $id);
     }
 
@@ -135,7 +145,9 @@ final class AdminCourseComponentController extends BaseController
     public function delete(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
-        return $this->handle(function () use ($user, $id): void { $this->items->delete($id, $user->id); $this->flash('success', 'The unused Course Item was deleted.'); $this->redirect('/admin/course-items'); }, '/admin/course-items/' . $id);
+        // A Presentation's recordings go with it: their rows by the database, their files here once it is gone.
+        $clips = array_values($this->narrations->forItem($id));
+        return $this->handle(function () use ($user, $id, $clips): void { $this->items->delete($id, $user->id); $this->narrations->removeFiles($clips); $this->flash('success', 'The unused Course Item was deleted.'); $this->redirect('/admin/course-items'); }, '/admin/course-items/' . $id);
     }
 
     #[Route('/admin/courses/{id}/content', name: 'admin_course_content', requirements: ['id' => '\\d+'], methods: ['GET'])]
@@ -143,7 +155,21 @@ final class AdminCourseComponentController extends BaseController
     {
         $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
         // The modal's Create new item form uses the same rich-text and question editors as its page.
-        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $this->items->courseContent($courseId), 'load_ckeditor' => true, 'load_question_editor' => true]);
+        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $this->items->courseContent($courseId), 'arrangement' => $this->restructurer->arrangement($courseId), 'load_ckeditor' => true, 'load_question_editor' => true]);
+    }
+
+    /** A course of the older shape arranged into numbered module sections, in one step (CourseRestructurer). */
+    #[Route('/admin/courses/{id}/content/arrange-modules', name: 'admin_course_content_arrange_modules', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function arrangeModules(): Response
+    {
+        $this->requireCsrf(); $courseId = $this->courseId(); $user = $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
+        return $this->handle(function () use ($courseId, $user): void {
+            $report = $this->restructurer->arrange($courseId, $user->id);
+            $this->flash('success', $report['modules'] === 0
+                ? sprintf('%d summar%s moved out of the lessons into parts of their own.', $report['summaries'], $report['summaries'] === 1 ? 'y' : 'ies')
+                : sprintf('The course is arranged into %d modules%s. %d videos, %d summaries and %d practical work items became parts of their own.', $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['summaries'], $report['practicals']));
+            $this->redirect('/admin/courses/' . $courseId . '/content');
+        }, '/admin/courses/' . $courseId . '/content');
     }
 
     /** The tree alone, which the editor swaps in after an insertion. */
@@ -357,16 +383,78 @@ final class AdminCourseComponentController extends BaseController
         $course = $courseId > 0 ? $this->items->courseContent($courseId) : null;
         $creating = (int) ($item['id'] ?? 0) === 0;
         $returnTo = $creating ? null : $this->editReturn();
-        $data = ['return_to' => $returnTo ?? '', 'title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])];
+        $data = ['return_to' => $returnTo ?? '', 'title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item: ' . CourseItemService::TYPE_LABELS[$type], 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])]
+            + $this->partEditorData($item);
         if ($creating && $this->inModal($courseId)) { return $this->renderFragment('partials/admin/course-item-form', $data + ['in_modal' => true], $status); }
-        return $this->render('admin-course-item-form', $data + ['load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)], $status);
+        return $this->render('admin-course-item-form', $data + ['load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true), 'load_catwalk' => $type === 'slide_deck', 'load_narration_recorder' => $type === 'slide_deck' && (int) ($item['id'] ?? 0) > 0], $status);
+    }
+
+    /**
+     * What the Presentation and Flash cards editors draw beside their fields: the layouts and choices, the deck as
+     * CatWalk plays it, each slide's narration, and the specification's guidance for what is in the form now.
+     *
+     * @param array<string,mixed> $item
+     * @return array<string,mixed>
+     */
+    private function partEditorData(array $item): array
+    {
+        $data = ['lesson_roles' => CourseItemService::LESSON_ROLES, 'cards_warnings' => []];
+        $type = (string) ($item['item_type'] ?? '');
+        $config = is_array($item['type_config'] ?? null) ? $item['type_config'] : [];
+        if ($type === 'slide_deck') {
+            $data['presentation_choices'] = $this->presentations->detailChoices(SlideDeck::normalise($config));
+        }
+        if ($type === 'flashcards') {
+            $data['cards_warnings'] = FlashCards::warnings(FlashCards::normalise($config['cards'] ?? []));
+        }
+        return $data;
+    }
+
+    /**
+     * The Presentation editor's recorder sends each slide's narration here as it is kept (narration-recorder.js):
+     * the item must be saved, the slide in it, and the person able to edit it.
+     */
+    #[Route('/admin/course-items/{item_id}/narration/{slide_id}', name: 'admin_course_item_narration', requirements: ['item_id' => '\\d+', 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
+    public function recordNarration(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $id = $this->itemId();
+        $this->requireManagedItem($id);
+        $file = $_FILES['audio'] ?? null;
+        try {
+            if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) $file['tmp_name'])) { throw new InvalidArgumentException('The recording did not arrive. Record it again.'); }
+            $duration = is_numeric($_POST['duration'] ?? null) ? (float) $_POST['duration'] : null;
+            $clip = $this->narrations->save($id, (string) $this->param('slide_id'), (string) $file['tmp_name'], $duration, $user->id);
+        } catch (InvalidArgumentException|\RuntimeException $exception) {
+            return new \Symfony\Component\HttpFoundation\JsonResponse(['ok' => false, 'message' => $exception->getMessage()], 422);
+        }
+        return new \Symfony\Component\HttpFoundation\JsonResponse(['ok' => true, 'url' => '/narrations/' . $clip['public_id'], 'message' => 'The narration was kept.']);
+    }
+
+    /** A slide's narration removed where it is shown, at once (owner, 2026-10-29: "there is no button to delete the recording - this is necessary"). */
+    #[Route('/admin/course-items/{item_id}/narration/{slide_id}/remove', name: 'admin_course_item_narration_remove', requirements: ['item_id' => '\\d+', 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
+    public function removeNarration(): Response
+    {
+        $this->requireCsrf();
+        $this->requirePermission('COURSE.EDIT');
+        $id = $this->itemId();
+        $this->requireManagedItem($id);
+        $this->narrations->remove($id, (string) $this->param('slide_id'));
+        return new \Symfony\Component\HttpFoundation\JsonResponse(['ok' => true, 'message' => 'The narration was removed.']);
     }
 
     /** @return array<string,mixed> */
     private function blankItem(string $type): array
     {
         if (!in_array($type, CourseItemService::TYPES, true)) { $type = 'html_lesson'; }
-        return ['id' => 0, 'item_key' => '', 'item_type' => $type, 'title' => '', 'description_html' => '', 'content_source' => '', 'type_config' => [], 'resource_id' => null, 'questions' => [], 'pass_mark' => 50, 'practice' => false, 'practice_enabled' => false, 'practice_pool_mode' => 'both', 'practice_question_count' => 5, 'graded_question_count' => 1, 'maximum_attempts' => null, 'time_limit_seconds' => 1800, 'score_policy' => 'highest', 'randomise_questions' => false, 'randomise_options' => false, 'negative_marking' => false, 'usage' => []];
+        // A new Presentation starts with a title slide and a new set of flash cards with one empty card.
+        $config = match ($type) {
+            'slide_deck' => ['kind' => 'intro', 'theme' => 'light', 'slides' => []],
+            'flashcards' => ['cards' => [['front' => '', 'back' => '', 'hint' => '']]],
+            default => [],
+        };
+        return ['id' => 0, 'item_key' => '', 'item_type' => $type, 'title' => '', 'description_html' => '', 'content_source' => '', 'type_config' => $config, 'estimated_minutes' => null, 'resource_id' => null, 'questions' => [], 'pass_mark' => 50, 'practice' => false, 'practice_enabled' => false, 'practice_pool_mode' => 'both', 'practice_question_count' => 5, 'graded_question_count' => 1, 'maximum_attempts' => null, 'time_limit_seconds' => 1800, 'score_policy' => 'highest', 'randomise_questions' => false, 'randomise_options' => false, 'negative_marking' => false, 'usage' => []];
     }
 
     /** @return array<string,mixed> */
@@ -461,7 +549,7 @@ final class AdminCourseComponentController extends BaseController
     {
         $course = $this->items->courseContent($courseId);
         $data = ['title' => $kind === 'section' ? 'Add section' : 'Add existing item', 'course' => $course, 'kind' => $kind, 'place' => $place, 'insert_error' => $error,
-            'values' => ['course_item_id' => (string) ($values['course_item_id'] ?? ''), 'title' => (string) ($values['title'] ?? ''), 'introduction_html' => (string) ($values['introduction_html'] ?? ''), 'show_outline' => !empty($values['show_outline']), 'public_preview' => !empty($values['public_preview']), 'delay_total' => $this->delayTotal($values)]];
+            'values' => ['course_item_id' => (string) ($values['course_item_id'] ?? ''), 'title' => (string) ($values['title'] ?? ''), 'introduction_html' => (string) ($values['introduction_html'] ?? ''), 'show_outline' => !empty($values['show_outline']), 'numbered' => !empty($values['numbered']), 'public_preview' => !empty($values['public_preview']), 'delay_total' => $this->delayTotal($values)]];
         if ($kind === 'existing') {
             $search = trim((string) ($values['q'] ?? ''));
             $library = $this->items->library($search); $items = [];

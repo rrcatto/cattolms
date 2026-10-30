@@ -184,6 +184,25 @@ async function scenario(name, browserName, run) {
             assert.equal(await savedTree(page, state), 'A[a2,a3,a1],B[b1[b1x]],c');
         });
 
+        await scenario('Cancel closes Edit section and Placement settings where they are, changing nothing', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await page.evaluate(() => { window.__sameDocument = true; });
+            for (const [id, summary, field] of [[n().A, 'Edit section', 'input[name="title"]'], [n().a1, 'Placement settings', 'input[name="display_title_override"]']]) {
+                const edit = row(page, id).locator('details.cl-course-tree-edit');
+                await edit.locator('summary').click();
+                const input = edit.locator(field);
+                const before = await input.inputValue();
+                await input.fill('Typed, then cancelled');
+                await edit.getByRole('link', {name: 'Cancel'}).click();
+                assert.equal(await edit.evaluate((element) => element.open), false, `${summary} closes.`);
+                assert.equal(await input.inputValue(), before, `${summary} goes back to what was saved.`);
+                assert.equal(await page.evaluate(() => document.activeElement.textContent.trim()), summary, `Focus returns to ${summary}.`);
+            }
+            assert.equal(await page.evaluate(() => window.__sameDocument === true), true, 'Cancel loads no page.');
+            assert.equal(await savedTree(page, state), 'A[a1,a2,a3],B[b1[b1x]],c');
+        });
+
         await scenario('collapsed sections stay collapsed for the session', browserName, async () => {
             state = reset();
             await page.goto(url());
@@ -395,7 +414,7 @@ async function scenario(name, browserName, run) {
         await browser.close();
     }
 
-    await scenario('without JavaScript the ⋯ menu, Move into page and + Add here work', 'chromium-nojs', async () => {
+    await scenario('without JavaScript the ⋯ menu, Move into page, + Add here and Cancel work', 'chromium-nojs', async () => {
         state = reset();
         const browser = await playwright.chromium.launch();
         const context = await browser.newContext({ignoreHTTPSErrors: true, javaScriptEnabled: false});
@@ -423,6 +442,10 @@ async function scenario(name, browserName, run) {
         await page.locator('#insert-section-title').press('Enter');
         await page.waitForURL(/\/content#course-node-\d+$/);
         assert.match(await renderedTree(page, state), /^A\[a3,a1,\d+,a2\],B\[b1\[b1x\],c\]$/, 'Without JavaScript + Add here opens the form on its own page.');
+        const edit = row(page, state.nodes.A).locator('details.cl-course-tree-edit');
+        await edit.locator('summary').click();
+        await edit.getByRole('link', {name: 'Cancel'}).click();
+        await page.waitForURL(new RegExp(`/content#course-node-${state.nodes.A}$`));
         await browser.close();
     });
 

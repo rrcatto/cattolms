@@ -7,6 +7,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Course\CourseNavigation;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\AssessmentService;
+use CattoLearning\Course\CourseReviewService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -15,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class AssessmentController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly AssessmentService $assessments, private readonly LearningService $learning)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly AssessmentService $assessments, private readonly LearningService $learning, private readonly CourseReviewService $reviews)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -59,7 +60,11 @@ final class AssessmentController extends BaseController
     public function result(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE'); $slug = $this->param('slug'); $publicId = $this->param('session'); $preview = $this->previewMode();
-        return $this->handle(function () use ($user, $slug, $publicId, $preview): Response { $session = $this->assessments->result($user->id, $publicId); return $this->render('assessment-session-result', ['course' => $this->learning->courseHome($user->id, $slug, $preview), 'preview_query' => $this->previewQuery($preview), 'title' => 'Assessment result', 'session' => $session, 'course_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview), 'retake_url' => '/learn/' . rawurlencode($slug) . '/item/' . (int) $session['structure_node_id'] . '/assessment/' . rawurlencode((string) $session['assessment_key']) . $this->previewQuery($preview), 'is_preview' => $preview]); }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
+        return $this->handle(function () use ($user, $slug, $publicId, $preview): Response { $session = $this->assessments->result($user->id, $publicId); $course = $this->learning->courseHome($user->id, $slug, $preview);
+            // After the final assessment the learner is asked for a review, on the page itself, unless they have given one (decision 8A).
+            $reviewPrompt = !$preview && ($session['assessment_role'] ?? '') === 'final' && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, (int) $course['id']) && $this->reviews->learnerReview((int) $course['id'], $user->id) === null
+                ? ['max_comment' => CourseReviewService::MAX_COMMENT, 'return' => $this->sessionUrl($slug, $publicId, '/result', false)] : null;
+            return $this->render('assessment-session-result', ['course' => $course, 'review_prompt' => $reviewPrompt, 'preview_query' => $this->previewQuery($preview), 'title' => 'Assessment result', 'session' => $session, 'course_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview), 'retake_url' => '/learn/' . rawurlencode($slug) . '/item/' . (int) $session['structure_node_id'] . '/assessment/' . rawurlencode((string) $session['assessment_key']) . $this->previewQuery($preview), 'is_preview' => $preview]); }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
     }
 
     private function previewMode(): bool { $preview = (string) ($_GET['preview'] ?? '') === '1'; if ($preview) { $this->requireCourseAuthor(); } return $preview; }

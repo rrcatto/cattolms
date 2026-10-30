@@ -3,7 +3,7 @@
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
 	{% set ph_kicker = 'Course importer' %}
-	{% set ph_title = 'Import HTML or Catto Learning JSON' %}
+	{% set ph_title = 'Import Course' %}
 	{% set ph_lead = 'Both formats are analysed and previewed before PostgreSQL is changed.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">
@@ -14,13 +14,13 @@
 					Select course file
 				</h2>
 				<p>
-					Upload an original self-study HTML course or a structured <code>.json</code> course export. Theme JSON is imported separately in Administration → Themes.
+					Upload a course package (<code>.zip</code>, made to the course specification 3.0: a <code>course.json</code> and a folder for each module), an original self-study HTML course, or a <code>.json</code> course export. Theme JSON is imported separately in Administration → Themes.
 				</p>
 				<form action="/admin/courses/import" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML or JSON course file', for: 'course-file', required: true})} %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course package, HTML or JSON course file', for: 'course-file', required: true})} %}
 {% block control %}
-<input class="cl-input cl-input-lg mb-7" id="course-file" type="file" name="course_file" accept=".html,.htm,.json,text/html,application/json" required {{ ui_field_attrs(props) }}>
+<input class="cl-input cl-input-lg mb-7" id="course-file" type="file" name="course_file" accept=".zip,.html,.htm,.json,application/zip,text/html,application/json" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}

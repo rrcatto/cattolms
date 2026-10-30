@@ -1,0 +1,63 @@
+{
+  "title": "Growing Vegetables in Small Spaces",
+  "kind": "trailer",
+  "minutes": 2,
+  "theme": "dark",
+  "slides": [
+    {
+      "layout": "title",
+      "title": "Welcome",
+      "kicker": "Growing Vegetables in Small Spaces",
+      "heading": "Grow food where you live",
+      "sub": "A balcony, a stoep or a small yard is enough",
+      "narration": "You do not need a farm. This course shows you how to grow vegetables in the space you already have."
+    },
+    {
+      "layout": "statement",
+      "title": "The idea",
+      "text": "You do not need a farm to grow good food. You need sun, good soil and a plan."
+    },
+    {
+      "layout": "points",
+      "title": "Who it is for",
+      "heading": "This course is for you if",
+      "points": ["You rent a flat or a small house", "Your pots of vegetables keep failing", "You are starting a school or community garden"]
+    },
+    {
+      "layout": "steps",
+      "title": "How a module works",
+      "heading": "Every module, step by step",
+      "steps": ["A short presentation sets the scene", "The lesson teaches it properly", "Flash cards fix it in memory", "A task you do in your own space"]
+    },
+    {
+      "layout": "compare",
+      "title": "Garden soil or potting soil",
+      "heading": "What belongs in a pot?",
+      "columns": [
+        {"heading": "Garden soil", "points": ["Packs down hard", "Drains badly", "May carry weed seeds"]},
+        {"heading": "Potting soil", "points": ["Stays light and open", "Drains freely", "Made for containers"]}
+      ]
+    },
+    {
+      "layout": "number",
+      "title": "Work it out",
+      "figure": "40 litres",
+      "label": "of potting soil fills a tub big enough for one tomato plant. You learn to work out your own."
+    },
+    {
+      "layout": "check",
+      "title": "Try a question",
+      "question": "What pH do most vegetables prefer?",
+      "options": ["Below 5, quite acidic", "Between 6.0 and 7.0", "Above 8, quite alkaline"],
+      "answer": 1,
+      "explanation": "Between about 6.0 and 7.0 the nutrients in the soil are within the roots' reach. The course shows you how to test your own."
+    },
+    {
+      "layout": "cta",
+      "title": "Start growing",
+      "heading": "Fill your first container this season",
+      "text": "Every module ends with something you do in your own space.",
+      "actions": ["enrol", "preview"]
+    }
+  ]
+}

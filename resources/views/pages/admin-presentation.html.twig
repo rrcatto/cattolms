@@ -1,0 +1,62 @@
+{#
+	A presentation's page, as the owner approved its mockup (2026-10-30: "the Preview not be reduced in size and shunted
+	off to the right hand side. It needs to remain at the top, same large size"; "Under that ... a small block for the
+	Presentation details ... with an Edit button"; "under details ... the draggable list of slides. Clicking the Edit
+	button on a slide takes us to Pg 2"). The preview plays every saved slide; the details open their own page; the
+	slides are a list or a grid of pictures, dragged by their handles or moved by their ⋯ menus (each move saved at once),
+	each opening its own page; then where the presentation is placed and its checks. Course\Catwalk\PresentationPages
+	gathers it; every change is a form, so it all works without JavaScript.
+#}
+{% extends layout %}
+{% block page_body %}
+{{ importmap() }}
+	{% set p = presentation %}
+	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set ph_back_href = crumb.href %}{% set ph_back_label = crumb.label %}
+	{% set ph_kicker = item.name %}{% set ph_title = 'Edit Course Item: Presentation' %}
+	{% set ph_badges %}{{ ui('feedback.badge', {label: p.kind_label, tone: 'info'}) }}{{ ui('feedback.badge', {label: p.theme_label ~ ' look', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.slides|length ~ (p.slides|length == 1 ? ' slide' : ' slides'), tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.recorded ~ ' of ' ~ p.slides|length ~ ' recorded', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.placements|length == 1 ? 'Placed in 1 course' : 'Placed in ' ~ p.placements|length ~ ' courses', tone: 'neutral'}) }}{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-preview'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Preview', summary: 'As learners see it, with every saved change. Choose a slide\'s picture below to show it here.'}) }}
+		<div class="cl-presentation-preview">{{ p.preview_html|raw }}</div>
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-details', variant: 'compact'})} %}{% block surface_body %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Details'})} %}{% block section_actions %}{{ ui('action.link', {label: 'Edit details', href: base ~ '/details', icon: 'action-edit'}) }}{% endblock %}{% endembed %}
+		{{ ui('data.key-value-list', {items: [{label: 'Name', value: item.name}, {label: 'Title', value: item.title}, {label: 'Description', value: item.description_html ?: 'None yet: the player shows the title.'}]}) }}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-slides'})} %}{% block surface_body %}<div id="slides-view">
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Slides', summary: (p.slides|length == 1 ? '1 slide' : p.slides|length ~ ' slides') ~ '. Drag a slide by its handle, or use its ⋯ menu, to change the order: it is saved as soon as you let go.'})} %}{% block section_actions %}
+			{% include '@platform/partials/view-switch.html.twig' with {vs: view_switch} %}
+			{{ ui('action.link', {label: 'Add a slide', variant: 'primary', href: base ~ '/slides/add', get: base ~ '/slides/add', target: '#slide-add-body', modal: 'slide-add', icon: 'action-add'}) }}
+		{% endblock %}{% endembed %}
+		<div class="cl-tree-wrap" data-controller="presentation-slides" data-presentation-slides-url-value="{{ base }}/slides" data-action="dragstart->presentation-slides#start dragover->presentation-slides#over dragleave->presentation-slides#leave drop->presentation-slides#drop dragend->presentation-slides#end submit->presentation-slides#menu">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<p class="cl-tree-help" id="slide-keys" data-presentation-slides-target="enhanced" hidden>Drag a slide by its handle and drop it before or after another. On a focused handle the arrow keys move it one place, and Home and End move it to the start or the end.</p>
+			<p class="cl-tree-status" role="status" aria-live="polite" data-presentation-slides-target="status"></p>
+			<p class="cl-tree-error" role="alert" data-presentation-slides-target="error" hidden></p>
+			{% include '@platform/partials/admin/presentation-slides.html.twig' %}
+		</div>
+	</div>{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-placed'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Where it is placed', summary: 'A shared Course Item: a change here shows wherever it is placed.'}) }}
+			{% if p.placements %}
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for placed in p.placements %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ placed.course_title }}</strong>{% if placed.module %}<br><span class="small cl-text-secondary">{{ placed.module }}</span>{% endif %}{% endblock %}{% block actions %}{{ ui('action.link', {label: 'Course Content', size: 'small', href: '/admin/courses/' ~ placed.course_id ~ '/content', icon: 'action-open'}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'Placed nowhere yet', summary: 'Add it to a course from Course Content, with + Add here and Add existing item.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-checks'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Checks', summary: 'What the course specification suggests. A presentation can be saved either way.'}) }}
+			<ul class="cl-presentation-checks">{% for check in p.checks %}<li class="cl-presentation-check cl-presentation-check--{{ check.ok ? 'fine' : 'look' }}">{{ ui('icon', {name: check.ok ? 'action-done' : 'action-inspect', decorative: true}) }}<span>{{ check.text }}</span></li>{% endfor %}</ul>
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	</section>
+
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'slide-add', title: 'Add a slide', size: 'wide'})} %}{% block modal_body %}<div id="slide-add-body"></div>{% endblock %}{% endembed %}
+{% endblock %}

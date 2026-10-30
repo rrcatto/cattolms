@@ -1,0 +1,34 @@
+{#
+	The layout window (owner, 2026-10-30, the approved mockup's page 3): every layout drawn as a sample slide in the
+	presentation's look, in four groups. Change layout (mode 'change') opens it over the slide's page: the choice is sent
+	with the slide's own form, so what was typed and not saved yet comes along, and the slide is drawn again in the new
+	layout, still unsaved. Add a slide (mode 'add') opens it over the presentation's page and asks where the new slide
+	goes, then opens the new slide's page. Without JavaScript it is a page of its own (in_modal false), with its own form.
+#}
+{% set field = mode == 'add' ? 'layout' : 'slide_layout' %}
+{% set linked = in_modal and mode == 'change' %}
+{% set chooser %}
+	<p class="cl-slide-layout-lead">{{ mode == 'add' ? 'Choose its layout by its picture: you fill it in next, and nothing is kept until you press Save slide.' : 'The slide keeps its short title, chapter, background and narration, and every field both layouts have. Fields the new layout has no place for are left out: Close without saving brings them back.' }}</p>
+	{% for group in groups %}
+		{{ ui('form.picture-choice', {name: field, legend: group.legend, items: group.items, selected: current, form: linked ? 'slide-form' : ''}) }}
+	{% endfor %}
+	{% if mode == 'add' %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Put it after', for: 'slide-after', help: 'An Up next or call to action slide stays the last.'})} %}{% block control %}<select class="cl-select" id="slide-after" name="after" {{ ui_field_attrs(props) }}><option value="0"{{ after == 0 ? ' selected' : '' }}>At the start</option>{% for place in places %}<option value="{{ place.value }}"{{ after == place.value ? ' selected' : '' }}>{{ place.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+	{% endif %}
+{% endset %}
+{% set actions %}
+	{% if linked %}
+		{{ ui('action.button', {label: 'Use this layout', variant: 'primary', type: 'submit', form: 'slide-form', name: 'slide_action', value: 'layout', skip_validation: true, icon: 'action-switch'}) }}
+		{{ ui('action.button', {label: 'Cancel', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+	{% else %}
+		{{ ui('action.button', {label: mode == 'add' ? 'Add the slide' : 'Use this layout', variant: 'primary', type: 'submit', icon: mode == 'add' ? 'action-add' : 'action-switch'}) }}
+		{% if in_modal %}{{ ui('action.button', {label: 'Cancel', type: 'button', close_modal: true, icon: 'action-cancel'}) }}{% else %}{{ ui('action.link', {label: 'Cancel', href: back, icon: 'action-cancel'}) }}{% endif %}
+	{% endif %}
+{% endset %}
+{% if linked %}
+	<div class="cl-slide-layout-choice">{{ chooser }}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ actions }}{% endblock %}{% endembed %}</div>
+{% elseif mode == 'add' %}
+	<form class="cl-slide-layout-choice" action="{{ action }}" method="get">{{ chooser }}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ actions }}{% endblock %}{% endembed %}</form>
+{% else %}
+	<form class="cl-slide-layout-choice" action="{{ action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="slide_action" value="layout">{% if after is not null %}<input type="hidden" name="after" value="{{ after }}">{% endif %}{{ chooser }}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ actions }}{% endblock %}{% endembed %}</form>
+{% endif %}

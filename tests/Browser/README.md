@@ -169,8 +169,10 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 Course Creators and Courses open as tables and the catalogue as cards; each grid shows whole rows (5 people or
 companies, 4 courses at 1440px, at most 2 at 390px), its own page sizes and its Sort, and every picture it asks for
 arrives; the choice is remembered without the address and the list comes back when chosen; the catalogue's list holds on
-a tag's page; every view passes the shared page checks (`page-construction.cjs`); and, in the first theme, the switch and
-the Sort work without JavaScript. It uses `section-pages.cjs`'s fixture (below) and writes screenshots and
+a tag's page; every view passes the shared page checks (`page-construction.cjs`); in the first theme every switch changes
+only its own list without loading the page (Administration's lists, the catalogue, the Company workspace's people,
+Subscribers, a company's people and courses, a presentation's slides) and keeps the focus on the button pressed; and, in
+the first theme, the switch and the Sort work without JavaScript. It uses `section-pages.cjs`'s fixture (below) and writes screenshots and
 `results.json` to `/tmp/catto-card-grids` (`CATTO_BROWSER_OUTPUT`); `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run:
 
 ```sh
@@ -438,6 +440,25 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/landing-pages-fixture.php cleanup'
 ```
 
+## Course parts and CatWalk
+
+`course-parts.cjs` checks the course structure and CatWalk presentations (owner, 2026-10-28, decisions 1A to 7A) in Chromium and Firefox at 1440 and 390px (134 checks):
+
+- **The outline.** The module's section reads "Module 1: <title>", each part shows its kind (Presentation, Lesson, Summary, Flash cards, Practical work) and the module its time.
+- **A presentation.** CatWalk mounts it; Next reveals a slide's points one at a time and then moves on; the quick question marks the right and wrong answers and opens the explanation; Contents lists and jumps to every slide and Escape closes it; the last slide's Continue leads to the next part; nothing scrolls sideways. Two presentations in one lesson each answer only their own keys.
+- **Flash cards, practical work and PDFs.** A card turns over, Again brings it back later and the set ends when every card is known; the model answer starts closed and opens; the lesson, summary, flash cards and practical work each download as a PDF.
+- **Without JavaScript.** The presentation reads as one page of every slide and the flash cards as a list; in the editor, Add a slide and Remove slide send the form back without saving anything.
+- **Narration (Chromium).** The editor's preview plays the deck and every slide has its recorder; a recording made with a stand-in microphone is kept, the author hears it, a visitor is refused it, and the reader offers Narration.
+
+The fixture makes an ADMIN, a provider company and a course with a numbered module of every part (made through `CourseItemService`, as "+ Add here" does) and a second module; its clean-up removes everything it made, the narration files included.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-parts-fixture.php create'
+podman cp env_php_1:/tmp/catto-course-parts-state.json /tmp/catto-course-parts-state.json
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-parts.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-parts-fixture.php cleanup'
+```
+
 ## Legal pages and terms acceptance
 
 `legal-pages.cjs` checks the public legal pages and the checkout acceptance box (77 checks):
@@ -531,6 +552,15 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAI
 ## Every page, by following links
 
 `page-construction.cjs` holds the checks both share: one `h1`, only page rows in main, no words on the texture, the first card's edge on an unboxed page head's title, every painted notice, page head and identity band with the cards' edges (UX rule 1.7a), no sideways scrolling, nothing standing out of a table, and a pagination bar that fits a desktop line.
+
+`presentation-editor.cjs` checks the presentation editor (owner, 2026-10-30) on the course parts fixture: the presentation's page (preview, list and grid, drags up and down and left and right, keyboard and ⋯ menu moves, Up next kept last, copy and delete) in Chromium and Firefox; Add a slide, a slide's page (the row of slides, Preview, Change layout keeping what was typed, a refused Save, Close asking first), the script saved in place and the details page in Chromium; a recording discarded, kept, still there after a reload and removed (a stand-in microphone); every new page built as every page is at 1440 and 390px; and without JavaScript the ⋯ menu, Add a slide, Preview and Change layout.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-parts-fixture.php create'
+podman cp env_php_1:/tmp/catto-course-parts-state.json /tmp/catto-course-parts-state.json
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/presentation-editor.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-parts-fixture.php cleanup'
+```
 
 `every-page.cjs` follows every link on the site from the home page, the catalogue, Administration, Account and Company, as an ADMIN who also runs a company and as a visitor, at 1440 and 390px, and checks each page with the same tests `section-pages.cjs` applies to the menu pages (`page-construction.cjs`): one h1, only page rows directly in main, no words on the page texture, the first card's edge on the page head's (or its picture's) edge, no sideways scrolling, nothing standing out of a table, no action cut off by its cell; and that no link leads to an error page (a failure names the page the link was on). Pages that differ only in an id are visited twice at most. Home, course landing pages, the course reader and its public preview are built another way on purpose and are not judged. It uses the section pages fixture's session:
 

@@ -1,0 +1,20 @@
+{# A Flash cards item's cards (owner, 2026-10-28, decision 1A): a front that asks, a back that answers and an optional
+   hint, plain text. Add a card and Remove send the form back to be drawn again (card_action), so it works without
+   JavaScript; nothing is saved until Save. Cards can also be pasted, one per line: front | back | hint. #}
+{% set cards = item.type_config.cards|default([]) %}
+{{ ui('layout.section-head', {heading: 'Flash cards', heading_level: 3, summary: 'The learner reads the front, turns the card over and says whether they knew it. Missed cards come back. A module usually has 10 to 20.'}) }}
+{% if cards_warnings|default([]) %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'The cards can be saved, but the course specification suggests', section_spacing: true})} %}{% block body %}<ul>{% for warning in cards_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}{% endif %}
+<ol class="cl-card-list">
+{% for card in cards %}{% set ci = loop.index0 %}
+<li class="cl-card-editor"><fieldset><legend>Card {{ loop.index }}</legend>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Front: the question', for: 'card-' ~ ci ~ '-front', required: true, full_width: true})} %}{% block control %}<input class="cl-input" id="card-{{ ci }}-front" name="cards[{{ ci }}][front]" maxlength="200" value="{{ card.front|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Back: the answer', for: 'card-' ~ ci ~ '-back', required: true, full_width: true, help: 'The answer first, then at most one sentence of why.'})} %}{% block control %}<textarea class="cl-input" id="card-{{ ci }}-back" name="cards[{{ ci }}][back]" rows="2" maxlength="400" {{ ui_field_attrs(props) }}>{{ card.back|default('') }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Hint', for: 'card-' ~ ci ~ '-hint', full_width: true, help: 'Optional: a nudge, never the answer.'})} %}{% block control %}<input class="cl-input" id="card-{{ ci }}-hint" name="cards[{{ ci }}][hint]" maxlength="150" value="{{ card.hint|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+<div class="cl-slide-editor-actions">{{ ui('action.button', {label: 'Remove card', variant: 'quiet', size: 'small', type: 'submit', name: 'card_action', value: 'remove:' ~ ci, skip_validation: true, icon: 'action-remove'}) }}</div>
+</fieldset></li>
+{% endfor %}
+</ol>
+<div class="cl-slide-editor-actions">{{ ui('action.button', {label: 'Add a card', variant: 'secondary', type: 'submit', name: 'card_action', value: 'add', skip_validation: true, icon: 'action-add'}) }}</div>
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Or paste cards', for: 'cards-paste', full_width: true, help: 'One card per line: front | back | hint. They are added after the cards above when you save or add a card.'})} %}{% block control %}<textarea class="cl-input" id="cards-paste" name="cards_paste" rows="4" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}

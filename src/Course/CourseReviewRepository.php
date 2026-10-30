@@ -29,6 +29,41 @@ final class CourseReviewRepository
     }
 
     /**
+     * The learners to ask for a review now (decision 8A): each finished the course between REVIEW_ASK_AFTER and
+     * REVIEW_ASK_UNTIL ago, has not reviewed it and has not been asked, is an active account, and has a primary
+     * address that is not on Addresses never emailed. Locked, so two schedulers never ask twice.
+     *
+     * @return list<array{enrolment_id:int,email:string,first_name:string,course_title:string,course_slug:string}>
+     */
+    public function dueReviewRequests(int $limit, DateTimeImmutable $now, int $afterSeconds, int $untilSeconds): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT e.id AS enrolment_id, ue.email, COALESCE(NULLIF(btrim(u.first_name), ''), NULLIF(split_part(btrim(COALESCE(u.display_name, '')), ' ', 1), ''), '') AS first_name,
+                    c.title AS course_title, c.slug AS course_slug
+               FROM course_enrolments e
+               JOIN users u ON u.id = e.user_id AND u.status = 'active'
+               JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary
+               JOIN courses c ON c.id = e.course_id
+              WHERE e.is_preview = FALSE AND e.status IN ('active', 'completed', 'expired') AND e.access_removed_at IS NULL
+                AND e.completed_at IS NOT NULL AND e.review_requested_at IS NULL
+                AND e.completed_at <= CAST(:asked_after AS timestamptz) AND e.completed_at > CAST(:asked_until AS timestamptz)
+                AND NOT EXISTS (SELECT 1 FROM course_reviews r WHERE r.course_id = e.course_id AND r.user_id = e.user_id)
+                AND NOT EXISTS (SELECT 1 FROM mailing_suppressions s WHERE s.email = LOWER(ue.email))
+              ORDER BY e.completed_at, e.id
+              LIMIT :limit
+                FOR UPDATE OF e SKIP LOCKED",
+            ['asked_after' => $now->modify('-' . $afterSeconds . ' seconds')->format(self::TIME), 'asked_until' => $now->modify('-' . $untilSeconds . ' seconds')->format(self::TIME), 'limit' => $limit]
+        );
+        return array_map(static fn(array $row): array => ['enrolment_id' => (int) $row['enrolment_id'], 'email' => (string) $row['email'], 'first_name' => (string) $row['first_name'],
+            'course_title' => (string) $row['course_title'], 'course_slug' => (string) $row['course_slug']], $rows);
+    }
+
+    public function markReviewRequested(int $enrolmentId, DateTimeImmutable $at): void
+    {
+        $this->db->executeStatement('UPDATE course_enrolments SET review_requested_at = CAST(:at AS timestamptz) WHERE id = :id', ['at' => $at->format(self::TIME), 'id' => $enrolmentId]);
+    }
+
+    /**
      * A learner may review a course they hold, or held, a genuine entitlement to: any learner
      * enrolment that was assigned, is active or completed, or has expired. A cancelled enrolment
      * (refunded or access removed) and an ADMIN preview enrolment never qualify.

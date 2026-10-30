@@ -174,6 +174,20 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendReviewRequest(string $email, string $firstName, string $courseTitle, string $reviewUrl): void
+    {
+        $hello = $firstName !== '' ? 'Hello ' . $firstName . ',' : 'Hello,';
+        $this->send(
+            $email,
+            'How did you find ' . $courseTitle . '?',
+            '<p>' . $this->escape($hello) . '</p>'
+            . '<p>You finished <strong>' . $this->escape($courseTitle) . '</strong> a few days ago. Would you tell other learners what you thought of it? A rating and a few words help them choose.</p>'
+            . '<p><a href="' . $this->escape($reviewUrl) . '">Rate this course</a></p>'
+            . '<p>Your review is published under your first name and the initial of your surname once it has been checked. We ask only once.</p>',
+            "{$hello}\n\nYou finished {$courseTitle} a few days ago. Would you tell other learners what you thought of it? A rating and a few words help them choose.\n\nRate this course: {$reviewUrl}\n\nYour review is published under your first name and the initial of your surname once it has been checked. We ask only once."
+        );
+    }
+
     public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
     {
         $url = rtrim(Env::string('APP_URL'), '/') . '/learn/' . rawurlencode($courseSlug);

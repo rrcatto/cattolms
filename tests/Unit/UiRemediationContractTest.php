@@ -56,7 +56,7 @@ TWIG;
 
     public function testActionElementSpecificPropertiesAreRejected(): void
     {
-        foreach (['action.link' => ['disabled', 'form', 'name', 'value', 'close_modal', 'stimulus_action', 'type'], 'action.button' => ['href', 'new_window', 'rel', 'navigation_key']] as $component => $properties) {
+        foreach (['action.link' => ['disabled', 'form', 'name', 'value', 'close_modal', 'stimulus_action', 'type'], 'action.button' => ['href', 'new_window', 'rel', 'navigation_key', 'close_disclosure']] as $component => $properties) {
             foreach ($properties as $property) {
                 try {
                     (new PlatformUi())->properties($component, ['label' => 'Test', $property => true]);

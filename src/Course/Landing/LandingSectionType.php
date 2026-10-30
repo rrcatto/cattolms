@@ -47,6 +47,8 @@ enum LandingSectionType: string
     case Pricing = 'pricing';
     case Faq = 'faq';
     case Cta = 'cta';
+    // One of the course's Presentations, such as its trailer, played by CatWalk (owner, 2026-10-28, decision 7A).
+    case Presentation = 'presentation';
 
     /** Where the hero's second button may lead: a part of the page, or the course's free preview. */
     public const SECONDARY_TARGETS = [
@@ -90,6 +92,7 @@ enum LandingSectionType: string
             self::Pricing => 'Pricing',
             self::Faq => 'FAQ',
             self::Cta => 'Call to action',
+            self::Presentation => 'Presentation',
         };
     }
 
@@ -106,6 +109,7 @@ enum LandingSectionType: string
             self::Pricing => 'The course’s current prices and access periods, with the buy button.',
             self::Faq => 'Questions and answers that open one at a time.',
             self::Cta => 'A closing heading and sentence with the buy button.',
+            self::Presentation => 'One of the course’s presentations, such as its trailer, played on the page.',
         };
     }
 
@@ -128,6 +132,7 @@ enum LandingSectionType: string
             self::Pricing => 'Price and access',
             self::Faq => 'Questions and answers',
             self::Cta => 'Ready to start?',
+            self::Presentation => 'Take the tour',
         };
     }
 
@@ -147,6 +152,7 @@ enum LandingSectionType: string
             // With no approved review the section is always left out (owner, 2026-10-20).
             self::Reviews => ['heading' => '', 'text' => '', 'limit' => 3],
             self::Faq => ['heading' => '', 'text' => '', 'items' => []],
+            self::Presentation => ['heading' => '', 'text' => '', 'presentation' => ''],
         };
     }
 
@@ -184,6 +190,7 @@ enum LandingSectionType: string
                 'limit' => self::limit($input['limit'] ?? 3),
             ],
             self::Pricing, self::Cta => ['heading' => $heading(), 'text' => $text(600)],
+            self::Presentation => ['heading' => $heading(), 'text' => $text(600), 'presentation' => self::presentationKey($input['presentation'] ?? '')],
             self::Faq => [
                 'heading' => $heading(),
                 'text' => $text(),
@@ -207,6 +214,7 @@ enum LandingSectionType: string
             self::Outcomes => $empty ? ['Learning outcomes has no outcomes yet.'] : [],
             self::Benefits => $empty ? ['Benefits has no benefits yet.'] : [],
             self::Faq => $empty ? ['FAQ has no questions yet.'] : [],
+            self::Presentation => ($data['presentation'] ?? '') === '' ? ['Presentation has no presentation chosen.'] : [],
             self::Hero => ($data['image'] ?? '') === 'resource' && empty($data['image_resource_id']) ? ['The hero has no picture chosen.'] : [],
             default => [],
         };
@@ -233,6 +241,7 @@ enum LandingSectionType: string
             self::Reviews => 'Up to ' . $plural((int) ($data['limit'] ?? 3), 'approved review', 'approved reviews'),
             self::Pricing => 'The course’s current prices',
             self::Cta => $named !== '' ? $named : 'The buy button',
+            self::Presentation => ($data['presentation'] ?? '') === '' ? 'No presentation chosen yet' : 'Plays ' . (string) $data['presentation'],
         };
     }
 
@@ -260,6 +269,15 @@ enum LandingSectionType: string
             'secondary' => $secondary,
             'secondary_label' => LandingCopy::line($input['secondary_label'] ?? '', 40, 'The second button’s label'),
         ];
+    }
+
+    private static function presentationKey(mixed $value): string
+    {
+        $key = trim((string) (is_scalar($value) ? $value : ''));
+        if ($key !== '' && preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $key) !== 1) {
+            throw new InvalidArgumentException('Choose one of the course’s presentations.');
+        }
+        return $key;
     }
 
     private static function flag(mixed $value): bool

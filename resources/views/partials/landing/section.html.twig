@@ -52,6 +52,8 @@
 {% endembed %}
 				{% endfor %}
 			</div>
+		{% elseif section.type == 'presentation' %}
+			{{ section.deck_html|raw }}
 		{% elseif section.type == 'cta' %}
 			{% include '@platform/partials/course-purchase.html.twig' with {purchase: section.purchase, purchase_style: 'compact', purchase_key: 'cta-' ~ section.id, landing_page_id: landing.landing_page_id, purchase_inert: landing.preview} %}
 		{% endif %}

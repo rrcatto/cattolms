@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 1.0.0 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.0.1 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -82,9 +82,11 @@ One scheduler runs everything on an installation: `php bin/console schedule:run 
 | Clean-up (`cleanup`) | every day | deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
 | Sign-up check lists (`signup_lists`) | every day | fetches the Tor exit addresses daily and, weekly, the VPN and hosting networks and the throwaway email domains the sign-up check reads |
 | News emails (`mailing`) | every minute | records course changes as held updates, releases the updates whose time has come and delivers them (at once to people who want them as they happen, in each digest on its day), sends within the sending hours at the pace Mailing › Sending settings allows, pauses a sending whose bounces or complaints are too high, reads back what became of each email and asks sleeping addresses once a day |
+| Review requests (`review_requests`) | every hour | emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review (`Course\ReviewRequests`); never to an address on Addresses never emailed, never about a course completed more than 30 days ago |
+| Course videos (`video_check`) | every day | asks YouTube's oEmbed address (`https://www.youtube.com/oembed`, the video's id only) whether each video placed in a course can still be played on another site; one that cannot is on the dashboard's Needs your attention until it plays again (`Course\CourseVideoCheck`, `course_video_checks`) |
 | Log archive (`log_archive`) | every day just after midnight | moves `storage/logs/application.log`, and any other log beside it such as `schedule.log`, into `storage/logs/archive` compressed (`application-2026-10-27.log.gz`), starts each afresh and deletes archives older than `LOG_ARCHIVES_KEPT_FOR` (2 weeks; Settings → Maintenance overrides it). See "Application logging" below |
 
-Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce and news emails after 5 minutes, popularity after 3 hours, clean-up and the log archive after 2 days, the sign-up check lists after 3 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
+Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce and news emails after 5 minutes, popularity and review requests after 3 hours, clean-up and the log archive after 2 days, the sign-up check lists and course videos after 3 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
 
 The commerce job does these things:
 
@@ -158,12 +160,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.0`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.1`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.0.0  # the tag being released
+   V=v1.0.1  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

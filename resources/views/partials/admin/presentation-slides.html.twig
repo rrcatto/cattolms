@@ -1,0 +1,35 @@
+{#
+	A presentation's slides in order, as a list or a grid of their pictures (owner, 2026-10-30: "I need both a list and
+	grid view of all the slides and I should have a drag and drop editor"). The presentation-slides controller swaps this
+	region for the server's copy after every move: the saved order, or the stored one with the reason in data-error when a
+	move was refused. data-order is the order this copy shows, sent with a move so a list changed elsewhere is refused
+	rather than guessed at. A slide's picture shows it in the preview above; Edit opens its own page.
+#}
+{% set base = '/admin/course-items/' ~ item.id %}
+<div class="cl-tree cl-slide-tree cl-slide-tree--{{ view_switch.view }}" id="presentation-slide-list" data-presentation-slides-target="tree" data-view="{{ view_switch.view }}" data-error="{{ list_error|default('') }}" data-order="{{ presentation.order }}">
+	<ol class="cl-tree-list" data-parent="" aria-label="The slides, in order">
+		{% for slide in presentation.slides %}
+			<li class="cl-tree-node" id="slide-{{ slide.id }}" data-node-id="{{ slide.id }}" data-depth="1" data-height="1">
+				<div class="cl-tree-row cl-slide-row">
+					<button type="button" class="cl-tree-handle" aria-label="Move slide {{ slide.number }}, {{ slide.title }}" aria-describedby="slide-keys" data-presentation-slides-target="handle" data-action="pointerdown->presentation-slides#arm keydown->presentation-slides#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>
+					<span class="cl-slide-number" aria-hidden="true">{{ slide.number }}</span>
+					<a class="cl-slide-picture" href="#presentation-preview" data-action="presentation-slides#show" data-slide-number="{{ slide.number }}" aria-label="Show slide {{ slide.number }} in the preview">{{ slide.thumb|raw }}</a>
+					<div class="cl-tree-label cl-slide-label">
+						<span class="cl-tree-name">{{ slide.title }}</span>
+						<span class="cl-tree-meta">{{ slide.layout_label }} · {{ slide.recorded ? 'Recording saved' : (slide.scripted ? 'Script, no recording yet' : 'No narration') }}</span>
+					</div>
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+						{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: base ~ '/slides/' ~ slide.id, aria_label: 'Edit slide ' ~ slide.number ~ ', ' ~ slide.title, icon: 'action-edit'}) }}
+						{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'More for slide ' ~ slide.number})} %}{% block body %}
+							{% for move in [{direction: 'top', label: 'Move to the start', icon: 'action-move-top', allowed: not slide.is_first}, {direction: 'up', label: 'Move earlier', icon: 'action-move-up', allowed: not slide.is_first}, {direction: 'down', label: 'Move later', icon: 'action-move-down', allowed: not slide.is_last}, {direction: 'bottom', label: 'Move to the end', icon: 'action-move-bottom', allowed: not slide.is_last}] %}
+								<form action="{{ base }}/slides/{{ slide.id }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed, icon: move.icon}) }}</form>
+							{% endfor %}
+							<form action="{{ base }}/slides/{{ slide.id }}/copy" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make a copy', type: 'submit', size: 'small', variant: 'quiet', icon: 'action-copy'}) }}</form>
+							<form action="{{ base }}/slides/{{ slide.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', type: 'submit', size: 'small', variant: 'danger', icon: 'action-remove', disabled: presentation.slides|length < 2, confirm: 'Delete slide ' ~ slide.number ~ ', "' ~ slide.title ~ '"' ~ (slide.recorded ? ', and its recording' : '') ~ '? This cannot be undone.'}) }}</form>
+						{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+				</div>
+			</li>
+		{% endfor %}
+	</ol>
+</div>

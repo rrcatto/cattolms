@@ -94,6 +94,7 @@
 		{% set cc = company_courses_section %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'provided'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Courses it provides', summary: (cc.figures.total == 1 ? '1 course' : cc.figures.total ~ ' courses') ~ ': ' ~ cc.figures.published ~ ' published, ' ~ cc.figures.draft ~ ' draft' ~ (cc.figures.retired > 0 ? ', ' ~ cc.figures.retired ~ ' retired' : '') ~ '. ' ~ (cc.figures.learners == 1 ? '1 learner is' : cc.figures.learners ~ ' learners are') ~ ' on them.'}) }}
+			<div id="company_courses-view">
 			<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: cc.view_switch} %}</div>
 			{% if cc.view == 'grid' %}
 			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Courses'})} %}{% block body %}
@@ -123,6 +124,7 @@
 			{% endembed %}
 			{% endif %}
 			{% if cc.more > 0 %}<p class="small">And {{ cc.more }} more. <a href="/admin/courses?courses_q={{ co.name|url_encode }}">All its courses</a></p>{% endif %}
+			</div>
 		{% endblock %}{% endembed %}
 		{% endif %}
 

@@ -221,9 +221,20 @@ final class LearningService
         $course['introduction_html'] = GradeScale::resolve((string) ($course['introduction_html'] ?? ''), $course['grade_bands']);
         $course['enrolment'] = $enrolment;
         $course['structure'] = $this->courseItems->availability((int) $course['id'], empty($enrolment['started_at']) ? null : (string) $enrolment['started_at'], false);
+        // A trailer is for visitors, on the landing page and in the public preview: someone who has the course never
+        // meets it in their outline or reading order (2026-10-29), so Start course never opens on an advert for it.
+        $course['structure'] = array_values(array_filter((array) $course['structure'], static fn(array $row): bool => !self::isTrailer($row)));
+        // Where Start course and Begin course lead: the first stop in reading order, when it is open (owner, 2026-10-29:
+        // "Why two click throughs? There should only be one!").
+        $first = CourseNavigation::sequence((array) $course['structure'])[0] ?? null;
+        $course['first_stop_path'] = $first === null || (!$preview && !empty($first['is_locked'])) ? null : self::stopPath((string) $course['slug'], $first);
         $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
         $course['is_preview'] = $preview;
         $course['access_period_label'] = $this->durationLabel((int) ($enrolment['access_period_seconds'] ?? 0));
+        // Whose refund starting ends, for the start page (owner, 2026-10-29): the learner's own when they bought it, their
+        // company's for a place from its credit, and none for a course given to test or an administrator's preview.
+        $course['start_refund'] = $preview ? 'none' : (in_array((string) ($enrolment['source_type'] ?? ''), ['paid_order', 'bundle'], true) ? 'own'
+            : ($this->courses->enrolmentFromCompanyCredit((int) $enrolment['id']) ? 'company' : 'none'));
         $course['remaining_access_label'] = empty($enrolment['expires_at']) ? '' : CourseItemService::duration((int) ceil(max(0, (strtotime((string) $enrolment['expires_at']) ?: time()) - time()) / 60));
         $certificate = $this->certificates->forEnrolment((int) $enrolment['id']);
         $course['certificate'] = $certificate !== null && $certificate['revoked_at'] === null ? $certificate : null;
@@ -328,7 +339,10 @@ final class LearningService
         $around = CourseNavigation::neighbours((array) $course['structure'], $nodeId);
         $node['previous_node'] = $around['previous'];
         $node['next_node'] = $around['next'];
-        $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false);
+        // A Presentation's Continue leads to the next stop, or back to the course after the last (CatWalk, 2026-10-28).
+        $next = $around['next'];
+        $continue = $next === null ? '/learn/' . rawurlencode((string) $course['slug']) : self::stopPath((string) $course['slug'], $next);
+        $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false, [], ['continue' => $continue . ($preview ? '?preview=1' : '')]);
         $node['rendered_html'] = GradeScale::resolve($node['rendered_html'], (array) $course['grade_bands']);
         if ($preview) { $node['rendered_html'] = preg_replace('/(href="\/learn\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['item'] = $node;
@@ -353,6 +367,24 @@ final class LearningService
     }
 
     /** In the words every offer uses (Support\AccessPeriod: a month is 30 days and each whole year 365, owner 2026-10-26). */
+    /** @param array<string,mixed> $row */
+    private static function isTrailer(array $row): bool
+    {
+        $config = is_array($row['type_config'] ?? null) ? $row['type_config'] : [];
+        return (string) ($row['node_type'] ?? '') === 'item' && (string) ($row['item_type'] ?? '') === 'slide_deck' && ($config['kind'] ?? '') === 'trailer';
+    }
+
+    /**
+     * A stop's address in the reader: an assessment's own page, anything else its content page.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function stopPath(string $slug, array $row): string
+    {
+        $assessment = in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true);
+        return '/learn/' . rawurlencode($slug) . '/item/' . (int) $row['id'] . ($assessment ? '/assessment/' . rawurlencode((string) $row['item_key']) : '/content');
+    }
+
     private function durationLabel(int $seconds): string
     {
         return AccessPeriod::label($seconds);

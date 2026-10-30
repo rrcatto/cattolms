@@ -59,6 +59,31 @@ final class PictureChoiceContractTest extends TestCase
     }
 
     /**
+     * Drawn slides (owner, 2026-10-30: "I have to be able to see what each layout design looks like"): an option may be
+     * a slide as the presentation player draws it, sent with a form elsewhere on the page when form is given.
+     */
+    public function testAnOptionMayBeADrawnSlideSentWithAnotherForm(): void
+    {
+        $drawing = (new \CattoLearning\Course\Catwalk\DeckRenderer())->thumbnail(['layout' => 'statement', 'title' => 'Idea', 'text' => 'Feed the soil.'], 'light', 'medium');
+        $html = ComponentHarness::render('form.picture-choice', ['name' => 'slide_layout', 'legend' => 'One idea', 'selected' => 'statement', 'form' => 'slide-form', 'items' => [
+            ['value' => 'statement', 'label' => 'Statement', 'drawing' => $drawing, 'note' => 'One big idea or a quotation'],
+        ]]);
+        $xpath = self::xpath($html);
+        self::assertSame(1, $xpath->query('//label[contains(@class,"cl-ui-picture-choice-item--drawing")]/input[@type="radio" and @name="slide_layout" and @form="slide-form" and @checked]')->length);
+        self::assertSame(1, $xpath->query('//span[@class="cl-ui-picture-choice-drawing"]//div[contains(@class,"cw-deck") and @inert and @data-cw-manual]//p[@class="cw-big"]')->length, 'The slide is drawn, never played.');
+
+        $ui = new PlatformUi();
+        foreach (['<div class="cl-slide-thumb cl-slide-thumb--small"><script>x()</script></div>', '<p>not a slide</p>', str_replace('<p class="cw-big">', '<p class="cw-big" onclick="x()">', $drawing)] as $bad) {
+            try {
+                $ui->properties('form.picture-choice', ['name' => 'layout', 'legend' => 'Layout', 'items' => [['value' => 'a', 'label' => 'A', 'drawing' => $bad]]]);
+                self::fail('Accepted ' . $bad);
+            } catch (\InvalidArgumentException $refused) {
+                self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage());
+            }
+        }
+    }
+
+    /**
      * Feature cards (owner, 2026-10-20: the Register page's account type as "a Feature Card Radio Selector (Grid
      * Layout). Each card should have an SVG icon, a Bold Title, and a description"): an option may carry an SVG
      * icon instead of a picture, drawn inline, never anything that runs or links out.

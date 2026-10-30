@@ -43,7 +43,8 @@ final class LandingPagesTest extends TestCase
             self::assertSame($type->defaults(), $type->normalise($type->defaults()), $type->value . ' defaults are stored as they are.');
             $labels[] = $type->label();
         }
-        self::assertSame(['Hero', 'Who this course is for', 'Learning outcomes', 'Course contents', 'Benefits', 'Reviews', 'Pricing', 'FAQ', 'Call to action'], $labels);
+        // A Presentation section plays one of the course's presentations, such as its trailer (CatWalk, owner 2026-10-28).
+        self::assertSame(['Hero', 'Who this course is for', 'Learning outcomes', 'Course contents', 'Benefits', 'Reviews', 'Pricing', 'FAQ', 'Call to action', 'Presentation'], $labels);
     }
 
     public function testOnlyBenefitsQuestionsAndCallsToActionMayRepeat(): void
@@ -51,7 +52,7 @@ final class LandingPagesTest extends TestCase
         $repeatable = array_values(array_filter(LandingSectionType::cases(), static fn(LandingSectionType $type): bool => !$type->once()));
         self::assertSame([LandingSectionType::Benefits, LandingSectionType::Faq, LandingSectionType::Cta], $repeatable);
         $baseline = (string) file_get_contents(self::ROOT . '/database/migrations/20261006120000_create_v088_baseline.php');
-        self::assertStringContainsString("WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing')", $baseline, 'The database holds the same rule.');
+        self::assertStringContainsString("WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing','presentation')", $baseline, 'The database holds the same rule.');
     }
 
     public function testANewPageStartsWithTheRecommendedSectionsAndNoCopyWrittenForTheAuthor(): void
@@ -147,8 +148,10 @@ final class LandingPagesTest extends TestCase
         foreach (['pages/landing-page.html.twig', 'partials/landing/hero.html.twig', 'partials/landing/section.html.twig', 'partials/landing/paragraphs.html.twig'] as $file) {
             $landing .= (string) file_get_contents($views . '/' . $file);
         }
-        self::assertSame(1, substr_count($landing, '|raw'), 'Only the course’s own generated cover artwork is drawn raw.');
+        self::assertSame(2, substr_count($landing, '|raw'), 'Only the course’s own generated cover artwork and a Presentation’s markup are drawn raw.');
         self::assertStringContainsString('landing.course.cover_svg|raw', $landing);
+        // The Presentation's markup is DeckRenderer's, every word in it escaped (CatWalk, owner 2026-10-28).
+        self::assertStringContainsString('section.deck_html|raw', $landing);
         self::assertStringNotContainsString('include \'@platform/partials/landing/section-\' ~', $landing, 'No template path is built from data.');
         self::assertStringContainsString("include '@platform/partials/course-purchase.html.twig'", $landing);
         self::assertStringContainsString("include '@platform/partials/course-purchase.html.twig'", (string) file_get_contents($views . '/pages/course-detail.html.twig'), 'The course page draws the same purchase box.');

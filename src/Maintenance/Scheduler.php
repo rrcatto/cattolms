@@ -46,6 +46,8 @@ final class Scheduler
         private readonly ?\CattoLearning\Auth\Signup\SignupLists $signupLists = null,
         private readonly ?\CattoLearning\Mailing\MailingJob $mailing = null,
         private readonly ?LogArchive $logs = null,
+        private readonly ?\CattoLearning\Course\ReviewRequests $reviewRequests = null,
+        private readonly ?\CattoLearning\Course\CourseVideoCheck $videos = null,
     ) {}
 
     /**
@@ -86,6 +88,8 @@ final class Scheduler
                 ScheduledJob::SignupLists => $this->signupLists(),
                 ScheduledJob::Mailing => $this->mailing?->run() ?? 'Not available here.',
                 ScheduledJob::LogArchive => $this->logArchive(),
+                ScheduledJob::ReviewRequests => $this->reviewRequests === null ? 'Not available here.' : self::reviewsAsked($this->reviewRequests->send()),
+                ScheduledJob::VideoCheck => $this->videos?->run() ?? 'Not available here.',
             };
         } catch (Throwable $failed) {
             $this->runs->failed($job, $this->now(), $failed->getMessage());
@@ -112,6 +116,11 @@ final class Scheduler
         $deleted = $this->cleanup->run();
         return sprintf('Deleted %d activity log entries, %d analytics events, %d contact messages, %d sign-up attempts and %d news email records older than %d years, %d expired sign-in links, %d expired sign-in sessions and %d expired browser sessions.',
             $deleted['activity_log'], $deleted['analytics_events'], $deleted['contact_messages'], $deleted['signup_attempts'], $deleted['mailing_copies'], RetentionCleanup::YEARS, $deleted['login_tokens'], $deleted['auth_sessions'], $deleted['web_sessions']);
+    }
+
+    private static function reviewsAsked(int $sent): string
+    {
+        return $sent === 0 ? 'Nobody was due to be asked for a review.' : 'Asked ' . $sent . ' learner' . ($sent === 1 ? '' : 's') . ' for a review.';
     }
 
     /** The application log, archived and started afresh (owner, 2026-10-27). */

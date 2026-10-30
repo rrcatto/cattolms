@@ -39,9 +39,14 @@ final class TrustedCourseImportTest extends TestCase
             $key = $analysis['import_key'];
             self::assertSame($analysis['structure'][0]['node_key'], $analysis['structure'][1]['parent_node_key']);
             $portability->commitImport($key, 0, $owner, $course);
+            // The import arranges the course into module sections (course structure, owner 2026-10-28): the module's
+            // numbered section holds its lesson and then its assessment.
             $rows = $container->get(\CattoLearning\Course\CourseItemRepository::class)->structure($course);
-            self::assertSame('assessment', $rows[1]['item_type']);
-            self::assertSame((int) $rows[0]['id'], (int) $rows[1]['parent_node_id']);
+            self::assertSame('section', $rows[0]['node_type']);
+            self::assertTrue((bool) $rows[0]['numbered']);
+            self::assertSame('First module', $rows[0]['section_title']);
+            self::assertSame(['html_lesson', 'assessment'], [$rows[1]['item_type'], $rows[2]['item_type']]);
+            self::assertSame([(int) $rows[0]['id'], (int) $rows[0]['id']], [(int) $rows[1]['parent_node_id'], (int) $rows[2]['parent_node_id']]);
         } finally {
             @unlink($temporary);
             if ($key !== null) {

@@ -46,6 +46,11 @@ final class CourseReviewController extends BaseController
         $user = $this->requirePermission('LEARNING.REVIEW.CREATE');
         $course = $this->course();
         $back = '/learn/' . rawurlencode((string) $course['slug']) . '/review';
+        // A review written on the final assessment's result page goes back there (decision 8A); nothing else is followed.
+        $return = (string) ($_POST['return'] ?? '');
+        if (preg_match('#^/learn/' . preg_quote(rawurlencode((string) $course['slug']), '#') . '/assessment/session/[0-9a-fA-F-]{36}/result$#', $return) === 1) {
+            $back = $return;
+        }
         return $this->handle(function () use ($user, $course): void {
             $outcome = $this->reviews->submit($user->id, (int) $course['id'], $_POST['rating'] ?? null, $_POST['comment'] ?? '');
             $this->flash('success', match ($outcome) {

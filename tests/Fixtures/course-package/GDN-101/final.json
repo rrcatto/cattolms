@@ -1,0 +1,65 @@
+{
+  "pass_mark": 50,
+  "questions": [
+    {
+      "q": "A friend's bed stays waterlogged for days after rain and sets like brick in winter. What would you suggest first?",
+      "o": ["Add agricultural lime every season", "Dig in compost and keep the bed mulched", "Spread a layer of river sand on top", "Water it only once a week"],
+      "a": 1, "p": 2, "m": "m1",
+      "e": "Waterlogging and baking hard are signs of clay. Compost opens clay up so water drains and air gets in, and mulch protects the surface. Lime changes pH, not texture, and sand on top does not mix in."
+    },
+    {
+      "q": "Together with water, which part of a good soil makes up about a quarter of its volume?",
+      "o": ["Air", "Organic matter", "Sand", "Silt"],
+      "a": 0, "p": 1, "m": "m1",
+      "e": "A healthy loam is about 25% air and 25% water. Organic matter is about 5%, and sand and silt are part of the 45% of mineral particles."
+    },
+    {
+      "q": "A jar test shows 2 cm of sand, 2 cm of silt and 6 cm of clay. Which problem do you expect in this soil?",
+      "o": ["It dries out within hours of watering", "It is too alkaline for vegetables", "It drains slowly and shuts out air when wet", "It cannot hold any nutrients"],
+      "a": 2, "p": 2, "m": "m1",
+      "e": "Clay is 60% of this soil. Clay holds water and nutrients well but drains slowly, so roots can run short of air after rain. Texture says nothing about pH."
+    },
+    {
+      "q": "Your test kit reads pH 8.1 in a dry inland garden. What is the gentlest first step?",
+      "o": ["Add agricultural lime", "Dig in plenty of compost and test again next season", "Replace the soil with potting soil", "Add as much sulphur as the bed will take"],
+      "a": 1, "p": 3, "m": "m1",
+      "e": "Organic matter brings an alkaline soil towards neutral over seasons without the risk of overshooting. Sulphur works faster but only in the amount on its label. Lime would raise the pH further."
+    },
+    {
+      "q": "A compost bin holds only dry leaves and straw, and nothing has happened in three months. What does it need?",
+      "o": ["More dry leaves", "A lid to keep it dry", "Greens and some water", "Nothing, it only needs time"],
+      "a": 2, "p": 2, "m": "m1",
+      "e": "A heap of browns alone has too little nitrogen and usually too little water for the organisms that break it down. Add greens such as peels or fresh grass, and dampen it."
+    },
+    {
+      "q": "Roughly how hot does the centre of a well-built compost heap get?",
+      "o": ["25 to 30 °C", "35 to 45 °C", "55 to 65 °C", "90 to 100 °C"],
+      "a": 2, "p": 1, "m": "m1",
+      "e": "A heap of about a cubic metre with the right mix heats to 55 to 65 °C within days, hot enough to kill most weed seeds and disease organisms."
+    },
+    {
+      "q": "Which of these containers should you not use for growing food?",
+      "o": ["A food-grade plastic tub", "A terracotta pot", "A fabric grow bag", "An old paint tin"],
+      "a": 3, "p": 1, "m": "m1",
+      "e": "Paint tins, chemical drums and treated timber can leach harmful substances into the soil. Food-grade plastic, terracotta and fabric grow bags are safe."
+    },
+    {
+      "q": "A round tub is 30 cm across and you will fill it 25 cm deep. Roughly how much potting soil does it take?",
+      "o": ["About 7 litres", "About 18 litres", "About 71 litres", "About 180 litres"],
+      "a": 1, "p": 3, "m": "m1",
+      "e": "The radius is 15 cm, so the volume is 3.14 × 15 × 15 × 25 = about 17,700 cm³, or about 18 litres. Using the full 30 cm as the radius gives the wrong answer of 71 litres."
+    },
+    {
+      "q": "A pot of lettuce on a hot balcony wilts every afternoon, though you water it each evening. Which change helps most?",
+      "o": ["Water it deeply each morning and mulch the pot", "Move the watering to midday", "Give it a cup of water every hour", "Add fertiliser to the water"],
+      "a": 0, "p": 2, "m": "m1",
+      "e": "Morning watering gives the plant water when the heat comes, and mulch slows the loss. Frequent small amounts keep roots shallow, and fertiliser does not fix a shortage of water."
+    },
+    {
+      "q": "Why does every container need drainage holes?",
+      "o": ["So that extra water escapes and the roots get air", "So that roots can grow out into the floor", "So that the soil warms up faster", "So that you need to water less often"],
+      "a": 0, "p": 1, "m": "m1",
+      "e": "Without holes water collects at the bottom of the container, the roots sit in it, and they rot for lack of air."
+    }
+  ]
+}

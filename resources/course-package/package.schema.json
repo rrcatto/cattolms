@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cattolms-course-package-3.0",
+  "title": "CattoLMS course package 3.0",
+  "description": "The root validates course.json. The other files of a package are validated against the definitions: module.json against #/$defs/moduleFile, final.json against #/$defs/finalFile, diagnostic.json against #/$defs/diagnosticFile and trailer.json against #/$defs/deck.",
+  "$ref": "#/$defs/courseFile",
+  "$defs": {
+    "plainText": {"type": "string", "minLength": 1, "pattern": "^[^<>]*$"},
+    "date": {"type": "string", "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"},
+    "moduleKey": {"type": "string", "pattern": "^m[1-9][0-9]?$"},
+    "minutes": {"type": "integer", "minimum": 1, "maximum": 600},
+
+    "courseFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "schema_version", "course", "modules"],
+      "properties": {
+        "format": {"const": "cattolms-course"},
+        "schema_version": {"const": "3.0"},
+        "course": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "title", "summary", "level", "content_checked"],
+          "properties": {
+            "code": {"type": "string", "minLength": 2, "maxLength": 20, "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"},
+            "title": {"$ref": "#/$defs/plainText", "maxLength": 240},
+            "subtitle": {"$ref": "#/$defs/plainText", "maxLength": 320},
+            "summary": {"$ref": "#/$defs/plainText", "minLength": 20, "maxLength": 1000},
+            "level": {"enum": ["Beginner", "Intermediate", "Advanced"]},
+            "language": {"type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$"},
+            "content_checked": {"$ref": "#/$defs/date"},
+            "certificate": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "accreditation": {"type": "string", "maxLength": 300, "pattern": "^[^<>]*$"}
+              }
+            }
+          }
+        },
+        "catalogue": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "category": {"$ref": "#/$defs/plainText", "maxLength": 300},
+            "tags": {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true, "items": {"$ref": "#/$defs/plainText", "maxLength": 80}},
+            "related": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"}}
+          }
+        },
+        "modules": {"type": "array", "minItems": 1, "maxItems": 60, "uniqueItems": true, "items": {"$ref": "#/$defs/moduleKey"}},
+        "parts": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "modules"],
+            "properties": {
+              "title": {"$ref": "#/$defs/plainText", "maxLength": 160},
+              "modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/moduleKey"}}
+            }
+          }
+        },
+        "grade_bands": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "label", "from", "passing"],
+            "properties": {
+              "code": {"type": "string", "minLength": 1, "maxLength": 8},
+              "label": {"$ref": "#/$defs/plainText", "maxLength": 80},
+              "from": {"type": "number", "minimum": 0, "maximum": 100},
+              "passing": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+
+    "moduleFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "title", "introduction", "outcomes", "presentation", "lesson"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^(m[1-9][0-9]?|review)$"},
+        "kind": {"enum": ["module", "review"]},
+        "title": {"$ref": "#/$defs/plainText", "maxLength": 160},
+        "subtitle": {"$ref": "#/$defs/plainText", "maxLength": 240},
+        "introduction": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/plainText", "maxLength": 1200}},
+        "outcomes": {"type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true, "items": {"$ref": "#/$defs/plainText", "maxLength": 300}},
+        "presentation": {"$ref": "#/$defs/deck"},
+        "video": {"$ref": "#/$defs/video"},
+        "lesson": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "minutes"],
+          "properties": {"title": {"$ref": "#/$defs/plainText", "maxLength": 160}, "minutes": {"$ref": "#/$defs/minutes"}}
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minutes"],
+          "properties": {"minutes": {"$ref": "#/$defs/minutes"}}
+        },
+        "flashcards": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cards"],
+          "properties": {
+            "cards": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 60,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["front", "back"],
+                "properties": {
+                  "front": {"$ref": "#/$defs/plainText", "maxLength": 200},
+                  "back": {"$ref": "#/$defs/plainText", "maxLength": 400},
+                  "hint": {"$ref": "#/$defs/plainText", "maxLength": 150}
+                }
+              }
+            }
+          }
+        },
+        "practical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "minutes"],
+          "properties": {"title": {"$ref": "#/$defs/plainText", "maxLength": 160}, "minutes": {"$ref": "#/$defs/minutes"}}
+        },
+        "assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["questions"],
+          "properties": {
+            "pass_mark": {"type": "number", "minimum": 0, "maximum": 100},
+            "questions": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"$ref": "#/$defs/question"}}
+          }
+        }
+      }
+    },
+
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["q", "o", "a", "e"],
+      "properties": {
+        "q": {"$ref": "#/$defs/plainText", "maxLength": 1200},
+        "o": {"type": "array", "minItems": 2, "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/plainText", "maxLength": 400}},
+        "a": {"type": "integer", "minimum": 0, "maximum": 5},
+        "p": {"type": "integer", "minimum": 1, "maximum": 5},
+        "e": {"$ref": "#/$defs/plainText", "maxLength": 1500},
+        "m": {"type": "string", "pattern": "^(m[1-9][0-9]?|review)$"},
+        "u": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^(m[1-9][0-9]?|review)$"}}
+      }
+    },
+
+    "finalFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questions"],
+      "properties": {
+        "pass_mark": {"type": "number", "minimum": 0, "maximum": 100},
+        "ask": {"type": "integer", "minimum": 1},
+        "questions": {"type": "array", "minItems": 1, "maxItems": 300, "items": {"$ref": "#/$defs/question"}}
+      }
+    },
+
+    "diagnosticFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["questions"],
+      "properties": {
+        "pass_mark": {"type": "number", "minimum": 0, "maximum": 100},
+        "questions": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/$defs/question"}}
+      }
+    },
+
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["youtube_id", "title", "channel", "minutes", "watch_for", "checked"],
+      "properties": {
+        "youtube_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{11}$"},
+        "title": {"$ref": "#/$defs/plainText", "maxLength": 200},
+        "channel": {"$ref": "#/$defs/plainText", "maxLength": 120},
+        "minutes": {"$ref": "#/$defs/minutes"},
+        "start_seconds": {"type": "integer", "minimum": 0},
+        "watch_for": {"$ref": "#/$defs/plainText", "maxLength": 500},
+        "checked": {"$ref": "#/$defs/date"}
+      }
+    },
+
+    "deck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "kind", "minutes", "slides"],
+      "properties": {
+        "title": {"$ref": "#/$defs/plainText", "maxLength": 120},
+        "kind": {"enum": ["intro", "review", "overview", "trailer"]},
+        "minutes": {"$ref": "#/$defs/minutes"},
+        "theme": {"enum": ["light", "dark"]},
+        "slides": {"type": "array", "minItems": 1, "maxItems": 25, "items": {"$ref": "#/$defs/slide"}}
+      }
+    },
+
+    "slide": {
+      "oneOf": [
+        {"$ref": "#/$defs/slideTitle"},
+        {"$ref": "#/$defs/slideStatement"},
+        {"$ref": "#/$defs/slidePoints"},
+        {"$ref": "#/$defs/slideCompare"},
+        {"$ref": "#/$defs/slidePicture"},
+        {"$ref": "#/$defs/slideNumber"},
+        {"$ref": "#/$defs/slideTimeline"},
+        {"$ref": "#/$defs/slideSteps"},
+        {"$ref": "#/$defs/slideCase"},
+        {"$ref": "#/$defs/slideCheck"},
+        {"$ref": "#/$defs/slideNext"},
+        {"$ref": "#/$defs/slideCta"}
+      ]
+    },
+    "slideTitleText": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^<>]*$"},
+    "slideTone": {"enum": ["base", "alt", "accent"]},
+    "slideNarration": {"$ref": "#/$defs/plainText", "maxLength": 2000},
+    "short": {"$ref": "#/$defs/plainText", "maxLength": 200},
+    "line": {"$ref": "#/$defs/plainText", "maxLength": 400},
+
+    "slideTitle": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading"],
+      "properties": {"layout": {"const": "title"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "kicker": {"$ref": "#/$defs/short"}, "heading": {"$ref": "#/$defs/short"}, "sub": {"$ref": "#/$defs/line"}}
+    },
+    "slideStatement": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "text"],
+      "properties": {"layout": {"const": "statement"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "text": {"$ref": "#/$defs/line"}, "source": {"$ref": "#/$defs/short"}}
+    },
+    "slidePoints": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "points"],
+      "properties": {"layout": {"const": "points"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "points": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"$ref": "#/$defs/short"}}, "ordered": {"type": "boolean"}, "build": {"type": "boolean"}}
+    },
+    "slideCompare": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "columns"],
+      "properties": {"layout": {"const": "compare"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"},
+        "columns": {"type": "array", "minItems": 2, "maxItems": 2, "items": {
+          "type": "object", "additionalProperties": false, "required": ["heading"],
+          "properties": {"heading": {"$ref": "#/$defs/short"}, "points": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"$ref": "#/$defs/short"}}, "text": {"$ref": "#/$defs/line"}}}}}
+    },
+    "slidePicture": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "picture", "alt"],
+      "properties": {"layout": {"const": "picture"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "picture": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*\\.(svg|png|jpg|jpeg)$"}, "alt": {"$ref": "#/$defs/line"}, "caption": {"$ref": "#/$defs/line"}}
+    },
+    "slideNumber": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "figure", "label"],
+      "properties": {"layout": {"const": "number"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "figure": {"type": "string", "minLength": 1, "maxLength": 12, "pattern": "^[^<>]*$"}, "label": {"$ref": "#/$defs/line"}, "source": {"$ref": "#/$defs/short"}}
+    },
+    "slideTimeline": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "events"],
+      "properties": {"layout": {"const": "timeline"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"},
+        "events": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"type": "object", "additionalProperties": false, "required": ["when", "what"], "properties": {"when": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^<>]*$"}, "what": {"$ref": "#/$defs/short"}}}}}
+    },
+    "slideSteps": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "steps"],
+      "properties": {"layout": {"const": "steps"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "steps": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"$ref": "#/$defs/short"}}}
+    },
+    "slideCase": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "facts", "question", "outcome"],
+      "properties": {"layout": {"const": "case"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "facts": {"$ref": "#/$defs/plainText", "maxLength": 600}, "question": {"$ref": "#/$defs/line"}, "outcome": {"$ref": "#/$defs/plainText", "maxLength": 600}}
+    },
+    "slideCheck": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "question", "options", "answer", "explanation"],
+      "properties": {"layout": {"const": "check"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "question": {"$ref": "#/$defs/line"}, "options": {"type": "array", "minItems": 2, "maxItems": 4, "uniqueItems": true, "items": {"$ref": "#/$defs/short"}}, "answer": {"type": "integer", "minimum": 0, "maximum": 3}, "explanation": {"$ref": "#/$defs/plainText", "maxLength": 600}}
+    },
+    "slideNext": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "text"],
+      "properties": {"layout": {"const": "next"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "text": {"$ref": "#/$defs/line"}, "action_label": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^<>]*$"}}
+    },
+    "slideCta": {
+      "type": "object", "additionalProperties": false, "required": ["layout", "title", "heading", "text", "actions"],
+      "properties": {"layout": {"const": "cta"}, "title": {"$ref": "#/$defs/slideTitleText"}, "chapter": {"$ref": "#/$defs/short"}, "tone": {"$ref": "#/$defs/slideTone"}, "narration": {"$ref": "#/$defs/slideNarration"},
+        "heading": {"$ref": "#/$defs/short"}, "text": {"$ref": "#/$defs/line"}, "actions": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["enrol", "preview"]}}}
+    }
+  }
+}

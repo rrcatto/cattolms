@@ -218,6 +218,7 @@ final class StructuredCourseImporter
                 'level' => trim((string) ($courseInput['level'] ?? '')),
                 'estimated_minutes' => max(0, (int) ($courseInput['estimated_minutes'] ?? 0)),
                 'default_access_period_seconds' => max(1, (int) ($courseInput['default_access_period_seconds'] ?? 31536000)),
+                'first_module_number' => (int) ($courseInput['first_module_number'] ?? 1) === 0 ? 0 : 1,
                 'module_weight' => (float) ($courseInput['module_weight'] ?? 0.5),
                 'final_weight' => (float) ($courseInput['final_weight'] ?? 0.5),
                 'certificate_enabled' => (bool) ($courseInput['certificate_enabled'] ?? true),

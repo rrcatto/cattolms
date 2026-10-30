@@ -98,6 +98,10 @@
 					<p class="cl-landing-note">The prices and access periods are the course’s own, read when the page is shown, with the buy buttons a visitor can use.</p>
 				{% elseif section.type == 'cta' %}
 					<p class="cl-landing-note">Under the text the page shows the course’s buy button, or Continue course for a learner who already has it.</p>
+				{% elseif section.type == 'presentation' %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Which presentation', for: 'landing-presentation', help: presentations ? 'The course’s trailer is listed first. Its buttons lead to the course’s page and its free preview.' : 'The course has no presentation yet: add one in Course Content, such as a trailer, then choose it here.'})} %}
+{% block control %}<select class="cl-select" id="landing-presentation" name="presentation" {{ ui_field_attrs(props) }}><option value="">Choose a presentation</option>{% for deck in presentations %}<option value="{{ deck.item_key }}"{% if values.presentation == deck.item_key %} selected{% endif %}>{{ deck.name }}: {{ deck.title }}{{ deck.kind == 'trailer' ? ' (the trailer)' : '' }}</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
 				{% endif %}
 			{% endif %}
 {% endblock %}

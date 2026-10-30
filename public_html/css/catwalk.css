@@ -1,0 +1,212 @@
+/* CatWalk 1.0.0, the presentation engine (owner, 2026-10-28, decision 7A; DEVDOCS "Catwalk Presentation Engine -
+   Specification"). Plays a div.cw-deck of section.cw-slide elements, phone first: the deck reflows to its box and its
+   text scales with it (container query units). Without JavaScript, and in print, every slide shows in order with all
+   its steps, a readable page. A deck's look comes only from the --cw- tokens below, which a course may set: colours are
+   hex codes. Nothing here depends on CattoLMS, so the same file serves a deck outside it. */
+
+.cw-deck {
+  --cw-bg: #FBF8F2;
+  --cw-bg-alt: #F2ECE0;
+  --cw-ink: #1B1B1F;
+  --cw-muted: #5C5A55;
+  --cw-accent: #8A6A1F;
+  --cw-accent-2: #9A2F42;
+  --cw-good: #2E7A4A;
+  --cw-bar: #EFE8DA;
+  --cw-font-display: "Libre Caslon Text", Georgia, "Times New Roman", serif;
+  --cw-font-body: "Libre Franklin", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cw-radius: 12px;
+  position: relative;
+  container-type: inline-size;
+  container-name: cw;
+  margin: 1.25rem 0;
+  border-radius: var(--cw-radius);
+  background: var(--cw-bg);
+  color: var(--cw-ink);
+  font-family: var(--cw-font-body);
+  line-height: 1.4;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 8%);
+}
+.cw-deck[data-cw-theme="dark"] {
+  --cw-bg: #0B0F17;
+  --cw-bg-alt: #121826;
+  --cw-ink: #EFE7D6;
+  --cw-muted: #A9A39A;
+  --cw-accent: #C9A04A;
+  --cw-accent-2: #E0788A;
+  --cw-good: #6CC08A;
+  --cw-bar: #151B28;
+}
+.cw-deck:focus-visible { outline: 3px solid var(--cw-accent); outline-offset: 3px; }
+
+/* ---------- A slide, as a page (no JavaScript, print) and on the runway ---------- */
+.cw-slide {
+  box-sizing: border-box;
+  padding: clamp(1.25rem, 5cqi, 3.5rem);
+  display: flex;
+  flex-direction: column;
+  /* Centred, but a slide fuller than its box starts at its top, so nothing above can be cut off. */
+  justify-content: safe center;
+  gap: clamp(0.5rem, 1.6cqi, 1.1rem);
+  background: var(--cw-bg);
+  min-width: 0;
+}
+.cw-slide[data-cw-tone="alt"] { background: var(--cw-bg-alt); }
+.cw-slide[data-cw-tone="accent"] { background: var(--cw-accent); color: var(--cw-bg); }
+.cw-slide[data-cw-tone="accent"] .cw-kicker,
+.cw-slide[data-cw-tone="accent"] .cw-source,
+.cw-slide[data-cw-tone="accent"] .cw-label { color: var(--cw-bg); }
+.cw-deck:not(.cw-ready) .cw-slide + .cw-slide { border-top: 1px solid rgb(127 127 127 / 25%); }
+.cw-slide > * { margin: 0; max-width: 62ch; }
+.cw-slide h2 {
+  font-family: var(--cw-font-display);
+  font-size: clamp(1.35rem, 4.4cqi, 2.6rem);
+  line-height: 1.15;
+  font-weight: 600;
+  text-wrap: balance;
+  color: inherit;
+}
+.cw-slide h3 { font-size: clamp(1rem, 2.4cqi, 1.3rem); margin: 0 0 0.4rem; }
+.cw-slide p,
+.cw-slide li { font-size: clamp(1rem, 2.4cqi, 1.35rem); }
+.cw-kicker { text-transform: uppercase; letter-spacing: 0.1em; font-size: clamp(0.75rem, 1.6cqi, 0.95rem) !important; color: var(--cw-accent); font-weight: 600; }
+.cw-sub { color: var(--cw-muted); font-size: clamp(1.05rem, 2.8cqi, 1.55rem) !important; }
+.cw-big { font-family: var(--cw-font-display); font-size: clamp(1.6rem, 6.4cqi, 4rem) !important; line-height: 1.1; text-wrap: balance; }
+.cw-slide[data-cw-layout="statement"] .cw-big { font-size: clamp(1.35rem, 4.6cqi, 2.8rem) !important; }
+.cw-label { color: var(--cw-muted); }
+.cw-source { color: var(--cw-muted); font-size: clamp(0.8rem, 1.8cqi, 1rem) !important; }
+.cw-slide ul,
+.cw-slide ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 0.45em; }
+.cw-slide ul li::marker { color: var(--cw-accent); }
+.cw-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: clamp(0.75rem, 3cqi, 2rem); max-width: none !important; }
+.cw-col { border-top: 3px solid var(--cw-accent); padding-top: 0.6rem; min-width: 0; }
+.cw-figure { margin: 0; display: flex; flex-direction: column; gap: 0.5rem; max-width: none !important; }
+.cw-figure img,
+.cw-figure .cw-svg svg { max-width: 100%; max-height: 55cqi; height: auto; display: block; margin: 0 auto; }
+.cw-figure figcaption { color: var(--cw-muted); font-size: clamp(0.85rem, 1.9cqi, 1.05rem); text-align: center; }
+.cw-timeline { list-style: none; padding-left: 0 !important; border-left: 3px solid var(--cw-accent); }
+.cw-timeline li { padding-left: 1rem; position: relative; }
+.cw-when { display: block; color: var(--cw-accent); font-weight: 700; }
+.cw-steps { counter-reset: cwstep; list-style: none; padding-left: 0 !important; }
+.cw-steps li { counter-increment: cwstep; display: grid; grid-template-columns: 2em 1fr; gap: 0.6em; align-items: start; }
+.cw-steps li::before { content: counter(cwstep); width: 1.7em; height: 1.7em; border-radius: 50%; display: grid; place-items: center; background: var(--cw-accent); color: var(--cw-bg); font-weight: 700; font-size: 0.85em; }
+.cw-facts { border-left: 3px solid var(--cw-muted); padding-left: 0.9rem; }
+.cw-question { font-weight: 600; }
+.cw-outcome { background: var(--cw-bg-alt); border-radius: calc(var(--cw-radius) / 2); padding: 0.75rem 1rem; }
+.cw-slide[data-cw-tone="alt"] .cw-outcome { background: var(--cw-bg); }
+.cw-options { padding-left: 1.4em; }
+.cw-explain summary { cursor: pointer; color: var(--cw-accent); font-weight: 600; font-size: clamp(0.95rem, 2cqi, 1.1rem); }
+.cw-explain p { margin-top: 0.5rem; }
+.cw-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.cw-action {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0.55rem 1.3rem;
+  border-radius: 999px; background: var(--cw-accent); color: var(--cw-bg) !important; font-weight: 700; text-decoration: none !important;
+  align-self: flex-start; font-size: clamp(0.95rem, 2cqi, 1.1rem);
+}
+.cw-action:hover { filter: brightness(1.08); }
+.cw-action:focus-visible { outline: 3px solid var(--cw-ink); outline-offset: 3px; }
+.cw-notes { display: none; }
+.cw-deck:not(.cw-ready) .cw-notes { display: block; color: var(--cw-muted); font-size: 0.9rem; border-top: 1px dashed rgb(127 127 127 / 40%); padding-top: 0.5rem; }
+
+/* ---------- The player (JavaScript) ---------- */
+.cw-ready { display: flex; flex-direction: column; }
+.cw-ready .cw-viewport { position: relative; display: grid; aspect-ratio: 16 / 9; min-height: 0; }
+.cw-ready .cw-slide {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 350ms ease, transform 350ms ease, visibility 0s linear 350ms;
+  overflow-y: auto;
+  cursor: pointer;
+}
+.cw-ready .cw-slide.cw-current { visibility: visible; opacity: 1; transform: none; transition: opacity 350ms ease, transform 350ms ease, visibility 0s; }
+.cw-ready .cw-step { transition: opacity 250ms ease; }
+/* In the player a picture takes the room its slide has left under the heading and above the caption. */
+.cw-ready .cw-slide[data-cw-layout="picture"] .cw-figure { flex: 1 1 auto; min-height: 0; }
+.cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg { flex: 1 1 auto; min-height: 0; display: flex; }
+.cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg svg { width: 100%; height: 100%; max-height: none; }
+.cw-ready .cw-slide[data-cw-layout="picture"] .cw-figure img { flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; max-height: none; object-fit: contain; }
+.cw-ready .cw-step.cw-step-hidden { opacity: 0; visibility: hidden; }
+.cw-ready .cw-slide a,
+.cw-ready .cw-slide button,
+.cw-ready .cw-slide summary { cursor: pointer; }
+@container cw (max-width: 34rem) {
+  .cw-ready .cw-viewport { aspect-ratio: auto; min-height: 60svh; max-height: 85svh; }
+  /* On a phone the slide grows to fit, so a picture is sized by its width, not stretched to the box. */
+  .cw-ready .cw-slide[data-cw-layout="picture"] .cw-figure,
+  .cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg { flex: 0 1 auto; }
+  .cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg svg,
+  .cw-ready .cw-slide[data-cw-layout="picture"] .cw-figure img { height: auto; }
+}
+.cw-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem clamp(0.5rem, 2cqi, 1rem); background: var(--cw-bar); color: var(--cw-ink); font-size: 0.9rem; }
+.cw-bar-top { justify-content: space-between; min-height: 2.4rem; }
+.cw-bar-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cw-bar-chapter { color: var(--cw-muted); white-space: nowrap; }
+.cw-bar-bottom { flex-wrap: wrap; }
+.cw-progress { display: flex; gap: 3px; flex: 1 1 100%; order: -1; padding-top: 0.15rem; }
+.cw-progress span { flex: 1; height: 4px; border-radius: 2px; background: rgb(127 127 127 / 30%); }
+.cw-progress span.cw-chapter-start { margin-left: 5px; }
+.cw-progress span.cw-done { background: var(--cw-accent); }
+.cw-progress span.cw-here { background: var(--cw-accent-2); }
+.cw-btn {
+  min-width: 44px; min-height: 44px; padding: 0 0.85rem; border: 1px solid rgb(127 127 127 / 35%); border-radius: 999px;
+  background: var(--cw-bg); color: var(--cw-ink); font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+}
+.cw-btn:hover { border-color: var(--cw-accent); }
+.cw-btn:focus-visible { outline: 3px solid var(--cw-accent); outline-offset: 2px; }
+.cw-btn[disabled] { opacity: 0.45; cursor: default; }
+.cw-btn[aria-pressed="true"] { background: var(--cw-accent); color: var(--cw-bg); border-color: var(--cw-accent); }
+.cw-btn-primary { background: var(--cw-accent); color: var(--cw-bg); border-color: var(--cw-accent); }
+.cw-counter { font-variant-numeric: tabular-nums; color: var(--cw-muted); padding: 0 0.35rem; }
+.cw-spacer { flex: 1; }
+.cw-live { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cw-contents {
+  position: absolute; inset: 2.4rem 0 auto auto; width: min(22rem, 100%); max-height: calc(100% - 6rem); overflow-y: auto; z-index: 3;
+  background: var(--cw-bg); color: var(--cw-ink); border: 1px solid rgb(127 127 127 / 35%); border-radius: var(--cw-radius); padding: 0.75rem; box-shadow: 0 8px 30px rgb(0 0 0 / 25%);
+}
+.cw-contents h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.cw-contents ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.cw-contents button { width: 100%; text-align: left; min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; padding: 0.35rem 0.6rem; cursor: pointer; }
+.cw-contents button:hover,
+.cw-contents button[aria-current="true"] { background: var(--cw-bg-alt); }
+.cw-contents button:focus-visible { outline: 3px solid var(--cw-accent); outline-offset: -3px; }
+.cw-contents .cw-contents-chapter { color: var(--cw-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.4rem; padding: 0 0.6rem; }
+.cw-transcript { padding: 0.6rem clamp(0.75rem, 2cqi, 1.2rem); background: var(--cw-bg-alt); color: var(--cw-ink); font-size: 0.95rem; border-top: 1px solid rgb(127 127 127 / 25%); }
+.cw-transcript:empty { display: none; }
+
+/* A quick question: the options become buttons, and the explanation opens once one is chosen. */
+.cw-options.cw-choices { list-style: none; padding-left: 0 !important; }
+.cw-choice {
+  width: 100%; text-align: left; min-height: 44px; padding: 0.6rem 0.9rem; border-radius: calc(var(--cw-radius) / 1.5);
+  border: 2px solid rgb(127 127 127 / 35%); background: var(--cw-bg); color: var(--cw-ink); font: inherit; font-size: clamp(1rem, 2.3cqi, 1.25rem); cursor: pointer;
+}
+.cw-choice:hover:not([disabled]) { border-color: var(--cw-accent); }
+.cw-choice:focus-visible { outline: 3px solid var(--cw-accent); outline-offset: 2px; }
+.cw-choice[disabled] { cursor: default; }
+.cw-choice.cw-right { border-color: var(--cw-good); background: color-mix(in srgb, var(--cw-good) 14%, var(--cw-bg)); }
+.cw-choice.cw-wrong { border-color: var(--cw-accent-2); background: color-mix(in srgb, var(--cw-accent-2) 12%, var(--cw-bg)); }
+.cw-choice .cw-mark { font-weight: 700; margin-left: 0.4rem; }
+.cw-explain.cw-explain-locked summary { display: none; }
+.cw-explain.cw-explain-locked:not([open]) { display: none; }
+
+/* Full screen, and the whole window where the browser has no full screen (iPhone). */
+.cw-deck:fullscreen { margin: 0; border-radius: 0; display: flex; flex-direction: column; justify-content: center; }
+.cw-deck:fullscreen .cw-viewport { flex: 1; aspect-ratio: auto; }
+.cw-deck.cw-expanded { position: fixed; inset: 0; z-index: 1000; margin: 0; border-radius: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+.cw-deck.cw-expanded .cw-viewport { flex: 1; aspect-ratio: auto; max-height: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-ready .cw-slide,
+  .cw-ready .cw-slide.cw-current,
+  .cw-ready .cw-step { transition: none; transform: none; }
+}
+
+@media print {
+  .cw-deck { box-shadow: none; border: 1px solid #999999; break-inside: auto; }
+  .cw-ready .cw-viewport { display: block; aspect-ratio: auto; }
+  .cw-ready .cw-slide { visibility: visible; opacity: 1; transform: none; break-inside: avoid; border-top: 1px solid #CCCCCC; }
+  .cw-ready .cw-step.cw-step-hidden { visibility: visible; opacity: 1; }
+  .cw-bar, .cw-contents, .cw-transcript { display: none !important; }
+}

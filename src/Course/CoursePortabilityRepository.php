@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for course portability records.
 
 Changelog:
+2026/10/29 SAST
+- A preview enrolment runs for the period a buyer gets (the course's default price option, else its default
+  period) instead of a fixed ten years, which the start page names; one not started follows the prices.
 2026/10/07 SAST
 - coursesPlacingItemKey() names the courses that place a Course Item, so an import that collides
   with a course already on the site can be offered as its replacement.
@@ -187,6 +190,7 @@ final class CoursePortabilityRepository
         // Insert-if-absent in one statement rather than load, branch, save. The mapper form read
         // the row and wrote it back as two steps, so two administrators previewing the same course
         // at once could both find it absent and both insert.
+        $period = $this->previewAccessPeriod($courseId);
         $this->db->executeStatement(
             'INSERT INTO course_enrolments
                 (public_id, user_id, course_id, source_type, source_reference, status,
@@ -207,12 +211,18 @@ final class CoursePortabilityRepository
                 'source_type' => 'preview',
                 'source_reference' => 'administrator-preview',
                 'status' => 'assigned',
-                'access_period_seconds' => 315360000,
+                'access_period_seconds' => $period,
                 'assigned_at' => gmdate('Y-m-d H:i:sP'),
                 'assigned_by_user_id' => $userId,
                 'created_at' => gmdate('Y-m-d H:i:sP'),
                 'updated_at' => gmdate('Y-m-d H:i:sP'),
             ]
+        );
+        // A preview not started yet follows the course's prices, so its start page names the period a buyer gets now.
+        $this->db->executeStatement(
+            'UPDATE course_enrolments SET access_period_seconds = :period, updated_at = NOW()
+              WHERE user_id = :user_id AND course_id = :course_id AND is_preview = TRUE AND started_at IS NULL AND access_period_seconds <> :period',
+            ['period' => $period, 'user_id' => $userId, 'course_id' => $courseId]
         );
 
         $row = $this->db->fetchAssociative(
@@ -222,6 +232,23 @@ final class CoursePortabilityRepository
         );
 
         return $row === false ? [] : $row;
+    }
+
+    /**
+     * The access period a preview runs for: the one a buyer gets, from the course's default price option as the course
+     * page chooses it (the active option marked default, else the first active one), else the course's own default
+     * period. It was a fixed ten years until 2026-10-29, which the start page has named since v0.9.4.
+     */
+    private function previewAccessPeriod(int $courseId): int
+    {
+        return (int) $this->db->fetchOne(
+            'SELECT COALESCE(
+                    (SELECT v.access_period_seconds FROM course_price_variants v
+                      WHERE v.course_id = c.id AND v.is_active ORDER BY v.is_default DESC, v.position, v.id LIMIT 1),
+                    c.default_access_period_seconds)
+               FROM courses c WHERE c.id = :course_id',
+            ['course_id' => $courseId]
+        );
     }
 
     public function resetPreview(int $userId, int $courseId): void

@@ -68,7 +68,8 @@ final class LearningController extends BaseController
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly AnalyticsEventRecorder $analytics,
-        private readonly \CattoLearning\Mailing\MailingConsents $mailing
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing,
+        private readonly \CattoLearning\Course\Parts\CoursePartPdfs $partPdfs
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -122,11 +123,13 @@ final class LearningController extends BaseController
         $preview = $this->previewMode();
         return $this->handle(function () use ($user, $slug, $preview): void {
             // Starting begins the access period and ends any refund (owner, 2026-10-17): the learner ticks that first.
-            if (!$preview && $this->posted('confirm_start') !== 'yes') throw new \RuntimeException('Tick the box to confirm that starting begins your access period and that a started course can no longer be refunded.');
+            if (!$preview && $this->posted('confirm_start') !== 'yes') throw new \RuntimeException('Tick the box to confirm that starting begins your access period.');
             $this->learning->start($user->id, $slug, $preview);
             if (!$preview && $this->posted('follow_course') === '1' && (int) $this->posted('course_id') > 0) $this->mailing->subscribe($user->id, 'course', (int) $this->posted('course_id'), 'start_course');
             $this->flash('success', 'The course has started. Your access period begins now.');
-            $this->redirect('/learn/' . rawurlencode($slug) . ($preview ? '?preview=1' : ''));
+            // Straight into the course's first part: one click, not Start course and then Begin course (owner, 2026-10-29).
+            $first = $this->learning->courseHome($user->id, $slug, $preview)['first_stop_path'] ?? null;
+            $this->redirect((is_string($first) ? $first : '/learn/' . rawurlencode($slug)) . ($preview ? '?preview=1' : ''));
         }, '/learn/' . rawurlencode($slug));
     }
 
@@ -148,10 +151,12 @@ final class LearningController extends BaseController
                 $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::LearnerReader, $user->id, $this->analyticsVisitor(), 'item', $nodeId, $itemId > 0 ? $itemId : null);
             }
             return $this->render('learn-item', [
-                'title' => (string) ($course['item']['display_title_override'] ?: $course['item']['item_title']),
+                'title' => (string) ($course['item']['node_type'] === 'section' ? ($course['item']['section_number'] !== null ? 'Module ' . $course['item']['section_number'] . ': ' : '') . $course['item']['section_title'] : ($course['item']['display_title_override'] ?: $course['item']['item_title'])),
                 'course' => $course,
                 'item' => $course['item'],
                 'course_content_mode' => true,
+                'load_catwalk' => str_contains((string) $course['item']['rendered_html'], 'class="cw-deck"'),
+                'load_flashcards' => str_contains((string) $course['item']['rendered_html'], 'data-cl-flashcards'),
                 'is_preview' => $preview,
                 'preview_query' => $preview ? '?preview=1' : '',
             ]);
@@ -175,6 +180,35 @@ final class LearningController extends BaseController
             throw new AccessDeniedHttpException($exception->getMessage());
         }
         return FileDownload::attachment($file['path'], $file['filename'], $file['mime_type']);
+    }
+
+    /**
+     * A module's lesson, summary, flash cards or practical work as a PDF to keep (owner, 2026-10-28, decision 6A), for a
+     * learner who may open the part now.
+     */
+    #[Route('/learn/{slug}/item/{node_id}/pdf', name: 'learning_course_part_pdf', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    public function pdf(): Response
+    {
+        $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+        try {
+            $course = $this->learning->item($user->id, (string) $this->param('slug'), (int) $this->param('node_id'), $this->previewMode());
+        } catch (\InvalidArgumentException $exception) {
+            throw $this->notFound($exception->getMessage());
+        }
+        return $this->partPdf($course, (array) $course['item']);
+    }
+
+    /**
+     * @param array<string,mixed> $course
+     * @param array<string,mixed> $node
+     */
+    private function partPdf(array $course, array $node): Response
+    {
+        if (!\CattoLearning\Course\Parts\CoursePartPdfs::printable($node)) { throw $this->notFound('This part has no PDF.'); }
+        $heading = \CattoLearning\Course\Parts\CoursePartPdfs::heading($course, $node);
+        $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, (string) $node['rendered_html'])]]);
+        $file = $this->partPdfs->file($html);
+        return FileDownload::attachment($file, \CattoLearning\Course\Parts\CoursePartPdfs::filename($heading['module'], $heading['part'] === 'Lesson' ? '' : $heading['part']), 'application/pdf');
     }
 
     private function previewMode(): bool

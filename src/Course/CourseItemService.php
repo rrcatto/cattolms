@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Catwalk\SlideDeck;
+use CattoLearning\Course\Catwalk\SlideLayouts;
+use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Duration;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -12,9 +15,11 @@ use InvalidArgumentException;
 /** Owns Course Item lifecycle, placements, structure, availability and publication validation. */
 final class CourseItemService
 {
-    public const TYPES = ['html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file'];
-    public const TYPE_LABELS = ['html_lesson' => 'HTML lesson', 'assessment' => 'Assessment', 'diagnostic' => 'Diagnostic', 'pdf' => 'PDF', 'image_graphic' => 'Image or graphic', 'uploaded_video' => 'Video (uploaded)', 'youtube' => 'Video (YouTube)', 'audio' => 'Audio', 'markdown' => 'Markdown', 'downloadable_file' => 'Downloadable file'];
-    public const TYPE_PLURAL_LABELS = ['html_lesson' => 'HTML lessons', 'assessment' => 'Assessments', 'diagnostic' => 'Diagnostics', 'pdf' => 'PDFs', 'image_graphic' => 'Images and graphics', 'uploaded_video' => 'Uploaded videos', 'youtube' => 'YouTube videos', 'audio' => 'Audio items', 'markdown' => 'Markdown items', 'downloadable_file' => 'Downloadable files'];
+    // A module's parts (owner, 2026-10-28): a Presentation (slide_deck, played by CatWalk), Flash cards and Practical
+    // work joined the lesson, video, summary and assessment.
+    public const TYPES = ['html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file','slide_deck','flashcards','practical'];
+    public const TYPE_LABELS = ['html_lesson' => 'HTML lesson', 'assessment' => 'Assessment', 'diagnostic' => 'Diagnostic', 'pdf' => 'PDF', 'image_graphic' => 'Image or graphic', 'uploaded_video' => 'Video (uploaded)', 'youtube' => 'Video (YouTube)', 'audio' => 'Audio', 'markdown' => 'Markdown', 'downloadable_file' => 'Downloadable file', 'slide_deck' => 'Presentation', 'flashcards' => 'Flash cards', 'practical' => 'Practical work'];
+    public const TYPE_PLURAL_LABELS = ['html_lesson' => 'HTML lessons', 'assessment' => 'Assessments', 'diagnostic' => 'Diagnostics', 'pdf' => 'PDFs', 'image_graphic' => 'Images and graphics', 'uploaded_video' => 'Uploaded videos', 'youtube' => 'YouTube videos', 'audio' => 'Audio items', 'markdown' => 'Markdown items', 'downloadable_file' => 'Downloadable files', 'slide_deck' => 'Presentations', 'flashcards' => 'Flash card sets', 'practical' => 'Practical work items'];
     /** One line per type for the "Create new item" choice. */
     public const TYPE_DESCRIPTIONS = [
         'html_lesson' => 'Authored lesson content; may embed other items with [course-item:key].',
@@ -27,7 +32,12 @@ final class CourseItemService
         'audio' => 'An audio file, or a remote audio address.',
         'markdown' => 'A Markdown file rendered as content.',
         'downloadable_file' => 'Any file learners download: Word, Excel, OpenDocument, ZIP and more.',
+        'slide_deck' => 'Slides that open a module or sell a course, played by CatWalk, with narration.',
+        'flashcards' => 'Questions and answers the learner turns over to test their recall.',
+        'practical' => 'Tasks to do, with a model answer the learner opens to check their work.',
     ];
+    /** What an HTML lesson is in its module: the lesson itself, or the module's summary. */
+    public const LESSON_ROLES = ['' => 'The lesson', 'summary' => 'The module\'s summary'];
     /** Item types that need a Resource Library file. */
     public const RESOURCE_TYPES = ['pdf','image_graphic','uploaded_video','markdown','downloadable_file'];
     /** Resource classifications each resource-backed item type accepts; null accepts any file. */
@@ -128,9 +138,76 @@ final class CourseItemService
         elseif ($action[0] === 'remove-option' && isset($questions[$index]['options'][$optionIndex]) && count($questions[$index]['options']) > 2) { array_splice($questions[$index]['options'], $optionIndex, 1); }
         $draft = array_replace($before, $input);
         foreach (['practice','practice_enabled','randomise_questions','randomise_options','negative_marking'] as $field) { $draft[$field] = !empty($input[$field]); }
-        foreach (['youtube_id','remote_uri','caption','transcript','poster_resource_id','subtitle_resource_id'] as $field) { if (array_key_exists($field, $input)) { $draft['type_config'][$field] = $input[$field]; } }
+        foreach (['youtube_id','remote_uri','caption','transcript','poster_resource_id','subtitle_resource_id','start_seconds'] as $field) { if (array_key_exists($field, $input)) { $draft['type_config'][$field] = $input[$field]; } }
         $draft['questions'] = $questions;
+        if (($draft['item_type'] ?? '') === 'slide_deck' && array_key_exists('slides', $input)) { $draft['type_config'] = self::deckDraft($input); }
+        if (($draft['item_type'] ?? '') === 'flashcards' && (array_key_exists('cards', $input) || array_key_exists('cards_paste', $input))) { $draft['type_config'] = ['cards' => self::cardsDraft($input)]; }
+        if (($draft['item_type'] ?? '') === 'practical' && array_key_exists('answer_html', $input)) { $draft['type_config'] = ['answer_html' => (string) $input['answer_html']]; }
+        if (($draft['item_type'] ?? '') === 'html_lesson' && array_key_exists('lesson_role', $input)) {
+            $config = is_array($draft['type_config'] ?? null) ? $draft['type_config'] : [];
+            if ((string) $input['lesson_role'] === '') { unset($config['presentation_role']); } else { $config['presentation_role'] = (string) $input['lesson_role']; }
+            $draft['type_config'] = $config;
+        }
         return $draft;
+    }
+
+    /**
+     * The Presentation editor's form again, with the slide action applied: add a slide after one, remove, move up or
+     * down, or redraw a slide in the layout just chosen. Nothing is saved.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public static function deckDraft(array $input): array
+    {
+        $deck = SlideDeck::normalise(self::deckInput($input));
+        $slides = $deck['slides'];
+        [$action, $at] = array_pad(explode(':', (string) ($input['slide_action'] ?? '')), 2, '');
+        $index = (int) $at;
+        if ($action === 'add') {
+            // "add:end" appends a slide in the layout chosen below the slides, "add:3" adds one after slide 4.
+            $chosen = is_array($input['new_slide_layout'] ?? null) ? ($input['new_slide_layout'][$at] ?? 'points') : 'points';
+            $layout = is_string($chosen) && isset(SlideLayouts::LAYOUTS[$chosen]) ? $chosen : 'points';
+            array_splice($slides, $at === 'end' || $at === '' ? count($slides) : min(count($slides), $index + 1), 0, [SlideDeck::normaliseSlide(['layout' => $layout])]);
+        } elseif ($action === 'remove' && isset($slides[$index])) {
+            array_splice($slides, $index, 1);
+        } elseif ($action === 'up' && $index > 0 && isset($slides[$index])) {
+            [$slides[$index - 1], $slides[$index]] = [$slides[$index], $slides[$index - 1]];
+        } elseif ($action === 'down' && isset($slides[$index + 1])) {
+            [$slides[$index + 1], $slides[$index]] = [$slides[$index], $slides[$index + 1]];
+        }
+        $deck['slides'] = $slides;
+        return $deck;
+    }
+
+    /**
+     * The cards as the editor posts them, with any pasted below them, one per line: front | back | hint.
+     *
+     * @param array<string,mixed> $input
+     * @return list<array<string,string>>
+     */
+    public static function cardsInput(array $input): array
+    {
+        $cards = array_values(array_map(static fn(array $card): array => ['front' => (string) ($card['front'] ?? ''), 'back' => (string) ($card['back'] ?? ''), 'hint' => (string) ($card['hint'] ?? '')], array_filter((array) ($input['cards'] ?? []), 'is_array')));
+        foreach (preg_split('/\R/', (string) ($input['cards_paste'] ?? '')) ?: [] as $line) {
+            if (trim($line) === '') { continue; }
+            [$front, $back, $hint] = array_pad(array_map('trim', explode('|', $line, 3)), 3, '');
+            $cards[] = ['front' => $front, 'back' => $back, 'hint' => $hint];
+        }
+        return $cards;
+    }
+
+    /**
+     * @param array<string,mixed> $input
+     * @return list<array<string,string>>
+     */
+    public static function cardsDraft(array $input): array
+    {
+        $cards = self::cardsInput($input);
+        [$action, $at] = array_pad(explode(':', (string) ($input['card_action'] ?? '')), 2, '');
+        if ($action === 'add') { $cards[] = ['front' => '', 'back' => '', 'hint' => '']; }
+        elseif ($action === 'remove' && isset($cards[(int) $at])) { array_splice($cards, (int) $at, 1); }
+        return $cards;
     }
 
     /** @param array<string,mixed> $input */
@@ -167,6 +244,7 @@ final class CourseItemService
         if (isset($input['question_html'])) { unset($input['questions']); }
         $input['item_key'] = (string) ($input['item_key'] ?? '');
         $input['title'] = (string) ($input['title'] ?? '');
+        if (trim((string) ($input['name'] ?? '')) === trim((string) $source['name'])) { $input['name'] = ''; }
         if (isset($input['questions']) && is_array($input['questions'])) {
             foreach ($input['questions'] as &$question) {
                 unset($question['id']);
@@ -338,7 +416,9 @@ final class CourseItemService
     {
         return $this->transactions->run(function () use ($courseId, $input, $userId): array {
             $itemId = $this->create($input, $userId);
-            return ['item' => $itemId, 'node' => $this->addExisting($courseId, $itemId, $input, $userId)];
+            $node = $this->addExisting($courseId, $itemId, $input, $userId);
+            if (trim((string) ($input['name'] ?? '')) === '') { $this->nameFromPlacements($courseId, [$itemId]); }
+            return ['item' => $itemId, 'node' => $node];
         });
     }
 
@@ -366,7 +446,7 @@ final class CourseItemService
         $delay = $this->delay($input);
         return $this->transactions->run(function () use ($courseId, $parent, $title, $delay, $input, $userId): int {
             $this->assertNewParent($courseId, $parent);
-            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']));
+            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']), !empty($input['numbered']));
             $this->placeNew($courseId, $id, $parent, $input, $userId);
             $this->audit->record($userId, 'course_section.created', ['course_id' => $courseId, 'node_id' => $id]);
             return $id;
@@ -413,7 +493,9 @@ final class CourseItemService
         if ($title === '') { throw new InvalidArgumentException('A section needs a title.'); }
         $hasDelay = array_intersect(['relative_delay_minutes','delay_weeks','delay_days','delay_hours','delay_minutes'], array_keys($input)) !== [];
         $delay = $hasDelay ? $this->delay($input) : (int) $node['relative_delay_minutes'];
-        $this->transactions->run(fn() => $this->items->updateSection($nodeId, $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview'])));
+        // A form without the module tick (an older caller) keeps the section's numbering as it was.
+        $numbered = array_key_exists('numbered', $input) ? !empty($input['numbered']) : (bool) $this->items->sectionNumbered($nodeId);
+        $this->transactions->run(fn() => $this->items->updateSection($nodeId, $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']), $numbered));
         $this->audit->record($userId, 'course_section.updated', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }
 
@@ -483,7 +565,18 @@ final class CourseItemService
     {
         $rows = $this->items->structure($courseId, $publicOnly);
         $availableByNode = []; $lastByParent = []; $scheduledAncestor = []; $moduleNumber = 0; $assessmentModuleNumber = null;
+        // A course built of module sections (owner, 2026-10-28, decision 4A) numbers its sections, in course order,
+        // and none of its lessons; a course of the older shape numbers its HTML modules as before.
+        $sectionModules = array_filter($rows, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered'])) !== [];
+        // Numbered from 1, or from 0 when the course's first module sets it up (owner, 2026-10-29).
+        $sectionNumber = $this->items->firstModuleNumber($courseId) - 1; $moduleOf = [];
         foreach ($rows as &$row) {
+            $row['section_number'] = (string) $row['node_type'] === 'section' && !empty($row['numbered']) ? ++$sectionNumber : null;
+            // The module a row sits in, for the outline's part labels: its own number for a module section.
+            $row['module_of'] = $moduleOf[$row['parent_node_id'] === null ? 0 : (int) $row['parent_node_id']] ?? null;
+            $moduleOf[(int) $row['id']] = $row['section_number'] ?? $row['module_of'];
+            $row['minutes'] = (string) $row['node_type'] === 'item' ? self::itemMinutes($row) : null;
+            $row['minutes_label'] = $row['minutes'] === null ? '' : self::duration((int) $row['minutes']);
             $parent = $row['parent_node_id'] === null ? 0 : (int) $row['parent_node_id'];
             $ancestorUnlock = $parent === 0 ? null : ($scheduledAncestor[$parent] ?? null);
             $previousUnlock = $lastByParent[$parent] ?? ($parent === 0 ? 0 : ($availableByNode[$parent] ?? 0));
@@ -499,16 +592,88 @@ final class CourseItemService
             $row['remaining_delay_label'] = self::duration($unlockTimestamp === null ? 0 : (int) ceil(max(0, $unlockTimestamp - time()) / 60));
             $row['delay_label'] = self::duration($own);
             $isReviewStudyAid = $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson' && $this->isReviewStudyAid($row);
-            $isHtmlModule = $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson' && !$isReviewStudyAid;
+            $isHtmlModule = !$sectionModules && $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson' && !$isReviewStudyAid && ($row['type_config']['presentation_role'] ?? '') !== 'summary';
             if ($isHtmlModule) { $moduleNumber++; $assessmentModuleNumber = $moduleNumber; }
             if ($isReviewStudyAid) { $assessmentModuleNumber = null; }
             $row['is_review_study_aid'] = $isReviewStudyAid;
             $row['is_final_assessment'] = ($row['assessment_role'] ?? '') === 'final';
             $row['module_number'] = $isHtmlModule ? $moduleNumber : null;
-            $row['assessment_module_number'] = !$row['is_final_assessment'] && !$isHtmlModule && !$isReviewStudyAid && $row['node_type'] === 'item' && in_array($row['item_type'], ['assessment', 'diagnostic'], true) ? $assessmentModuleNumber : null;
+            $row['assessment_module_number'] = !$sectionModules && !$row['is_final_assessment'] && !$isHtmlModule && !$isReviewStudyAid && $row['node_type'] === 'item' && in_array($row['item_type'], ['assessment', 'diagnostic'], true) ? $assessmentModuleNumber : null;
+            $row['part'] = self::part($row);
+        }
+        unset($row);
+        // Each section's time is everything in it: what the outline shows beside a module.
+        $parents = []; $totals = [];
+        foreach ($rows as $row) { $parents[(int) $row['id']] = $row['parent_node_id'] === null ? null : (int) $row['parent_node_id']; }
+        foreach ($rows as $row) {
+            if ($row['minutes'] === null) { continue; }
+            for ($up = $parents[(int) $row['id']]; $up !== null; $up = $parents[$up] ?? null) { $totals[$up] = ($totals[$up] ?? 0) + (int) $row['minutes']; }
+        }
+        foreach ($rows as &$row) {
+            $row['total_minutes'] = (string) $row['node_type'] === 'section' && isset($totals[(int) $row['id']]) ? $totals[(int) $row['id']] : null;
+            $row['total_minutes_label'] = $row['total_minutes'] === null ? '' : self::duration((int) $row['total_minutes']);
         }
         unset($row);
         return $rows;
+    }
+
+    /**
+     * What a row is in its module, for the outline's labels: presentation, video, lesson, summary, flash cards,
+     * practical, assessment, or the item's own type.
+     *
+     * @param array<string,mixed> $row
+     */
+    public static function part(array $row): string
+    {
+        if ((string) $row['node_type'] !== 'item') { return 'section'; }
+        $role = (string) ($row['type_config']['presentation_role'] ?? '');
+        return match ((string) $row['item_type']) {
+            'slide_deck' => 'presentation',
+            'youtube', 'uploaded_video' => 'video',
+            'html_lesson' => $role === 'summary' ? 'summary' : ($role === 'review_study_aid' ? 'review' : 'lesson'),
+            'flashcards' => 'flashcards',
+            'practical' => 'practical',
+            'assessment' => ($row['assessment_role'] ?? '') === 'final' ? 'final' : 'assessment',
+            default => (string) $row['item_type'],
+        };
+    }
+
+    /** The label of a part in the outline, before the item's own title. */
+    public const PART_LABELS = ['presentation' => 'Presentation', 'video' => 'Video', 'lesson' => 'Lesson', 'summary' => 'Summary', 'flashcards' => 'Flash cards', 'practical' => 'Practical work', 'assessment' => 'Assessment', 'final' => 'Final assessment', 'diagnostic' => 'Diagnostic'];
+
+    /**
+     * The minutes a learner takes over an item: its own estimate, else one worked out from its size (a slide about
+     * 25 seconds, a flash card 45, an assessment question 90, a lesson at 120 words a minute). A video without a
+     * stated length has none.
+     *
+     * @param array<string,mixed> $row
+     */
+    public static function itemMinutes(array $row): ?int
+    {
+        $own = (int) ($row['estimated_minutes'] ?? 0);
+        if ($own > 0) { return $own; }
+        $config = is_array($row['type_config'] ?? null) ? $row['type_config'] : [];
+        return match ((string) ($row['item_type'] ?? '')) {
+            'slide_deck' => SlideDeck::estimatedMinutes(['slides' => array_values((array) ($config['slides'] ?? []))]),
+            'flashcards' => FlashCards::estimatedMinutes(array_values((array) ($config['cards'] ?? []))),
+            'assessment' => ($asked = (int) (($row['graded_question_count'] ?? 0) ?: ($row['graded_question_pool'] ?? 0))) > 0 ? (int) ceil($asked * 1.5) : null,
+            'diagnostic' => ($asked = (int) ($row['question_count'] ?? 0)) > 0 ? (int) ceil($asked * 1.5) : null,
+            'html_lesson', 'practical' => self::readingMinutes((string) ($row['content_source'] ?? '') . ' ' . (string) ($row['type_config']['answer_html'] ?? '')),
+            default => null,
+        };
+    }
+
+    /** At 120 words a minute, to the next five minutes. */
+    public static function readingMinutes(string $html): ?int
+    {
+        static $known = [];
+        $key = md5($html);
+        if (!array_key_exists($key, $known)) {
+            $text = html_entity_decode(strip_tags((string) preg_replace('#<(svg|style|script)\b.*?</\1>#si', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $words = count(preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY) ?: []);
+            $known[$key] = $words < 20 ? null : max(5, (int) (ceil($words / 120 / 5) * 5));
+        }
+        return $known[$key];
     }
 
     /** @param array<string,mixed> $row */
@@ -562,7 +727,151 @@ final class CourseItemService
         foreach (['youtube_id','remote_uri','caption','transcript','poster_resource_id','subtitle_resource_id'] as $field) {
             if (array_key_exists($field, $input)) { $config[$field] = trim((string) $input[$field]); }
         }
-        return ['item_key' => $key, 'item_type' => $type, 'title' => $title, 'description_html' => $this->html->preserve((string) ($input['description_html'] ?? '')), 'content_source' => $this->html->preserve((string) ($input['content_source'] ?? '')), 'type_config' => $config, 'resource_id' => $resource];
+        // Where a YouTube video starts, for a long one of which only part is relevant (2026-10-29).
+        if ($type === 'youtube' && array_key_exists('start_seconds', $input)) {
+            $start = trim((string) $input['start_seconds']);
+            if ($start !== '' && preg_match('/^\d{1,6}$/', $start) !== 1) { throw new InvalidArgumentException('Start at must be a whole number of seconds.'); }
+            if ($start === '' || (int) $start === 0) { unset($config['start_seconds']); } else { $config['start_seconds'] = (int) $start; }
+        }
+        $content = $this->html->preserve((string) ($input['content_source'] ?? ''));
+        if ($type === 'slide_deck') {
+            $deck = array_key_exists('slides', $input) ? self::deckInput($input) : $config;
+            foreach (['deck_kind' => 'kind', 'deck_theme' => 'theme'] as $field => $part) { if (is_string($input[$field] ?? null)) { $deck[$part] = $input[$field]; } }
+            // A new Presentation starts with a title slide showing its title (a trailer also ends with a call to action);
+            // its slides are then added and edited on its own page (owner, 2026-10-30).
+            if (($deck['slides'] ?? []) === []) {
+                $deck['slides'] = [['layout' => 'title', 'title' => 'Welcome', 'heading' => mb_substr($title, 0, 200)]];
+                if (($deck['kind'] ?? '') === 'trailer') { $deck['slides'][] = ['layout' => 'cta', 'title' => 'Start the course', 'heading' => 'Ready to start?', 'text' => 'Get the course, or preview it first.', 'actions' => ['enrol', 'preview']]; }
+            }
+            $config = SlideDeck::validate($deck);
+        } elseif ($type === 'flashcards') {
+            $config = ['cards' => FlashCards::validate(array_key_exists('cards', $input) || array_key_exists('cards_paste', $input) ? self::cardsInput($input) : ($config['cards'] ?? []))];
+        } elseif ($type === 'practical') {
+            $answer = $this->html->preserve((string) (array_key_exists('answer_html', $input) ? $input['answer_html'] : ($config['answer_html'] ?? '')));
+            if (trim(strip_tags($content)) === '') { throw new InvalidArgumentException('Practical work needs its tasks.'); }
+            if (trim(strip_tags($answer)) === '') { throw new InvalidArgumentException('Practical work needs a model answer for its tasks, so learners can check their own work.'); }
+            $config = ['answer_html' => $answer];
+        } elseif ($type === 'html_lesson' && array_key_exists('lesson_role', $input)) {
+            $role = (string) $input['lesson_role'];
+            if ($role === '' || !isset(self::LESSON_ROLES[$role])) { unset($config['presentation_role']); } else { $config['presentation_role'] = $role; }
+        }
+        // A Presentation's description is one plain line in the player's top bar (owner, 2026-10-30, decision A).
+        $description = $type === 'slide_deck' ? SlideDeck::description((string) ($input['description_html'] ?? '')) : $this->html->preserve((string) ($input['description_html'] ?? ''));
+        return ['item_key' => $key, 'name' => $this->nameFor($input, $title, $currentId), 'item_type' => $type, 'title' => $title, 'description_html' => $description, 'content_source' => $content, 'type_config' => $config, 'resource_id' => $resource, 'estimated_minutes' => self::minutes($input['estimated_minutes'] ?? null)];
+    }
+
+    /**
+     * The name administrators know an item by (owner, 2026-10-30, decision A: many items share a title, such as "What
+     * you will learn"): never used twice; left empty, it is taken from where the item is placed, "GDN-101 Module 1 Presentation",
+     * or from its title while it is placed nowhere.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function nameFor(array $input, string $title, int $currentId): string
+    {
+        $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['name'] ?? '')));
+        if ($name === '') { return $this->freeName(($currentId > 0 ? $this->placeName($currentId) : null) ?? $title, $currentId); }
+        if (mb_strlen($name) > 160) { throw new InvalidArgumentException('A name has at most 160 characters.'); }
+        if (in_array(mb_strtolower($name), $this->items->namesLike($name, $currentId), true)) {
+            throw new InvalidArgumentException('Another Course Item is already named "' . $name . '". Names are never used twice, so choose another, or leave it empty to name it after its place.');
+        }
+        return $name;
+    }
+
+    /** The name, or the name with the first free number after it: "GDN-101 Module 1 Video 2". */
+    public function freeName(string $base, int $exceptId = 0): string
+    {
+        $base = mb_substr(trim($base), 0, 150);
+        $taken = array_flip($this->items->namesLike($base, $exceptId));
+        if (!isset($taken[mb_strtolower($base)])) { return $base; }
+        for ($n = 2; isset($taken[mb_strtolower($base . ' ' . $n)]); $n++);
+        return $base . ' ' . $n;
+    }
+
+    /** The name an item's place gives it, in the first course it is placed in; null while it is placed nowhere. */
+    private function placeName(int $itemId): ?string
+    {
+        $courseId = $this->items->placementCourse($itemId);
+        if ($courseId === null) { return null; }
+        $code = $this->items->courseCode($courseId);
+        foreach ($this->availability($courseId, null, false) as $row) {
+            if ((string) $row['node_type'] === 'item' && (int) ($row['course_item_id'] ?? 0) === $itemId) { return self::nameOfPlace($code, $row); }
+        }
+        return null;
+    }
+
+    /**
+     * The name of a place in a course's outline: the course's code, then the module and the part ("GDN-101 Module 1
+     * Presentation"), or the item's title outside the modules ("GDN-101 Final assessment").
+     *
+     * @param array<string,mixed> $row A row of availability().
+     */
+    public static function nameOfPlace(string $code, array $row): string
+    {
+        $part = self::part($row);
+        $label = self::PART_LABELS[$part] ?? (self::TYPE_LABELS[(string) ($row['item_type'] ?? '')] ?? 'Item');
+        $module = $row['module_of'] ?? null;
+        $title = trim((string) ($row['item_title'] ?? ''));
+        $prefix = $code === '' ? '' : $code . ' ';
+        return $module !== null ? $prefix . 'Module ' . $module . ' ' . $label : $prefix . ($title !== '' ? $title : $label);
+    }
+
+    /**
+     * Names items after their places in the course: imported items, items arranged into modules, and one created in
+     * the course with its name left empty. Each item is named once, from its first place.
+     *
+     * @param list<int> $itemIds
+     */
+    public function nameFromPlacements(int $courseId, array $itemIds): void
+    {
+        $wanted = array_flip($itemIds);
+        if ($wanted === []) { return; }
+        $code = $this->items->courseCode($courseId);
+        foreach ($this->availability($courseId, null, false) as $row) {
+            $id = (int) ($row['course_item_id'] ?? 0);
+            if ((string) $row['node_type'] !== 'item' || !isset($wanted[$id])) { continue; }
+            unset($wanted[$id]);
+            $this->items->rename($id, $this->freeName(self::nameOfPlace($code, $row), $id));
+        }
+    }
+
+    /**
+     * The course's items whose names are still the ones their places or titles gave them, which follow them when the
+     * course is arranged again; a name typed by hand stays.
+     *
+     * @return list<int>
+     */
+    public function automaticallyNamed(int $courseId): array
+    {
+        $code = $this->items->courseCode($courseId); $ids = [];
+        foreach ($this->availability($courseId, null, false) as $row) {
+            if ((string) $row['node_type'] !== 'item') { continue; }
+            $name = (string) ($row['item_name'] ?? '');
+            foreach ([self::nameOfPlace($code, $row), trim((string) ($row['item_title'] ?? ''))] as $base) {
+                if ($name === $base || preg_match('/^' . preg_quote($base, '/') . ' \d+$/u', $name) === 1) { $ids[] = (int) $row['course_item_id']; break; }
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    /** The time a learner takes, in whole minutes: empty for none. */
+    private static function minutes(mixed $value): ?int
+    {
+        $text = trim((string) (is_scalar($value) ? $value : ''));
+        if ($text === '') { return null; }
+        if (preg_match('/^\d+$/', $text) !== 1 || (int) $text < 1 || (int) $text > 1440) { throw new InvalidArgumentException('The time to study is a whole number of minutes, from 1 to 1,440.'); }
+        return (int) $text;
+    }
+
+    /**
+     * A Presentation as its editor posts it: the kind, the look and each slide's fields.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    public static function deckInput(array $input): array
+    {
+        return ['kind' => (string) ($input['deck_kind'] ?? $input['type_config']['kind'] ?? 'intro'), 'theme' => (string) ($input['deck_theme'] ?? $input['type_config']['theme'] ?? 'light'), 'slides' => array_values(array_filter((array) ($input['slides'] ?? []), 'is_array'))];
     }
 
     /** @param array<string,mixed> $input */

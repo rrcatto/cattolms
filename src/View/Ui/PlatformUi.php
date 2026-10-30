@@ -27,7 +27,7 @@ final class PlatformUi
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
         'layout.tabs' => ['template' => 'layout/tabs', 'defaults' => ['items' => null, 'current' => '', 'aria_label' => null]],
-        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
+        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'close_disclosure' => false, 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
         'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'form_action' => '', 'form_target' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
         'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false, 'narrow_menu' => false, 'label' => 'Actions', 'aria_label' => '', 'icon' => 'action-open', 'compact' => false]],
@@ -38,7 +38,7 @@ final class PlatformUi
         // A choice made by picture: a radio group whose options are images with a label and an
         // optional note - certificate designs and where the words go on one.
         // columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row, further rows beneath, left-aligned.
-        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => null, 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto'], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 4]]],
+        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => null, 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => ''], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 4]]],
         'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
@@ -159,7 +159,8 @@ final class PlatformUi
         }
         if ($component === 'form.picture-choice') {
             if (!is_string($values['name']) || $values['name'] === '' || !is_string($values['legend']) || $values['legend'] === '' || !is_scalar($values['selected'])
-                || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)) {
+                || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)
+                || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)) {
                 throw new InvalidArgumentException('A picture choice needs a field name, a legend and a selected value.');
             }
             if (!is_array($values['items']) || $values['items'] === []) throw new InvalidArgumentException('A picture choice needs at least one option.');
@@ -169,10 +170,14 @@ final class PlatformUi
                 $keys = is_array($item) ? array_keys($item) : [];
                 $picture = in_array($keys, [['value', 'label', 'image'], ['value', 'label', 'image', 'note']], true);
                 $icon = in_array($keys, [['value', 'label', 'icon'], ['value', 'label', 'icon', 'note']], true);
-                if ((!$picture && !$icon) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '')
+                // A slide as the presentation player draws it (owner, 2026-10-30: a layout or a look chosen by what it
+                // looks like): only DeckRenderer::thumbnail's markup, nothing that runs.
+                $drawing = in_array($keys, [['value', 'label', 'drawing'], ['value', 'label', 'drawing', 'note']], true);
+                if ((!$picture && !$icon && !$drawing) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '')
                     || ($picture && (!is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1))
-                    || ($icon && !self::pictureOnly($item['icon']))) {
-                    throw new InvalidArgumentException('Each picture choice option has a value, a label, a picture on this site or an SVG icon, and an optional note.');
+                    || ($icon && !self::pictureOnly($item['icon']))
+                    || ($drawing && !self::slideDrawing($item['drawing']))) {
+                    throw new InvalidArgumentException('Each picture choice option has a value, a label, a picture on this site, an SVG icon or a drawn slide, and an optional note.');
                 }
             }
         }
@@ -251,6 +256,13 @@ final class PlatformUi
     }
 
     /** An icon drawn inline: an SVG picture with nothing that runs and no link outside itself (View\Artwork\UploadedSvg). */
+    /** A slide drawn by DeckRenderer::thumbnail: its wrapper, an inert deck, and no script, handler or script address. */
+    private static function slideDrawing(mixed $drawing): bool
+    {
+        return is_string($drawing) && preg_match('/^<div class="cl-slide-thumb cl-slide-thumb--(small|medium|large)"><div class="cw-deck cw-ready" data-cw-manual data-cw-theme="(light|dark)" inert aria-hidden="true">/', $drawing) === 1
+            && preg_match('/<\s*(script|iframe|object|embed)\b|\son[a-z]+\s*=|javascript:/i', $drawing) !== 1;
+    }
+
     private static function pictureOnly(mixed $icon): bool
     {
         if (!is_string($icon) || !str_starts_with(ltrim($icon), '<svg')) return false;

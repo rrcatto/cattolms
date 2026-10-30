@@ -1,0 +1,38 @@
+{#
+	One slide's fields on its own page (owner, 2026-10-30, the approved mockup): its short title and chapter, the fields
+	its layout has, and its background, chosen by picture. Plain text only, as SlideLayouts defines each layout. The
+	narration script is saved apart, in the Narration card below.
+	slide: the slide as stored or as the form left it; slide_layout: SlideLayouts::LAYOUTS[...] with its name; tones: the
+	background choices, drawn.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Short title', for: 'slide-title', required: true, help: 'Up to 40 characters, shown in Contents and the list of slides.'})} %}{% block control %}<input class="cl-input" id="slide-title" name="slide[title]" maxlength="40" required value="{{ slide.title|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Chapter', for: 'slide-chapter', help: 'Optional. Starts a chapter at this slide, named in the progress bar and Contents.'})} %}{% block control %}<input class="cl-input" id="slide-chapter" name="slide[chapter]" maxlength="200" value="{{ slide.chapter|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% for name, field in slide_layout.fields %}{% set fid = 'slide-' ~ name %}{% set fname = 'slide[' ~ name ~ ']' %}{% set value = attribute(slide, name)|default(null) %}
+{% if field.kind == 'text' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: fid, required: field.required|default(false), full_width: true, help: field.words|default(0) ? 'Up to ' ~ field.words ~ ' words.' : ''})} %}{% block control %}<input class="cl-input" id="{{ fid }}" name="{{ fname }}"{% if field.max|default(0) %} maxlength="{{ field.max }}"{% endif %} value="{{ value }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% elseif field.kind == 'long' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: fid, required: field.required|default(false), full_width: true, help: field.words|default(0) ? 'Up to ' ~ field.words ~ ' words.' : ''})} %}{% block control %}<textarea class="cl-input" id="{{ fid }}" name="{{ fname }}" rows="4" {{ ui_field_attrs(props) }}>{{ value }}</textarea>{% endblock %}{% endembed %}
+{% elseif field.kind == 'lines' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: fid, required: field.required|default(false), full_width: true, help: (field.min|default(0) ? field.min ~ ' to ' ~ field.most ~ ', one per line' : 'One per line') ~ (field.words|default(0) ? ', each up to ' ~ field.words ~ ' words.' : '.')})} %}{% block control %}<textarea class="cl-input" id="{{ fid }}" name="{{ fname }}" rows="{{ field.most|default(4) + 1 }}" {{ ui_field_attrs(props) }}>{{ value is iterable ? value|join("\n") : value }}</textarea>{% endblock %}{% endembed %}
+{% elseif field.kind == 'events' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: fid, required: true, full_width: true, help: field.min ~ ' to ' ~ field.most ~ ' events, one per line, such as: Spring | Sow and plant'})} %}{% block control %}<textarea class="cl-input" id="{{ fid }}" name="{{ fname }}" rows="7" {{ ui_field_attrs(props) }}>{% for event in value|default([]) %}{{ event.when }} | {{ event.what }}{% if not loop.last %}{{ "\n" }}{% endif %}{% endfor %}</textarea>{% endblock %}{% endembed %}
+{% elseif field.kind == 'columns' %}
+{% for ci in 0..1 %}{% set column = value[ci]|default({}) %}{% set cid = fid ~ '-' ~ ci %}{% set which = ci == 0 ? 'First' : 'Second' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: which ~ ' column: heading', for: cid ~ '-heading', required: true})} %}{% block control %}<input class="cl-input" id="{{ cid }}-heading" name="{{ fname }}[{{ ci }}][heading]" maxlength="200" value="{{ column.heading|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: which ~ ' column: points, one per line', for: cid ~ '-points', help: 'Or write a line of text instead, below.'})} %}{% block control %}<textarea class="cl-input" id="{{ cid }}-points" name="{{ fname }}[{{ ci }}][points]" rows="4" {{ ui_field_attrs(props) }}>{{ column.points|default([])|join("\n") }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: which ~ ' column: a line of text instead', for: cid ~ '-text', full_width: true})} %}{% block control %}<input class="cl-input" id="{{ cid }}-text" name="{{ fname }}[{{ ci }}][text]" maxlength="400" value="{{ column.text|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endfor %}
+{% elseif field.kind == 'answer' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: fid, required: true, help: 'The options are counted as you wrote them above.'})} %}{% block control %}<select class="cl-select" id="{{ fid }}" name="{{ fname }}" {{ ui_field_attrs(props) }}>{% for oi in 0..3 %}<option value="{{ oi }}"{% if value is not null and value == oi %} selected{% endif %}>Option {{ oi + 1 }}{% if slide.options[oi]|default('') %}: {{ slide.options[oi] }}{% endif %}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% elseif field.kind == 'flag' %}
+<div class="cl-ui-field--full"><input type="hidden" name="{{ fname }}" value="0">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: field.label})} %}{% block control %}<input type="checkbox" name="{{ fname }}" value="1"{% if value is null ? field.default|default(false) : value %} checked{% endif %}>{% endblock %}{% endembed %}</div>
+{% elseif field.kind == 'actions' %}
+<div class="cl-ui-field--full">{% for action, action_label in slide_actions %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Button: ' ~ action_label})} %}{% block control %}<input type="checkbox" name="{{ fname }}[]" value="{{ action }}"{% if action in value|default([]) %} checked{% endif %}>{% endblock %}{% endembed %}{% endfor %}</div>
+{% elseif field.kind == 'picture' %}
+<input type="hidden" name="{{ fname }}" value="{{ value }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: value ? 'Replace the picture' : 'Picture', for: fid ~ '-upload', required: not value, full_width: true, help: (value ? 'The slide has a picture' ~ (value starts with 'data:image/' ? ' (a photo). ' : ' (a drawing). ') : '') ~ 'An SVG drawing, or a PNG or JPEG photo or chart, up to 1.5 MB.'})} %}{% block control %}<input class="cl-input" type="file" accept=".svg,.png,.jpg,.jpeg,image/svg+xml,image/png,image/jpeg" id="{{ fid }}-upload" name="slide_picture" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% endfor %}
+{% endblock %}{% endembed %}
+{{ ui('form.picture-choice', {name: 'slide[tone]', legend: 'Background', help: 'Drawn as the slide was last saved or previewed.', items: tones, selected: slide.tone|default('')}) }}

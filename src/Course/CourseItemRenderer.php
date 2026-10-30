@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Catwalk\DeckRenderer;
+use CattoLearning\Course\Catwalk\SlideDeck;
+use CattoLearning\Course\Catwalk\NarrationRepository;
+use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\View\Ui\PlatformUi;
 
 /** Resolves stored Course Item source at display time and delegates output to bounded type renderers. */
@@ -12,16 +16,21 @@ final class CourseItemRenderer
     /** The shared primary action's classes plus the Download-specific hook. */
     public const DOWNLOAD_ACTION_CLASSES = 'cl-ui-action cl-ui-action--primary cl-ui-action--normal cl-course-item-download-link';
 
-    /** @param PlatformUi|null $ui The platform UI, for the icon sprite's fingerprinted address. */
-    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources, private readonly ?PlatformUi $ui = null)
+    /**
+     * @param PlatformUi|null $ui The platform UI, for the icon sprite's fingerprinted address.
+     * @param DeckRenderer|null $decks CatWalk's markup for a Presentation.
+     * @param NarrationRepository|null $narrations A Presentation's recorded narration, by slide.
+     */
+    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources, private readonly ?PlatformUi $ui = null, private readonly ?DeckRenderer $decks = null, private readonly ?NarrationRepository $narrations = null)
     {
     }
 
     /**
      * @param array<string,mixed> $item
      * @param list<string> $stack
+     * @param array{continue?:string,enrol?:string,preview?:string} $links Where a Presentation's buttons lead: the next stop, buying and the preview.
      */
-    public function render(array $item, string $courseSlug, int $contextNodeId, bool $publicPreview = false, array $stack = []): string
+    public function render(array $item, string $courseSlug, int $contextNodeId, bool $publicPreview = false, array $stack = [], array $links = []): string
     {
         $key = (string) ($item['item_key'] ?? '');
         if (in_array($key, $stack, true)) {
@@ -36,9 +45,15 @@ final class CourseItemRenderer
         $description = (string) (($item['display_description_override'] ?? '') ?: ($item['description_html'] ?? ''));
         $config = is_array($item['type_config'] ?? null) ? $item['type_config'] : [];
         return match ((string) ($item['item_type'] ?? '')) {
-            'html_lesson' => $this->leadDescription($description, $embedded) . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack),
+            'html_lesson' => $this->leadDescription($description, $embedded) . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack, $links),
+            // A Presentation's description is in its player's top bar, not above it (owner, 2026-10-30).
+            'slide_deck' => $this->deck($item, $courseSlug, $links, $description),
+            'flashcards' => $this->leadDescription($description, $embedded) . FlashCards::render(FlashCards::normalise($config['cards'] ?? []), $key),
+            // The tasks, then the model answer, which stays closed until the learner chooses to see it (decision 3A).
+            'practical' => $this->leadDescription($description, $embedded) . '<div class="cl-practical">' . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack, $links) . '</div>'
+                . '<details class="cl-practical-answer"><summary>Show the model answer</summary><div class="cl-practical-answer-body">' . (string) ($config['answer_html'] ?? '') . '</div></details>',
             'image_graphic' => '<figure class="cl-course-item-media"><img src="' . $this->resourceUrl($item) . '" alt="' . self::escape((string) ($item['resource_description'] ?? '')) . '"><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>',
-            'youtube' => '<figure class="cl-course-item-media"><iframe src="https://www.youtube-nocookie.com/embed/' . rawurlencode((string) ($config['youtube_id'] ?? '')) . '" title="' . self::escape((string) ($item['title'] ?? 'Video')) . '" allowfullscreen></iframe><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
+            'youtube' => '<figure class="cl-course-item-media"><iframe src="https://www.youtube-nocookie.com/embed/' . rawurlencode((string) ($config['youtube_id'] ?? '')) . ((int) ($config['start_seconds'] ?? 0) > 0 ? '?start=' . (int) $config['start_seconds'] : '') . '" title="' . self::escape((string) ($item['title'] ?? 'Video')) . '" allowfullscreen></iframe><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
             'uploaded_video' => '<figure class="cl-course-item-media"><video controls src="' . $this->resourceUrl($item) . '"' . $this->poster($config) . '>' . $this->subtitles($config) . '</video><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
             'audio' => '<section class="cl-course-item-media"><audio controls src="' . ($item['resource_id'] ? $this->resourceUrl($item) : self::escape((string) ($config['remote_uri'] ?? ''))) . '"></audio>' . $description . '<p>' . self::escape((string) ($config['caption'] ?? '')) . '</p>' . $this->transcript($config) . '</section>',
             'pdf' => '<section class="cl-course-item-document"><object data="' . $this->resourceUrl($item) . '" type="application/pdf"><a href="' . $this->resourceUrl($item) . '">Open PDF</a></object><p><a href="' . $this->resourceUrl($item) . '" download>Download ' . self::escape((string) ($item['title'] ?? 'PDF')) . '</a></p>' . $description . '</section>',
@@ -81,13 +96,36 @@ final class CourseItemRenderer
             . '</section>';
     }
 
-    /** @param list<string> $stack */
-    private function renderHtml(string $source, string $slug, int $contextNodeId, bool $public, array $stack): string
+    /**
+     * @param list<string> $stack
+     * @param array<string,string> $links
+     */
+    private function renderHtml(string $source, string $slug, int $contextNodeId, bool $public, array $stack, array $links = []): string
     {
-        return (string) preg_replace_callback('/\[course-item:([a-zA-Z0-9][a-zA-Z0-9._-]{0,119})\]/', function (array $match) use ($slug, $contextNodeId, $public, $stack): string {
+        return (string) preg_replace_callback('/\[course-item:([a-zA-Z0-9][a-zA-Z0-9._-]{0,119})\]/', function (array $match) use ($slug, $contextNodeId, $public, $stack, $links): string {
             $item = $this->items->itemByKey((string) $match[1]);
-            return $item === null ? '<aside class="cl-course-item-error">Unresolved Course Item: ' . self::escape((string) $match[1]) . '</aside>' : $this->render($item, $slug, $contextNodeId, $public, $stack);
+            return $item === null ? '<aside class="cl-course-item-error">Unresolved Course Item: ' . self::escape((string) $match[1]) . '</aside>' : $this->render($item, $slug, $contextNodeId, $public, $stack, $links);
         }, $source);
+    }
+
+    /**
+     * A Presentation, drawn for CatWalk, with its recorded narration and where its buttons lead: Continue to the
+     * next stop (the course page after the last), and a trailer's buttons to the course page and its preview.
+     *
+     * @param array<string,mixed> $item
+     * @param array<string,string> $links
+     */
+    private function deck(array $item, string $slug, array $links, string $description = ''): string
+    {
+        $config = is_array($item['type_config'] ?? null) ? $item['type_config'] : [];
+        $itemId = (int) ($item['course_item_id'] ?? $item['id'] ?? 0);
+        $narrations = [];
+        foreach ($itemId > 0 && $this->narrations !== null ? $this->narrations->forItem($itemId) : [] as $slideId => $publicId) {
+            $narrations[$slideId] = '/narrations/' . rawurlencode($publicId);
+        }
+        $links += ['continue' => '/learn/' . rawurlencode($slug), 'enrol' => '/courses/' . rawurlencode($slug), 'preview' => '/courses/' . rawurlencode($slug) . '/preview'];
+        $title = (string) (($item['display_title_override'] ?? '') ?: ($item['title'] ?? $item['item_title'] ?? 'Presentation'));
+        return ($this->decks ?? new DeckRenderer())->render($config, (string) ($item['item_key'] ?? ''), SlideDeck::barText($description, $title), $links, $narrations);
     }
 
     /** @param array<string,mixed> $config */

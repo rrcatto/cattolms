@@ -1,0 +1,206 @@
+{
+  "key": "m1",
+  "title": "Soil, compost and containers",
+  "subtitle": "What your plants grow in, and how to make it good",
+  "introduction": [
+    "Most vegetable gardens that fail, fail in the soil. Roots need water, air and food from the ground they grow in, and soil that packs down, drains in minutes or holds no life gives them too little of all three.",
+    "In this module you learn to read your soil, feed it with compost, and choose and fill a container for each crop. By the end you will have tested your own soil, started compost and filled your first container, ready to plant in Module 2."
+  ],
+  "outcomes": [
+    "Describe what a good soil is made of, and test your own soil's texture with a jar test.",
+    "Explain what pH means for plants, and decide whether a soil needs lime, sulphur or neither.",
+    "Make compost from greens and browns in the right balance, and fix a heap that has gone wrong.",
+    "Choose a container of the right size for a crop, work out how much potting soil it needs, and fill it.",
+    "Mulch and water beds and containers so that they come through a dry spell."
+  ],
+  "presentation": {
+    "title": "What you will learn in this module",
+    "kind": "intro",
+    "minutes": 3,
+    "slides": [
+      {
+        "layout": "title",
+        "title": "Welcome",
+        "kicker": "Soil, compost and containers",
+        "heading": "Good food starts below the surface",
+        "sub": "Three things to get right before you plant anything",
+        "narration": "Before we talk about seeds or seasons, we start underground. In this module you get three things right: the soil, the compost that feeds it, and the containers you will grow in."
+      },
+      {
+        "layout": "number",
+        "title": "The small part that matters",
+        "figure": "5%",
+        "label": "of a good garden soil is organic matter. It holds water and feeds the life in the soil.",
+        "source": "A typical figure for a loam",
+        "narration": "It is a small share, but it does a great deal of the work. Most of what you do in this module comes down to adding more of it."
+      },
+      {
+        "layout": "case",
+        "title": "Ayanda's lettuce",
+        "heading": "Why did the seedlings stop growing?",
+        "facts": "Ayanda filled two pots with soil dug from the garden and planted lettuce seedlings. She watered them every evening. Within a month the soil was a hard block and the seedlings had stopped growing.",
+        "question": "What went wrong?",
+        "outcome": "Garden soil packs down in a pot and shuts out the air the roots need. You will learn what to use instead."
+      },
+      {
+        "layout": "points",
+        "title": "By the end of this module",
+        "heading": "You will be able to",
+        "points": [
+          "Test your soil's texture with a jar",
+          "Make compost that is ready in months",
+          "Choose and fill a container for each crop",
+          "Keep plants alive through a dry spell"
+        ]
+      },
+      {
+        "layout": "picture",
+        "title": "The jar test",
+        "heading": "What a jar of soil can tell you",
+        "picture": "jar-test.svg",
+        "alt": "A jar of settled soil in three layers: sand at the bottom, silt above it and clay on top",
+        "caption": "Sand settles first, then silt, then clay."
+      },
+      {
+        "layout": "check",
+        "title": "A quick question",
+        "question": "Which of these is a brown in a compost heap?",
+        "options": ["Vegetable peels", "Dry leaves", "Coffee grounds"],
+        "answer": 1,
+        "explanation": "Dry leaves are rich in carbon, which makes them a brown. Vegetable peels and coffee grounds are rich in nitrogen: they are greens."
+      },
+      {
+        "layout": "next",
+        "title": "Up next",
+        "heading": "Now watch the video",
+        "text": "Watch for how the heap is kept as damp as a wrung-out sponge, and how often it is turned.",
+        "action_label": "Watch the video"
+      }
+    ]
+  },
+  "video": {
+    "youtube_id": "EXAMPLE0001",
+    "title": "How to make compost at home",
+    "channel": "The channel's name as YouTube shows it",
+    "minutes": 8,
+    "watch_for": "Watch for the balance of greens and browns, and how the heap is kept damp and turned. Both are in section 4 of the lesson.",
+    "checked": "2026-10-28"
+  },
+  "lesson": {"title": "Soil, compost and containers", "minutes": 45},
+  "summary": {"minutes": 5},
+  "flashcards": {
+    "cards": [
+      {"front": "Which soil particle is the largest?", "back": "Sand, 0.05 to 2 mm across. It drains fast and holds little water or food."},
+      {"front": "Which soil particle is the smallest?", "back": "Clay, smaller than 0.002 mm. It holds water and nutrients but drains slowly."},
+      {"front": "What is loam?", "back": "A mix of sand, silt and clay in which none dominates, roughly 40%, 40% and 20%. It drains well yet holds water."},
+      {"front": "What are the four parts of a good soil, by volume?", "back": "Mineral particles about 45%, water about 25%, air about 25% and organic matter about 5%.", "hint": "Two of them share half the soil equally."},
+      {"front": "In a jar test, in what order do the layers settle?", "back": "Sand first, within minutes. Then silt, over a few hours. Clay last, over a day or more."},
+      {"front": "What does a pH of 7 mean?", "back": "Neutral: neither acidic nor alkaline. Below 7 is acidic, above 7 alkaline."},
+      {"front": "What pH do most vegetables grow best in?", "back": "Between about 6.0 and 7.0, where the soil's nutrients are within the roots' reach."},
+      {"front": "How do you raise the pH of an acidic soil?", "back": "Agricultural or dolomitic lime, in the amount on the bag, worked in a few weeks before planting."},
+      {"front": "What makes a compost material a green?", "back": "It is rich in nitrogen: vegetable peels, fresh grass cuttings, coffee grounds and tea leaves."},
+      {"front": "What makes a compost material a brown?", "back": "It is rich in carbon: dry leaves, straw, shredded cardboard and newspaper."},
+      {"front": "What balance of browns and greens does compost need?", "back": "Roughly two to three parts browns to one part greens, by volume."},
+      {"front": "How damp should a compost heap be?", "back": "As damp as a wrung-out sponge. Water it in dry weather and cover it in heavy rain."},
+      {"front": "Why should garden soil never go into a container?", "back": "It packs down, drains badly and shuts out air, and may carry weed seeds and pests. Use potting soil."},
+      {"front": "How deep should mulch be in a container?", "back": "2 to 3 cm, kept a few centimetres away from the stems. In beds, 5 to 7 cm."},
+      {"front": "When should you water a container?", "back": "When it is dry 2 to 3 cm down: deeply, in the early morning, until water runs from the holes."}
+    ]
+  },
+  "practical": {"title": "Test, plan and fill", "minutes": 120},
+  "assessment": {
+    "pass_mark": 50,
+    "questions": [
+      {
+        "q": "Roughly what share of a good garden soil, by volume, is air?",
+        "o": ["About 5%", "About 25%", "About 45%", "About 75%"],
+        "a": 1, "p": 1,
+        "e": "A healthy loam is about a quarter air and a quarter water, with mineral particles making up about 45% and organic matter about 5%."
+      },
+      {
+        "q": "Water lies on your bed for an hour before it soaks in, and a squeeze test leaves a sticky lump you can roll into a sausage. What is the best long-term fix?",
+        "o": ["Dig in compost every season", "Spread river sand over the top", "Water less often but for longer", "Work in agricultural lime"],
+        "a": 0, "p": 2,
+        "e": "The soil is clay. Compost opens it up so water and air can move through it. Sand on top does not mix in, watering does not change the soil, and lime changes the pH, not the texture."
+      },
+      {
+        "q": "After a day, the settled soil in your jar is 10 cm deep: 7 cm sand, 2 cm silt and 1 cm clay. What does this tell you?",
+        "o": ["It is a clay soil that will waterlog", "It is a loam that needs nothing added", "The test failed because the layers are uneven", "It is a sandy soil that will dry out quickly"],
+        "a": 3, "p": 2,
+        "e": "Sand is 70% of it, so it is a sandy soil. It drains fast and holds little water, so it needs compost to hold more and mulch to keep it from drying out."
+      },
+      {
+        "q": "In a jar test, which layer settles first?",
+        "o": ["Clay", "Silt", "Sand", "Organic matter"],
+        "a": 2, "p": 1,
+        "e": "Sand grains are the largest and heaviest, so they settle within a minute or two. Clay, the smallest, takes a day or more, and organic matter floats."
+      },
+      {
+        "q": "Your soil test reads pH 5.2 and you want to grow cabbages. What do you do?",
+        "o": ["Add agricultural lime as directed, weeks before planting", "Add agricultural sulphur to the bed", "Nothing, since cabbages like acidic soil", "Dig in fresh grass cuttings"],
+        "a": 0, "p": 2,
+        "e": "At 5.2 the soil is too acidic for most vegetables, and the cabbage family prefers the upper end of the 6.0 to 7.0 range. Lime raises the pH but acts slowly. Sulphur would lower it further."
+      },
+      {
+        "q": "A neighbour tells you to lime your vegetable bed every year to keep it sweet. Your soil tests at pH 7.2. What is the best response?",
+        "o": ["Lime it, since lime is good for every vegetable", "Lime half the bed and compare the two halves", "Add lime and sulphur together so they cancel out", "Do not lime it: at pH 7.2 lime would make it too alkaline"],
+        "a": 3, "p": 3,
+        "e": "The soil is already slightly alkaline. Lime would push it further from the range vegetables like, and an alkaline soil is much harder to bring down than an acidic one is to raise."
+      },
+      {
+        "q": "Which of these is a brown in compost?",
+        "o": ["Coffee grounds", "Shredded cardboard", "Vegetable peels", "Fresh grass cuttings"],
+        "a": 1, "p": 1,
+        "e": "Cardboard is rich in carbon, a brown. Coffee grounds, peels and fresh grass are rich in nitrogen: greens."
+      },
+      {
+        "q": "Your compost bin is wet and slimy and smells of ammonia. What has most likely gone wrong?",
+        "o": ["It has too many browns", "It has dried out", "It has too many greens and too little air", "It has reached its working temperature"],
+        "a": 2, "p": 2,
+        "e": "Slime and an ammonia smell come from too much nitrogen and no air. Mix in browns, turn the heap and let air in. A heap with too many browns sits dry and inactive instead."
+      },
+      {
+        "q": "Your kitchen produces four buckets of vegetable peels a week. Roughly how many buckets of browns should you add?",
+        "o": ["One", "Two", "Eight to twelve", "Twenty"],
+        "a": 2, "p": 2,
+        "e": "Compost needs roughly two to three parts browns to one part greens by volume, so four buckets of greens need eight to twelve buckets of browns."
+      },
+      {
+        "q": "Your small balcony compost bin never gets hot. Which of these should you keep out of it, though a large hot heap could take it?",
+        "o": ["Dry leaves", "Tea leaves", "Shredded newspaper", "Weeds that have gone to seed"],
+        "a": 3, "p": 3,
+        "e": "A heap at 55 to 65 °C kills most weed seeds. A small bin rarely gets that hot, so the seeds survive and you spread weeds with your compost."
+      },
+      {
+        "q": "You want to grow one tomato plant in a pot. Which container is suitable?",
+        "o": ["A 5-litre pot, 20 cm deep", "A 10-litre bucket, 25 cm deep", "A 25-litre tub, 32 cm deep, with drainage holes", "A 30-litre tub, 35 cm deep, without holes"],
+        "a": 2, "p": 2,
+        "e": "A tomato needs at least 20 litres and 30 cm of depth, and every container needs drainage holes. The 30-litre tub without holes would waterlog."
+      },
+      {
+        "q": "Your balcony box is 80 cm long, 20 cm wide and 20 cm deep, and you will fill it to 17 cm. How many litres of potting soil do you need?",
+        "o": ["About 3 litres", "About 27 litres", "About 32 litres", "About 272 litres"],
+        "a": 1, "p": 2,
+        "e": "80 × 20 × 17 = 27,200 cm³. There are 1,000 cm³ in a litre, so you need about 27 litres. 32 litres would fill it to the rim."
+      },
+      {
+        "q": "You fill pots with soil from your garden bed. Six weeks later the plants are stunted and the soil is a hard block. Why?",
+        "o": ["It packs down in a container and shuts out air", "It has no nutrients left in it at all", "The pots were far too large for the plants", "Garden soil is always too acidic for pots"],
+        "a": 0, "p": 2,
+        "e": "Garden soil compacts in a container into a dense mass with no air, and drains badly. Potting soil is made to stay light and open."
+      },
+      {
+        "q": "It is a hot summer and water is restricted. Which approach keeps your containers alive with the least water?",
+        "o": ["Mulch the pots and water deeply in the morning when dry 2 cm down", "A little water every evening, so the soil never dries out", "Water at midday, whenever the plants begin to wilt", "Stand each pot in a saucer of water all summer"],
+        "a": 0, "p": 2,
+        "e": "Mulch slows evaporation, deep watering sends roots down, and morning watering loses less to heat. A little water often keeps roots shallow, and a standing saucer drowns them."
+      },
+      {
+        "q": "Sipho mulches his tomato pot with straw piled up against the stem, and the base of the stem starts to rot. What should he have done?",
+        "o": ["Used wood chips instead of straw", "Kept the mulch a few centimetres away from the stem", "Used no mulch in a container at all", "Laid the mulch 10 cm deep"],
+        "a": 1, "p": 3,
+        "e": "Mulch held against a stem keeps it wet and lets rot set in. Any mulch works if it is kept a few centimetres away. In a container 2 to 3 cm is enough."
+      }
+    ]
+  }
+}

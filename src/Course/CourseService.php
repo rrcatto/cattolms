@@ -1091,16 +1091,19 @@ final class CourseService
         // Its place in the catalogue, when the form showed it (owner, 2026-10-20).
         $positioned = array_key_exists('catalogue_position', $input);
         $position = $positioned ? self::cataloguePosition($input['catalogue_position']) : null;
+        // The number of its first module, when the form showed it (owner, 2026-10-29: a first module that sets the course up is Module 0).
+        $firstModule = array_key_exists('first_module_number', $input) ? ((string) $input['first_module_number'] === '0' ? 0 : 1) : null;
         // The courses related to it, when the form showed them (owner, 2026-10-20): each relation is the other course's too.
         $relatedIds = array_key_exists('related_shown', $input) ? $this->validRelatedIds($courseId, $input['related_ids'] ?? []) : null;
-        $this->transactions->run(function () use ($courseId, $data, $userId, $tagIds, $coverSvg, $positioned, $position, $relatedIds): void {
+        $this->transactions->run(function () use ($courseId, $data, $userId, $tagIds, $coverSvg, $positioned, $position, $relatedIds, $firstModule): void {
             $this->courses->updateCourse($courseId, $data, $userId);
             if ($tagIds !== null) $this->courses->replaceCourseTags($courseId, $tagIds);
             if ($coverSvg !== null) $this->courses->setCourseCover($courseId, $coverSvg);
             if ($positioned) $this->courses->setCataloguePosition($courseId, $position);
+            if ($firstModule !== null) $this->courses->setFirstModuleNumber($courseId, $firstModule);
             if ($relatedIds !== null) $this->courses->replaceRelatedCourses($courseId, $relatedIds);
         });
-        $extra = ($tagIds === null ? [] : ['tag_ids' => $tagIds]) + ($coverSvg === null ? [] : ['cover_replaced' => true]) + ($positioned ? ['catalogue_position' => $position] : [])
+        $extra = ($tagIds === null ? [] : ['tag_ids' => $tagIds]) + ($coverSvg === null ? [] : ['cover_replaced' => true]) + ($positioned ? ['catalogue_position' => $position] : []) + ($firstModule === null ? [] : ['first_module_number' => $firstModule])
             + ($relatedIds === null ? [] : ['related_course_ids' => $relatedIds]);
         $this->courses->recordHistory($courseId, $userId, 'course.updated', 'course', $courseId, 'Course details updated.', $data + $extra);
         $this->audit->record($userId, 'course.updated', ['course_id' => $courseId] + $extra);

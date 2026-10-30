@@ -2053,3 +2053,142 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-company-movements strong{white-space:nowrap}
 .cl-company-activity li{padding-top:.6rem;border-top:1px solid var(--cl-border,#e6d8c6)}
 .cl-company-billing{margin:0 0 1rem}
+/* A module's parts in the reader (course structure, owner 2026-10-28): each outline row's part and time, the section
+   page's outline of its parts, flash cards one at a time (course-flashcards.js; a plain list without JavaScript) and
+   practical work with its model answer behind a button. The reader is Core's and always light (UX rule 7.10). */
+.cl-course-outline-part{display:block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a8899;margin-bottom:.1rem}
+.cl-course-outline-item.is-current .cl-course-outline-part{color:#d8e7f7}
+.cl-course-outline-time{display:block;font-size:.78rem;font-weight:500;color:#7a8899;margin-top:.15rem}
+.cl-course-outline-item.is-current .cl-course-outline-time{color:#d8e7f7}
+.cl-section-outline{list-style:none;margin:1.5rem 0 0;padding:0;border:1px solid #e0e6ed;border-radius:.75rem;overflow:hidden}
+.cl-section-outline li{display:grid;grid-template-columns:minmax(7rem,9rem) minmax(0,1fr) auto;gap:.75rem;align-items:baseline;padding:.7rem 1rem;border-top:1px solid #e0e6ed}
+.cl-section-outline li:first-child{border-top:0}
+.cl-section-outline-part{font-size:.78rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5f6f82}
+.cl-section-outline-time{font-size:.88rem;color:#5f6f82;white-space:nowrap}
+.cl-section-outline-total{display:flex;justify-content:flex-end;padding:.6rem 1rem;background:#f6f8fb;font-weight:700;color:#173b61;border-top:1px solid #e0e6ed}
+@media(max-width:560px){.cl-section-outline li{grid-template-columns:1fr auto}.cl-section-outline-part{grid-column:1/-1}}
+.cl-flashcards{margin:1.5rem 0}
+.cl-flashcards-list{display:grid;gap:.75rem;padding-left:1.4rem}
+.cl-flashcard{padding:.75rem 1rem;border:1px solid #d9e0e8;border-radius:.6rem;background:#fff}
+.cl-flashcard-front{margin:0;font-weight:700}
+.cl-flashcard-hint{margin:.35rem 0 0;color:#5f6f82;font-size:.95rem}
+.cl-flashcard-hint span{font-weight:700}
+.cl-flashcard-back{margin-top:.5rem}
+.cl-flashcard-back summary{cursor:pointer;color:#145da0;font-weight:600}
+.cl-flashcard-back p{margin:.4rem 0 0}
+.cl-flashcards-player{display:grid;gap:1rem;max-width:40rem;margin-inline:auto}
+.cl-flashcards-status{margin:0;text-align:center;color:#5f6f82;font-size:.95rem}
+.cl-flashcards-card{display:grid;align-content:center;gap:.75rem;min-height:14rem;padding:clamp(1.25rem,4vw,2.25rem);border:2px solid #d6e4f2;border-radius:1rem;background:#fbfdff;text-align:center;box-shadow:0 8px 24px rgba(20,35,50,.08)}
+.cl-flashcards-card.is-turned{border-color:#145da0;background:#f2f8fe}
+.cl-flashcards-card:focus-visible{outline:3px solid #145da0;outline-offset:3px}
+.cl-flashcards-side{margin:0;font-size:.75rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#7a8899}
+.cl-flashcards-front{margin:0;font-size:clamp(1.15rem,2.6vw,1.45rem);font-weight:700;color:#16283e}
+.cl-flashcards-hint{margin:0;color:#5f6f82}
+.cl-flashcards-back{margin:0;font-size:1.1rem;color:#173b61}
+.cl-flashcards-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:.75rem}
+.cl-flashcards-button{min-height:44px;min-width:8rem;padding:.6rem 1.2rem;border-radius:.55rem;font:inherit;font-weight:700;cursor:pointer}
+.cl-flashcards-primary{background:#145da0;border:1px solid #145da0;color:#fff}
+.cl-flashcards-primary:hover{background:#0e467a}
+.cl-flashcards-secondary{background:#fff;border:1px solid #9fb3c8;color:#173b61}
+.cl-flashcards-secondary:hover{border-color:#145da0}
+.cl-flashcards-button:focus-visible,.cl-flashcards-link:focus-visible{outline:3px solid #145da0;outline-offset:2px}
+.cl-flashcards-link{display:block;margin:1rem auto 0;padding:.4rem .6rem;border:0;background:none;color:#145da0;font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
+.cl-practical .task{margin:1.25rem 0;padding:1rem 1.15rem;border:1px solid #d9e0e8;border-radius:.6rem;background:#fff}
+.cl-practical .task h3{margin-top:0}
+.cl-practical-answer{margin-top:2rem;padding:1rem 1.15rem;border:2px solid #d6e4f2;border-radius:.75rem;background:#f8fbfe}
+.cl-practical-answer>summary{cursor:pointer;font-weight:800;color:#145da0;min-height:44px;display:flex;align-items:center}
+.cl-practical-answer-body .answer{margin:1rem 0;padding-top:.75rem;border-top:1px solid #d9e0e8}
+.cl-practical-answer-body .answer h3{margin-top:0}
+.cl-course-item-pdf{display:flex;justify-content:flex-end;margin:0 0 1rem}
+/* The Presentation, Flash cards and Practical work editors (course structure, owner 2026-10-28). */
+.cl-slide-preview{margin:1.5rem 0;display:grid;gap:.75rem}
+.cl-slide-list{list-style:none;margin:1.5rem 0 0;padding:0;display:grid;gap:1.25rem}
+.cl-slide-editor>fieldset{margin:0;padding:1rem 1.15rem 1.15rem;border:1px solid var(--cl-border,#d0d7de);border-radius:var(--cl-radius,.5rem);background:var(--cl-surface,#fff);min-width:0}
+.cl-slide-editor legend{padding:0 .4rem;font-weight:700}
+.cl-slide-editor-apply{display:flex;align-items:flex-end}
+.cl-slide-editor-picture{margin:0;color:var(--cl-muted,#5f6b7a);font-size:.9rem}
+.cl-slide-editor-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.9rem}
+.cl-slide-editor-new{display:inline-flex;align-items:center;gap:.4rem;font-size:.9rem}
+.cl-slide-editor-new .cl-select{width:auto}
+/* The presentation editor (owner, 2026-10-30, the approved mockup). A slide's picture is the slide itself, drawn 800
+   pixels wide and shrunk, so its words keep the player's proportions (DeckRenderer::thumbnail): 160, 240 or 360 wide. */
+.cl-slide-thumb{display:block;flex:0 0 auto;width:fit-content;max-width:100%;overflow:hidden;border-radius:.4rem;box-shadow:0 0 0 1px var(--cl-border,#dfe4ea);line-height:1.4;pointer-events:none}
+.cl-slide-thumb .cw-deck{width:800px;margin:0;box-shadow:none;border-radius:0}
+.cl-slide-thumb--small .cw-deck{zoom:.2}
+.cl-slide-thumb--medium .cw-deck{zoom:.3}
+.cl-slide-thumb--large .cw-deck{zoom:.45}
+.cl-slide-thumb .cw-ready .cw-slide{overflow:hidden;transition:none;cursor:default}
+.cl-presentation-preview{max-width:68rem;margin-inline:auto}
+.cl-presentation-preview .cw-deck{margin:0}
+.cl-slide-tree .cl-slide-row{gap:.5rem .9rem;padding:.6rem .25rem}
+.cl-slide-number{flex:0 0 auto;min-width:1.6rem;font-weight:700;font-size:1.15rem;text-align:center}
+.cl-slide-picture{display:block;flex:0 0 auto;border-radius:.4rem;color:inherit}
+.cl-slide-picture:focus-visible{outline:2px solid var(--cl-accent,#2563eb);outline-offset:3px}
+.cl-slide-label{flex-direction:column;align-items:flex-start;gap:.15rem}
+.cl-slide-tree--grid .cl-tree-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(16rem,1fr));gap:1rem}
+.cl-slide-tree--grid .cl-slide-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"picture picture picture" "number label handle" "actions actions actions";align-items:center;height:100%;box-sizing:border-box;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-slide-tree--grid .cl-slide-picture{grid-area:picture;justify-self:center}
+.cl-slide-tree--grid .cl-slide-number{grid-area:number}
+.cl-slide-tree--grid .cl-slide-label{grid-area:label}
+.cl-slide-tree--grid .cl-slide-row>.cl-tree-handle{grid-area:handle}
+.cl-slide-tree--grid .cl-slide-row>.cl-ui-action-group{grid-area:actions}
+.cl-slide-tree--grid .cl-tree-node[data-drop="before"]>.cl-tree-row{box-shadow:inset 4px 0 0 var(--cl-accent,#2563eb)}
+.cl-slide-tree--grid .cl-tree-node[data-drop="after"]{box-shadow:none}
+.cl-slide-tree--grid .cl-tree-node[data-drop="after"]>.cl-tree-row{box-shadow:inset -4px 0 0 var(--cl-accent,#2563eb)}
+.cl-presentation-checks{list-style:none;margin:0;padding:0;display:grid;gap:.55rem}
+.cl-presentation-check{display:flex;gap:.6rem;align-items:flex-start}
+.cl-presentation-check .cl-ui-icon{flex:0 0 auto;width:1.2rem;height:1.2rem;margin-top:.15rem}
+.cl-presentation-check--fine .cl-ui-icon{color:var(--cl-success,#2e7a4a)}
+.cl-presentation-check--look .cl-ui-icon{color:var(--cl-warning,#a15c00)}
+/* A choice made by drawn slides (a layout, a look, a background): the grid follows the drawings' width. */
+.cl-ui-picture-choice-drawing{display:block}
+.cl-ui-picture-choice-item--drawing .cl-slide-thumb{margin-inline:auto}
+.cl-ui-picture-choice-item--drawing input{z-index:2}
+.cl-ui-picture-choice-grid:has(.cl-slide-thumb--small){grid-template-columns:repeat(auto-fill,minmax(calc(160px + 1.1rem),1fr))}
+.cl-ui-picture-choice-grid:has(.cl-slide-thumb--medium){grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(240px + 1.1rem)),1fr))}
+/* A slide's page and the details page: the row of slides, the bar that stays in view, the layout and the script. */
+.cl-slide-strip{display:flex;align-items:center;gap:.4rem}
+.cl-slide-strip-scroll{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem);background:transparent;color:inherit;cursor:pointer}
+.cl-slide-strip-scroll[hidden]{display:none}
+.cl-slide-strip-scroll:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-slide-strip-scroll:focus-visible{outline:2px solid var(--cl-accent,#2563eb);outline-offset:2px}
+.cl-slide-strip-scroll .cl-ui-icon{width:1.25rem;height:1.25rem}
+.cl-slide-strip-list{list-style:none;margin:0;padding:.25rem;display:flex;gap:.75rem;flex:1 1 auto;min-width:0;overflow-x:auto;scroll-snap-type:x proximity}
+.cl-slide-strip-item{flex:0 0 auto;scroll-snap-align:start}
+.cl-slide-strip-link,.cl-slide-strip-here{display:flex;flex-direction:column;gap:.3rem;width:160px;padding:3px;border:3px solid transparent;border-radius:.5rem;color:inherit;text-decoration:none}
+.cl-slide-strip-link:hover{border-color:var(--cl-border,#dfe4ea)}
+.cl-slide-strip-link:focus-visible{outline:2px solid var(--cl-accent,#2563eb);outline-offset:2px}
+.cl-slide-strip-here{border-color:var(--cl-accent,#2563eb)}
+.cl-slide-strip-title{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-slide-strip-here .cl-slide-strip-title{font-weight:700}
+.cl-slide-bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem 1rem;margin:0 0 1.25rem;padding:.75rem 0;border-bottom:1px solid var(--cl-border,#dfe4ea);background:var(--cl-page-surface,var(--cl-surface,#fff))}
+.cl-slide-bar-text h2{margin:0}
+.cl-slide-bar-status{margin:.15rem 0 0;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}
+.cl-slide-layout{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;margin:0 0 1.25rem;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-slide-layout-text{display:flex;flex-direction:column;gap:.1rem;flex:1 1 14rem;min-width:0}
+.cl-slide-layout-label{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--cl-muted,#5f6b7a)}
+.cl-slide-form .cl-ui-picture-choice,#details-form .cl-ui-picture-choice{margin-top:1.25rem}
+.cl-slide-layout-lead{margin:0 0 1rem}
+.cl-slide-layout-choice .cl-ui-picture-choice{margin-bottom:1.25rem}
+.cl-slide-preview-note{margin:0 0 .75rem;color:var(--cl-muted,#5f6b7a)}
+.cl-narration-form .cl-narration{margin-top:0}
+.cl-presentation-delete{margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}
+.cl-presentation-delete p{margin:0 0 .75rem}
+.cl-narration-script-status{margin:.5rem 0 1rem}
+.cl-narration-script-status:empty{display:none}
+.cl-narration-script-result{font-size:.9rem;color:var(--cl-success,#2e7a4a)}
+.cl-narration-script-result.is-error{color:var(--cl-danger,#b42318)}
+.cl-narration{display:grid;gap:.6rem;margin-top:1rem;padding:.8rem 1rem;border:1px dashed var(--cl-border,#d0d7de);border-radius:var(--cl-radius,.5rem)}
+.cl-narration-title{margin:0;font-weight:700}
+.cl-narration-current audio{width:min(100%,28rem)}
+.cl-narration-none{margin:0;color:var(--cl-muted,#5f6b7a);font-size:.92rem}
+.cl-narration-recorder{display:grid;gap:.6rem}.cl-narration-recorder[hidden]{display:none}.cl-narration-saved{display:grid;gap:.4rem}.cl-narration-label{margin:0;font-weight:600;font-size:.92rem}.cl-narration-note{margin:0;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}.cl-narration-controls{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}.cl-narration-take{display:grid;gap:.4rem;padding:.6rem .8rem;border-left:3px solid var(--cl-accent,#8a6a1f);background:var(--cl-surface-alt,rgb(127 127 127 / 6%))}.cl-narration-take[hidden],.cl-narration-remove[hidden]{display:none}.cl-narration-take audio{width:min(100%,28rem)}
+.cl-narration-status{margin:0;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}.cl-narration-status:empty{display:none}
+.cl-card-list{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:1rem}
+.cl-card-editor>fieldset{margin:0;padding:1rem 1.15rem;border:1px solid var(--cl-border,#d0d7de);border-radius:var(--cl-radius,.5rem);min-width:0}
+.cl-card-editor legend{padding:0 .4rem;font-weight:700}
+.cl-section-outcomes{display:grid;gap:.35rem;padding-left:1.3rem}
+/* The reader on a phone: one column, the outline above the content. The reader's later, unscoped column rule had
+   overridden the phone rule since it was written, so a phone showed the outline and a sliver of content side by side
+   (found 2026-10-28 with CatWalk, which is phone first). This comes after every reader rule, so it holds. */
+@media(max-width:760px){.cl-course-reader{grid-template-columns:minmax(0,1fr)}.cl-course-reader>.cl-course-outline{position:static;max-height:18rem;border-right:0;border-bottom:1px solid #d9e0e8;box-shadow:none}.cl-course-reader-content{padding:1rem}.cl-course-reader-content .cl-course-item{padding:1.15rem}}

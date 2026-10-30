@@ -2,6 +2,58 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-10-30 — v1.0.1 The course structure, CatWalk presentations and the presentation editor
+
+### Installing and updating
+
+- **A clean installation is needed.** The baseline schema changed: the item types Presentation, Flash cards and Practical work, each Course Item's name (`course_items.name`, unique) and time to study (`course_items.estimated_minutes`), numbered module sections (`course_sections.numbered`) and a course's first module number (`courses.first_module_number`), each slide's narration (`course_slide_narrations`), the landing page's Presentation section, the review email's record (`course_enrolments.review_requested_at`) and each course video's check (`course_video_checks`). A v1.0.0 database cannot be updated in place: install v1.0.1 on an empty database, then import your catalogue package at Administration → Courses → Import & Export Catalogue.
+- **No new `.env` settings, packages or themes.** Narration clips are kept in `storage/course-narrations/` and course part PDFs in `storage/course-pdfs/`, beside the other storage folders.
+- **New scheduled jobs:** `review_requests` (every hour) and `video_check` (every day). The commerce worker runs them; restart it after an update.
+- **A new console command** for scripts, `course:arrange-modules`, does what Arrange into modules does on Course Content.
+- **Outside sources:** the `video_check` job asks YouTube's oEmbed address (`https://www.youtube.com/oembed`) about each course video, sending only the video's id. CatWalk sends nothing over the network, and a module's Video part is the YouTube item that already existed. Recording a slide's narration uses the administrator's microphone in their own browser.
+- **Changed legal text:** the Privacy Policy (dated 28 October 2026) adds asking a learner once, by email a few days after they finish a course, to review it.
+- **Removed:** the one-page Presentation editor (every slide on one form) is replaced by the presentation editor below, at the same address.
+
+### The course structure
+
+- **A module is a numbered section** ("This section is a module: number it"), read as "Module N: title" in the outline and on its pages, holding its parts in order: Presentation, Video, Lesson, Summary, Flash cards, Practical work and Assessment. The outline shows each part's kind and time, and each module its total.
+- **Time to study** on every item, or worked out from its size: about 25 seconds a slide, 45 a flash card, 90 a question, and a lesson at 120 words a minute.
+- **Flash cards:** a set of up to 60 cards, worked through one at a time (Turn over, I knew it, Again) until every card is known, nothing recorded; a list without JavaScript; a pasted list in the editor.
+- **Practical work:** tasks with a model answer behind "Show the model answer".
+- **PDFs** of the lesson, summary, review study aid, flash cards and practical work ("Download as PDF"), with drawings printed as pictures.
+- **Arrange into modules** on Course Content turns a course of the older shape (one lesson per module) into module sections in one step: outcomes into the section's introduction, the video, the summary and the practical work into parts of their own, the assessment after them. An HTML import is arranged as it is imported, and an arranged course whose lessons still end with their summary is offered "Move the summaries into parts of their own".
+- **Module 0.** A course whose first module sets it up (a practice environment and a readiness check) numbers its modules from 0: "Number the modules from" on the course's Details tab.
+- **A video's start time**, for a long video of which only part is relevant, on the YouTube item's form.
+- **A trailer stays with visitors.** A trailer presentation plays on the landing page and in the public preview, but is never in the outline of someone who has the course.
+- **Course package 3.0** (`docs/COURSE-PACKAGE.md`): a zipped folder of `course.json` and a folder per module, imported at Import course after being checked against its schema, every error named. A worked example, GDN-101, is in `tests/Fixtures/course-package/`.
+
+### Course Items and lists
+
+- **Course Item names.** Every Course Item has a name only administrators see, never used twice, such as "GDN-101 Module 1 Presentation", which the Course Item Library, Add existing item, Course Content and a landing page's choice of presentation show and the Library's search finds. Left empty, it is named after its place (the course's code, the module and the part); imported items and the parts Arrange into modules makes are named that way. Learners still see the title.
+- **Course Item types by their names.** The editor is "Edit Course Item: " and the item's type (such as "Edit Course Item: Presentation"), opened by "Edit Course Item" and saved by "Save Course Item", and every page names a type the same way (Presentation, Flash cards, Video (YouTube)), never by its stored code ("slide deck"). Import HTML course is now Import course, since it also takes course packages.
+- **List and grid views change in place.** The List and Grid buttons above a list (People, Companies, Course Creators, Courses, the catalogue, the Company workspace's People, Subscribers, a company's people and courses, and a presentation's slides) change only the list, without loading the page again.
+- **Course Content's Cancel** under Edit section and Placement settings closes the form where it is and puts it back as it was saved, without loading the page again.
+
+### CatWalk presentations
+
+- **A Presentation** is a Course Item of slides kept as data, in twelve layouts (title, statement, points, compare, picture, number, timeline, steps, case, quick question, Up next, call to action), played by CatWalk (`docs/CATWALK.md`): one slide at a time on any screen, points revealed one by one, quick questions marked at once and never graded, contents, full screen, a transcript, keys that answer only in their own deck, swipes, and reduced motion followed. Without JavaScript, and in print, it reads as one page.
+- **The presentation editor**, a part at a time: the presentation's page plays it at the top, at full size, shows its details (with Edit details) and its slides as a list or a grid of their pictures, dragged by a handle or moved by the keyboard or a ⋯ menu, each move saved at once, copied and deleted, then where it is placed and its checks. Each slide has its own page: the row of slides at the top with icon buttons to scroll it, Preview in a window (saving nothing), Save slide, Close (which asks first when changes are not saved), Change layout in a window where every layout is drawn as a sample slide (keeping what was typed and the fields both layouts share), the background chosen by picture, and its narration. Add a slide chooses the layout by picture and where it goes; the new slide is kept only by Save slide. The details page has the name, title, description, key, time to study, what it is for and the look (both chosen by picture), Make a copy and Delete. A new presentation asks only what it is for and its look, and starts with a title slide.
+- **Narration:** each slide's narration recorded on its page with the microphone, or uploaded (WebM, Ogg, MP4, MP3 or WAV, up to 20 MB), and played with the slide when the learner turns narration on. A new recording or chosen file is heard first, then kept or discarded; Keep and Remove act at once, and the script has its own Save the script. Clips are heard only by those who may see the presentation, and travel in catalogue packages.
+- **A presentation's description** is one plain line of up to 100 characters, shown in the player's top bar in place of the title, which the page's heading already shows.
+- **A landing page's Presentation section** plays one of the course's presentations, such as its trailer, ending with Get this course and Preview the course.
+
+### Reviews and videos
+
+- **Asked for a review when they finish.** The final assessment's result page holds the review form, and saving it comes back there. Three days after completing a course, a learner who has not reviewed it is emailed once with a link to rate it, never at an address on Addresses never emailed.
+- **Course videos are checked every day.** A video YouTube says was removed, is private or may not be played on other sites is listed under Needs your attention, with a button to its item, until it plays again.
+
+### Fixed
+
+- **An administrator's course preview named ten years** on its start page ("starting begins my access period of 10 years"). Every preview enrolment had a fixed ten-year period, there since the first version and shown since v0.9.4 named the period. A preview now runs for the period a buyer gets: the course's default price option, else the course's default access period. A preview not yet started follows price changes.
+- **Start course took two clicks.** It returned to the course page, where Begin course had to be clicked as well. Start course now opens the course's first part, and Begin course, for a learner coming back, leads to the same part (it had pointed at the first row even when that row was a heading with nothing to show).
+- **Start course's wording** names whose refund starting ends: the learner's own for a course they bought, their company's for a place from its credit, and none for a course given to test or an administrator's preview.
+- **A picture slide fits its slide.** On a wide screen a tall diagram pushed its heading and caption out of the slide, and a slide fuller than its box lost its top. A picture now takes the room under its heading, and on a phone it is sized by its width.
+
 ## 2026-10-28 — v1.0.0 Mailing, the sign-up check, South African ID numbers, overview pages and drawn pictures
 
 ### Installing and updating

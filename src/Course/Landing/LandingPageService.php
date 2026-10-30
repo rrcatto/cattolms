@@ -204,6 +204,9 @@ final class LandingPageService
                 $input['image_resource_id'] = $this->uploadPicture($upload, (string) ($input['upload_title'] ?? ''), $userId);
             }
             $data = $type->normalise($input);
+            if ($type === LandingSectionType::Presentation && $data['presentation'] !== '' && $this->pages->presentation($courseId, $data['presentation']) === null) {
+                throw new InvalidArgumentException('Choose one of this course’s presentations.');
+            }
             if ($type === LandingSectionType::Hero && $data['image'] === 'resource') {
                 if ($data['image_resource_id'] === null) {
                     throw new InvalidArgumentException('Choose the picture from the Resource Library, or upload one.');
@@ -308,6 +311,9 @@ final class LandingPageService
             }
             if ($section['type'] === LandingSectionType::Hero && $section['data']['image'] === 'resource' && $section['data']['image_resource_id'] !== null && $this->pages->picture((int) $section['data']['image_resource_id']) === null) {
                 $problems[] = 'The hero’s picture is no longer in the Resource Library.';
+            }
+            if ($section['type'] === LandingSectionType::Presentation && ($section['data']['presentation'] ?? '') !== '' && $this->pages->presentation((int) $page['course_id'], (string) $section['data']['presentation']) === null) {
+                $problems[] = 'The presentation the page plays is no longer in the course.';
             }
         }
         if ($shown === 0) {

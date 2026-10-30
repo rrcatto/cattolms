@@ -1446,6 +1446,12 @@ final class CourseRepository
     }
 
     /** Where the course stands in the catalogue, or null for after the numbered courses (owner, 2026-10-20). */
+    /** The number of the course's first module section: 1, or 0 when its first module sets the course up (2026-10-29). */
+    public function setFirstModuleNumber(int $courseId, int $number): void
+    {
+        $this->db->executeStatement('UPDATE courses SET first_module_number = :number, updated_at = NOW() WHERE id = :id', ['number' => $number === 0 ? 0 : 1, 'id' => $courseId]);
+    }
+
     public function setCataloguePosition(int $courseId, ?int $position): void
     {
         $this->db->executeStatement('UPDATE courses SET catalogue_position = :position, updated_at = NOW() WHERE id = :id', ['position' => $position, 'id' => $courseId]);
@@ -1815,6 +1821,14 @@ final class CourseRepository
         return (int) ($rows[0]['total'] ?? 0);
     }
 
+    /** @return array<int,string> Every course's code, by id, in catalogue order. */
+    public function codes(): array
+    {
+        $codes = [];
+        foreach ($this->db->fetchAllAssociative('SELECT id, code FROM courses ORDER BY catalogue_position NULLS LAST, id') as $row) { $codes[(int) $row['id']] = (string) $row['code']; }
+        return $codes;
+    }
+
     /** @return array<string,mixed>|null */
     public function findById(int $courseId): ?array
     {
@@ -2150,6 +2164,12 @@ final class CourseRepository
                 'created_at' => gmdate('Y-m-d H:i:sP'),
             ]
         );
+    }
+
+    /** Whether an enrolment is a place from a company's course credit: the company paid for it. */
+    public function enrolmentFromCompanyCredit(int $enrolmentId): bool
+    {
+        return (bool) $this->db->fetchOne('SELECT EXISTS (SELECT 1 FROM course_credit_allocations WHERE enrolment_id = :id)', ['id' => $enrolmentId]);
     }
 
     /** @return array<string,mixed>|null */

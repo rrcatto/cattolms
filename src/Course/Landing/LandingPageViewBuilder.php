@@ -55,6 +55,8 @@ final class LandingPageViewBuilder
         private readonly LandingPageRepository $pages,
         private readonly CourseReviewService $reviews,
         private readonly CoursePurchaseOptions $purchases,
+        private readonly ?\CattoLearning\Course\Catwalk\DeckRenderer $decks = null,
+        private readonly ?\CattoLearning\Course\Catwalk\NarrationRepository $narrations = null,
     ) {
     }
 
@@ -181,7 +183,23 @@ final class LandingPageViewBuilder
             LandingSectionType::Reviews => $this->reviewsSection($common, $data, $course, $rating ?? ['count' => 0]),
             LandingSectionType::Pricing => $common + ['rating' => $rating, 'purchase' => $purchase],
             LandingSectionType::Cta => $common + ['purchase' => $purchase],
+            LandingSectionType::Presentation => $common + ['deck_html' => $this->deck((string) ($data['presentation'] ?? ''), $course)],
         };
+    }
+
+    /**
+     * The chosen Presentation, as CatWalk plays it: its buttons lead to the course's page and its free preview.
+     *
+     * @param array<string,mixed> $course
+     */
+    private function deck(string $key, array $course): string
+    {
+        $item = $key === '' ? null : $this->pages->presentation((int) $course['id'], $key);
+        if ($item === null) { return ''; }
+        $narrations = [];
+        foreach ($this->narrations?->forItem((int) $item['id']) ?? [] as $slide => $publicId) { $narrations[$slide] = '/narrations/' . rawurlencode($publicId); }
+        $slug = rawurlencode((string) $course['slug']);
+        return ($this->decks ?? new \CattoLearning\Course\Catwalk\DeckRenderer())->render((array) $item['type_config'], (string) $item['item_key'], \CattoLearning\Course\Catwalk\SlideDeck::barText((string) ($item['description_html'] ?? ''), (string) $item['title']), ['enrol' => '/courses/' . $slug, 'preview' => '/courses/' . $slug . '/preview', 'continue' => '/courses/' . $slug], $narrations);
     }
 
     /**

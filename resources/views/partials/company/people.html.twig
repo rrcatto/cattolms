@@ -9,7 +9,7 @@
 
 	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', eyebrow: 'People', summary: 'People in the company you are administering.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
-{% block toolbar %}{% if company_people_view_switch|default(null) and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: company_people_view_switch} %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if company_people_view_switch|default(null) and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: company_people_view_switch, vs_region: 'people-view'} %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 			{% if company_people_view|default('list') == 'grid' %}

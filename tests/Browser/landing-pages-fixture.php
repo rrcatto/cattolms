@@ -56,7 +56,7 @@ $node = static fn(int $course, ?int $parent, int $position, string $type): int =
     ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type]
 );
 $item = static fn(int $owner, string $key, string $type, string $title, string $description, string $content): int => (int) $db->fetchOne(
-    'INSERT INTO course_items (public_id,item_key,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id) VALUES (:p,:k,:t,:title,:d,:content,:u,:u) RETURNING id',
+    'INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id) VALUES (:p,:k,:k,:t,:title,:d,:content,:u,:u) RETURNING id',
     ['p' => Uuid::v4(), 'k' => $key, 't' => $type, 'title' => $title, 'd' => $description, 'content' => $content, 'u' => $owner]
 );
 $place = static fn(int $node, int $course, int $item, bool $preview) => $db->executeStatement(

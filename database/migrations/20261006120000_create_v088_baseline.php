@@ -11,6 +11,13 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/28 SAST (course structure and CatWalk)
+- course_items.item_type gains slide_deck (Presentation), flashcards and practical, and course_items gains
+  estimated_minutes; course_sections.numbered (a module's section, numbered by the site); course_slide_narrations
+  (each slide's recorded narration); course_landing_sections.section_type gains presentation, once a page.
+- courses.first_module_number: 1, or 0 for a course whose first module sets it up (2026-10-29).
+- course_enrolments.review_requested_at: when the one email asking for a review was sent (decision 8A);
+  course_video_checks: each course video's last check against YouTube.
 2026/10/28 SAST (updates and lists)
 - mailing_lists gains own lists (name, words, shown, join link), each list's sender, template and welcome email and
   closing; mailing_preferences, mailing_updates, mailing_update_deliveries, mailing_course_prices and mailing_forwards;
@@ -254,6 +261,7 @@ private const FOREIGN_KEY_INDEXES = [
         'course_enrolments_assigned_by_user_fk_idx' => 'course_enrolments (assigned_by_user_id)',
         'course_favourites_course_fk_idx' => 'course_favourites (course_id)',
         'course_item_placements_course_item_fk_idx' => 'course_item_placements (course_item_id)',
+        'course_slide_narrations_created_by_user_fk_idx' => 'course_slide_narrations (created_by_user_id)',
         'course_item_references_referenced_key_idx' => 'course_item_references (referenced_key)',
         'course_items_created_by_user_fk_idx' => 'course_items (created_by_user_id)',
         'course_items_resource_fk_idx' => 'course_items (resource_id)',
@@ -989,6 +997,8 @@ CREATE TABLE courses (
     estimated_minutes INTEGER NULL CHECK (estimated_minutes IS NULL OR estimated_minutes >= 0),
     status VARCHAR(24) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired','archived')),
     default_access_period_seconds INTEGER NOT NULL DEFAULT 31536000 CHECK (default_access_period_seconds > 0),
+    -- The number of a course's first module section: 1, or 0 for a course whose first module sets it up (owner, 2026-10-29).
+    first_module_number SMALLINT NOT NULL DEFAULT 1 CHECK (first_module_number IN (0, 1)),
     certificate_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     -- The course's own certificate data: an optional accreditation or CPD line, and the design its
     -- certificates are drawn in (a certificate document template). The wording, signatory and look
@@ -1071,12 +1081,17 @@ CREATE TABLE course_items (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
     item_key VARCHAR(120) NOT NULL UNIQUE CHECK (item_key ~ '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$'),
-    item_type VARCHAR(32) NOT NULL CHECK (item_type IN ('html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file')),
+    item_type VARCHAR(32) NOT NULL CHECK (item_type IN ('html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file','slide_deck','flashcards','practical')),
+    -- The name administrators know it by, never used twice (owner, 2026-10-30: many items share a title, such as "What
+    -- you will learn"), such as "GDN-101 Module 1 Presentation": the Course Item Library lists and searches it. Learners see the title.
+    name VARCHAR(160) NOT NULL CHECK (btrim(name) <> ''),
     title VARCHAR(240) NOT NULL,
     description_html TEXT NOT NULL DEFAULT '',
     content_source TEXT NOT NULL DEFAULT '',
     type_config JSONB NOT NULL DEFAULT '{}'::jsonb,
     resource_id BIGINT NULL REFERENCES resources(id) ON DELETE RESTRICT,
+    -- The time a learner takes over the item, shown in the outline with its section's total (course structure 2026-10-28).
+    estimated_minutes INTEGER NULL CHECK (estimated_minutes IS NULL OR (estimated_minutes > 0 AND estimated_minutes <= 1440)),
     created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     updated_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1084,6 +1099,7 @@ CREATE TABLE course_items (
 );
 CREATE INDEX course_items_type_title_idx ON course_items(item_type, title, id);
 CREATE INDEX course_items_title_idx ON course_items(title, id);
+CREATE UNIQUE INDEX course_items_name_unique ON course_items (lower(name));
 
 CREATE TABLE course_item_references (
     source_course_item_id BIGINT NOT NULL REFERENCES course_items(id) ON DELETE CASCADE,
@@ -1114,7 +1130,9 @@ CREATE TABLE course_sections (
     introduction_html TEXT NOT NULL DEFAULT '',
     show_outline BOOLEAN NOT NULL DEFAULT FALSE,
     -- A section opts into the public course preview like a Course Item placement.
-    public_preview BOOLEAN NOT NULL DEFAULT FALSE
+    public_preview BOOLEAN NOT NULL DEFAULT FALSE,
+    -- A module's section: the site numbers these in course order ("Module 3: Evidence", owner decision 4A, 2026-10-28).
+    numbered BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE course_item_placements (
@@ -1149,6 +1167,34 @@ CREATE TABLE course_item_assessments (
     difficulty_selection JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- A Presentation's narration (CatWalk, owner 2026-10-28): one recorded or uploaded clip per slide, the slide named by
+-- the stable id it keeps in the deck's slide data when slides are added, moved or removed. The file sits in storage
+-- under course-narrations/, named by public_id.
+CREATE TABLE course_slide_narrations (
+    id BIGSERIAL PRIMARY KEY,
+    public_id UUID NOT NULL UNIQUE,
+    course_item_id BIGINT NOT NULL REFERENCES course_items(id) ON DELETE CASCADE,
+    slide_id VARCHAR(32) NOT NULL CHECK (slide_id ~ '^[a-z0-9]{6,32}$'),
+    content_type VARCHAR(80) NOT NULL CHECK (content_type IN ('audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav')),
+    byte_size BIGINT NOT NULL CHECK (byte_size > 0),
+    sha256 CHAR(64) NOT NULL,
+    duration_seconds NUMERIC(8,2) NULL CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+    created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (course_item_id, slide_id)
+);
+-- Whether each course video still plays (decision 8A): the daily video_check job asks YouTube about every video placed
+-- in a course; one that no longer plays is on the dashboard's Needs your attention until it plays again or is gone.
+CREATE TABLE course_video_checks (
+    course_item_id BIGINT PRIMARY KEY REFERENCES course_items(id) ON DELETE CASCADE,
+    youtube_id VARCHAR(11) NOT NULL CHECK (youtube_id ~ '^[A-Za-z0-9_-]{11}$'),
+    status VARCHAR(16) NOT NULL CHECK (status IN ('plays','blocked','removed','invalid')),
+    detail VARCHAR(300) NOT NULL DEFAULT '',
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    failing_since TIMESTAMPTZ NULL,
+    CHECK ((status = 'plays') = (failing_since IS NULL))
 );
 
 CREATE FUNCTION course_structure_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
@@ -1275,6 +1321,8 @@ CREATE TABLE course_enrolments (
     started_at TIMESTAMPTZ NULL,
     expires_at TIMESTAMPTZ NULL,
     completed_at TIMESTAMPTZ NULL,
+    -- The one email asking the learner to review the course, a few days after completing it (decision 8A).
+    review_requested_at TIMESTAMPTZ NULL,
     assigned_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
     is_preview BOOLEAN NOT NULL DEFAULT FALSE,
     access_removed_at TIMESTAMPTZ NULL,
@@ -2769,7 +2817,7 @@ CREATE UNIQUE INDEX course_landing_pages_one_per_course ON course_landing_pages 
 CREATE TABLE course_landing_sections (
     id BIGSERIAL PRIMARY KEY,
     landing_page_id BIGINT NOT NULL REFERENCES course_landing_pages(id) ON DELETE CASCADE,
-    section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','reviews','pricing','faq','cta')),
+    section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','reviews','pricing','faq','cta','presentation')),
     position INTEGER NOT NULL CHECK (position >= 0),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     data JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(data) = 'object'),
@@ -2780,7 +2828,7 @@ CREATE TABLE course_landing_sections (
 );
 -- Sections a page can hold only once. Benefits, FAQ and call-to-action sections may repeat.
 CREATE UNIQUE INDEX course_landing_sections_once ON course_landing_sections (landing_page_id, section_type)
-    WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing');
+    WHERE section_type IN ('hero','audience','outcomes','contents','reviews','pricing','presentation');
 
 -- The stored course popularity snapshot, replaced whole by popularity:recalculate. Pages read it
 -- and never calculate on a request.
@@ -3131,7 +3179,7 @@ DROP TABLE IF EXISTS
     companies, company_billing_profiles, company_departures, company_favourites, company_users, course_categories,
     course_credit_allocations, course_credits, course_edit_history, course_editors,
     course_enrolments, course_favourites, course_grade_bands, course_item_assessments, course_landing_pages, course_landing_sections,
-    course_item_placements, course_item_references, course_items, course_popularity,
+    course_item_placements, course_item_references, course_slide_narrations, course_video_checks, course_items, course_popularity,
     course_popularity_runs, course_price_variants, course_requests, course_results, course_reviews,
     course_sections, course_structure_nodes, course_tags, courses, permissions, promotion_bundles,
     promotion_courses, promotion_redemptions, promotions, resources, role_permissions, roles, tags,

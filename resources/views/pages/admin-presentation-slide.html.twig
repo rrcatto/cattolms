@@ -1,0 +1,87 @@
+{#
+	One slide's page, as the owner approved its mockup (2026-10-30): the row of slides at the top, to edit another one
+	("This can have left and right nav buttons to scroll backwards and forwards through the slides ... First and Last
+	Slide buttons (but use svg icons, not text"); no side preview but a Preview button that "pops up a modal to show just
+	the slide you're currently editing ... None of this actually saves the work"; Save slide, which "just saves and
+	remains on the page"; Close, back to the presentation, which asks first when changes are not saved; Change layout,
+	the layout window over the page; and the narration at the bottom, saved apart. A new slide has the same page and
+	is kept only when Save slide is pressed. Course\Catwalk\PresentationPages gathers it.
+#}
+{% extends layout %}
+{% block page_body %}
+{{ importmap() }}
+	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set is_new = after is not null %}
+	{% set slide_url = is_new ? base ~ '/slides/new' : base ~ '/slides/' ~ slide.id %}
+	{% set layout_url = is_new ? base ~ '/slides/new/layout?' ~ {after: after, layout: slide_layout.name}|url_encode : base ~ '/slides/' ~ slide.id ~ '/layout' %}
+	{% set ph_back_href = base %}{% set ph_back_label = 'The presentation: ' ~ item.title %}
+	{% set ph_kicker = item.name ~ ' · ' ~ (is_new ? 'New slide' : 'Slide ' ~ position ~ ' of ' ~ slide_count) %}
+	{% set ph_title = is_new ? 'New slide' : (slide.title|default('') ?: 'Untitled slide') %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	{% if notice %}<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: notice.tone})} %}{% block body %}<p>{{ notice.text }}</p>{% endblock %}{% endembed %}</section>{% endif %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'slide-strip', variant: 'compact'})} %}{% block surface_body %}
+		<nav class="cl-slide-strip" aria-label="The presentation's slides: choose one to edit it" data-controller="slide-strip">
+			<button type="button" class="cl-slide-strip-scroll" aria-label="Show the first slides" data-slide-strip-target="scroller" data-action="slide-strip#first" hidden>{{ ui('icon', {name: 'action-first', decorative: true}) }}</button>
+			<button type="button" class="cl-slide-strip-scroll" aria-label="Show earlier slides" data-slide-strip-target="scroller" data-action="slide-strip#back" hidden>{{ ui('icon', {name: 'action-step-back', decorative: true}) }}</button>
+			<ol class="cl-slide-strip-list" data-slide-strip-target="strip">
+				{% for entry in strip %}
+					<li class="cl-slide-strip-item">
+						{% if entry.current %}
+							<span class="cl-slide-strip-here" aria-current="page">{{ entry.thumb|raw }}<span class="cl-slide-strip-title">{{ entry.number }}. {{ entry.title }}</span></span>
+						{% else %}
+							<a class="cl-slide-strip-link" href="{{ base }}/slides/{{ entry.id }}">{{ entry.thumb|raw }}<span class="cl-slide-strip-title">{{ entry.number }}. {{ entry.title }}</span></a>
+						{% endif %}
+					</li>
+				{% endfor %}
+			</ol>
+			<button type="button" class="cl-slide-strip-scroll" aria-label="Show later slides" data-slide-strip-target="scroller" data-action="slide-strip#on" hidden>{{ ui('icon', {name: 'action-step-on', decorative: true}) }}</button>
+			<button type="button" class="cl-slide-strip-scroll" aria-label="Show the last slides" data-slide-strip-target="scroller" data-action="slide-strip#last" hidden>{{ ui('icon', {name: 'action-last', decorative: true}) }}</button>
+		</nav>
+	{% endblock %}{% endembed %}</section>
+
+	{% if preview_html %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'slide-preview-page'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Preview', summary: 'Not saved yet: the slide as the form below holds it.'}) }}
+		<div class="cl-presentation-preview">{{ preview_html|raw }}</div>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'slide-editor'})} %}{% block surface_body %}
+		<form id="slide-form" class="cl-slide-form" action="{{ slide_url }}" method="post" enctype="multipart/form-data" data-controller="unsaved-changes slide-editor" data-unsaved-changes-dirty-value="{{ unsaved ? 'true' : 'false' }}" data-unsaved-changes-forms-value="#narration-form" data-unsaved-changes-leave-value=".cl-back-link, #slide-close, .cl-slide-strip-link" data-slide-editor-preview-value="#slide-preview-body">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% if is_new %}<input type="hidden" name="after" value="{{ after }}">{% endif %}
+			<input type="hidden" name="slide[layout]" value="{{ slide_layout.name }}">
+			<div class="cl-slide-bar">
+				<div class="cl-slide-bar-text">
+					<h2>{{ is_new ? 'New slide' : 'Slide ' ~ position }}</h2>
+					<p class="cl-slide-bar-status" role="status" data-unsaved-changes-target="status" data-saved="{{ is_new ? 'Not saved yet: press Save slide to add it.' : 'Saved. No changes yet.' }}" data-changed="Changes not saved yet. Save slide keeps them.">{{ unsaved or is_new ? (is_new ? 'Not saved yet: press Save slide to add it.' : 'Changes not saved yet. Save slide keeps them.') : 'Saved. No changes yet.' }}</p>
+				</div>
+				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+					{{ ui('action.button', {label: 'Preview', type: 'submit', name: 'slide_action', value: 'preview', skip_validation: true, modal: 'slide-preview', stimulus_action: 'slide-editor#preview', icon: 'action-preview'}) }}
+					{{ ui('action.button', {label: 'Save slide', variant: 'primary', type: 'submit', name: 'slide_action', value: 'save', icon: 'action-save-changes'}) }}
+					{{ ui('action.link', {label: 'Close', href: base ~ '#slide-' ~ slide.id|default(''), id: 'slide-close', icon: 'action-cancel'}) }}
+				{% endblock %}{% endembed %}
+			</div>
+			<div class="cl-slide-layout">
+				{{ layout_thumb|raw }}
+				<div class="cl-slide-layout-text"><span class="cl-slide-layout-label">Layout</span><strong>{{ slide_layout.label }}</strong><span>{{ slide_layout.use }}</span></div>
+				{{ ui('action.link', {label: 'Change layout', href: layout_url, get: layout_url, target: '#slide-layout-body', modal: 'slide-layout', icon: 'action-switch'}) }}
+			</div>
+			{% include '@platform/partials/admin/slide-fields.html.twig' %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+
+	{% if not is_new %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'narration'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Narration', summary: 'Optional. The script and the recording are each saved here, with their own buttons: neither waits for Save slide.'}) }}
+		{% include '@platform/partials/admin/slide-narration.html.twig' %}
+	{% endblock %}{% endembed %}</section>
+	{% else %}
+	<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Narration'})} %}{% block body %}<p>Save the slide first. Then its script and its recording are added here.</p>{% endblock %}{% endembed %}</section>
+	{% endif %}
+
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'slide-preview', title: 'Preview of the slide', size: 'wide'})} %}{% block modal_body %}<div id="slide-preview-body"></div>{% endblock %}{% block modal_actions %}{{ ui('action.button', {label: 'Close the preview', type: 'button', close_modal: true, icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'slide-layout', title: 'Change the layout', size: 'wide'})} %}{% block modal_body %}<div id="slide-layout-body"></div>{% endblock %}{% endembed %}
+{% endblock %}

@@ -78,8 +78,8 @@ final class CourseItemEditReturnTest extends TestCase
     {
         $html = $this->ok('/admin/courses/' . $this->course . '/content');
         $link = '/admin/course-items/' . $this->itemId . '?return_to=' . rawurlencode($this->returnTo);
-        self::assertStringContainsString('href="' . htmlspecialchars($link, ENT_QUOTES) . '"', $html, 'Edit shared item carries the course and the row.');
-        self::assertStringNotContainsString('href="/admin/course-items/' . $this->itemId . '"', $html, 'No Edit shared item link in Course Content loses its context.');
+        self::assertStringContainsString('href="' . htmlspecialchars($link, ENT_QUOTES) . '"', $html, 'Edit Course Item carries the course and the row.');
+        self::assertStringNotContainsString('href="/admin/course-items/' . $this->itemId . '"', $html, 'No Edit Course Item link in Course Content loses its context.');
     }
 
     public function testEditingFromCourseContentReturnsToThatCourse(): void

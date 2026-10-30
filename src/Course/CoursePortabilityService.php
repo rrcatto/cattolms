@@ -65,7 +65,10 @@ final class CoursePortabilityService
         private readonly CompanyRepository $companies,
         private readonly CourseCatalogueSettings $catalogue,
         private readonly string $storageRoot,
-        private readonly string $bundledImportRoot
+        private readonly string $bundledImportRoot,
+        // A Presentation's narration travels with it (CatWalk, owner 2026-10-28): its list in the course file, its clips in a catalogue package.
+        private readonly ?Catwalk\NarrationRepository $narrationRecords = null,
+        private readonly ?CourseRestructurer $restructurer = null
     ) {
     }
 
@@ -78,17 +81,18 @@ final class CoursePortabilityService
         $this->refuseSeedImporter($userId);
         $error = (int) ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error !== UPLOAD_ERR_OK) {
-            throw new InvalidArgumentException('Select a valid HTML or JSON course file.');
+            throw new InvalidArgumentException('Select a course: a course package (.zip), or an HTML or JSON course file.');
         }
         $size = (int) ($uploadedFile['size'] ?? 0);
-        if ($size < 1 || $size > 20 * 1024 * 1024) {
-            throw new InvalidArgumentException('The course file must be between 1 byte and 20 MB.');
+        if ($size < 1 || $size > 100 * 1024 * 1024) {
+            throw new InvalidArgumentException('The course file must be between 1 byte and 100 MB.');
         }
         $name = basename((string) ($uploadedFile['name'] ?? 'course.html'));
-        if (!preg_match('/\.(?:html?|json)$/i', $name)) {
-            throw new InvalidArgumentException('Only HTML and JSON course files can be imported.');
+        if (!preg_match('/\.(?:html?|json|zip)$/i', $name)) {
+            throw new InvalidArgumentException('Import a course package (.zip), or an HTML or JSON course file.');
         }
-        $extension = preg_match('/\.json$/i', $name) === 1 ? 'json' : 'html';
+        // A course package 3.0 (owner, 2026-10-28, decision 5A): a zip of course.json and a folder per module.
+        $extension = preg_match('/\.zip$/i', $name) === 1 ? 'zip' : (preg_match('/\.json$/i', $name) === 1 ? 'json' : 'html');
         $temporary = (string) ($uploadedFile['tmp_name'] ?? '');
         if (!is_uploaded_file($temporary) && !is_file($temporary)) {
             throw new InvalidArgumentException('The uploaded course file is unavailable.');
@@ -172,6 +176,11 @@ final class CoursePortabilityService
         $this->refuseSeedImporter($userId);
         $analysis = $this->reanalyseImport($key);
         $courseId = $this->importChecked($analysis, $categoryId, $userId, $replaceCourseId, $code);
+        // An HTML course arrives in the older shape, one lesson per module: it is arranged into module sections at once
+        // (course structure, owner 2026-10-28).
+        if ($this->restructurer !== null && ($this->staged($key)[1]['extension'] ?? '') === 'html' && $this->restructurer->needsArranging($courseId)) {
+            $this->restructurer->arrange($courseId, $userId);
+        }
         if (is_array($analysis['catalogue'] ?? null)) {
             // The category is the one the review chose, already given; the rest of the package's settings follow.
             $settings = array_diff_key($analysis['catalogue'], ['category' => true]);
@@ -226,7 +235,12 @@ final class CoursePortabilityService
             }
             throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts']));
         }
-        return $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId, $code);
+        $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId, $code);
+        // The number of its first module travels with it (2026-10-29).
+        if (array_key_exists('first_module_number', (array) ($analysis['course'] ?? []))) {
+            $this->courses->setFirstModuleNumber($courseId, (int) $analysis['course']['first_module_number']);
+        }
+        return $courseId;
     }
 
     /**
@@ -308,7 +322,7 @@ final class CoursePortabilityService
         $courseItems = []; $resources = []; $structure = [];
         foreach ($rows as $row) {
             $node = ['node_key' => (string) $row['public_id'], 'parent_node_key' => $row['parent_node_id'] === null ? null : ($byNode[(int) $row['parent_node_id']] ?? null), 'position' => (int) $row['position'], 'node_type' => (string) $row['node_type'], 'relative_delay_minutes' => (int) $row['relative_delay_minutes']];
-            if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline'], 'public_preview' => (bool) $row['public_preview']]; }
+            if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline'], 'public_preview' => (bool) $row['public_preview'], 'numbered' => (bool) ($row['numbered'] ?? false)]; }
             else {
                 $key = (string) $row['item_key']; $node += ['item_key' => $key, 'display_title_override' => $row['display_title_override'], 'display_description_override' => $row['display_description_override'], 'public_preview' => (bool) $row['public_preview'], 'assessment_role' => (string) $row['assessment_role']];
                 foreach ($this->courseItemRecords->reachableItems((int) $row['course_item_id']) as $reachable) {
@@ -327,7 +341,7 @@ final class CoursePortabilityService
                         if ($auxiliary !== null) { $item['type_config'][str_replace('_id', '_public_id', $field)] = $auxiliary['public_id']; $resources[(string) $auxiliary['public_id']] = array_intersect_key($auxiliary, array_flip(['public_id','title','description','filename','original_filename','resource_type','mime_type','byte_size'])); }
                         unset($item['type_config'][$field]);
                     }
- $courseItems[$key] = ['item_key' => $key, 'item_type' => $item['item_type'], 'title' => $item['title'], 'description_html' => $item['description_html'], 'content_source' => $item['content_source'], 'type_config' => $item['type_config'], 'resource_public_id' => $item['resource_public_id'] ?? null, 'instructions_html' => $item['instructions_html'] ?? '', 'result_pass_html' => $item['result_pass_html'] ?? '', 'result_fail_html' => $item['result_fail_html'] ?? '', 'pass_mark' => $item['pass_mark'] ?? null, 'practice' => $item['practice'] ?? false, 'practice_enabled' => $item['practice_enabled'] ?? false, 'practice_pool_mode' => $item['practice_pool_mode'] ?? null, 'practice_question_count' => $item['practice_question_count'] ?? null, 'graded_question_count' => $item['graded_question_count'] ?? null, 'maximum_attempts' => $item['maximum_attempts'] ?? null, 'time_limit_seconds' => $item['time_limit_seconds'] ?? null, 'score_policy' => $item['score_policy'] ?? null, 'randomise_questions' => $item['randomise_questions'] ?? false, 'randomise_options' => $item['randomise_options'] ?? false, 'negative_marking' => $item['negative_marking'] ?? false, 'questions' => $item['questions']]; if (!empty($item['resource_public_id'])) { $resources[(string) $item['resource_public_id']] = ['public_id' => $item['resource_public_id'], 'title' => $item['resource_title'], 'description' => $item['resource_description'], 'filename' => $item['resource_filename'], 'original_filename' => $item['original_filename'], 'resource_type' => $item['resource_type'], 'mime_type' => $item['mime_type'], 'byte_size' => (int) $item['byte_size']]; } }
+ $courseItems[$key] = ['item_key' => $key, 'item_type' => $item['item_type'], 'title' => $item['title'], 'description_html' => $item['description_html'], 'content_source' => $item['content_source'], 'type_config' => $item['type_config'], 'resource_public_id' => $item['resource_public_id'] ?? null, 'instructions_html' => $item['instructions_html'] ?? '', 'result_pass_html' => $item['result_pass_html'] ?? '', 'result_fail_html' => $item['result_fail_html'] ?? '', 'pass_mark' => $item['pass_mark'] ?? null, 'practice' => $item['practice'] ?? false, 'practice_enabled' => $item['practice_enabled'] ?? false, 'practice_pool_mode' => $item['practice_pool_mode'] ?? null, 'practice_question_count' => $item['practice_question_count'] ?? null, 'graded_question_count' => $item['graded_question_count'] ?? null, 'maximum_attempts' => $item['maximum_attempts'] ?? null, 'time_limit_seconds' => $item['time_limit_seconds'] ?? null, 'score_policy' => $item['score_policy'] ?? null, 'randomise_questions' => $item['randomise_questions'] ?? false, 'randomise_options' => $item['randomise_options'] ?? false, 'negative_marking' => $item['negative_marking'] ?? false, 'questions' => $item['questions'], 'estimated_minutes' => $item['estimated_minutes'] ?? null]; if ((string) $item['item_type'] === 'slide_deck' && $this->narrationRecords !== null) { $courseItems[$key]['narrations'] = array_map(static fn(array $clip): array => ['slide_id' => (string) $clip['slide_id'], 'public_id' => (string) $clip['public_id'], 'content_type' => (string) $clip['content_type'], 'byte_size' => (int) $clip['byte_size'], 'sha256' => (string) $clip['sha256'], 'duration_seconds' => $clip['duration_seconds'] === null ? null : (float) $clip['duration_seconds']], $this->narrationRecords->rowsForItem((int) $item['id'])); } if (!empty($item['resource_public_id'])) { $resources[(string) $item['resource_public_id']] = ['public_id' => $item['resource_public_id'], 'title' => $item['resource_title'], 'description' => $item['resource_description'], 'filename' => $item['resource_filename'], 'original_filename' => $item['original_filename'], 'resource_type' => $item['resource_type'], 'mime_type' => $item['mime_type'], 'byte_size' => (int) $item['byte_size']]; } }
             }
             $structure[] = $node;
         }
@@ -347,6 +361,7 @@ final class CoursePortabilityService
                 'level' => $course['level'],
                 'estimated_minutes' => $course['estimated_minutes'],
                 'default_access_period_seconds' => (int) $course['default_access_period_seconds'],
+                'first_module_number' => (int) ($course['first_module_number'] ?? 1),
                 'introduction_html' => $course['introduction_html'],
                 'show_outline_on_intro' => (bool) $course['show_outline_on_intro'],
                 'certificate_enabled' => (bool) $course['certificate_enabled'],
@@ -470,6 +485,8 @@ final class CoursePortabilityService
                 else { if (!isset($created[(string) ($placement['item_key'] ?? '')])) { throw new InvalidArgumentException('The import structure references an undefined Course Item key.'); } $nodeId = $this->courseItems->addExisting($courseId, $created[(string) $placement['item_key']], $placement, $userId); }
                 if (!empty($placement['node_key'])) { $createdNodes[(string) $placement['node_key']] = $nodeId; }
             }
+            // Imported items are named after their places in the course (owner, 2026-10-30): packages carry no names.
+            $this->courseItems->nameFromPlacements($courseId, array_values($created));
             $bands = (array) ($analysis['grade_bands'] ?? []);
             if ($bands !== []) {
                 $this->courses->replaceGradeBands($courseId, $bands);
@@ -595,6 +612,14 @@ final class CoursePortabilityService
     /** @return array<string,mixed> */
     private function analysePath(string $path, string $name, string $extension): array
     {
+        if ($extension === 'zip') {
+            // Read and checked as the course specification says, then imported as every course package is.
+            $read = Package\CoursePackage::read($path);
+            $analysis = $this->courseComponentAnalysis($this->jsonImporter->analyse($read['package'], $name));
+            $analysis['warnings'] = array_values(array_merge((array) ($analysis['warnings'] ?? []), $read['warnings']));
+            $analysis['package_version'] = '3.0';
+            return $analysis;
+        }
         $analysis = $extension === 'json'
             ? $this->jsonImporter->analyseFile($path, $name)
             : $this->htmlImporter->analyseFile($path, $name);

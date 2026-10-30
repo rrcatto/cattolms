@@ -75,6 +75,10 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Position in the catalogue (optional)', for: 'catalogue-position', help: 'Courses with a number come first in the catalogue, lowest first; the rest follow, newest first. Number in hundreds (100, 200, 300) to leave room for courses in between.'})} %}
 {% block control %}<input class="cl-input" type="number" id="catalogue-position" name="catalogue_position" min="1" max="2000000000" step="1" value="{{ course.catalogue_position|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
+					{# Module 0 for a course whose first module sets it up (owner, 2026-10-29). #}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Number the modules from', for: 'first-module-number', help: 'Choose 0 when the first module sets up the course, such as a practice environment and a readiness check: it is then Module 0, and the rest follow from Module 1.'})} %}
+{% block control %}<select class="cl-input" id="first-module-number" name="first_module_number" {{ ui_field_attrs(props) }}><option value="1"{{ course.first_module_number|default(1) == 1 ? ' selected' : '' }}>1</option><option value="0"{{ course.first_module_number|default(1) == 0 ? ' selected' : '' }}>0</option></select>{% endblock %}
+{% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover picture (an SVG file, optional)', for: 'course-cover', full_width: true, help: 'Shown at the top of the course\'s catalogue card and on its landing page. Leave it empty to keep the current picture.'})} %}
 {% block control %}
 						{% if course.cover_svg|default('') %}<span class="cl-course-cover-preview" aria-hidden="true">{{ course.cover_svg|raw }}</span>{% endif %}

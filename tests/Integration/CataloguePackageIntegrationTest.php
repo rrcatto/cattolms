@@ -213,6 +213,48 @@ final class CataloguePackageIntegrationTest extends TestCase
         $this->package->stageFile($odd, 'catalogue.zip', $this->admin);
     }
 
+    public function testAPresentationsNarrationComesInWithItsCourseAndGoesOutInTheSitesOwnExport(): void
+    {
+        // CatWalk (owner, 2026-10-28): each slide's recorded narration travels in narrations/ beside the course file.
+        $code = 'NAR-' . strtoupper(substr($this->suffix, 0, 6));
+        $course = $this->course($code, 'nar-course-' . $this->suffix);
+        $deckKey = 'pkg-' . $this->suffix . '-presentation';
+        $clip = self::uuid();
+        $course['course_items'][] = ['item_key' => $deckKey, 'item_type' => 'slide_deck', 'title' => 'What you will learn', 'description_html' => '', 'content_source' => '', 'resource_public_id' => null,
+            'type_config' => ['kind' => 'intro', 'theme' => 'light', 'slides' => [
+                ['id' => 'a1b2c3d4e5f6', 'layout' => 'title', 'title' => 'Welcome', 'heading' => 'Good food starts below the surface', 'narration' => 'We start underground.'],
+                ['id' => 'b2c3d4e5f6a1', 'layout' => 'next', 'title' => 'Up next', 'heading' => 'Now read the lesson', 'text' => 'Look for greens and browns.', 'action_label' => 'Start the lesson'],
+            ]],
+            'narrations' => [['public_id' => $clip, 'slide_id' => 'a1b2c3d4e5f6', 'content_type' => 'audio/wav', 'duration_seconds' => 0.1],
+                ['public_id' => self::uuid(), 'slide_id' => 'b2c3d4e5f6a1', 'content_type' => 'audio/wav', 'duration_seconds' => 0.1]]];
+        $course['structure'][] = ['node_key' => $deckKey, 'parent_node_key' => null, 'position' => 2, 'node_type' => 'item', 'relative_delay_minutes' => 0, 'item_key' => $deckKey, 'public_preview' => false, 'assessment_role' => 'content'];
+        $samples = str_repeat("\x80", 800);
+        $wav = 'RIFF' . pack('V', 36 + strlen($samples)) . 'WAVEfmt ' . pack('VvvVVvv', 16, 1, 1, 8000, 8000, 1, 8) . 'data' . pack('V', strlen($samples)) . $samples;
+        // The second clip is listed but not in the package: it is left out, and nothing else is refused for it.
+        $zip = $this->zip($this->catalogue([$code]), [$code => $course], [], ['narrations/' . $clip . '.wav' => $wav]);
+
+        $plan = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => true], $this->admin);
+        self::assertSame(1, $report['counts']['imported'], json_encode($report['courses']) ?: '');
+        $deck =(int) $this->db->fetchOne('SELECT id FROM course_items WHERE item_key = :k', ['k' => $deckKey]);
+        $narrations = IntegrationContainer::get()->get(\CattoLearning\Course\Catwalk\Narrations::class);
+        $rows = $narrations->rowsForItem($deck);
+        foreach ($rows as $row) $this->files[] = $narrations->path((string) $row['public_id'], (string) $row['content_type']);
+        self::assertSame([['a1b2c3d4e5f6', 'audio/wav', strlen($wav)]], array_map(static fn(array $row): array => [(string) $row['slide_id'], (string) $row['content_type'], (int) $row['byte_size']], $rows),
+            'The first slide has its narration, kept with a public id of its own.');
+        self::assertNotSame($clip, (string) $rows[0]['public_id']);
+
+        $export = $this->files[] = $this->package->export($this->admin, [(int) $this->courses->findByCode($code)['id']]);
+        $archive = new ZipArchive();
+        self::assertTrue($archive->open($export));
+        $exported = json_decode((string) $archive->getFromName('courses/' . $code . '.json'), true);
+        $bytes = $archive->getFromName('narrations/' . $rows[0]['public_id'] . '.wav');
+        $archive->close();
+        $item = array_values(array_filter($exported['course_items'], static fn(array $item): bool => $item['item_key'] === $deckKey))[0];
+        self::assertSame([['public_id' => (string) $rows[0]['public_id'], 'slide_id' => 'a1b2c3d4e5f6']], array_map(static fn(array $c): array => ['public_id' => $c['public_id'], 'slide_id' => $c['slide_id']], $item['narrations']));
+        self::assertSame($wav, $bytes, 'The clip goes out in the site’s own export.');
+    }
+
     private function path(): string
     {
         return 'Pkg root ' . $this->suffix . ' › Pkg child ' . $this->suffix;

@@ -1,0 +1,14 @@
+{#
+	The layout window as a page of its own, for a browser without JavaScript: Change layout on a slide's page, or Add a
+	slide on the presentation's page. With JavaScript the same choice opens in a window over the page.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = back %}{% set ph_back_label = mode == 'add' ? 'The presentation' : 'The slide' %}
+	{% set ph_kicker = item.name %}{% set ph_title = mode == 'add' ? 'Add a slide' : 'Change the layout' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'slide-layouts'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Layouts', summary: 'Each drawn as learners see it, in this presentation\'s look.'}) }}
+		{% include '@platform/partials/admin/slide-layout-choice.html.twig' %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

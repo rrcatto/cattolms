@@ -159,6 +159,12 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendCourseEnrolmentNotice($this->router->deliveryAddress($email), $courseTitle, $courseSlug);
     }
 
+    public function sendReviewRequest(string $email, string $firstName, string $courseTitle, string $reviewUrl): void
+    {
+        if ($this->holds('review_request', $email, '')) return;
+        $this->mailer->sendReviewRequest($this->router->deliveryAddress($email), $firstName, $courseTitle, $reviewUrl);
+    }
+
     public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
     {
         if ($this->holds('course_test_invitation', $email, '')) return;

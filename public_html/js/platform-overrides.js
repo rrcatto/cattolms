@@ -189,6 +189,18 @@
       const element = event.target instanceof Element ? event.target.closest('[data-confirm]') : null;
       if (element && !confirm(element.dataset.confirm || 'Continue?')) event.preventDefault();
     });
+    /* Cancel on a form opened in place in a disclosure (Course Content's Edit section and Placement settings; owner,
+       2026-10-30: pressing it "takes a long time ... it reloads the page"): the form goes back to what was saved and
+       closes where it is, with no page load. Without JavaScript the link loads the page again at the same row. */
+    document.addEventListener('click', event => {
+      const link = event.target instanceof Element ? event.target.closest('[data-close-disclosure]') : null;
+      const details = link ? link.closest('details') : null;
+      if (!details) return;
+      event.preventDefault();
+      link.closest('form')?.reset();
+      details.open = false;
+      details.querySelector(':scope > summary')?.focus();
+    });
     /* Live dataset search needs nothing from this file. The debounce, the abort-in-flight and the
        loading indicator are declared on the input itself, and the submit button now lives inside a
        noscript element, so it is never in the document when scripting is available and is a real

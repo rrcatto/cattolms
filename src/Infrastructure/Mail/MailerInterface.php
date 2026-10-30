@@ -64,6 +64,9 @@ interface MailerInterface
 
     public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void;
 
+    /** The one email asking a learner who completed a course a few days ago to review it (decision 8A, ReviewRequests). */
+    public function sendReviewRequest(string $email, string $firstName, string $courseTitle, string $reviewUrl): void;
+
     /**
      * A contact form message to the site's mailbox, replying to its sender (owner, 2026-10-20; ContactService):
      * its reference, reason, sender, account reference (from the account when signed_in, else as typed),

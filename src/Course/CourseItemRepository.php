@@ -73,7 +73,7 @@ final class CourseItemRepository
         $where = ['1=1'];
         $params = [];
         if ($search !== '') {
-            $where[] = '(ci.title ILIKE :search OR ci.item_key ILIKE :search)';
+            $where[] = '(ci.name ILIKE :search OR ci.title ILIKE :search OR ci.item_key ILIKE :search)';
             $params['search'] = '%' . $search . '%';
         }
         if ($type !== '') {
@@ -81,7 +81,7 @@ final class CourseItemRepository
             $params['type'] = $type;
         }
         return array_map($this->normalise(...), $this->db->fetchAllAssociative(
-            $this->itemSelect() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY ci.title,ci.item_key,ci.id',
+            $this->itemSelect() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY lower(ci.name),ci.id',
             $params
         ));
     }
@@ -90,13 +90,13 @@ final class CourseItemRepository
     public function createItem(array $data, int $userId): int
     {
         $row = $this->db->fetchAssociative(
-            'INSERT INTO course_items (public_id,item_key,item_type,title,description_html,content_source,type_config,resource_id,created_by_user_id,updated_by_user_id,created_at,updated_at)
-             VALUES (:public_id,:item_key,:item_type,:title,:description_html,:content_source,:type_config,:resource_id,:user_id,:user_id,NOW(),NOW()) RETURNING id',
+            'INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,type_config,resource_id,estimated_minutes,created_by_user_id,updated_by_user_id,created_at,updated_at)
+             VALUES (:public_id,:item_key,:name,:item_type,:title,:description_html,:content_source,:type_config,:resource_id,:minutes,:user_id,:user_id,NOW(),NOW()) RETURNING id',
             [
-                'public_id' => Uuid::v4(), 'item_key' => $data['item_key'], 'item_type' => $data['item_type'],
+                'public_id' => Uuid::v4(), 'item_key' => $data['item_key'], 'name' => $data['name'], 'item_type' => $data['item_type'],
                 'title' => $data['title'], 'description_html' => $data['description_html'],
                 'content_source' => $data['content_source'], 'type_config' => json_encode($data['type_config'], JSON_THROW_ON_ERROR),
-                'resource_id' => $data['resource_id'], 'user_id' => $userId,
+                'resource_id' => $data['resource_id'], 'minutes' => $data['estimated_minutes'] ?? null, 'user_id' => $userId,
             ]
         );
         $id = (int) ($row['id'] ?? 0);
@@ -110,11 +110,11 @@ final class CourseItemRepository
     public function updateItem(int $id, array $data, int $userId): void
     {
         if ($this->db->executeStatement(
-            'UPDATE course_items SET item_key=:item_key,item_type=:item_type,title=:title,description_html=:description_html,content_source=:content_source,type_config=:type_config,resource_id=:resource_id,updated_by_user_id=:user_id,updated_at=NOW() WHERE id=:id',
+            'UPDATE course_items SET item_key=:item_key,name=:name,item_type=:item_type,title=:title,description_html=:description_html,content_source=:content_source,type_config=:type_config,resource_id=:resource_id,estimated_minutes=:minutes,updated_by_user_id=:user_id,updated_at=NOW() WHERE id=:id',
             [
-                'id' => $id, 'item_key' => $data['item_key'], 'item_type' => $data['item_type'], 'title' => $data['title'],
+                'id' => $id, 'item_key' => $data['item_key'], 'name' => $data['name'], 'item_type' => $data['item_type'], 'title' => $data['title'],
                 'description_html' => $data['description_html'], 'content_source' => $data['content_source'],
-                'type_config' => json_encode($data['type_config'], JSON_THROW_ON_ERROR), 'resource_id' => $data['resource_id'], 'user_id' => $userId,
+                'type_config' => json_encode($data['type_config'], JSON_THROW_ON_ERROR), 'resource_id' => $data['resource_id'], 'minutes' => $data['estimated_minutes'] ?? null, 'user_id' => $userId,
             ]
         ) === 0) {
             throw new RuntimeException('The Course Item does not exist.');
@@ -170,6 +170,72 @@ final class CourseItemRepository
         $this->db->executeStatement('DELETE FROM course_items WHERE id=:id', ['id' => $id]);
     }
 
+    /**
+     * The names already taken that start with this one, in lower case: the name itself and any numbered after it
+     * ("... 2", "... 3"), so a free one is found in one query (owner, 2026-10-30: names are never used twice).
+     *
+     * @return list<string>
+     */
+    public function namesLike(string $name, int $exceptId = 0): array
+    {
+        return array_map('strval', $this->db->fetchFirstColumn(
+            "SELECT lower(name) FROM course_items WHERE id <> :id AND (lower(name) = lower(:name) OR lower(name) LIKE lower(:prefix) ESCAPE '\\')",
+            ['id' => $exceptId, 'name' => $name, 'prefix' => addcslashes($name, '%_\\') . ' %']
+        ));
+    }
+
+    /** Holds a Course Item's row until the transaction ends, so two changes to one Presentation never cross. */
+    public function lockItem(int $id): void
+    {
+        if ($this->db->fetchOne('SELECT id FROM course_items WHERE id = :id FOR UPDATE', ['id' => $id]) === false) {
+            throw new RuntimeException('The Course Item does not exist.');
+        }
+    }
+
+    /** @param array<string,mixed> $config A Presentation's deck, already validated. */
+    public function saveDeck(int $id, array $config, int $userId): void
+    {
+        $this->db->executeStatement(
+            'UPDATE course_items SET type_config = CAST(:config AS jsonb), updated_by_user_id = :user, updated_at = NOW() WHERE id = :id',
+            ['id' => $id, 'config' => json_encode($config, JSON_THROW_ON_ERROR), 'user' => $userId]
+        );
+    }
+
+    public function rename(int $id, string $name): void
+    {
+        $this->db->executeStatement('UPDATE course_items SET name = :name WHERE id = :id', ['id' => $id, 'name' => $name]);
+    }
+
+    /** A course's code, which names the items placed in it. */
+    public function courseCode(int $courseId): string
+    {
+        return (string) ($this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $courseId]) ?: '');
+    }
+
+    /** The course an item is first placed in, which names it: the lowest course id, or none. */
+    public function placementCourse(int $itemId): ?int
+    {
+        $course = $this->db->fetchOne('SELECT MIN(course_id) FROM course_item_placements WHERE course_item_id = :id', ['id' => $itemId]);
+        return $course === null || $course === false ? null : (int) $course;
+    }
+
+    public function highestItemId(): int
+    {
+        return (int) ($this->db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM course_items') ?: 0);
+    }
+
+    /** @return list<int> Every Course Item placed in the course. */
+    public function placedItemIds(int $courseId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT DISTINCT course_item_id FROM course_item_placements WHERE course_id = :course', ['course' => $courseId]));
+    }
+
+    /** The number of the course's first module section, 1 or 0 (2026-10-29). */
+    public function firstModuleNumber(int $courseId): int
+    {
+        return (int) ($this->db->fetchOne('SELECT first_module_number FROM courses WHERE id = :id', ['id' => $courseId]) ?? 1);
+    }
+
     /** @return list<array<string,mixed>> */
     public function structure(int $courseId, bool $publicOnly = false): array
     {
@@ -181,9 +247,10 @@ final class CourseItemRepository
                 UNION ALL
                 SELECT n.*,t.depth+1,t.order_path||ARRAY[n.position,n.id::int] FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id
              )
-             SELECT n.*,s.title AS section_title,s.introduction_html AS section_introduction_html,s.show_outline,
+             SELECT n.*,s.title AS section_title,s.introduction_html AS section_introduction_html,s.show_outline,s.numbered,
                     p.course_item_id,p.display_title_override,p.display_description_override,COALESCE(p.public_preview, s.public_preview) AS public_preview,p.assessment_role,
-                    ci.item_key,ci.item_type,ci.title AS item_title,ci.description_html,ci.content_source,ci.type_config,ci.resource_id,
+                    ci.item_key,ci.name AS item_name,ci.item_type,ci.title AS item_title,ci.description_html,ci.content_source,ci.type_config,ci.resource_id,ci.estimated_minutes,ci.updated_at AS item_updated_at,
+                    (SELECT COUNT(*) FROM assessment_questions q WHERE q.course_item_id=ci.id AND q.graded_eligible) AS graded_question_pool,(SELECT COUNT(*) FROM assessment_questions q WHERE q.course_item_id=ci.id) AS question_count,
                     r.public_id AS resource_public_id,r.filename AS resource_filename,r.original_filename,r.resource_type,r.mime_type,r.byte_size,r.description AS resource_description,
                     a.instructions_html,a.result_pass_html,a.result_fail_html,a.pass_mark,a.practice,a.practice_enabled,a.practice_pool_mode,
                     a.practice_question_count,a.graded_question_count,a.maximum_attempts,a.time_limit_seconds,a.score_policy,a.randomise_questions,a.randomise_options,a.negative_marking,a.difficulty_selection
@@ -214,7 +281,7 @@ final class CourseItemRepository
         );
     }
 
-    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay, bool $publicPreview = false): int
+    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay, bool $publicPreview = false, bool $numbered = false): int
     {
         $row = $this->db->fetchAssociative(
             "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes) VALUES (:public_id,:course,:parent,:position,'section',:delay) RETURNING id",
@@ -222,8 +289,8 @@ final class CourseItemRepository
         );
         $id = (int) ($row['id'] ?? 0);
         $this->db->executeStatement(
-            'INSERT INTO course_sections (node_id,title,introduction_html,show_outline,public_preview) VALUES (:id,:title,:intro,:outline,:public)',
-            ['id' => $id, 'title' => $title, 'intro' => $introduction, 'outline' => $showOutline, 'public' => $publicPreview]
+            'INSERT INTO course_sections (node_id,title,introduction_html,show_outline,public_preview,numbered) VALUES (:id,:title,:intro,:outline,:public,:numbered)',
+            ['id' => $id, 'title' => $title, 'intro' => $introduction, 'outline' => $showOutline, 'public' => $publicPreview, 'numbered' => $numbered]
         );
         return $id;
     }
@@ -337,10 +404,15 @@ final class CourseItemRepository
         );
     }
 
-    public function updateSection(int $nodeId, string $title, string $introduction, bool $outline, int $delay, bool $publicPreview = false): void
+    public function updateSection(int $nodeId, string $title, string $introduction, bool $outline, int $delay, bool $publicPreview = false, bool $numbered = false): void
     {
-        $this->db->executeStatement('UPDATE course_sections SET title=:title,introduction_html=:intro,show_outline=:outline,public_preview=:public WHERE node_id=:id', ['title' => $title, 'intro' => $introduction, 'outline' => $outline, 'public' => $publicPreview, 'id' => $nodeId]);
+        $this->db->executeStatement('UPDATE course_sections SET title=:title,introduction_html=:intro,show_outline=:outline,public_preview=:public,numbered=:numbered WHERE node_id=:id', ['title' => $title, 'intro' => $introduction, 'outline' => $outline, 'public' => $publicPreview, 'numbered' => $numbered, 'id' => $nodeId]);
         $this->db->executeStatement('UPDATE course_structure_nodes SET relative_delay_minutes=:delay,updated_at=NOW() WHERE id=:id', ['delay' => $delay, 'id' => $nodeId]);
+    }
+
+    public function sectionNumbered(int $nodeId): bool
+    {
+        return $this->boolean($this->db->fetchOne('SELECT numbered FROM course_sections WHERE node_id=:id', ['id' => $nodeId]));
     }
 
     /** SQL join for a paged enrolment row named ce, including embedded assessments once per placement. */
@@ -602,7 +674,7 @@ final class CourseItemRepository
         foreach (['type_config','difficulty_selection'] as $field) {
             if (array_key_exists($field, $row)) { $row[$field] = $this->json($row[$field]); }
         }
-        foreach (['public_preview','show_outline','practice','practice_enabled','randomise_questions','randomise_options','negative_marking','submitted'] as $field) {
+        foreach (['public_preview','show_outline','numbered','practice','practice_enabled','randomise_questions','randomise_options','negative_marking','submitted'] as $field) {
             if (array_key_exists($field, $row) && $row[$field] !== null) { $row[$field] = $this->boolean($row[$field]); }
         }
         return $row;

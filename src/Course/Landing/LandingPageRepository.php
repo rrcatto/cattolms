@@ -290,4 +290,34 @@ final class LandingPageRepository
         $row['data'] = is_array($data) ? $data : [];
         return $row;
     }
+
+    /**
+     * The course's Presentations a landing page may play: each placed in the course, the trailer first.
+     *
+     * @return list<array{item_key:string,title:string,name:string,kind:string}>
+     */
+    public function presentations(int $courseId): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT DISTINCT ci.item_key, ci.title, ci.name, COALESCE(ci.type_config->>'kind', 'intro') AS kind
+             FROM course_item_placements p JOIN course_items ci ON ci.id = p.course_item_id
+             WHERE p.course_id = :course AND ci.item_type = 'slide_deck'
+             ORDER BY kind = 'trailer' DESC, ci.name, ci.item_key",
+            ['course' => $courseId]
+        );
+        return array_map(static fn(array $row): array => ['item_key' => (string) $row['item_key'], 'title' => (string) $row['title'], 'name' => (string) $row['name'], 'kind' => (string) $row['kind']], $rows);
+    }
+
+    /** @return array<string,mixed>|null A Presentation placed in the course, with its slides. */
+    public function presentation(int $courseId, string $key): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT ci.id, ci.item_key, ci.title, ci.description_html, ci.type_config FROM course_items ci
+             WHERE ci.item_key = :key AND ci.item_type = 'slide_deck' AND EXISTS (SELECT 1 FROM course_item_placements p WHERE p.course_item_id = ci.id AND p.course_id = :course)",
+            ['key' => $key, 'course' => $courseId]
+        );
+        if ($row === false) { return null; }
+        $row['type_config'] = json_decode((string) $row['type_config'], true) ?: [];
+        return $row;
+    }
 }

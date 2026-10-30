@@ -56,6 +56,7 @@ final class AdminLandingPageController extends BaseController
         private readonly CourseService $courses,
         private readonly LandingPageService $landing,
         private readonly LandingPageViewBuilder $views,
+        private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -147,6 +148,7 @@ final class AdminLandingPageController extends BaseController
             'landing' => $view,
             'page_meta' => $view['meta'],
             'landing_editor_href' => self::home($course),
+            'load_catwalk' => LandingPageController::playsPresentation($view),
         ]);
     }
 
@@ -367,6 +369,9 @@ final class AdminLandingPageController extends BaseController
         }
         if ($type === LandingSectionType::Reviews) {
             $data['review_limit_max'] = LandingSectionType::REVIEW_LIMIT_MAX;
+        }
+        if ($type === LandingSectionType::Presentation) {
+            $data['presentations'] = $this->landingPages->presentations((int) $course['id']);
         }
         return $data;
     }

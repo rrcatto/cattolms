@@ -25,9 +25,13 @@ Kinds, in this order, oldest first within each:
 - money: TransactionAttention's items (an order paid in part or overpaid, a cancelled order's payment, a refund to
   decide or to pay out, money that paid no order), each on its own page;
 - identity: an identity check Didit's reviewers are deciding (the person's page);
+- video: a course video YouTube says no longer plays (CourseVideoCheck, decision 8A; the video's item: replace it or
+  take it out of the course);
 - draft: a course not yet published (the course's page: publish it or delete it).
 
 Changelog:
+2026/10/28 SAST
+- A course video that no longer plays (the daily video check, decision 8A).
 2026/10/21 SAST
 - First version, replacing the dashboard's counts with their generic Review buttons, the separate Transactions that
   need attention card and the accounts-waiting notice.
@@ -76,7 +80,8 @@ final class AdminAttention
         private readonly IdentityVerificationService $identity,
         private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signups = null,
         private readonly ?\CattoLearning\Auth\Signup\SignInHistory $signIns = null,
-        private readonly ?\CattoLearning\Mailing\CampaignRepository $campaigns = null
+        private readonly ?\CattoLearning\Mailing\CampaignRepository $campaigns = null,
+        private readonly ?\CattoLearning\Course\CourseVideoCheckRepository $videos = null
     ) {
     }
 
@@ -155,6 +160,11 @@ final class AdminAttention
             }
         }
         if ($admin->hasPermission('COURSE.MANAGEMENT.VIEW')) {
+            foreach ($this->videos?->failing() ?? [] as $video) {
+                $items[] = self::item('video', 'Course video', null, false, $video['title'] . ' in ' . $video['course_title'] . ' no longer plays',
+                    $video['detail'] . ' Found on ' . self::date($video['failing_since']) . '. Replace the video in its item, or take it out of the course.',
+                    '/admin/course-items/' . $video['course_item_id'], 'Open the video', $video['failing_since']);
+            }
             foreach ($this->records->draftCourses() as $course) {
                 $items[] = self::item('draft', 'Draft course', null, false, $course['title'] . ' is not published',
                     'Nobody can see or buy it. Publish it when it is ready, or delete it.',
@@ -171,7 +181,7 @@ final class AdminAttention
                     '/mailing/messages/' . $campaign['id'] . '#send', $approval ? 'Approve or cancel' : 'Resume or cancel', (string) $campaign['updated_at']);
             }
         }
-        $order = array_flip(['account', 'signin_country', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'draft']);
+        $order = array_flip(['account', 'signin_country', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'video', 'draft']);
         usort($items, static fn(array $a, array $b): int => [$order[$a['kind']], $a['at']] <=> [$order[$b['kind']], $b['at']]);
         return $items;
     }

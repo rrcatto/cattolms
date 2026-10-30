@@ -15,6 +15,9 @@ dashboard warns when the commerce job is, because without it no buyer is emailed
 is cancelled.
 
 Changelog:
+2026/10/28 SAST
+- Review requests and the course video check (owner, 2026-10-28, decision 8A): the one email asking a learner for a
+  review, every hour, and whether every course video still plays, every day.
 2026/10/27 SAST
 - The log archive (owner, 2026-10-27): the application log archived just after midnight every day. A job may run
   at a time of day (runsAt) instead of at its interval from its last run.
@@ -36,6 +39,8 @@ enum ScheduledJob: string
     case SignupLists = 'signup_lists';
     case Mailing = 'mailing';
     case LogArchive = 'log_archive';
+    case ReviewRequests = 'review_requests';
+    case VideoCheck = 'video_check';
 
     /** How often the job runs, in seconds. */
     public function interval(): int
@@ -47,6 +52,8 @@ enum ScheduledJob: string
             self::SignupLists => 86400,
             self::Mailing => 60,
             self::LogArchive => 86400,
+            self::ReviewRequests => 3600,
+            self::VideoCheck => 86400,
         };
     }
 
@@ -84,6 +91,8 @@ enum ScheduledJob: string
             self::SignupLists => 3 * 86400,
             self::Mailing => 300,
             self::LogArchive => 2 * 86400,
+            self::ReviewRequests => 3 * 3600,
+            self::VideoCheck => 3 * 86400,
         };
     }
 
@@ -96,6 +105,8 @@ enum ScheduledJob: string
             self::SignupLists => 'Sign-up check lists',
             self::Mailing => 'News emails',
             self::LogArchive => 'Log archive',
+            self::ReviewRequests => 'Review requests',
+            self::VideoCheck => 'Course videos',
         };
     }
 
@@ -109,6 +120,8 @@ enum ScheduledJob: string
             self::SignupLists => 'Every day: fetches the Tor exit addresses, and every week the VPN and hosting networks and the throwaway email domains, for the sign-up check.',
             self::Mailing => 'Every minute: sends the news campaigns at the pace Settings allow, pauses one whose bounces or complaints are too high, reads back what became of each email, makes the new-course digest on its day, and once a day asks the sleeping addresses whether they still want news.',
             self::LogArchive => 'Every day just after midnight: moves the application log, and any other log beside it, into a compressed archive, starts each afresh and deletes the archives older than Settings keep them.',
+            self::ReviewRequests => 'Every hour: emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review.',
+            self::VideoCheck => 'Every day: asks YouTube whether each course video can still be played, and lists any that cannot under Needs your attention.',
         };
     }
 }

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Three pots of vegetables on a balcony rail in the sun">
+  <rect width="1600" height="1000" fill="#2F5D50"/>
+  <circle cx="1270" cy="230" r="120" fill="#F2C14E"/>
+  <rect x="0" y="720" width="1600" height="280" fill="#7A4E2D"/>
+  <rect x="0" y="700" width="1600" height="30" fill="#5C3A21"/>
+  <path d="M330 520 C300 420 360 360 400 330 C420 400 400 470 360 520 Z" fill="#7BB661"/>
+  <path d="M360 520 C400 430 470 410 520 400 C500 470 450 510 380 530 Z" fill="#5E9C4A"/>
+  <path d="M300 540 C240 470 250 410 270 380 C320 430 330 490 320 540 Z" fill="#8CC56F"/>
+  <path d="M250 540 L450 540 L420 720 L280 720 Z" fill="#C8693A"/>
+  <path d="M720 470 C700 380 740 300 780 270 C800 350 790 420 750 470 Z" fill="#7BB661"/>
+  <circle cx="830" cy="430" r="34" fill="#D7442E"/>
+  <circle cx="780" cy="390" r="28" fill="#E05A3A"/>
+  <path d="M800 470 C840 380 900 360 950 350 C930 420 880 460 810 480 Z" fill="#5E9C4A"/>
+  <path d="M680 500 L920 500 L890 720 L710 720 Z" fill="#B85C33"/>
+  <path d="M1160 560 C1140 500 1170 460 1200 440 C1220 490 1210 530 1180 560 Z" fill="#8CC56F"/>
+  <path d="M1200 560 C1230 500 1270 480 1310 470 C1300 520 1260 550 1210 570 Z" fill="#7BB661"/>
+  <path d="M1110 570 L1330 570 L1310 720 L1130 720 Z" fill="#C8693A"/>
+</svg>

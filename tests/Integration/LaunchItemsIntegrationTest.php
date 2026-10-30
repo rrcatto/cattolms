@@ -162,7 +162,7 @@ final class LaunchItemsIntegrationTest extends TestCase
         self::assertStringStartsWith('Order emails have not been sent since ', (string) $status->commerceWarning());
         $this->db->executeStatement("UPDATE scheduled_jobs SET last_succeeded_at = NOW() WHERE job_key = 'commerce'");
         self::assertNull($status->commerceWarning(), 'A running commerce job raises no warning.');
-        self::assertSame(['commerce', 'popularity', 'cleanup', 'signup_lists', 'mailing', 'log_archive'], array_column($status->jobs(), 'key'));
+        self::assertSame(['commerce', 'popularity', 'cleanup', 'signup_lists', 'mailing', 'log_archive', 'review_requests', 'video_check'], array_column($status->jobs(), 'key'));
     }
 
     public function testThePaymentMethodsSettingRefusesWhatCannotBeOfferedAndLogsAChange(): void

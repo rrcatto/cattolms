@@ -39,8 +39,8 @@ if (($argv[1] ?? '') === 'create') {
         ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type]);
     $section = $node(null, 1, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Getting started')", ['n' => $section]);
-    $lesson = (int) $db->fetchOne("INSERT INTO course_items (public_id,item_key,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id)
-        VALUES (:p,:k,'html_lesson','What this course covers','','<p>Each theme draws this lesson in Core''s reader.</p>',:u,:u) RETURNING id",
+    $lesson = (int) $db->fetchOne("INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id)
+        VALUES (:p,:k,:k,'html_lesson','What this course covers','','<p>Each theme draws this lesson in Core''s reader.</p>',:u,:u) RETURNING id",
         ['p' => Uuid::v4(), 'k' => $reader['slug'] . '-overview', 'u' => $user]);
     $db->executeStatement('INSERT INTO course_item_placements (node_id,course_id,course_item_id,public_preview) VALUES (:n,:c,:i,TRUE)', ['n' => $node($section, 1, 'item'), 'c' => $course, 'i' => $lesson]);
     // 110 people added as ADMIN adds them, each a different real name (owner, 2026-10-27: never the same name twice).

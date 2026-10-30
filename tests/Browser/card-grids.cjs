@@ -10,6 +10,10 @@
    - every view passes the shared page checks (page-construction.cjs);
    - a card's ⋯ menu opens whole, every action in it visible, clickable and on the screen (2026-10-27: the card hid
      what it held, so only a sliver of Administration → Courses' menu showed and it seemed to do nothing);
+   - with JavaScript, in the first theme, every switch changes only its own list, the page never loading again (owner,
+     2026-10-30: "I just want the view of the list of slides to change without a full page reload"), and the button
+     pressed keeps the focus: Administration's lists, the catalogue, the Company workspace's people, Subscribers, a
+     company's page (its people and its courses) and a presentation's slides;
    - without JavaScript, in the first theme, the switch's links and the grid's Sort still work.
    Fixture: php tests/Browser/section-pages-fixture.php create|cleanup (in env_php_1), as section-pages.cjs. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -164,6 +168,53 @@ async function cardMenus(page, label, failures) {
       await context.close();
       console.log(`${theme.slug} ${width}: done`);
     }
+  }
+
+  // In place: every switch changes only its own list, and no page loads again.
+  const firstTheme = themes.filter(t => !only.length || only.includes(t.slug))[0];
+  if (firstTheme) {
+    const key = `${firstTheme.slug}-v${firstTheme.version}`;
+    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});
+    await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    const shown = (area) => page.evaluate((area) => {
+      const link = [...document.querySelectorAll(`${area} .cl-view-switch a`)].find(a => /shown now/.test(a.getAttribute('aria-label') || ''));
+      return link ? link.textContent.trim().toLowerCase() : '';
+    }, area);
+    const inPlace = async (route, area, optional = false) => {
+      const label = `in place ${route}`;
+      await page.goto(`${base}${route}${route.includes('?') ? '&' : '?'}theme_preview=${key}`, {waitUntil: 'networkidle'});
+      views++;
+      const from = await shown(area);
+      if (!from) { if (!optional) failures.push(`${label}: no view switch in ${area}`); return; }
+      for (const to of from === 'list' ? ['grid', 'list'] : ['list', 'grid']) {
+        await page.evaluate(() => { window.__samePage = true; });
+        const link = page.locator(`${area} .cl-view-switch a`, {hasText: to === 'grid' ? 'Grid' : 'List'});
+        const id = await link.getAttribute('id');
+        await link.click();
+        try {
+          await page.waitForFunction(([area, to]) => [...document.querySelectorAll(`${area} .cl-view-switch a`)].some(a => /shown now/.test(a.getAttribute('aria-label') || '') && a.textContent.trim().toLowerCase() === to), [area, to], {timeout: 10000});
+        } catch { failures.push(`${label}: ${to} was not shown`); return; }
+        if (!(await page.evaluate(() => window.__samePage === true))) failures.push(`${label}: showing the ${to} loaded the page again`);
+        if (await page.evaluate(() => document.activeElement && document.activeElement.id) !== id) failures.push(`${label}: the focus left the ${to} button`);
+      }
+    };
+    for (const list of lists) await inPlace(list.route, `#${list.name}-view`);
+    await inPlace('/courses', '#catalogue-region');
+    await inPlace('/company/people', '#people-view');
+    await inPlace('/mailing/subscribers', '#subscribers-view');
+    const listing = await context.newPage();
+    await listing.goto(`${base}/admin/companies?companies_view=list`, {waitUntil: 'networkidle'});
+    const company = await listing.locator('#companies-view a[href^="/admin/companies/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/companies\/\d+$/.test(href)));
+    await listing.goto(`${base}/admin/course-items?type=slide_deck`, {waitUntil: 'networkidle'});
+    const presentation = await listing.locator('a[href^="/admin/course-items/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/course-items\/\d+$/.test(href)));
+    await listing.close();
+    if (company) { await inPlace(company, '#company_people-view'); await inPlace(company, '#company_courses-view', true); } else failures.push('in place: no company to open');
+    if (presentation) await inPlace(presentation, '#slides-view'); else failures.push('in place: no presentation to open');
+    if (errors.length) failures.push(`in place: script errors: ${errors.join(' | ')}`);
+    await context.close();
   }
 
   // Without JavaScript: the switch is links and the Sort a form, so both work.

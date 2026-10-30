@@ -64,7 +64,18 @@ final class LandingPageController extends BaseController
         $user = $this->currentUser();
         $view = $this->views->build($page, $user, false);
         $this->analytics->viewed($page, $user?->id, $this->analyticsVisitor(), $this->analyticsCampaign(true));
-        return $this->render('landing-page', ['title' => $view['meta']['title'], 'active_nav' => 'catalogue', 'landing' => $view, 'page_meta' => $view['meta']]);
+        return $this->render('landing-page', ['title' => $view['meta']['title'], 'active_nav' => 'catalogue', 'landing' => $view, 'page_meta' => $view['meta'], 'load_catwalk' => self::playsPresentation($view)]);
+    }
+
+    /**
+     * Whether the page shows a Presentation, so CatWalk is loaded only where it is needed.
+     *
+     * @param array<string,mixed> $view
+     */
+    public static function playsPresentation(array $view): bool
+    {
+        foreach ((array) ($view['sections'] ?? []) as $section) { if (($section['type'] ?? '') === 'presentation' && ($section['deck_html'] ?? '') !== '') { return true; } }
+        return false;
     }
 
     #[Route('/landing/{slug}/picture/{public_id}', name: 'landing_page_picture', requirements: ['slug' => '[a-z0-9]+(?:-[a-z0-9]+)*', 'public_id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]

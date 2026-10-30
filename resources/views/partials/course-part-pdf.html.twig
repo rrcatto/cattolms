@@ -1,0 +1,72 @@
+{#
+	A module's lesson, summary, flash cards or practical work as a PDF to keep (owner, 2026-10-28, decision 6A), drawn by
+	DocumentPdfRenderer::renderPage through CoursePartPdfs. The course, the module and the part head the first page;
+	every page's foot names the course, the module and the date it was printed. Worked examples and other closed blocks
+	print open, and a slide deck prints as its slides one after another. Fonts are the bundled ones.
+#}
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<title>{{ pdf.title }} - {{ pdf.course }}</title>
+<style>
+	@page { margin: 18mm 18mm 24mm 18mm; }
+	body { font-family: 'Plex Sans', sans-serif; font-size: 10pt; line-height: 1.45; color: #1d2939; }
+	h1, h2, h3, h4 { font-family: 'Plex Sans', sans-serif; color: #173b61; line-height: 1.2; page-break-after: avoid; }
+	h1 { font-size: 20pt; margin: 0 0 3mm; }
+	h2 { font-size: 14pt; margin: 6mm 0 2.5mm; }
+	h3 { font-size: 11.5pt; margin: 4.5mm 0 2mm; }
+	h4 { font-size: 10.5pt; margin: 4mm 0 1.5mm; }
+	p, li { margin: 0 0 2mm; }
+	ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+	a { color: #145da0; text-decoration: none; }
+	table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; page-break-inside: auto; }
+	th, td { border: 0.5pt solid #c9d3de; padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+	th { background: #eef3f8; }
+	caption { text-align: left; font-weight: bold; margin-bottom: 1.5mm; }
+	tr { page-break-inside: avoid; }
+	figure { margin: 3mm 0 4mm; page-break-inside: avoid; }
+	figcaption, .fig-cap { font-size: 8.5pt; color: #5f6f82; }
+	img, svg { max-width: 100%; }
+	img.pdf-drawing { display: block; width: 100%; height: auto; margin: 2mm auto; }
+	blockquote { margin: 2mm 0 3mm; padding-left: 4mm; border-left: 1.5pt solid #9fb3c8; color: #334155; }
+	details { display: block; margin: 3mm 0; padding: 2.5mm 3.5mm; border: 0.5pt solid #d6e4f2; background: #f8fbfe; }
+	summary { display: block; font-weight: bold; margin-bottom: 1.5mm; }
+	aside, .tip, .warning, .note, .callout, .tipbox, .warnbox, .case, .case-card, .document, .docmock { display: block; margin: 3mm 0; padding: 2.5mm 3.5mm; border-left: 2pt solid #145da0; background: #f2f7fc; page-break-inside: avoid; }
+	.warning, .warnbox { border-left-color: #b45309; background: #fdf6ec; }
+	dl dt, .term-def dt { font-weight: bold; margin-top: 1.5mm; }
+	dl dd { margin: 0 0 1.5mm 5mm; }
+	.task, .answer { display: block; margin: 3mm 0 4mm; padding: 2.5mm 3.5mm; border: 0.5pt solid #c9d3de; page-break-inside: avoid; }
+	.pdf-answers { page-break-before: always; }
+	.pdf-answers-note { color: #5f6f82; }
+	.pdf-cards td.pdf-card-number { width: 7mm; color: #5f6f82; }
+	.pdf-card-hint { font-size: 8.5pt; color: #5f6f82; }
+	.cw-deck { display: block; }
+	.cw-slide { display: block; margin: 0 0 3mm; padding: 3mm 4mm; border: 0.5pt solid #c9d3de; page-break-inside: avoid; }
+	.cw-notes, .cw-bar, .cw-live { display: none; }
+	.cl-course-item-error { display: none; }
+
+	#pdf-foot { position: fixed; left: 0; right: 0; bottom: -16mm; height: 10mm; border-top: 0.6pt solid #145da0; padding-top: 1.5mm; font-size: 7.5pt; color: #5f6f82; }
+	.pdf-foot-row { display: table; width: 100%; }
+	.pdf-foot-left, .pdf-foot-right { display: table-cell; vertical-align: top; }
+	.pdf-foot-right { text-align: right; }
+	.pdf-masthead { border-bottom: 1.4pt solid #145da0; padding-bottom: 3.5mm; margin-bottom: 6mm; }
+	.pdf-course { font-size: 9pt; font-weight: bold; letter-spacing: 1.2pt; text-transform: uppercase; color: #145da0; }
+	.pdf-module { font-size: 11pt; color: #334155; margin-top: 1mm; }
+	.pdf-part { font-size: 8pt; font-weight: bold; letter-spacing: 1pt; text-transform: uppercase; color: #5f6f82; margin-top: 3mm; }
+</style>
+</head>
+<body>
+	<div id="pdf-foot"><div class="pdf-foot-row">
+		<div class="pdf-foot-left"><strong>{{ pdf.course }}</strong>{% if pdf.module %} · {{ pdf.module }}{% endif %}</div>
+		<div class="pdf-foot-right">{{ app_name }} · printed {{ pdf.date }}</div>
+	</div></div>
+	<div class="pdf-masthead">
+		<div class="pdf-course">{{ pdf.course }}</div>
+		{% if pdf.module %}<div class="pdf-module">{{ pdf.module }}</div>{% endif %}
+		<div class="pdf-part">{{ pdf.part }}</div>
+		<h1>{{ pdf.title }}</h1>
+	</div>
+	{{ pdf.body|raw }}
+</body>
+</html>

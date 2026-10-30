@@ -29,7 +29,7 @@
 						</div>
 					{% endif %}
 					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
-					{% if courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch} %}</div>{% endif %}
+					{% if courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region'} %}</div>{% endif %}
 					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
 					{% if courses and workspace.view|default('grid') == 'list' %}
 						{# One row per course, in the catalogue's order, on one line like every table's (the summary and rating

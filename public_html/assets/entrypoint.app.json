@@ -9,8 +9,12 @@
     "\/assets\/controllers\/course_order_controller.js",
     "\/assets\/controllers\/landing_sections_controller.js",
     "\/assets\/controllers\/popular_courses_controller.js",
+    "\/assets\/controllers\/presentation_slides_controller.js",
     "\/assets\/controllers\/profile_image_controller.js",
+    "\/assets\/controllers\/slide_editor_controller.js",
+    "\/assets\/controllers\/slide_strip_controller.js",
     "\/assets\/controllers\/tag_cloud_controller.js",
+    "\/assets\/controllers\/unsaved_changes_controller.js",
     "\/assets\/lib\/sortable_tree_controller.js",
     "TagCloud"
 ]

@@ -133,7 +133,8 @@
 {% block surface_body %}
 
 					{{ ui('layout.section-head', {heading: 'Course Item structure and keys', heading_level: 2, summary: 'Key collisions must be resolved before import; CattoLMS does not rename or guess.'}) }}
-					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in analysis.course_items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|replace({'_':' '}) }}</div>{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
+					{% if analysis.display_format == 'HTML' %}{{ ui('feedback.notice', {tone: 'info', heading: 'This course arrives with one lesson per module. When it is imported, each module becomes a numbered section holding its lesson, video, practical work and assessment, as Course Content shows them.', section_spacing: true}) }}{% endif %}
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in analysis.course_items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|item_type_label }}</div>{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
 					{% if existing_course %}{{ ui('feedback.notice', {tone: 'info', heading: 'These Course Items belong to “' ~ existing_course.title ~ '”, which is already on the site. Importing replaces that course.', section_spacing: true}) }}{% elseif analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Resolve Course Item key conflicts before importing', section_spacing: true}) }}{% endif %}
 					<h3>Legacy source components</h3>
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}

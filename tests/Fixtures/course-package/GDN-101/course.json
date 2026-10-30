@@ -1,0 +1,25 @@
+{
+  "format": "cattolms-course",
+  "schema_version": "3.0",
+  "course": {
+    "code": "GDN-101",
+    "title": "Growing Vegetables in Small Spaces",
+    "subtitle": "Food from a balcony, a stoep or a small yard",
+    "summary": "A practical course for people in South Africa who want to grow their own vegetables in containers and small beds. You learn to read and improve your soil, make compost, choose containers, and plan, plant and look after crops through the seasons, with a task to do in your own space in every module.",
+    "level": "Beginner",
+    "language": "en-ZA",
+    "content_checked": "2026-10-28",
+    "certificate": {"enabled": true, "accreditation": ""}
+  },
+  "catalogue": {
+    "category": "Home and Garden › Gardening",
+    "tags": ["Gardening", "Food growing"]
+  },
+  "modules": ["m1"],
+  "grade_bands": [
+    {"code": "A", "label": "Distinction (A)", "from": 75, "passing": true},
+    {"code": "B", "label": "Merit (B)", "from": 60, "passing": true},
+    {"code": "C", "label": "Pass (C)", "from": 50, "passing": true},
+    {"code": "F", "label": "Not yet (F)", "from": 0, "passing": false}
+  ]
+}

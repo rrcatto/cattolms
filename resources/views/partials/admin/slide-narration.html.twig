@@ -1,0 +1,33 @@
+{#
+	A slide's narration on its page, below the slide (owner, 2026-10-30, the approved mockup: "Keep the audio recording at
+	the bottom of this page"). Its own form: the script, saved by Save the script without the page loading (htmx), and the
+	recording, kept or removed at once by narration-recorder.js (owner, 2026-10-29: a new take is heard first, then kept
+	or discarded). Without JavaScript the form posts, an uploaded file going with the script, and Remove sends it.
+#}
+{% set narration_url = '/admin/course-items/' ~ item.id ~ '/slides/' ~ slide.id ~ '/narration' %}
+<form id="narration-form" class="cl-narration-form" action="{{ narration_url }}" method="post" enctype="multipart/form-data" hx-post="{{ narration_url }}" hx-target="#narration-script-status" hx-swap="innerHTML">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Script', for: 'narration-script', full_width: true, help: 'What you say on this slide. Learners can read it as the transcript. Up to 2,000 characters.'})} %}{% block control %}<textarea class="cl-input" id="narration-script" name="narration" rows="4" maxlength="2000" {{ ui_field_attrs(props) }}>{{ slide.narration|default('') }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the script', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+<p class="cl-narration-script-status" id="narration-script-status" role="status"></p>
+<div class="cl-narration" data-narration-slide="{{ slide.id }}" data-narration-url="/admin/course-items/{{ item.id }}/narration/{{ slide.id }}">
+<p class="cl-narration-title">Recording</p>
+<div class="cl-narration-saved">
+<p class="cl-narration-label">Saved for this slide</p>
+<div class="cl-narration-current">{% if clip %}<audio controls preload="none" src="/narrations/{{ clip }}"></audio>{% endif %}<p class="cl-narration-none"{{ clip ? ' hidden' : '' }}>No recording saved yet.</p></div>
+<div class="cl-narration-remove"{{ clip ? '' : ' hidden' }}>{{ ui('action.button', {label: 'Remove the recording', variant: 'secondary', size: 'small', type: 'submit', name: 'narration_remove', value: '1', skip_validation: true, icon: 'action-remove'}) }}</div>
+</div>
+<div class="cl-narration-recorder" hidden>
+<p class="cl-narration-note">Record, listen, then keep or discard it. Keep saves it for this slide at once: it does not wait for Save slide or Save the script.</p>
+<div class="cl-narration-controls">{{ ui('action.button', {label: 'Record narration', variant: 'secondary', size: 'small', type: 'button', icon: 'action-record', id: 'narration-record'}) }}{{ ui('action.button', {label: 'Stop recording', variant: 'secondary', size: 'small', type: 'button', icon: 'action-stop', id: 'narration-stop'}) }}</div>
+<div class="cl-narration-take" hidden>
+<p class="cl-narration-label">New recording, not saved yet</p>
+<audio controls preload="none"></audio>
+<div class="cl-narration-controls">{{ ui('action.button', {label: 'Keep this recording', variant: 'primary', size: 'small', type: 'button', icon: 'action-save', id: 'narration-keep'}) }}{{ ui('action.button', {label: 'Discard', variant: 'secondary', size: 'small', type: 'button', icon: 'action-cancel', id: 'narration-discard'}) }}</div>
+</div>
+<p class="cl-narration-status" role="status"></p>
+</div>
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Or upload an audio file', for: 'narration-file', help: 'WebM, Ogg, MP4 (M4A), MP3 or WAV, up to 20 MB. Choose it, listen, then keep or discard it.'})} %}{% block control %}<input class="cl-input" type="file" accept="audio/*" id="narration-file" name="narration_upload" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+<noscript><p class="cl-narration-note">An uploaded file is saved when you press Save the script.</p></noscript>
+</div>
+</form>

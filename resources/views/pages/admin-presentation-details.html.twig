@@ -1,0 +1,55 @@
+{#
+	A presentation's details, as the owner approved its mockup (2026-10-30: "Editing the presentation information needs to
+	be done separately from editing each individual slide"; "I don't think this page needs the preview. When you save or
+	close (without saving) this page, it can return to Pg 1 where the Preview gets redrawn. Don't drop the description
+	field"). Its name, title, description, key and time to study; what it is for and its look, each chosen by picture.
+	Save details keeps them and goes back to the presentation; Close goes back without them, asking first when something
+	was changed. Below, making a copy of the whole presentation, and deleting it while no course uses it.
+#}
+{% extends layout %}
+{% block page_body %}
+{{ importmap() }}
+	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set ph_back_href = base %}{% set ph_back_label = 'The presentation: ' ~ item.title %}
+	{% set ph_kicker = item.name %}{% set ph_title = 'Presentation details' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if notice %}<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: notice.tone})} %}{% block body %}<p>{{ notice.text }}</p>{% endblock %}{% endembed %}</section>{% endif %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-details-form'})} %}{% block surface_body %}
+		<form id="details-form" action="{{ base }}/details" method="post" data-controller="unsaved-changes" data-unsaved-changes-dirty-value="{{ unsaved ? 'true' : 'false' }}" data-unsaved-changes-leave-value=".cl-back-link, #details-close">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<div class="cl-slide-bar">
+				<div class="cl-slide-bar-text">
+					<h2>About the presentation</h2>
+					<p class="cl-slide-bar-status" role="status" data-unsaved-changes-target="status" data-saved="Saved. No changes yet." data-changed="Changes not saved yet. Save details keeps them and goes back to the presentation.">{{ unsaved ? 'Changes not saved yet. Save details keeps them and goes back to the presentation.' : 'Saved. No changes yet.' }}</p>
+				</div>
+				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+					{{ ui('action.button', {label: 'Save details', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}
+					{{ ui('action.link', {label: 'Close', href: base, id: 'details-close', icon: 'action-cancel'}) }}
+				{% endblock %}{% endembed %}
+			</div>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'details-name', help: 'What administrators know it by: the Course Item Library lists and searches it, and no two items share one. Leave it empty to name it after its place.'})} %}{% block control %}<input class="cl-input" id="details-name" name="name" maxlength="160" value="{{ values.name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', for: 'details-title', required: true, help: 'What learners see as the page\'s heading. Several presentations may share it.'})} %}{% block control %}<input class="cl-input" id="details-title" name="title" maxlength="240" required value="{{ values.title }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', for: 'details-description', full_width: true, help: 'One line in the player\'s top bar, under the page\'s heading, up to 100 characters. Without one the bar shows the title.'})} %}{% block control %}<input class="cl-input" id="details-description" name="description_html" maxlength="100" value="{{ values.description_html }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Item key', for: 'details-key', required: true, help: 'Case-sensitive letters, numbers, dots, underscores and hyphens. A lesson shows the presentation with [course-item:' ~ values.item_key ~ ']. Changing it does not rewrite those.'})} %}{% block control %}<input class="cl-input" id="details-key" name="item_key" maxlength="120" required value="{{ values.item_key }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time to study (minutes)', for: 'details-minutes', help: 'Optional: without it, the time is worked out from the slides.'})} %}{% block control %}<input class="cl-input" id="details-minutes" name="estimated_minutes" type="number" min="1" max="1440" value="{{ values.estimated_minutes }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {name: 'deck_kind', legend: 'What it is for', items: choices.kinds, selected: values.deck_kind, help: 'The checks on the presentation\'s page follow this choice.'}) }}
+			{{ ui('form.picture-choice', {name: 'deck_theme', legend: 'Look', items: choices.looks, selected: values.deck_theme, help: 'Drawn as its first slide.'}) }}
+		</form>
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-copy'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Copy or delete', summary: 'A copy is a new presentation with every slide, placed nowhere until you add it to a course. Its recordings are not copied.'}) }}
+		<form action="{{ base }}/save-as" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The copy\'s key', for: 'copy-key', required: true, help: 'Unique: letters, numbers, dots, underscores and hyphens.'})} %}{% block control %}<input class="cl-input" id="copy-key" name="item_key" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The copy\'s title', for: 'copy-title', required: true})} %}{% block control %}<input class="cl-input" id="copy-title" name="title" maxlength="240" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The copy\'s name', for: 'copy-name', help: 'Optional. Left empty, the copy is named after its title.'})} %}{% block control %}<input class="cl-input" id="copy-name" name="name" maxlength="160" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make a copy', type: 'submit', icon: 'action-copy'}) }}{% endblock %}{% endembed %}
+		</form>
+		<form class="cl-presentation-delete" action="{{ base }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><p>Deleting is for a presentation no course uses: it cannot be undone.</p>{{ ui('action.button', {label: 'Delete this presentation', variant: 'danger', type: 'submit', confirm: 'Delete this presentation and its recordings? A presentation a course still uses cannot be deleted.', icon: 'action-remove'}) }}</form>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

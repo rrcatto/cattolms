@@ -12,13 +12,15 @@
 {% if not course.enrolment.started_at %}
 {# Starting begins the access period and cannot be undone, so the learner confirms it first (owner, 2026-10-17). #}
 <form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
-{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand that starting begins my access period of ' ~ course.access_period_label ~ ', which then runs to its end, and that a started course can no longer be refunded.'})} %}{% block control %}<input type="checkbox" name="confirm_start" value="yes" required>{% endblock %}{% endembed %}
+{# Whose refund starting ends (owner, 2026-10-29): the learner's own, the company's for a place from its credit, or none for a course given to test or a preview. #}
+{% set start_refund = {own: ', and that a started course can no longer be refunded', company: ', and that once I start, my company can no longer get a refund for this place', none: ''}[course.start_refund|default('own')] %}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand that starting begins my access period of ' ~ course.access_period_label ~ ', which then runs to its end' ~ start_refund ~ '.'})} %}{% block control %}<input type="checkbox" name="confirm_start" value="yes" required>{% endblock %}{% endembed %}
 {# Asked once, here, whether they want the updates written about the course (mailing, step 1; owner, 2026-10-26). #}
 {% if ask_follow|default(false) %}<input type="hidden" name="course_id" value="{{ course.id }}">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me the updates written about this course by email. I can stop at any time.'})} %}{% block control %}<input type="checkbox" name="follow_course" value="1">{% endblock %}{% endembed %}{% endif %}
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit', icon: 'action-start'}) }}{% endblock %}{% endembed %}</form>
-{% elseif course.structure|default([])|length %}
+{% elseif course.first_stop_path|default(null) %}
 <nav class="cl-course-item-paging" aria-label="Course content">
-<span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query, icon: 'action-start'}) }}
+<span></span>{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: course.first_stop_path ~ preview_query, icon: 'action-start'}) }}
 </nav>
 {% endif %}
 {% if not is_preview and course.certificate|default(null) %}

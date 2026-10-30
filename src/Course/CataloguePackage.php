@@ -56,6 +56,8 @@ final class CataloguePackage
     public const CATALOGUE = 'catalogue.json';
     public const COURSES = 'courses/';
     public const RESOURCES = 'resources/';
+    /** Each Presentation's recorded narration, one clip per slide (CatWalk, owner 2026-10-28). */
+    public const NARRATIONS = 'narrations/';
     /** What an upload may be, and what a package may unpack to. */
     public const MAXIMUM_UPLOAD_BYTES = 64 * 1024 * 1024;
     private const MAXIMUM_UNPACKED_BYTES = 512 * 1024 * 1024;
@@ -74,6 +76,7 @@ final class CataloguePackage
         private readonly ResourceLibraryService $resources,
         private readonly AuditRepository $audit,
         private readonly string $storageRoot,
+        private readonly ?Catwalk\Narrations $narrations = null,
     ) {}
 
     /**
@@ -119,6 +122,12 @@ final class CataloguePackage
                 if ($publicId === '' || isset($files[$publicId])) continue;
                 $source = $this->resources->path(['filename' => (string) $resource['filename']]);
                 if (is_file($source)) $zip->addFile($source, $files[$publicId] = self::RESOURCES . $publicId . '/' . basename((string) $resource['filename']));
+            }
+            foreach ((array) $package['course_items'] as $item) {
+                foreach ((array) ($item['narrations'] ?? []) as $clip) {
+                    $source = $this->narrations?->path((string) $clip['public_id'], (string) $clip['content_type']);
+                    if ($source !== null && is_file($source)) $zip->addFile($source, self::NARRATIONS . basename($source));
+                }
             }
         }
         [$categories, $tags] = $this->taxonomyOf($chosen);
@@ -275,6 +284,8 @@ final class CataloguePackage
                     $courseId = $this->portability->importChecked($analysis, $categoryId ?? 0, $userId, null, $row['code']);
                     $details = array_merge([$categoryId === null ? 'Uncategorised' : 'Category: ' . $block['category']],
                         $this->settings->apply($courseId, array_diff_key($block, ['category' => true]), $userId, $prices));
+                    $narrated = $this->installNarrations($path, $package['narrations'], $data[$row['file']], $userId);
+                    if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     $outcome = array_replace($outcome, ['course_id' => $courseId, 'outcome' => 'imported', 'details' => $details]);
                     $report['counts']['imported']++;
                     $done[$courseId] = ['block' => $block, 'new' => true];
@@ -287,6 +298,8 @@ final class CataloguePackage
                         $analysis = $this->portability->analysePackage($data[$row['file']], $row['file']);
                         $this->portability->importChecked($analysis, (int) ($current['category_id'] ?? 0), $userId, $courseId, $row['code']);
                         $details[] = 'Content replaced with the package\'s';
+                        $narrated = $this->installNarrations($path, $package['narrations'], $data[$row['file']], $userId);
+                        if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     }
                     $details = array_merge($details, $this->settings->apply($courseId, $block, $userId, false));
                     $kind = in_array($row['code'], $replace, true) ? 'replaced' : ($details === [] ? 'unchanged' : 'updated');
@@ -414,6 +427,49 @@ final class CataloguePackage
     }
 
     /**
+     * A course's Presentations get the narration the package holds for them, each clip under its slide; a slide that
+     * already has one here keeps it.
+     *
+     * @param array<string,string> $narrations entry name by the clip's public id
+     * @param array<string,mixed> $course the course's package
+     */
+    private function installNarrations(string $path, array $narrations, array $course, int $userId): int
+    {
+        if ($narrations === [] || $this->narrations === null) return 0;
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) return 0;
+        $installed = 0;
+        try {
+            foreach ((array) ($course['course_items'] ?? []) as $item) {
+                if (!is_array($item) || ($item['item_type'] ?? '') !== 'slide_deck' || empty($item['narrations'])) continue;
+                $target = $this->items->itemByKey((string) $item['item_key']);
+                if ($target === null) continue;
+                $have = $this->narrations->forItem((int) $target['id']);
+                foreach ((array) $item['narrations'] as $clip) {
+                    $entry = $narrations[(string) ($clip['public_id'] ?? '')] ?? null;
+                    $slide = (string) ($clip['slide_id'] ?? '');
+                    if ($entry === null || $slide === '' || isset($have[$slide])) continue;
+                    $bytes = $zip->getFromName($entry);
+                    if ($bytes === false) continue;
+                    $temporary = (string) tempnam(sys_get_temp_dir(), 'narration');
+                    try {
+                        file_put_contents($temporary, $bytes);
+                        $this->narrations->save((int) $target['id'], $slide, $temporary, isset($clip['duration_seconds']) ? (float) $clip['duration_seconds'] : null, $userId);
+                        $installed++;
+                    } catch (InvalidArgumentException) {
+                        // A clip whose slide is not in the deck any more is left out.
+                    } finally {
+                        @unlink($temporary);
+                    }
+                }
+            }
+        } finally {
+            $zip->close();
+        }
+        return $installed;
+    }
+
+    /**
      * Installs the package's files that are not on the site yet, for the courses that use them.
      *
      * @param array<string,string> $files entry name by public id
@@ -447,7 +503,7 @@ final class CataloguePackage
     /**
      * The package's catalogue file, its courses' packages in catalogue order and its files.
      *
-     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string,data:array<string,mixed>}>,files:array<string,string>}
+     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string,data:array<string,mixed>}>,files:array<string,string>,narrations:array<string,string>}
      */
     private function read(string $path, string $extension): array
     {
@@ -455,7 +511,7 @@ final class CataloguePackage
             $catalogue = self::decode((string) file_get_contents($path), 'The catalogue file');
             CatalogueFile::check($catalogue);
             $this->packageCategoryPaths = self::paths((array) ($catalogue['categories'] ?? []));
-            return ['catalogue' => $catalogue, 'courses' => [], 'files' => []];
+            return ['catalogue' => $catalogue, 'courses' => [], 'files' => [], 'narrations' => []];
         }
         $zip = new ZipArchive();
         if ($zip->open($path, ZipArchive::RDONLY) !== true) throw new InvalidArgumentException('The file is not a zip: choose a catalogue package made by Export catalogue.');
@@ -464,6 +520,7 @@ final class CataloguePackage
             $unpacked = 0;
             $courses = [];
             $files = [];
+            $narrations = [];
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $stat = $zip->statIndex($index);
                 if ($stat === false) continue;
@@ -474,6 +531,7 @@ final class CataloguePackage
                 if ($name === self::CATALOGUE) continue;
                 if (preg_match('#^courses/([A-Za-z0-9][A-Za-z0-9._-]{0,120})\.json$#', $name) === 1) { $courses[] = $name; continue; }
                 if (preg_match('#^resources/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/([A-Za-z0-9][A-Za-z0-9._ -]{0,499})$#', $name, $match) === 1) { $files[$match[1]] = $name; continue; }
+                if (preg_match('#^narrations/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(webm|ogg|m4a|mp3|wav)$#', $name, $match) === 1) { $narrations[$match[1]] = $name; continue; }
                 throw new InvalidArgumentException('The package holds a file a catalogue package does not: ' . $name . '.');
             }
             $text = $zip->getFromName(self::CATALOGUE);
@@ -488,7 +546,7 @@ final class CataloguePackage
             foreach ($courses as $name) {
                 $packages[] = ['name' => $name, 'data' => self::decode((string) $zip->getFromName($name), $name)];
             }
-            return ['catalogue' => $catalogue, 'courses' => $packages, 'files' => $files];
+            return ['catalogue' => $catalogue, 'courses' => $packages, 'files' => $files, 'narrations' => $narrations];
         } finally {
             $zip->close();
         }

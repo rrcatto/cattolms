@@ -464,6 +464,55 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertStringContainsString('<meta property="og:image" content="' . rtrim(Env::string('APP_URL'), '/') . $url . '">', $this->html('/landing/' . $this->slug));
     }
 
+    public function testAPresentationSectionPlaysOneOfTheCoursesPresentationsAndItsNarrationIsPublicOnlyOnceThePageIs(): void
+    {
+        // A trailer played on the landing page (CatWalk, owner 2026-10-28, decision 7A).
+        $this->landing->create($this->course, $this->owner);
+        $this->complete();
+        $deck = ['kind' => 'trailer', 'theme' => 'dark', 'slides' => [
+            ['id' => 'a1b2c3d4e5f6', 'layout' => 'title', 'title' => 'Welcome', 'heading' => 'Transfers without the fear'],
+            ['id' => 'f6e5d4c3b2a1', 'layout' => 'cta', 'title' => 'Join', 'heading' => 'Start today', 'text' => 'A year to finish.', 'actions' => ['enrol', 'preview']],
+        ]];
+        $trailer = $this->item('slide_deck', 'The trailer', '', '', json_encode($deck, JSON_THROW_ON_ERROR));
+        $key = (string) $this->db->fetchOne('SELECT item_key FROM course_items WHERE id=:id', ['id' => $trailer]);
+        $section = $this->landing->addSection($this->course, 'presentation', $this->owner);
+        $this->refused(fn() => $this->landing->updateSection($this->course, $section, ['presentation' => $key], $this->owner), 'this course’s presentations');
+        $this->place($this->node(null, 3, 'item'), $trailer, false);
+        $this->landing->updateSection($this->course, $section, ['heading' => 'Take the tour', 'presentation' => $key], $this->owner);
+        $this->refused(fn() => $this->landing->addSection($this->course, 'presentation', $this->owner), 'has only one');
+
+        $audio = (string) tempnam(sys_get_temp_dir(), 'narration-');
+        $samples = str_repeat("\x80", 800);
+        file_put_contents($audio, 'RIFF' . pack('V', 36 + strlen($samples)) . 'WAVEfmt ' . pack('VvvVVvv', 16, 1, 1, 8000, 8000, 1, 8) . 'data' . pack('V', strlen($samples)) . $samples);
+        $narrations = IntegrationContainer::get()->get(\CattoLearning\Course\Catwalk\Narrations::class);
+        $clip = $narrations->save($trailer, 'a1b2c3d4e5f6', $audio, 0.1, $this->owner);
+        @unlink($audio);
+        $this->files[] = $narrations->path($clip['public_id'], $clip['content_type']);
+        $narration = '/narrations/' . $clip['public_id'];
+
+        self::assertSame(404, $this->send($narration)->getStatusCode(), 'Not public while the page is a draft.');
+        $this->signIn($this->owner);
+        $preview = $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        self::assertStringContainsString('class="cw-deck', $preview, 'The preview plays it.');
+        self::assertSame(200, $this->send($narration)->getStatusCode(), 'The course’s managers hear it.');
+
+        $this->landing->publish($this->course, $this->admin);
+        $_COOKIE = $this->cookies;
+        $html = $this->html('/landing/' . $this->slug);
+        self::assertStringContainsString('Take the tour', $html);
+        self::assertStringContainsString('Transfers without the fear', $html);
+        self::assertStringContainsString('/js/catwalk.js', $html, 'The page loads the engine only because it plays a presentation.');
+        self::assertStringContainsString('data-cw-audio="' . $narration . '"', $html);
+        self::assertStringContainsString('&quot;enrol&quot;:&quot;/courses/' . $this->slug . '&quot;', $html, 'Get this course leads to the course page.');
+        $heard = $this->send($narration);
+        self::assertSame(200, $heard->getStatusCode(), 'Anyone hears the narration of a published page’s presentation.');
+        self::assertSame('audio/wav', $heard->headers->get('Content-Type'));
+        self::assertStringNotContainsString('/js/catwalk.js', $this->html('/courses/' . $this->slug), 'A page without a presentation does not load it.');
+
+        $this->db->executeStatement('DELETE FROM course_structure_nodes WHERE course_id=:c AND id IN (SELECT node_id FROM course_item_placements WHERE course_item_id=:i)', ['c' => $this->course, 'i' => $trailer]);
+        self::assertStringNotContainsString('cw-deck', $this->html('/landing/' . $this->slug), 'A presentation taken out of the course is no longer played.');
+    }
+
     /** Fills the sections a new page leaves empty, so the page can be published. */
     private function complete(): void
     {
@@ -509,7 +558,7 @@ final class LandingPageIntegrationTest extends TestCase
     private function item(string $type, string $title, string $description, string $content, string $config): int
     {
         $id = (int) $this->db->fetchOne(
-            'INSERT INTO course_items (public_id,item_key,item_type,title,description_html,content_source,type_config,created_by_user_id,updated_by_user_id) VALUES (:p,:k,:t,:title,:d,:content,CAST(:config AS jsonb),:u,:u) RETURNING id',
+            'INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,type_config,created_by_user_id,updated_by_user_id) VALUES (:p,:k,:k,:t,:title,:d,:content,CAST(:config AS jsonb),:u,:u) RETURNING id',
             ['p' => Uuid::v4(), 'k' => 'landing-' . $type . '-' . $this->suffix, 't' => $type, 'title' => $title, 'd' => $description, 'content' => $content, 'config' => $config, 'u' => $this->owner]
         );
         $this->items[] = $id;
