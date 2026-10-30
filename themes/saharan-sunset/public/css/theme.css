@@ -857,10 +857,9 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
    landing hero) is padded by its band, not by the container. */
 .ss-body.cl-width-full .cl-main > :is(.cl-hero, .cl-feature-band, .cl-flash-stack, .cl-page-head:has(> .cl-container)) { padding-inline: var(--ss-row-pad); }
 .ss-body.cl-width-full .cl-main > .cl-page-head > .cl-container { padding-inline: 0 !important; }
-/* The landing hero is a band across the window like Home's hero (1.0.6, 2026-10-30). Core holds a page head to the
-   cards' width, so with the band's padding inside that width a landing page's headline stood in a narrow column in
-   the middle of a wide screen. */
-.ss-body.cl-width-full .cl-main > .cl-page-head:has(> .cl-container) { width: 100% !important; max-width: none !important; margin-inline: 0 !important; }
+/* The landing hero is as wide as the cards below it, not a band across the window (1.0.7, owner 2026-10-30: "limit it
+   to the boxed container - full width of that"): the frame, less the row's padding on each side. */
+.ss-body.cl-width-full .cl-main > .cl-landing-hero { width: calc(100% - 2 * var(--ss-row-pad)) !important; max-width: var(--ss-frame) !important; margin-inline: auto !important; padding-inline: 0 !important; }
 .ss-body.cl-width-full .cl-identity-head { background: var(--ss-paper); }
 
 .ss-body .cl-hero {
@@ -948,11 +947,11 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
 /* Core gives a landing page the cl-width-full body class, so the full-width frame of section 15
    applies: no box, and each row centred to --ss-frame. The ADMIN preview's notice is a row of its
    own above the hero. */
-.ss-body.cl-width-full .cl-main > .cl-page-section:has(+ .cl-landing-hero) { padding-block: 24px 0; }
+.ss-body.cl-width-full .cl-main > .cl-page-section:has(+ .cl-landing-hero) { padding-block: 24px; }
 
-/* Hero: a night band across the window, the headline in ivory, the price and buy buttons on a
-   paper card with the terracotta edge, and the course's picture framed on the right. */
-.ss-body .cl-main > .cl-landing-hero {
+/* Hero: the course's picture fills it with the words over it, as on a course page (1.0.7; core draws it). A hero
+   without a picture is a night box with the headline in ivory. */
+.ss-body .cl-main > .cl-landing-hero:not(:has(.cl-picture-head)) {
   position: relative;
   isolation: isolate;
   border-bottom: 0;
@@ -961,20 +960,13 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
     linear-gradient(180deg, #19130f 0%, var(--ss-night) 100%);
   color: var(--ss-on-dark);
 }
-.ss-body .cl-main > .cl-landing-hero > .cl-container { padding-top: 88px !important; padding-bottom: 84px !important; }
+.ss-body .cl-main > .cl-landing-hero:not(:has(.cl-picture-head)) > .cl-container { padding: 88px 48px 84px !important; }
+.ss-body .cl-main > .cl-landing-hero:has(.cl-picture-head) { border: 0; background: transparent; }
 .ss-body .cl-landing-headline { margin-top: 18px; color: var(--ss-on-dark); font-family: var(--ss-display); font-size: clamp(2.6rem, 5.4vw, 4.75rem); font-weight: 400; line-height: 1.02; }
 .ss-body .cl-landing-hero .cl-lead { max-width: 36rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
 .ss-body .cl-landing-hero .cl-ui-badge { background: transparent; border-color: var(--ss-dark-line); color: var(--ss-apricot); }
 .ss-body .cl-landing-hero .cl-rating-summary { color: var(--ss-on-dark-2); }
-.ss-body .cl-landing-hero-copy > .cl-ui-surface {
-  padding: 26px 28px;
-  background: var(--ss-paper);
-  border: 1px solid var(--ss-line);
-  border-top: 2px solid var(--ss-terra);
-  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .7);
-  color: var(--ss-ink);
-}
-.ss-body .cl-landing-hero-picture :is(img, .cl-landing-hero-cover) { border: 1px solid var(--ss-dark-line); box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .8); }
+.ss-body .cl-landing-picture-head { box-shadow: 0 30px 60px -30px rgba(18, 14, 11, .6); }
 .ss-body .cl-landing-hero :focus-visible { outline-color: var(--ss-apricot); }
 
 /* Sections: each one a paper panel on the texture, like Home's catalogue panel. */

@@ -220,12 +220,14 @@ async function editSection(page, label) {
         await ctx.close();
     });
 
-    await scenario('a visitor adds the course to the cart from the hero and comes back to the page', 'chromium', async () => {
+    await scenario('a visitor adds the course to the cart from Price and access and comes back to the page', 'chromium', async () => {
         const {ctx, page} = await open(chromium, state.tokens.learner);
         await go(page, PUBLIC);
-        const hero = page.locator('.cl-landing-hero');
-        assert.ok(clean(await hero.textContent()).includes('R 1 500,00 · 1 year access · other periods available'));
-        await submit(page, hero.getByRole('button', {name: 'Add to cart'}), 'add to cart');
+        // The hero has no buy box (owner, 2026-10-30): buying is in Price and access and the Call to action.
+        assert.equal(await page.locator('.cl-landing-hero').getByRole('button').count(), 0, 'Nothing to buy in the hero');
+        const pricing = page.locator('.cl-landing-section--pricing');
+        assert.ok(clean(await pricing.textContent()).includes('R 1 500,00'));
+        await submit(page, pricing.getByRole('button', {name: 'Add to cart'}), 'add to cart');
         assert.equal(new URL(page.url()).pathname, PUBLIC, 'Add to cart returns to the landing page');
         await flash(page, 'was added to My Cart');
         await ctx.close();
@@ -260,7 +262,7 @@ async function editSection(page, label) {
         await go(page, PUBLIC);
         await page.getByText('How long do I have?').click();
         assert.ok(await page.getByText('A year from when you start.').isVisible());
-        await submit(page, page.locator('.cl-landing-hero').getByRole('button', {name: 'Add to cart'}), 'add to cart');
+        await submit(page, page.locator('.cl-landing-section--pricing').getByRole('button', {name: 'Add to cart'}), 'add to cart');
         assert.equal(new URL(page.url()).pathname, PUBLIC);
         await ctx.close();
     });
@@ -282,24 +284,30 @@ async function editSection(page, label) {
                     assert.ok(await noSideScroll(page), `${theme} ${width} ${name} does not scroll sideways`);
                     assert.ok(await page.locator(selector).first().isVisible(), `${theme} ${width} ${name} shows ${selector}`);
                     if (name === 'public') {
-                        const button = await page.locator('.cl-landing-hero').getByRole('button', {name: 'Add to cart'}).boundingBox();
-                        assert.ok(button && button.height >= 32 && button.x >= 0 && button.x + button.width <= width, `${theme} ${width}: the hero's button is whole and easy to press`);
-                        const contrast = await page.locator('.cl-landing-hero .cl-ui-surface').first().evaluate((surface) => {
+                        const button = await page.locator('.cl-landing-section--pricing').getByRole('button', {name: 'Add to cart'}).boundingBox();
+                        assert.ok(button && button.height >= 32 && button.x >= 0 && button.x + button.width <= width, `${theme} ${width}: the buy button is whole and easy to press`);
+                        const contrast = await page.locator('.cl-landing-section--pricing .cl-ui-surface').first().evaluate((surface) => {
                             // Any CSS colour (rgb(), color(srgb …)) as 0-255 channels, through a canvas.
                             const canvas = document.createElement('canvas').getContext('2d', {willReadFrequently: true});
                             const rgb = (colour) => { canvas.clearRect(0, 0, 1, 1); canvas.fillStyle = colour; canvas.fillRect(0, 0, 1, 1); return [...canvas.getImageData(0, 0, 1, 1).data].slice(0, 3); };
                             const luminance = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
-                            const note = surface.querySelector('.cl-course-purchase-price');
+                            // Price and access lists its prices as choices; a compact box states one.
+                            const note = surface.querySelector('.cl-course-purchase-price, .cl-course-purchase label');
                             const [a, b] = [luminance(rgb(getComputedStyle(note).color)), luminance(rgb(getComputedStyle(surface).backgroundColor))];
                             return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
                         });
                         assert.ok(contrast >= 4.5, `${theme} ${width}: the buy box's price can be read (contrast ${contrast.toFixed(2)})`);
-                        // The hero's words and picture use the page's frame, as the rows below it do (2026-10-30).
-                        const share = await page.evaluate(() => {
-                            const hero = document.querySelector('.cl-landing-hero-grid'), row = document.querySelector('.cl-landing-sections > *');
-                            return hero && row ? hero.getBoundingClientRect().width / row.getBoundingClientRect().width : 1;
+                        // The hero is as wide as the cards below it and its cover fills it, with no buy box (owner, 2026-10-30).
+                        const hero = await page.evaluate(() => {
+                            const box = (el) => el.getBoundingClientRect();
+                            const head = box(document.querySelector('.cl-landing-hero')), cover = box(document.querySelector('.cl-landing-hero .cl-picture-head'));
+                            const card = box(document.querySelector('.cl-landing-sections > *'));
+                            return {edges: Math.max(Math.abs(head.left - card.left), Math.abs(head.right - card.right)), gap: Math.max(cover.left - head.left, head.right - cover.right, cover.top - head.top, head.bottom - cover.bottom),
+                                buttons: document.querySelectorAll('.cl-landing-hero button').length};
                         });
-                        assert.ok(share >= 0.85, `${theme} ${width}: the hero uses the page's width (${Math.round(share * 100)}% of the rows below it)`);
+                        assert.ok(hero.edges <= 2, `${theme} ${width}: the hero is as wide as the cards (${Math.round(hero.edges)}px off)`);
+                        assert.ok(hero.gap <= 6, `${theme} ${width}: the cover fills the hero (${Math.round(hero.gap)}px of the head show)`);
+                        assert.equal(hero.buttons, 0, `${theme} ${width}: no buy box in the hero`);
                     }
                     await page.screenshot({path: `${output}/${theme}-${width}-${name}.png`, fullPage: name === 'public'});
                 }
@@ -331,7 +339,7 @@ async function editSection(page, label) {
         assert.equal(clean(await visitor.page.locator('h1').first().textContent()), HEADLINE);
         await visitor.page.getByText('How long do I have?').click();
         assert.ok(await visitor.page.getByText('A year from when you start.').isVisible());
-        await submit(visitor.page, visitor.page.locator('.cl-landing-hero').getByRole('button', {name: 'Add to cart'}), 'add to cart');
+        await submit(visitor.page, visitor.page.locator('.cl-landing-section--pricing').getByRole('button', {name: 'Add to cart'}), 'add to cart');
         assert.equal(new URL(visitor.page.url()).pathname, PUBLIC);
         await visitor.ctx.close();
         const {ctx, page} = await open(firefox, state.tokens.admin);

@@ -1,5 +1,5 @@
 {
-    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-pUilQak.js",
+    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-R6gfGoq.js",
     "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
     "app.js": "\/assets\/app-we5Kv_X.js",
     "controllers\/catalogue_export_controller.js": "\/assets\/controllers\/catalogue_export_controller-93SjUjn.js",
@@ -8,6 +8,7 @@
     "controllers\/course_content_controller.js": "\/assets\/controllers\/course_content_controller-CeeAsVC.js",
     "controllers\/course_order_controller.js": "\/assets\/controllers\/course_order_controller-Hnvfrim.js",
     "controllers\/landing_sections_controller.js": "\/assets\/controllers\/landing_sections_controller-JHfO7SB.js",
+    "controllers\/page_layout_controller.js": "\/assets\/controllers\/page_layout_controller-lIgGpdp.js",
     "controllers\/popular_courses_controller.js": "\/assets\/controllers\/popular_courses_controller-LIn23Tr.js",
     "controllers\/presentation_slides_controller.js": "\/assets\/controllers\/presentation_slides_controller-KBsR78e.js",
     "controllers\/profile_image_controller.js": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",

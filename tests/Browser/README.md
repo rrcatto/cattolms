@@ -429,8 +429,8 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Editor.** ADMIN opens Landing page from the course editor's tools, creates the page (the hero and eight sections, Publish waiting for the empty lists), writes the hero, fills Who this course is for, Learning outcomes and a question, hides and shows Benefits, adds a call to action from Add section (Pricing is refused as already on the page) and removes it from its ⋯ menu.
 - **Order.** A section dragged by its handle and another moved with ↑ on its handle are saved and survive a reload; without JavaScript the ⋯ menu's Move to bottom moves a section; Firefox repeats a drag.
 - **Preview and publication.** Preview opens in a new tab with the buttons disabled, `noindex` and no canonical address; Publish makes the page public and the course editor says so; Unpublish takes it down (not found) and keeps every section, and a page that has been public offers no Delete.
-- **Visitor.** The published page shows the hero, the lists, the outline (never the fixture's lesson, bonds or question text), the approved review, both prices and a question that opens; its canonical address is set. Add to cart from the hero returns to the landing page, with JavaScript and without. A learner who has the course is offered Continue course and no Add to cart; a course with no active price says it is not on sale.
-- **Themes.** The page, the editor and a section form fit every bundled theme at 1440 and 390px without sideways scrolling; the hero's Add to cart is whole and at least 32px tall, and the buy box's price has a contrast of at least 4.5:1 against its card.
+- **Visitor.** The published page shows the hero, the lists, the outline (never the fixture's lesson, bonds or question text), the approved review, both prices and a question that opens; its canonical address is set. The hero has nothing to buy; Add to cart from Price and access returns to the landing page, with JavaScript and without. A learner who has the course is offered Continue course and no Add to cart; a course with no active price says it is not on sale.
+- **Themes.** The page, the editor and a section form fit every bundled theme at 1440 and 390px (the visitor's page at 1920 too) without sideways scrolling; the hero is as wide as the cards below it, its cover fills it (the fixture's course has one) and it holds no button; Price and access's Add to cart is whole and at least 32px tall, and its price has a contrast of at least 4.5:1 against its card.
 
 The fixture makes two published courses (one with two prices, an outline with protected content and an approved review; one not on sale with a published landing page), an ADMIN, a course owner, a learner who has the first course and one who does not. The check places no order, so `cleanup` removes everything.
 
@@ -556,6 +556,15 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAI
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-page.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php cleanup'
+```
+
+`page-layout.cjs` (2026-10-30) checks the Page Builder on the same fixture (which also gives an administrator's session and puts back the site's default course page layout at cleanup), in Chromium and Firefox: a course's Page layout tab starts on the site's default with the board locked, A layout of its own unlocks it, a template, Hide and Show, the arrows, a drag by the handle and a width change act in place with the sketch and the templates' In use following, leaving with changes asks first, and Save layout keeps it; the course page then draws its blocks in that order with two half blocks sharing a row; Reset to the site's default; Settings > Course pages changes the default for every course on it and goes Back to Course first; without JavaScript every button saves what it asks; the tab and Settings are built as every page is at 1440 and 390px, the board one column on a phone.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php create'
+podman cp env_php_1:/tmp/catto-course-page-state.json /tmp/catto-course-page-state.json
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/page-layout.cjs
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php cleanup'
 ```
 

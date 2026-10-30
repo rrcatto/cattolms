@@ -1752,23 +1752,22 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-document-preview-frame{display:block;width:100%;max-width:52rem;aspect-ratio:210/297;min-height:20rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
 .cl-document-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 .cl-document-logo{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
-/* Course landing pages (/landing/…): the hero in the page-head band with its picture beside the copy
-   on wide screens and above nothing on narrow ones, then each section on its own card. Layout only:
-   colours, type and borders come from the theme through its tokens. Decorative check marks are
-   absolutely placed and never interactive. */
+/* Course landing pages (/landing/…): the hero is the page head, as wide as the cards below it, its picture (the course's
+   cover or a Resource Library picture) filling it with the words over it as on a course page (owner, 2026-10-30), or the
+   words alone in the page-head band without a picture; then each section on its own card. Layout only: colours, type and
+   borders come from the theme through its tokens. Decorative check marks are absolutely placed and never interactive. */
 .cl-landing-hero .cl-rating-summary{margin:.25rem 0 0}
-.cl-landing-hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:1.5rem 2.5rem;align-items:center}
-@media (min-width:992px){.cl-landing-hero-grid.has-picture{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}}
-.cl-landing-hero-copy,.cl-landing-hero-picture{min-width:0}
+/* The picture covers the whole head: no band of the head's own shows above, below or beside it. */
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-landing-hero:has(.cl-picture-head){padding:0!important}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-landing-hero:has(.cl-picture-head)>.cl-container{padding-block:0!important}
+.cl-landing-picture-head{margin:0!important}
+.cl-landing-picture-head .cl-picture-head-art img{display:block;width:100%;height:100%;object-fit:cover}
+.cl-picture-head .cl-picture-head-text .cl-rating-summary{color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cl-picture-head .cl-landing-secondary{margin:1rem 0 0}
+.cl-picture-head .cl-landing-secondary .cl-ui-action{background:rgba(251,246,238,.95)!important;color:#2b2523!important;border-color:transparent!important}
+.cl-landing-hero-copy{min-width:0}
 .cl-landing-headline{margin:0 0 .75rem;font-size:clamp(2rem,1.4rem + 2.6vw,3.4rem);font-weight:700;line-height:1.1;text-wrap:balance;overflow-wrap:anywhere}
 .cl-landing-hero-copy .lead{margin:0 0 .75rem}
-.cl-landing-hero-copy>.cl-ui-surface{margin-top:1.25rem;max-width:38rem}
-/* The buy box is a card in the page-head band: its words take the card's colour, not the band's
-   (a theme that lightens every paragraph of a dark band would otherwise make them unreadable). */
-.cl-landing-hero .cl-landing-hero-copy>.cl-ui-surface :is(p,li){color:inherit}
-.cl-landing-hero-picture img{display:block;width:100%;height:auto;max-height:26rem;object-fit:cover;border-radius:var(--cl-radius,10px)}
-.cl-landing-hero-cover{aspect-ratio:3/2;overflow:hidden;border-radius:var(--cl-radius,10px)}
-.cl-landing-hero-cover svg{display:block;width:100%;height:100%}
 .cl-landing-secondary{margin:.75rem 0 0}
 .cl-landing-sections{display:grid;gap:1.5rem}
 .cl-landing-section{min-width:0;scroll-margin-top:5rem}
@@ -2227,3 +2226,60 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-course-presentation-note{margin:0 0 .75rem;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}
 /* In the page-wide window the slides keep 16:9 and fit the screen's height, so the controls stay in view. */
 @media (min-width:768px){.cl-ui-modal-card--page .cw-deck{max-width:max(20rem,calc((100dvh - 21rem) * 16 / 9));margin-inline:auto}}
+/* The Page Builder for course pages (owner, 2026-10-30): partials/admin/page-layout-builder.html.twig. */
+.cl-page-builder{display:grid;gap:1.25rem}
+.cl-page-builder-status{margin:0;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-part{min-width:0;padding:1rem 1.25rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem);background:var(--cl-surface,#fff)}
+.cl-page-builder-part[data-locked]{opacity:.55}
+.cl-page-builder-part-head{margin-bottom:.85rem}
+.cl-page-builder-part-head h3,.cl-page-builder-preview h3{margin:0 0 .25rem}
+.cl-page-builder-part-head p{margin:0;font-size:.9rem;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-templates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:1rem}
+.cl-page-builder-template{display:flex;flex-direction:column;gap:.45rem;padding:.85rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-page-builder-template[data-current="true"]{border-color:var(--cl-accent,#2563eb);background:var(--cl-primary-soft,#eef2f8)}
+.cl-page-builder-template p{margin:0;font-size:.85rem;color:var(--cl-muted,#5f6b7a);flex:1}
+.cl-page-builder-template>.cl-ui-action{align-self:flex-start}
+.cl-page-builder-in-use{display:none;margin-left:.35rem;padding:.05rem .45rem;border-radius:999px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:var(--cl-accent,#2563eb);color:var(--cl-on-color-1,#fff)}
+.cl-page-builder-template[data-current="true"] .cl-page-builder-in-use{display:inline-block}
+.cl-page-builder-wire,.cl-page-builder-sketch{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.cl-page-builder-wire>span,.cl-page-builder-sketch>span{display:flex;align-items:center;justify-content:center;min-height:1.35rem;padding:.15rem .3rem;overflow:hidden;border-radius:2px;font-size:.62rem;line-height:1.15;text-align:center;background:color-mix(in srgb,currentColor 10%,transparent)}
+.cl-page-builder-wire>[data-width="full"],.cl-page-builder-sketch>[data-width="full"],.cl-page-builder-wire-head,.cl-page-builder-sketch-fixed{grid-column:1 / -1}
+.cl-page-builder-wire-head{min-height:1.6rem!important;background:color-mix(in srgb,currentColor 22%,transparent)!important}
+.cl-page-builder-wire>[data-block="access"],.cl-page-builder-sketch>[data-block="access"]{background:var(--cl-accent,#2563eb);color:var(--cl-on-color-1,#fff)}
+.cl-page-builder-work{display:grid;gap:1.25rem}
+@media (min-width:992px){.cl-page-builder-work{grid-template-columns:minmax(0,1fr) 19rem;align-items:start}.cl-page-builder-preview{position:sticky;top:1rem}}
+.cl-page-builder-fixed{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.75rem;padding:.65rem .85rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-page-builder-fixed>span:first-child{display:flex;flex-direction:column}
+.cl-page-builder-fixed>span:first-child>span,.cl-page-builder-tile-name>span{font-size:.82rem;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-fixed-tag,.cl-page-builder-always{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-board,.cl-page-builder-shelf>ol{list-style:none;margin:0;padding:0}
+.cl-page-builder-board{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.cl-page-builder-board>[data-width="full"]{grid-column:1 / -1}
+@media (max-width:575.98px){.cl-page-builder-board{grid-template-columns:1fr}}
+.cl-page-builder-tile{display:flex;flex-direction:column;gap:.55rem;min-width:0;padding:.7rem .8rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem);background:var(--cl-page-surface,#fff)}
+.cl-page-builder-tile[data-dragging]{opacity:.45}
+.cl-page-builder-tile[data-drop]{outline:2px solid var(--cl-accent,#2563eb);outline-offset:2px}
+.cl-page-builder-tile-head{display:flex;align-items:flex-start;gap:.6rem}
+.cl-page-builder-handle{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem;cursor:grab;touch-action:none;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-part[data-locked] .cl-page-builder-handle{cursor:not-allowed}
+.cl-page-builder-tile-name{flex:1;min-width:0;display:flex;flex-direction:column}
+.cl-page-builder-arrows{display:flex;gap:.25rem;flex:0 0 auto}
+.cl-page-builder-tile-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem}
+.cl-page-builder-width{display:inline-flex;margin:0;padding:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem);overflow:hidden}
+.cl-page-builder-width label{position:relative;margin:0;cursor:pointer}
+.cl-page-builder-width input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cl-page-builder-width span{display:block;padding:.3rem .7rem;font-size:.82rem}
+.cl-page-builder-width label:has(input:checked) span{background:var(--cl-primary,#1f2937);color:var(--cl-on-color-1,#fff)}
+.cl-page-builder-width label:has(input:focus-visible){outline:2px solid var(--cl-accent,#2563eb);outline-offset:-2px}
+.cl-page-builder-width label:has(input:disabled){cursor:not-allowed}
+.cl-page-builder-board .cl-page-builder-show,.cl-page-builder-shelf .cl-page-builder-hide{display:none}
+.cl-page-builder-shelf{margin-top:1rem;padding:.75rem .85rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+.cl-page-builder-shelf-empty{margin:.35rem 0 0;font-size:.85rem;color:var(--cl-muted,#5f6b7a)}
+.cl-page-builder-shelf>ol{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+.cl-page-builder-shelf .cl-page-builder-tile{flex-direction:row;align-items:center;padding:.35rem .5rem}
+.cl-page-builder-shelf .cl-page-builder-handle,.cl-page-builder-shelf .cl-page-builder-arrows,.cl-page-builder-shelf .cl-page-builder-width,.cl-page-builder-shelf .cl-page-builder-tile-name>span{display:none}
+.cl-page-builder-reset{margin-top:1rem}
+.cl-page-builder-sketch{margin:.75rem 0;color:var(--cl-ink,#22303f)}
+.cl-page-builder-sketch>span{min-height:2rem}
+.cl-page-builder-sketch>[data-block="about"],.cl-page-builder-sketch>[data-block="how"],.cl-page-builder-sketch>[data-block="modules"]{min-height:3rem}
+.cl-page-builder-preview p{margin:0;font-size:.82rem;color:var(--cl-muted,#5f6b7a)}

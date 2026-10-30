@@ -168,9 +168,9 @@ final class CourseReviewPageTest extends TestCase
         }
         $_COOKIE = $this->cookies;
         $page = $this->html('/courses/' . $this->slug);
-        // In the course's own column, after what it holds (owner, 2026-10-30, the accepted mockup), Course access beside it.
+        // A row of its own after what the course holds, before Course access (owner, 2026-10-30: the page in rows).
         self::assertGreaterThan(strpos($page, 'About this course'), (int) strpos($page, 'id="reviews"'), 'The Reviews card follows the course.');
-        self::assertGreaterThan((int) strpos($page, 'id="reviews"'), (int) strpos($page, '<aside>'), 'in the course\'s column, before the side column with Course access.');
+        self::assertGreaterThan((int) strpos($page, 'id="reviews"'), (int) strpos($page, 'id="course-access"'), 'and comes before Course access.');
         self::assertGreaterThan((int) strpos($page, 'Third and glowing.'), (int) strpos($page, 'First and glowing.'), 'The newest first.');
         self::assertStringContainsString('<ol class="cl-review-list" start="1">', $page);
         foreach (['1.', '2.', '3.'] as $number) self::assertStringContainsString('<span class="cl-review-number" aria-hidden="true">' . $number . '</span>', $page);

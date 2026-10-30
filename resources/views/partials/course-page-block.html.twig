@@ -1,0 +1,135 @@
+{#
+	One block of a course's catalogue page, by its name (Page Builder, owner 2026-10-30; Course\CoursePageLayout::BLOCKS):
+	the page draws the blocks in the rows its layout gives (CoursePageLayout::rows), so each block is one card here. A
+	block that has nothing to show is never asked for (the controller leaves it out of the rows).
+#}
+{% if block_id == 'about' %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">About this course</h2>
+				<div class="cl-prose">
+					{{ course.description_html|raw }}
+				</div>
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'how' %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">How each module works</h2>
+				{% include '@platform/partials/course-module-parts.html.twig' with {modules_view: course_page} %}
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'modules' %}
+	{% if course_page.modules %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<div class="cl-course-modules-head">
+					<h2 class="h4" id="course-modules">The {{ course_page.modules|length }} {{ course_page.modules|length == 1 ? 'module' : 'modules' }}</h2>
+					{% if course_page.total %}<span>{{ course_page.total|capitalize }} in all</span>{% endif %}
+				</div>
+				{% include '@platform/partials/course-module-list.html.twig' with {modules_view: course_page, course_slug: course.slug, list_label_id: 'course-modules'} %}
+				{# How results are worked out is in the FAQ (owner, 2026-10-20: "the grading belongs elsewhere, in a FAQ"). #}
+				<p class="cl-course-grading-link">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
+{% endblock %}
+{% endembed %}
+	{% else %}
+	{# A course not arranged into modules lists what it holds, without its assessments, as before. #}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">Course Content</h2>
+				<ol>
+				{% for node in course.structure|filter(node => node.node_type == 'section' or node.item_type|default('') not in ['assessment', 'diagnostic']) %}
+					<li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
+				{% endfor %}
+				</ol>
+				<p class="cl-course-grading-link">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
+{% endblock %}
+{% endembed %}
+	{% endif %}
+{% elseif block_id == 'glance' %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">At a glance</h2>
+				{# A bought course opens at once (owner, 2026-10-20: "put 'immediately'"). #}
+				{{ ui('data.key-value-list', {items: (course.category_name ? [{label: 'Category', value: course.category_name}] : [])|merge(course_page.modules ? [{label: 'Modules', value: course_page.modules|length}] : [])|merge(course_page.total ? [{label: 'Study time', value: course_page.total|capitalize}] : [])|merge(course.level ? [{label: 'Level', value: course.level}] : [])|merge([{label: 'Access starts', value: 'Immediately'}])}) }}
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'get' %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">What you get</h2>
+				{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}
+{% block body %}
+					{% for figure in course_page.figures %}{{ ui('data.stat-card', {value: figure.n, label: figure.label}) }}{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'reviews' %}
+	{#
+		Reviews in their own card (owner, 2026-10-22), only when the course has a published review (owner, 2026-10-20:
+		"just leave it out entirely if there are no reviews"). Each number of stars with reviews shows just those, and View
+		all reviews takes the choice away again; the list is numbered, newest first.
+	#}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+					<section id="reviews" class="cl-course-reviews" aria-labelledby="course-reviews-heading" data-keep-scroll>
+						<h2 class="h4" id="course-reviews-heading">Reviews</h2>
+						<div class="cl-rating-overview">
+							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
+							<dl class="cl-rating-distribution">
+								{% for band in rating.distribution %}
+									{% set band_words = band.stars ~ (band.stars == 1 ? ' star' : ' stars') %}
+									<div><dt>{% if band.count > 0 %}<a href="/courses/{{ course.slug }}?reviews_stars={{ band.stars }}#reviews"{% if band.stars == reviews_stars %} aria-current="true"{% endif %}>{{ band_words }}</a>{% else %}{{ band_words }}{% endif %}</dt><dd>{{ ui('feedback.progress', {value: band.percent, label: band.percent ~ '% of reviews give ' ~ band_words}) }}<span>{{ band.count }}</span></dd></div>
+								{% endfor %}
+							</dl>
+						</div>
+						{% if reviews_stars %}
+							{% set shown = rating.distribution|filter(band => band.stars == reviews_stars)|first %}
+							<p class="cl-review-filtered">{{ shown.count == 1 ? '1 review gives' : shown.count ~ ' reviews give' }} {{ reviews_stars }} {{ reviews_stars == 1 ? 'star' : 'stars' }}. {{ ui('action.link', {label: 'View all reviews', variant: 'secondary', size: 'small', href: '/courses/' ~ course.slug ~ '#reviews', icon: 'action-view-all'}) }}</p>
+						{% endif %}
+						{% include '@platform/partials/course-reviews.html.twig' %}
+					</section>
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'access' %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+						<h2 class="h4" id="course-access">Course access</h2>
+						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full', purchase_key: 'side'} %}
+						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
+						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
+						{# Reviewing is offered to anyone who has held access to the course, including a learner whose access has expired. #}
+						{% if can_review %}
+							<div class="cl-course-review-action">
+								{% if own_review %}
+									<p>Your review: {{ own_review.status == 'approved' ? 'published' : (own_review.status == 'pending' ? 'pending moderation' : 'not published') }}.</p>
+								{% endif %}
+								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review', icon: (own_review ? 'action-edit' : 'action-rate')}) }}
+							</div>
+						{% endif %}
+						{# A question opens the contact form with this course chosen: a problem with it once it is yours, a question before buying until then (owner, 2026-10-20). #}
+						<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug, icon: 'action-report'}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug, icon: 'action-ask'}) }}</p>
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'start' %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<div class="cl-course-start">
+					<div>
+						<h2 class="h3" id="course-start-heading">{{ course_page.free ? 'Ready to start? Begin with ' ~ course_page.free ~ ', free' : 'Ready to start? Try it free first' }}</h2>
+						<p>Read the free preview before you decide. If it suits you, enrol in the full course.</p>
+					</div>
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.link', {label: course_page.free ? 'Read ' ~ course_page.free ~ ' free' : 'Preview this course', variant: 'primary', href: '/courses/' ~ course.slug ~ '/preview', icon: 'action-preview'}) }}{{ ui('action.link', {label: 'Get this course', variant: 'secondary', href: '#course-access', icon: 'action-buy'}) }}{% endblock %}{% endembed %}
+				</div>
+{% endblock %}
+{% endembed %}
+{% elseif block_id == 'related' %}
+	{# The courses related to this one (owner, 2026-10-20), published ones only, in the catalogue's order. #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			<h2 class="h3" id="related-courses-heading">Related courses</h2>
+			{{ ui('catalogue.course-grid', {courses: related_courses}) }}
+{% endblock %}
+{% endembed %}
+{% endif %}

@@ -175,8 +175,8 @@ final class LandingPageViewBuilder
                 'image_resource_id' => $data['image_resource_id'],
                 'secondary_target' => (string) $data['secondary'],
                 'secondary_label' => (string) $data['secondary_label'],
+                // No buy box in the hero (owner, 2026-10-30): buying is in Price and access and the Call to action.
                 'rating' => $rating,
-                'purchase' => $purchase,
             ],
             LandingSectionType::Audience, LandingSectionType::Outcomes => $common + ['items' => $data['items']],
             LandingSectionType::Benefits => $common + ['items' => array_map(static fn(array $item): array => ['title' => $item['title'], 'paragraphs' => LandingCopy::paragraphs($item['text'])], $data['items'])],

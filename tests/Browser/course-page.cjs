@@ -1,5 +1,6 @@
 /* A course's catalogue page (owner, 2026-10-30, the accepted mockup, its head kept as it was): the cover with the title,
- * one buy box (under Course access), the modules with how a module is made, and "Watch course presentation" opening the
+ * one buy box (under Course access), the page in rows (About beside How each module works, the modules across the
+ * page, At a glance beside What you get, the reviews, Course access), the modules with how a module is made, and "Watch course presentation" opening the
  * trailer in a window as wide as the page's box, closed by its Close button, by Esc and by the slides' Get this course
  * (which then shows Course access); without JavaScript the button opens the trailer in the free preview. Chromium and
  * Firefox, at 1440 and 390.
@@ -31,7 +32,11 @@ async function scenario(name, run) {
                 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
                 assert.equal((await page.goto(page_url, {waitUntil: 'networkidle'})).status(), 200);
                 assert.equal(await page.locator('.cl-course-purchase').count(), 1, 'one buy box');
-                assert.equal(await page.locator('aside .cl-course-purchase').count(), 1, 'under Course access, in the side column');
+                assert.equal(await page.locator('.cl-page-section:has(#course-access) .cl-course-purchase').count(), 1, 'under Course access');
+                // The page in rows (owner, 2026-10-30): About beside How each module works, then the modules across the page.
+                const [about, how, modules] = await Promise.all(['h2:text-is("About this course")', 'h2:text-is("How each module works")', '#course-modules'].map((s) => page.locator(s).boundingBox()));
+                if (width === 1440) assert.ok(Math.abs(about.y - how.y) < 2 && how.x > about.x, 'About and How each module works share a row');
+                assert.ok(modules.y > about.y && modules.y > how.y, 'the modules come after them');
                 assert.equal(await page.locator('.cl-picture-head .cl-course-detail-headline h1').count(), 1, 'the title over the cover');
                 assert.deepEqual(await page.locator('.cl-course-modules .cl-course-module-title').allTextContents(), state.modules, 'the modules, in order');
                 assert.match(await page.locator('.cl-course-module-paragraph').textContent(), /^Every module opens with a presentation/, 'how a module is made');

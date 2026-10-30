@@ -83,7 +83,8 @@ final class AdminCourseController extends BaseController
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages,
         private readonly \CattoLearning\Course\CourseCatalogueSettings $catalogueSettings,
-        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
+        private readonly \CattoLearning\Course\CoursePageLayouts $pageLayouts
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -147,6 +148,7 @@ final class AdminCourseController extends BaseController
             'active_tab' => $activeTab,
             'tab_url' => self::tabUrl($courseId, $activeTab),
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
+            'page_layout' => $activeTab === 'page-layout' ? $this->pageLayoutView($courseId) : null,
             'category_picker' => null,
             'category_places' => null,
             'tag_options' => [],
@@ -186,6 +188,8 @@ final class AdminCourseController extends BaseController
         'pricing' => ['Pricing', 'COURSE.PRICING.MANAGE'],
         'content' => ['Course content', null],
         'presentation' => ['Presentation', null],
+        // The course's catalogue page, block by block (Page Builder, owner 2026-10-30).
+        'page-layout' => ['Page layout', null],
         'grades' => ['Grades', null],
         'publication' => ['Publication', null],
         'history' => ['History', null],
@@ -197,6 +201,27 @@ final class AdminCourseController extends BaseController
         return '/admin/courses/' . $courseId . ($tab === 'overview' ? '' : '?tab=' . $tab);
     }
 
+
+    /**
+     * The course's page layout (Page Builder, owner 2026-10-30): its own, or the site's default again. Without JavaScript
+     * a template, a move or Reset is sent with the whole form and saved at once (CoursePageLayouts::fromForm).
+     */
+    #[Route('/admin/courses/{id}/page-layout', name: 'admin_course_page_layout', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function savePageLayout(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        $back = self::tabUrl($courseId, 'page-layout') . '#page-layout-form';
+        return $this->handle(function () use ($courseId, $user, $back): void {
+            [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
+            $default = $action === 'reset' || ($action === 'save' && (string) ($_POST['source'] ?? 'own') === 'default');
+            $this->pageLayouts->saveForCourse($courseId, $default ? null : $layout, $user->id);
+            $this->flash('success', $default ? 'This course\'s page follows the site\'s default layout.' : 'The layout of this course\'s page was saved.');
+            $this->redirect($back);
+        }, $back);
+    }
 
     #[Route('/admin/courses/{id}/preview', name: 'admin_course_preview', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function preview(): Response
@@ -688,6 +713,20 @@ final class AdminCourseController extends BaseController
             throw new AccessDeniedHttpException('You do not have permission to manage this course.');
         }
         return $course;
+    }
+
+    /**
+     * The Page layout tab: whether the course has a layout of its own, the builder for the layout it uses, and the
+     * site's default drawn small beside the choice (Page Builder, 2026-10-30).
+     *
+     * @return array<string,mixed>
+     */
+    private function pageLayoutView(int $courseId): array
+    {
+        $current = $this->pageLayouts->forCourse($courseId);
+        return $current + ['builder' => \CattoLearning\Course\CoursePageLayouts::builder($current['layout']),
+            // The site's default, which the builder shows again when the default is chosen.
+            'default_json' => json_encode($this->pageLayouts->siteDefault(), JSON_THROW_ON_ERROR)];
     }
 
     private function courseId(): int

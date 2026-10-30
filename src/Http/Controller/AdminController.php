@@ -152,7 +152,8 @@ final class AdminController extends BaseController
         private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
         private readonly \CattoLearning\Application\CompanyOverview $companyOverview,
         private readonly SeedDatabaseService $seedDatabase,
-        private readonly \CattoLearning\Maintenance\LogArchive $logArchive
+        private readonly \CattoLearning\Maintenance\LogArchive $logArchive,
+        private readonly \CattoLearning\Course\CoursePageLayouts $coursePageLayouts
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -1061,6 +1062,24 @@ final class AdminController extends BaseController
     }
 
     /** Settings > Maintenance (owner, 2026-10-27): how long the application log's archives are kept. */
+    /**
+     * The default layout of every course page (Page Builder, owner 2026-10-30). Without JavaScript a template, a move,
+     * a block hidden or shown, or Back to Course first is sent with the whole form and saved at once.
+     */
+    #[Route('/admin/settings/course-pages', name: 'admin_save_course_pages', methods: ['POST'])]
+    public function saveCoursePages(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $back = '/admin/settings?section=course-pages#settings-course-pages';
+        return $this->handle(function () use ($user, $back): void {
+            [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
+            $this->coursePageLayouts->saveSiteDefault($action === 'reset' ? \CattoLearning\Course\CoursePageLayout::template('course') : $layout, $user->id);
+            $this->flash('success', 'The default layout was saved. Every course page without a layout of its own uses it now.');
+            $this->redirect($back);
+        }, $back);
+    }
+
     #[Route('/admin/settings/log-archives', name: 'admin_save_log_archives', methods: ['POST'])]
     public function saveLogArchives(): Response
     {
@@ -1352,6 +1371,10 @@ final class AdminController extends BaseController
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
                 'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
+            // The default layout of every course page (Page Builder, owner 2026-10-30).
+            $default = $this->coursePageLayouts->siteDefault();
+            $data['course_page_layout'] = ['builder' => \CattoLearning\Course\CoursePageLayouts::builder($default),
+                'template' => array_values(array_filter(array_keys(\CattoLearning\Course\CoursePageLayout::TEMPLATES), static fn(string $key): bool => \CattoLearning\Course\CoursePageLayout::isTemplate($default, $key)))[0] ?? null];
             // How news is sent and the sending discipline (mailing, step 2; owner, 2026-10-26).
             // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
             $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);

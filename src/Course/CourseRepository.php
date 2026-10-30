@@ -1452,6 +1452,23 @@ final class CourseRepository
         $this->db->executeStatement('UPDATE courses SET first_module_number = :number, updated_at = NOW() WHERE id = :id', ['number' => $number === 0 ? 0 : 1, 'id' => $courseId]);
     }
 
+    /**
+     * The course's own layout of its catalogue page, or null when it follows the site's default (Page Builder, 2026-10-30).
+     *
+     * @return list<array{id:string,width:string,shown:bool}>|null
+     */
+    public function pageLayout(int $courseId): ?array
+    {
+        $json = $this->db->fetchOne('SELECT page_layout FROM courses WHERE id = :id', ['id' => $courseId]);
+        return is_string($json) && $json !== '' ? CoursePageLayout::normalise(json_decode($json, true)) : null;
+    }
+
+    /** @param list<array{id:string,width:string,shown:bool}>|null $layout Null: the site's default. */
+    public function setPageLayout(int $courseId, ?array $layout): void
+    {
+        $this->db->executeStatement('UPDATE courses SET page_layout = CAST(:layout AS JSONB), updated_at = NOW() WHERE id = :id', ['layout' => $layout === null ? null : json_encode(CoursePageLayout::normalise($layout), JSON_THROW_ON_ERROR), 'id' => $courseId]);
+    }
+
     public function setCataloguePosition(int $courseId, ?int $position): void
     {
         $this->db->executeStatement('UPDATE courses SET catalogue_position = :position, updated_at = NOW() WHERE id = :id', ['position' => $position, 'id' => $courseId]);

@@ -13,7 +13,7 @@ inside each course's JSON, so a course exported from its page and imported on an
 tags). The "catalogue" block of a catto-learning-course 2.1 package holds:
 
   {"category": "Design › Gardens", "tags": ["Planting"], "cover": "<svg …>", "position": 100,
-   "related": ["GDN-102"], "status": "published",
+   "related": ["GDN-102"], "status": "published", "page_layout": null,
    "prices": [{"period": 6, "unit": "months", "price": "950.00", "was_price": "1250.00", "currency": "ZAR",
                "label": "Six months", "active": true, "default": true}]}
 
@@ -23,7 +23,8 @@ CourseService and the course repository, as ADMIN does on the course's pages:
 
   the category only when the course has none (a category chosen on the site is kept);
   its tags, made exactly the block's (a tag the site lacks is made, with the icon that fits its name);
-  its cover and its catalogue position;
+  its cover, its catalogue position and its page layout (Page Builder, 2026-10-30: the course's own, a list of
+  {"id", "width", "shown"} blocks, or null for the site's default);
   its prices only for a course the import has just created, and only when asked (owner, 2026-10-23: "use the file's
   prices for new courses only"), never for a course already on the site.
 
@@ -33,6 +34,8 @@ status is the package's business: a catalogue import publishes new courses that 
 Changelog:
 2026/10/23 SAST
 - Created with the catalogue package.
+2026/10/30 SAST
+- The course's page layout (Page Builder).
 */
 
 declare(strict_types=1);
@@ -90,6 +93,7 @@ final class CourseCatalogueSettings
             'position' => $course['catalogue_position'] === null ? null : (int) $course['catalogue_position'],
             'related' => $related,
             'status' => (string) $course['status'],
+            'page_layout' => $this->repository->pageLayout($courseId),
             'prices' => $prices,
         ];
     }
@@ -144,6 +148,8 @@ final class CourseCatalogueSettings
             $current = $course['catalogue_position'] === null ? null : (int) $course['catalogue_position'];
             if ($position !== $current) $changes[] = 'Position in the catalogue: ' . ($position ?? 'none');
         }
+        $layout = self::pageLayout($block);
+        if ($layout !== false && $layout !== $this->repository->pageLayout($courseId)) $changes[] = self::pageLayoutWords($layout);
         $missing = array_diff($this->relatedIds($block), $this->repository->relatedCourseIds($courseId));
         if ($missing !== []) $changes[] = 'Related courses: ' . count($missing) . ' added';
         if ($prices && $this->repository->priceVariants($courseId) === [] && (array) ($block['prices'] ?? []) !== []) {
@@ -186,6 +192,11 @@ final class CourseCatalogueSettings
                 $this->repository->setCataloguePosition($courseId, $position);
                 $done[] = 'Position in the catalogue: ' . ($position ?? 'none');
             }
+        }
+        $layout = self::pageLayout($block);
+        if ($layout !== false && $layout !== $this->repository->pageLayout($courseId)) {
+            $this->repository->setPageLayout($courseId, $layout);
+            $done[] = self::pageLayoutWords($layout);
         }
         if ($prices && $this->repository->priceVariants($courseId) === []) {
             foreach (self::prices($block) as $price) {
@@ -253,6 +264,25 @@ final class CourseCatalogueSettings
         $list = array_values(array_unique(array_filter(array_map(static fn(mixed $name): string => trim((string) $name), (array) $names), static fn(string $name): bool => $name !== '')));
         sort($list, SORT_NATURAL | SORT_FLAG_CASE);
         return $list;
+    }
+
+    /**
+     * The block's page layout made whole, null for the site's default, or false when the block says nothing of it (an
+     * older package), which leaves the course as it is.
+     *
+     * @param array<string,mixed> $block
+     * @return list<array{id:string,width:string,shown:bool}>|null|false
+     */
+    private static function pageLayout(array $block): array|null|false
+    {
+        if (!array_key_exists('page_layout', $block)) return false;
+        return is_array($block['page_layout']) ? CoursePageLayout::normalise($block['page_layout']) : null;
+    }
+
+    /** @param list<array{id:string,width:string,shown:bool}>|null $layout */
+    private static function pageLayoutWords(?array $layout): string
+    {
+        return 'Page layout: ' . ($layout === null ? 'the site\'s default' : 'its own');
     }
 
     private static function cover(mixed $svg, string $slug): ?string

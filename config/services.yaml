@@ -109,7 +109,7 @@ services:
     # section types and copy rules.
     CattoLearning\Course\:
         resource: '../src/Course/'
-        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,CourseTiming.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php,Landing/LandingCopy.php,Landing/LandingSectionType.php,Catwalk/SlideDeck.php,Catwalk/SlideLayouts.php,Parts/FlashCards.php,Package/CoursePackage.php,Package/JsonSchema.php}'
+        exclude: '../src/Course/{CatalogueFilter.php,CoursePageLayout.php,CourseRatingSummary.php,CourseTiming.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php,Landing/LandingCopy.php,Landing/LandingSectionType.php,Catwalk/SlideDeck.php,Catwalk/SlideLayouts.php,Parts/FlashCards.php,Package/CoursePackage.php,Package/JsonSchema.php}'
 
     # BundleRules is a set of static rules, not a service.
     CattoLearning\Bundle\:

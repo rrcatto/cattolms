@@ -2,6 +2,24 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-10-30 — v1.0.2 The Page Builder for course pages, and the landing page's hero
+
+### Installing and updating
+
+- **A clean installation is needed.** The baseline schema gains `courses.page_layout`, a course's own page layout.
+- **No new `.env` settings, packages, scheduled jobs or legal text, and nothing removed; the bundled Saharan Sunset is now 1.0.7.** New: a section of Settings, Course pages, and a tab on each course, Page layout. Saharan Sunset 1.0.7 replaces 1.0.6's landing hero across the window.
+
+### The course page
+
+- **The course in rows.** Under the head, which is unchanged: About this course beside How each module works, the modules across the whole width, At a glance beside What you get, then the reviews, Course access across the whole width just above Ready to start, and Related courses. Two cards side by side are the same height.
+- **The Page Builder.** A course's page is laid out block by block: each of About this course, How each module works, the modules, At a glance, What you get, Reviews, Course access, Ready to start and Related courses has a place, is half or full width, and is shown or hidden (Course access is always shown, being the only place to buy). Two half blocks side by side share a row. Every course uses the default at Administration › Settings › Course pages until it is given a layout of its own on its Page layout tab, where Reset puts it back on the default. Three templates to start from: Course first (the rows above), Buy first and Reviews first. A block is dragged by its handle or moved with its arrows, made half or full width, hidden to a shelf or shown again, beside a sketch of the page as visitors see it; Save layout keeps it, and leaving with changes not saved asks first. Without JavaScript every button works and saves at once.
+- **A course package's catalogue block carries the course's own page layout,** so a catalogue imported on another site gives each course its layout, a course already there included.
+
+### The landing page's hero
+
+- **The hero is built as the course page's head is:** as wide as the cards below it, the hero picture (the course's cover or a Resource Library picture) filling it, and over it the category and level, the headline, the supporting text, the rating and the optional second button. A hero without a picture shows those words in the page-head band.
+- **No buy box in the hero.** Buying is in Price and access and the call to action.
+
 ## 2026-10-30 — v1.0.1 The course structure, CatWalk presentations and the presentation editor
 
 ### Installing and updating

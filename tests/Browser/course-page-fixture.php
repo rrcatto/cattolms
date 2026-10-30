@@ -8,22 +8,27 @@ Date time: 2026/10/30 SAST
 Version: 1.0.1
 
 Description:
-The course page check's course (tests/Browser/course-page.cjs): a published course of a provider company with two
-numbered modules, each a presentation, a lesson and an assessment, its first module in the free preview, a trailer in
-the free preview and a price, made through the services Course Content calls. Cleanup removes all of it.
+The course page check's course (tests/Browser/course-page.cjs, and page-layout.cjs for the Page Builder): a published
+course of a provider company with two numbered modules, each a presentation, a lesson and an assessment, its first
+module in the free preview, a trailer in the free preview and a price, made through the services Course Content calls,
+and a signed-in administrator. Cleanup removes all of it and puts back the site's default course page layout as it was.
 
     php tests/Browser/course-page-fixture.php create|cleanup
 
 Changelog:
 2026/10/30 SAST
 - Created.
+- An administrator's session and the site's default layout kept, for the Page Builder check.
 */
 
 declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseItemService;
+use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
+use CattoLearning\Infrastructure\Persistence\OptionRepository;
+use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 
@@ -73,13 +78,19 @@ if ($action === 'create') {
         "INSERT INTO course_price_variants (public_id,course_id,access_period_seconds,price_minor_units,currency_code,position,is_active,is_default,created_by_user_id,updated_by_user_id) VALUES (gen_random_uuid(),:c,31536000,150000,'ZAR',1,TRUE,TRUE,:u,:u)",
         ['c' => $id, 'u' => $admin['id']]
     );
-    $state = ['course_id' => $id, 'slug' => $course['slug'], 'modules' => $modules, 'trailer_node' => $trailer['node'], 'scrub' => $fixture->seeds()];
+    $token = Token::generate();
+    $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Course page browser', $admin['email']);
+    $state = ['course_id' => $id, 'slug' => $course['slug'], 'modules' => $modules, 'trailer_node' => $trailer['node'], 'token' => $token,
+        'default_layout' => $container->get(OptionRepository::class)->find('course_page.layout'), 'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo json_encode(['course' => $id, 'slug' => $course['slug']]), PHP_EOL;
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) { exit(0); }
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
+    // The site's default layout as it was before the Page Builder check changed it (first: the check's administrator saved it).
+    $options = $container->get(OptionRepository::class);
+    $state['default_layout'] === null ? $options->delete('course_page.layout') : $options->set('course_page.layout', (string) $state['default_layout']);
     (new CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed the course page fixture.\n";

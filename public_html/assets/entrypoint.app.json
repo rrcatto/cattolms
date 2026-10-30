@@ -8,6 +8,7 @@
     "\/assets\/controllers\/course_content_controller.js",
     "\/assets\/controllers\/course_order_controller.js",
     "\/assets\/controllers\/landing_sections_controller.js",
+    "\/assets\/controllers\/page_layout_controller.js",
     "\/assets\/controllers\/popular_courses_controller.js",
     "\/assets\/controllers\/presentation_slides_controller.js",
     "\/assets\/controllers\/profile_image_controller.js",

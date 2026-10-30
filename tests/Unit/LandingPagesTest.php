@@ -154,7 +154,9 @@ final class LandingPagesTest extends TestCase
         self::assertStringContainsString('section.deck_html|raw', $landing);
         self::assertStringNotContainsString('include \'@platform/partials/landing/section-\' ~', $landing, 'No template path is built from data.');
         self::assertStringContainsString("include '@platform/partials/course-purchase.html.twig'", $landing);
-        self::assertStringContainsString("include '@platform/partials/course-purchase.html.twig'", (string) file_get_contents($views . '/pages/course-detail.html.twig'), 'The course page draws the same purchase box.');
+        // The course page draws its blocks from one partial (Page Builder, 2026-10-30), Course access among them.
+        self::assertStringContainsString("include '@platform/partials/course-page-block.html.twig'", (string) file_get_contents($views . '/pages/course-detail.html.twig'));
+        self::assertStringContainsString("include '@platform/partials/course-purchase.html.twig'", (string) file_get_contents($views . '/partials/course-page-block.html.twig'), 'The course page draws the same purchase box.');
         $purchase = (string) file_get_contents($views . '/partials/course-purchase.html.twig');
         self::assertStringContainsString('action="/cart/add"', $purchase, 'Purchases go through the platform’s cart, never a link written into the page.');
         foreach (['href="{{ section.', 'href="{{ item.'] as $authored) {

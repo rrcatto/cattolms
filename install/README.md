@@ -56,7 +56,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 1.0.1` | Install this version. The default is the newest release. |
+| `--version 1.0.2` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -88,8 +88,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  1.0.1/                    the code of each installed version (root)
-  current -> 1.0.1          the version the site runs
+  1.0.2/                    the code of each installed version (root)
+  current -> 1.0.2          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

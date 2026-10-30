@@ -45,7 +45,8 @@ final class CourseController extends BaseController
         private readonly \CattoLearning\Bundle\BundleRepository $bundles,
         private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases,
         private readonly \CattoLearning\Mailing\MailingConsents $mailing,
-        private readonly \CattoLearning\Course\CoursePageView $coursePage
+        private readonly \CattoLearning\Course\CoursePageView $coursePage,
+        private readonly \CattoLearning\Course\CoursePageLayouts $layouts
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -265,6 +266,15 @@ final class CourseController extends BaseController
 
         // The modules, how a module is made, what the course holds and its trailer (owner, 2026-10-30, the accepted mockup).
         $page = $this->coursePage->view($course);
+        $purchase = $this->purchases->for($course, $user, '/courses/' . (string) $course['slug'], $course['price_variants']);
+        $related = $this->withFavourites($this->courses->relatedCourseCards($courseId));
+        // The page's blocks in the rows its layout gives (Page Builder, 2026-10-30), leaving out a block with nothing to show.
+        $present = array_keys(array_filter([
+            'about' => true, 'how' => $page['modules'] !== [], 'modules' => true, 'glance' => true, 'get' => $page['figures'] !== [],
+            'reviews' => $rating->count > 0, 'access' => true, 'start' => !empty($course['has_public_preview']) && ($purchase['state'] ?? '') !== 'owned',
+            'related' => $related !== [],
+        ]));
+        $rows = \CattoLearning\Course\CoursePageLayout::rows($this->layouts->forCourse($courseId)['layout'], $present);
 
         return $this->render('course-detail', [
             'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow'),
@@ -274,7 +284,8 @@ final class CourseController extends BaseController
             'load_catwalk' => $page['trailer'] !== null,
             'has_access' => $enrolment !== null,
             // What the reader can do about the course: the same rules as its landing page and checkout.
-            'purchase' => $this->purchases->for($course, $user, '/courses/' . (string) $course['slug'], $course['price_variants']),
+            'purchase' => $purchase,
+            'course_rows' => $rows,
             'enrolment_status' => is_array($enrolment) ? (string) $enrolment['status'] : '',
             'can_favourite' => $user !== null,
             'favourite_return' => '/courses/' . (string) $course['slug'],
@@ -289,7 +300,7 @@ final class CourseController extends BaseController
             'can_review' => $canReview,
             'own_review' => $canReview ? $this->reviews->learnerReview($courseId, $user->id) : null,
             // The published courses related to this one (owner, 2026-10-20), as catalogue cards.
-            'related_courses' => $this->withFavourites($this->courses->relatedCourseCards($courseId)),
+            'related_courses' => $related,
         ]);
     }
 

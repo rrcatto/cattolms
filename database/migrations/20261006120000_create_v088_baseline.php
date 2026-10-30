@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/30 SAST (course page layouts)
+- courses.page_layout: the course's own layout of its catalogue page (Page Builder), NULL for the site's default.
 2026/10/28 SAST (course structure and CatWalk)
 - course_items.item_type gains slide_deck (Presentation), flashcards and practical, and course_items gains
   estimated_minutes; course_sections.numbered (a module's section, numbered by the site); course_slide_narrations
@@ -999,6 +1001,9 @@ CREATE TABLE courses (
     default_access_period_seconds INTEGER NOT NULL DEFAULT 31536000 CHECK (default_access_period_seconds > 0),
     -- The number of a course's first module section: 1, or 0 for a course whose first module sets it up (owner, 2026-10-29).
     first_module_number SMALLINT NOT NULL DEFAULT 1 CHECK (first_module_number IN (0, 1)),
+    -- The course's own layout of its catalogue page, block by block (Page Builder, owner 2026-10-30); NULL follows the
+    -- site's default (Settings > Course pages).
+    page_layout JSONB NULL CHECK (page_layout IS NULL OR jsonb_typeof(page_layout) = 'array'),
     certificate_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     -- The course's own certificate data: an optional accreditation or CPD line, and the design its
     -- certificates are drawn in (a certificate document template). The wording, signatory and look
