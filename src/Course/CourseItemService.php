@@ -37,7 +37,7 @@ final class CourseItemService
         'practical' => 'Tasks to do, with a model answer the learner opens to check their work.',
     ];
     /** What an HTML lesson is in its module: the lesson itself, or the module's summary. */
-    public const LESSON_ROLES = ['' => 'The lesson', 'summary' => 'The module\'s summary'];
+    public const LESSON_ROLES = ['' => 'The lesson', 'summary' => 'The module\'s summary', 'review_study_aid' => 'A review study aid'];
     /** Item types that need a Resource Library file. */
     public const RESOURCE_TYPES = ['pdf','image_graphic','uploaded_video','markdown','downloadable_file'];
     /** Resource classifications each resource-backed item type accepts; null accepts any file. */
@@ -639,7 +639,7 @@ final class CourseItemService
     }
 
     /** The label of a part in the outline, before the item's own title. */
-    public const PART_LABELS = ['presentation' => 'Presentation', 'video' => 'Video', 'lesson' => 'Lesson', 'summary' => 'Summary', 'flashcards' => 'Flash cards', 'practical' => 'Practical work', 'assessment' => 'Assessment', 'final' => 'Final assessment', 'diagnostic' => 'Diagnostic'];
+    public const PART_LABELS = ['presentation' => 'Presentation', 'video' => 'Video', 'lesson' => 'Lesson', 'summary' => 'Summary', 'flashcards' => 'Flash cards', 'practical' => 'Practical work', 'review' => 'Review study aid', 'assessment' => 'Assessment', 'final' => 'Final assessment', 'diagnostic' => 'Diagnostic'];
 
     /**
      * The minutes a learner takes over an item: its own estimate, else one worked out from its size (a slide about

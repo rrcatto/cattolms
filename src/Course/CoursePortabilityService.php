@@ -11,6 +11,9 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/10/30 SAST
+- A course package carries each Course Item's name, and an import keeps it (the first free number after it when the
+  name is taken); only items that come without one are named after their places.
 2026/10/23 SAST
 - Course codes and course packages 2.1 (owner, 2026-10-23): exportCourse() writes the course's code and its catalogue
   settings (CourseCatalogueSettings); an import gives the course the code its review chose, else the file's, else one
@@ -341,7 +344,7 @@ final class CoursePortabilityService
                         if ($auxiliary !== null) { $item['type_config'][str_replace('_id', '_public_id', $field)] = $auxiliary['public_id']; $resources[(string) $auxiliary['public_id']] = array_intersect_key($auxiliary, array_flip(['public_id','title','description','filename','original_filename','resource_type','mime_type','byte_size'])); }
                         unset($item['type_config'][$field]);
                     }
- $courseItems[$key] = ['item_key' => $key, 'item_type' => $item['item_type'], 'title' => $item['title'], 'description_html' => $item['description_html'], 'content_source' => $item['content_source'], 'type_config' => $item['type_config'], 'resource_public_id' => $item['resource_public_id'] ?? null, 'instructions_html' => $item['instructions_html'] ?? '', 'result_pass_html' => $item['result_pass_html'] ?? '', 'result_fail_html' => $item['result_fail_html'] ?? '', 'pass_mark' => $item['pass_mark'] ?? null, 'practice' => $item['practice'] ?? false, 'practice_enabled' => $item['practice_enabled'] ?? false, 'practice_pool_mode' => $item['practice_pool_mode'] ?? null, 'practice_question_count' => $item['practice_question_count'] ?? null, 'graded_question_count' => $item['graded_question_count'] ?? null, 'maximum_attempts' => $item['maximum_attempts'] ?? null, 'time_limit_seconds' => $item['time_limit_seconds'] ?? null, 'score_policy' => $item['score_policy'] ?? null, 'randomise_questions' => $item['randomise_questions'] ?? false, 'randomise_options' => $item['randomise_options'] ?? false, 'negative_marking' => $item['negative_marking'] ?? false, 'questions' => $item['questions'], 'estimated_minutes' => $item['estimated_minutes'] ?? null]; if ((string) $item['item_type'] === 'slide_deck' && $this->narrationRecords !== null) { $courseItems[$key]['narrations'] = array_map(static fn(array $clip): array => ['slide_id' => (string) $clip['slide_id'], 'public_id' => (string) $clip['public_id'], 'content_type' => (string) $clip['content_type'], 'byte_size' => (int) $clip['byte_size'], 'sha256' => (string) $clip['sha256'], 'duration_seconds' => $clip['duration_seconds'] === null ? null : (float) $clip['duration_seconds']], $this->narrationRecords->rowsForItem((int) $item['id'])); } if (!empty($item['resource_public_id'])) { $resources[(string) $item['resource_public_id']] = ['public_id' => $item['resource_public_id'], 'title' => $item['resource_title'], 'description' => $item['resource_description'], 'filename' => $item['resource_filename'], 'original_filename' => $item['original_filename'], 'resource_type' => $item['resource_type'], 'mime_type' => $item['mime_type'], 'byte_size' => (int) $item['byte_size']]; } }
+ $courseItems[$key] = ['item_key' => $key, 'name' => (string) ($item['name'] ?? ''), 'item_type' => $item['item_type'], 'title' => $item['title'], 'description_html' => $item['description_html'], 'content_source' => $item['content_source'], 'type_config' => $item['type_config'], 'resource_public_id' => $item['resource_public_id'] ?? null, 'instructions_html' => $item['instructions_html'] ?? '', 'result_pass_html' => $item['result_pass_html'] ?? '', 'result_fail_html' => $item['result_fail_html'] ?? '', 'pass_mark' => $item['pass_mark'] ?? null, 'practice' => $item['practice'] ?? false, 'practice_enabled' => $item['practice_enabled'] ?? false, 'practice_pool_mode' => $item['practice_pool_mode'] ?? null, 'practice_question_count' => $item['practice_question_count'] ?? null, 'graded_question_count' => $item['graded_question_count'] ?? null, 'maximum_attempts' => $item['maximum_attempts'] ?? null, 'time_limit_seconds' => $item['time_limit_seconds'] ?? null, 'score_policy' => $item['score_policy'] ?? null, 'randomise_questions' => $item['randomise_questions'] ?? false, 'randomise_options' => $item['randomise_options'] ?? false, 'negative_marking' => $item['negative_marking'] ?? false, 'questions' => $item['questions'], 'estimated_minutes' => $item['estimated_minutes'] ?? null]; if ((string) $item['item_type'] === 'slide_deck' && $this->narrationRecords !== null) { $courseItems[$key]['narrations'] = array_map(static fn(array $clip): array => ['slide_id' => (string) $clip['slide_id'], 'public_id' => (string) $clip['public_id'], 'content_type' => (string) $clip['content_type'], 'byte_size' => (int) $clip['byte_size'], 'sha256' => (string) $clip['sha256'], 'duration_seconds' => $clip['duration_seconds'] === null ? null : (float) $clip['duration_seconds']], $this->narrationRecords->rowsForItem((int) $item['id'])); } if (!empty($item['resource_public_id'])) { $resources[(string) $item['resource_public_id']] = ['public_id' => $item['resource_public_id'], 'title' => $item['resource_title'], 'description' => $item['resource_description'], 'filename' => $item['resource_filename'], 'original_filename' => $item['original_filename'], 'resource_type' => $item['resource_type'], 'mime_type' => $item['mime_type'], 'byte_size' => (int) $item['byte_size']]; } }
             }
             $structure[] = $node;
         }
@@ -473,8 +476,12 @@ final class CoursePortabilityService
                 $courseId = $this->courses->createCourse($data, $userId);
             }
             $created = [];
+            $carried = [];
             foreach ((array) ($analysis['course_items'] ?? []) as $itemData) {
                 if (!is_array($itemData)) { continue; }
+                // A package's item keeps its name (2026-10-30), with the first free number after it when the name is taken.
+                $name = trim((string) ($itemData['name'] ?? ''));
+                if ($name !== '') { $itemData['name'] = $this->courseItems->freeName($name); $carried[(string) $itemData['item_key']] = true; }
                 $created[(string) $itemData['item_key']] = $this->courseItems->create($itemData, $userId);
             }
             $createdNodes = [];
@@ -485,8 +492,8 @@ final class CoursePortabilityService
                 else { if (!isset($created[(string) ($placement['item_key'] ?? '')])) { throw new InvalidArgumentException('The import structure references an undefined Course Item key.'); } $nodeId = $this->courseItems->addExisting($courseId, $created[(string) $placement['item_key']], $placement, $userId); }
                 if (!empty($placement['node_key'])) { $createdNodes[(string) $placement['node_key']] = $nodeId; }
             }
-            // Imported items are named after their places in the course (owner, 2026-10-30): packages carry no names.
-            $this->courseItems->nameFromPlacements($courseId, array_values($created));
+            // Items that came without a name are named after their places in the course (owner, 2026-10-30).
+            $this->courseItems->nameFromPlacements($courseId, array_values(array_diff_key($created, $carried)));
             $bands = (array) ($analysis['grade_bands'] ?? []);
             if ($bands !== []) {
                 $this->courses->replaceGradeBands($courseId, $bands);

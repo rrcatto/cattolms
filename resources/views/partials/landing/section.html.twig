@@ -23,6 +23,11 @@
 					</li>
 				{% endfor %}
 			</ul>
+		{% elseif section.type == 'contents' and section.modules|default([]) %}
+			{# A course of modules shows its modules and how a module is made, not every part (owner, 2026-10-30). #}
+			{% include '@platform/partials/course-module-parts.html.twig' with {modules_view: section} %}
+			<p class="cl-landing-modules-count" id="landing-modules-{{ section.id }}">{{ section.modules|length }} {{ section.modules|length == 1 ? 'module' : 'modules' }}{{ section.total ? ' · ' ~ section.total ~ ' in all' : '' }}</p>
+			{% include '@platform/partials/course-module-list.html.twig' with {modules_view: section, course_slug: section.course_slug, list_label_id: 'landing-modules-' ~ section.id} %}
 		{% elseif section.type == 'contents' %}
 			<p class="cl-landing-outline-count">{{ section.section_count }} {{ section.section_count == 1 ? 'section' : 'sections' }} · {{ section.item_count }} {{ section.item_count == 1 ? 'item' : 'items' }}</p>
 			<ol class="cl-landing-outline">

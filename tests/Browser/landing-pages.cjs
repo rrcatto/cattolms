@@ -271,9 +271,11 @@ async function editSection(page, label) {
         const sectionForm = await page.getByRole('link', {name: 'Edit FAQ'}).getAttribute('href');
         const pages = [['public', PUBLIC, '.cl-landing-hero h1'], ['editor', EDITOR, '#landing-section-list'], ['section', sectionForm, '#landing-heading']];
         for (const theme of themes) {
-            for (const width of [1440, 390]) {
+            for (const width of [1920, 1440, 390]) {
                 await page.setViewportSize({width, height: 1200});
                 for (const [name, url, selector] of pages) {
+                    // A wide screen for the visitor's page (2026-10-30: Saharan Sunset's hero stood in a narrow column there).
+                    if (width === 1920 && name !== 'public') continue;
                     step = `${theme} ${width} ${name}`;
                     const response = await page.goto(`${base}${url}?theme_preview=${theme}`);
                     assert.equal(response.status(), 200);
@@ -292,6 +294,12 @@ async function editSection(page, label) {
                             return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
                         });
                         assert.ok(contrast >= 4.5, `${theme} ${width}: the buy box's price can be read (contrast ${contrast.toFixed(2)})`);
+                        // The hero's words and picture use the page's frame, as the rows below it do (2026-10-30).
+                        const share = await page.evaluate(() => {
+                            const hero = document.querySelector('.cl-landing-hero-grid'), row = document.querySelector('.cl-landing-sections > *');
+                            return hero && row ? hero.getBoundingClientRect().width / row.getBoundingClientRect().width : 1;
+                        });
+                        assert.ok(share >= 0.85, `${theme} ${width}: the hero uses the page's width (${Math.round(share * 100)}% of the rows below it)`);
                     }
                     await page.screenshot({path: `${output}/${theme}-${width}-${name}.png`, fullPage: name === 'public'});
                 }

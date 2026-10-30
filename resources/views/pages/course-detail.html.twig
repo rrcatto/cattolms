@@ -1,21 +1,21 @@
 {% extends layout %}
+{#
+	A course's catalogue page, to help someone choose it (owner, 2026-10-30, the accepted mockup,
+	REPORTS/course-page-mockup/, with the head kept as it was: the cover with the title and the favourite star, and one
+	buy box, under Course access): "Watch course presentation" opens the trailer in a window as wide as the page's box
+	(the window's Close, Esc, or a click outside closes it; without JavaScript the button opens the trailer in the free
+	preview); then the course in cards: about it, how a module is made in one paragraph, its modules, what it holds and
+	its reviews, beside Course access and the facts; then the free preview offered again.
+#}
 {% block page_body %}
 	<section class="cl-page-head cl-course-head">
 		<div class="cl-container py-12">
 			{#
-				The badges, the title and the favourite star: over the course's cover picture when it has one (owner,
-				2026-10-20: "these course pages must look interesting … combine the image with the title overlaid on
-				it"), at the top of the left column otherwise.
+				The title and the favourite star over the course's cover picture when it has one (owner, 2026-10-20: "these
+				course pages must look interesting … combine the image with the title overlaid on it"; 2026-10-30: "just the
+				title and the favourite star"), at the top of the column below otherwise.
 			#}
 			{% set course_headline %}
-					<div class="d-flex flex-wrap gap-3 mb-5">
-						{% if course.category_name %}
-							{{ ui('feedback.badge', {label: (course.category_name), tone: 'neutral'}) }}
-						{% endif %}
-						{% if course.level %}
-							{{ ui('feedback.badge', {label: (course.level), tone: 'neutral'}) }}
-						{% endif %}
-					</div>
 					<div class="cl-course-detail-headline">
 						<h1 class="cl-display-4 fw-bold">
 							{{ course.title }}
@@ -38,91 +38,89 @@
 					<div class="cl-picture-head-text">{{ course_headline }}</div>
 				</div>
 			{% endif %}
-			<div class="row g-7 align-items-center">
-				<div class="lg:col-8">
-					{% if not course_hero %}{{ course_headline }}{% endif %}
-					{% if course.subtitle %}
-						<p class="h4 cl-text-light-muted">
-							{{ course.subtitle }}
-						</p>
-					{% endif %}
-					{% if rating.count > 0 %}{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}{% endif %}
-					<p class="cl-lead mt-5 mb-0">
-						{{ course.summary }}
+			<div class="cl-course-head-copy">
+				{% if not course_hero %}{{ course_headline }}{% endif %}
+				{% if course.subtitle %}
+					<p class="h4 cl-text-light-muted">
+						{{ course.subtitle }}
 					</p>
-				</div>
-				<div class="lg:col-4">
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-{# A bought course opens at once (owner, 2026-10-20: "put 'immediately'"). #}
-{{ ui('data.key-value-list', {items: [{label: 'Course Items', value: (course.item_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'Immediately'}]}) }}
-{% endblock %}
-{% endembed %}
-				</div>
+				{% endif %}
+				{% if rating.count > 0 %}{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}{% endif %}
+				{% if course_page.trailer %}
+					{# The course's trailer, front and centre (owner, 2026-10-30): a button that opens it in a window. #}
+					<p class="cl-course-watch">
+						{{ ui('action.link', {label: 'Watch course presentation', href: course_page.trailer.href, variant: 'primary', size: 'large', icon: 'action-play', modal: 'course-presentation'}) }}
+						<span class="cl-course-watch-note">{{ course_page.trailer.slides }} slides · {{ course_page.trailer.time }}{{ course_page.trailer.narrated ? ' · with narration' : '' }}</span>
+					</p>
+				{% endif %}
+				<ul class="cl-course-facts">
+					{% if course_page.modules %}<li>{{ course_page.modules|length }} {{ course_page.modules|length == 1 ? 'module' : 'modules' }}</li>{% endif %}
+					{% if course_page.total %}<li>{{ course_page.total|capitalize }}</li>{% endif %}
+					<li>Starts immediately</li>
+				</ul>
 			</div>
 		</div>
 	</section>
 	<section class="cl-page-section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
 {% block body %}
-
-			{# The course itself in a card, as every page's content is (UX rule 1.7; 2026-10-21: it stood on the page beside the
-			   Course access card). #}
-			<div>
+			<div class="cl-course-detail-main">
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 				<h2 class="h4">About this course</h2>
-				<div class="cl-prose mb-12">
+				<div class="cl-prose">
 					{{ course.description_html|raw }}
 				</div>
-				<h3 class="h4 mb-5">Course Content</h3>
-                {# The modules and other learning items only (owner, 2026-10-20): an assessment repeats its module's title, so assessments are left out. #}
-                <ol>
-                {% for node in course.structure|filter(node => node.node_type == 'section' or node.item_type|default('') not in ['assessment', 'diagnostic']) %}
-                    <li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
-                {% endfor %}
-                </ol>
-                {% if course.has_public_preview %}
-                    {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary', icon: 'action-preview'}) }}
-                {% endif %}
-				{# How results are worked out is in the FAQ (owner, 2026-10-20: "the grading belongs elsewhere, in a FAQ"). #}
-				<p class="cl-course-grading-link mt-7">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
-				{# A question opens the contact form with this course chosen: a problem with it once it is yours, a question before buying until then (owner, 2026-10-20). #}
-				<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug, icon: 'action-report'}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug, icon: 'action-ask'}) }}</p>
-
 {% endblock %}
 {% endembed %}
-			</div>
-			<aside>
-				{# Sticky only when it is alone in the column: a sticky card would ride over the Reviews card beneath it. #}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: rating.count == 0})} %}
+				{% if course_page.modules %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
-
-						<h2 class="h4">
-							Course access
-						</h2>
-						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full'} %}
-						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
-						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
-						{#
-							Reviewing is offered to anyone who has held access to the course, including a
-							learner whose access has expired, so it does not depend on has_access.
-						#}
-						{% if can_review %}
-							<div class="cl-course-review-action">
-								{% if own_review %}
-									<p>Your review: {{ own_review.status == 'approved' ? 'published' : (own_review.status == 'pending' ? 'pending moderation' : 'not published') }}.</p>
-								{% endif %}
-								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review', icon: (own_review ? 'action-edit' : 'action-rate')}) }}
-							</div>
-						{% endif %}
-
+					<h2 class="h4">How each module works</h2>
+					{% include '@platform/partials/course-module-parts.html.twig' with {modules_view: course_page} %}
 {% endblock %}
 {% endembed %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+					<div class="cl-course-modules-head">
+						<h2 class="h4" id="course-modules">The {{ course_page.modules|length }} {{ course_page.modules|length == 1 ? 'module' : 'modules' }}</h2>
+						{% if course_page.total %}<span>{{ course_page.total|capitalize }} in all</span>{% endif %}
+					</div>
+					{% include '@platform/partials/course-module-list.html.twig' with {modules_view: course_page, course_slug: course.slug, list_label_id: 'course-modules'} %}
+					{# How results are worked out is in the FAQ (owner, 2026-10-20: "the grading belongs elsewhere, in a FAQ"). #}
+					<p class="cl-course-grading-link">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
+{% endblock %}
+{% endembed %}
+				{% else %}
+					{# A course not arranged into modules lists what it holds, without its assessments, as before. #}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+					<h2 class="h4">Course Content</h2>
+					<ol>
+					{% for node in course.structure|filter(node => node.node_type == 'section' or node.item_type|default('') not in ['assessment', 'diagnostic']) %}
+						<li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
+					{% endfor %}
+					</ol>
+					<p class="cl-course-grading-link">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
+{% endblock %}
+{% endembed %}
+				{% endif %}
+				{% if course_page.figures %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+					<h2 class="h4">What you get</h2>
+					{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}
+{% block body %}
+						{% for figure in course_page.figures %}{{ ui('data.stat-card', {value: figure.n, label: figure.label}) }}{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				{% endif %}
 				{#
-					Reviews in their own card under Course access (owner, 2026-10-22), only when the course has a published review
-					(owner, 2026-10-20: "just leave it out entirely if there are no reviews"). Each number of stars with reviews shows
-					just those, and View all reviews takes the choice away again; the list is numbered, newest first.
+					Reviews in their own card (owner, 2026-10-22), only when the course has a published review (owner, 2026-10-20:
+					"just leave it out entirely if there are no reviews"). Each number of stars with reviews shows just those, and
+					View all reviews takes the choice away again; the list is numbered, newest first.
 				#}
 				{% if rating.count > 0 %}
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -147,11 +145,54 @@
 {% endblock %}
 {% endembed %}
 				{% endif %}
+			</div>
+			<aside>
+				{# Not sticky: the facts follow it in the column (2026-10-21: a sticky card rides over the card beneath it). #}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+						<h2 class="h4" id="course-access">Course access</h2>
+						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full', purchase_key: 'side'} %}
+						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
+						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
+						{# Reviewing is offered to anyone who has held access to the course, including a learner whose access has expired. #}
+						{% if can_review %}
+							<div class="cl-course-review-action">
+								{% if own_review %}
+									<p>Your review: {{ own_review.status == 'approved' ? 'published' : (own_review.status == 'pending' ? 'pending moderation' : 'not published') }}.</p>
+								{% endif %}
+								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review', icon: (own_review ? 'action-edit' : 'action-rate')}) }}
+							</div>
+						{% endif %}
+						{# A question opens the contact form with this course chosen: a problem with it once it is yours, a question before buying until then (owner, 2026-10-20). #}
+						<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug, icon: 'action-report'}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug, icon: 'action-ask'}) }}</p>
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+						<h2 class="h4">At a glance</h2>
+						{# A bought course opens at once (owner, 2026-10-20: "put 'immediately'"). #}
+						{{ ui('data.key-value-list', {items: (course.category_name ? [{label: 'Category', value: course.category_name}] : [])|merge(course_page.modules ? [{label: 'Modules', value: course_page.modules|length}] : [])|merge(course_page.total ? [{label: 'Study time', value: course_page.total|capitalize}] : [])|merge(course.level ? [{label: 'Level', value: course.level}] : [])|merge([{label: 'Access starts', value: 'Immediately'}])}) }}
+{% endblock %}
+{% endembed %}
 			</aside>
-
 {% endblock %}
 {% endembed %}
 	</section>
+	{% if course.has_public_preview and purchase.state != 'owned' %}
+		<section class="cl-page-section" aria-labelledby="course-start-heading">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<div class="cl-course-start">
+					<div>
+						<h2 class="h3" id="course-start-heading">{{ course_page.free ? 'Ready to start? Begin with ' ~ course_page.free ~ ', free' : 'Ready to start? Try it free first' }}</h2>
+						<p>Read the free preview before you decide. If it suits you, enrol in the full course.</p>
+					</div>
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.link', {label: course_page.free ? 'Read ' ~ course_page.free ~ ' free' : 'Preview this course', variant: 'primary', href: '/courses/' ~ course.slug ~ '/preview', icon: 'action-preview'}) }}{{ ui('action.link', {label: 'Get this course', variant: 'secondary', href: '#course-access', icon: 'action-buy'}) }}{% endblock %}{% endembed %}
+				</div>
+{% endblock %}
+{% endembed %}
+		</section>
+	{% endif %}
 	{# The courses related to this one (owner, 2026-10-20), published ones only, in the catalogue's order. #}
 	{% if related_courses|default([]) %}
 	<section class="cl-page-section" aria-labelledby="related-courses-heading">
@@ -162,5 +203,17 @@
 {% endblock %}
 {% endembed %}
 	</section>
+	{% endif %}
+	{% if course_page.trailer %}
+		{# The window the trailer plays in, as wide as the page's box (owner, 2026-10-30). #}
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'course-presentation', title: 'Course presentation', size: 'page'})} %}
+{% block modal_body %}
+			<p class="cl-course-presentation-note">{{ course.title }}. Esc closes this window.</p>
+			{{ course_page.trailer.html|raw }}
+{% endblock %}
+{% block modal_actions %}
+			{{ ui('action.button', {label: 'Close', variant: 'secondary', type: 'button', icon: 'action-cancel', close_modal: true}) }}
+{% endblock %}
+{% endembed %}
 	{% endif %}
 {% endblock %}

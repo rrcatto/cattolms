@@ -27,6 +27,7 @@ use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseItemRenderer;
 use CattoLearning\Course\CourseItemRepository;
 use CattoLearning\Course\CourseItemService;
+use CattoLearning\Course\CoursePortabilityService;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use InvalidArgumentException;
@@ -105,6 +106,40 @@ final class CourseItemNamesIntegrationTest extends TestCase
 
         $outside = $this->items->createAttached($this->course, $this->deck('names-outside-' . $this->suffix, 'Course preview'), $this->owner);
         self::assertSame($this->code . ' Course preview', $this->itemName($outside), 'Outside the modules, the course code and the title.');
+    }
+
+    public function testAPackageCarriesItemNamesAndAnImportKeepsThem(): void
+    {
+        $portability = $this->container->get(CoursePortabilityService::class);
+        $module = $this->items->addSection($this->course, ['title' => 'Soil and compost', 'numbered' => '1'], $this->owner);
+        $in = ['parent_node_id' => (string) $module];
+        $typed = 'Soil opening ' . $this->suffix;
+        $named = $this->items->createAttached($this->course, $in + ['name' => $typed] + $this->deck('carried-deck-' . $this->suffix), $this->owner);
+        $this->items->createAttached($this->course, $in + ['item_key' => 'carried-video-' . $this->suffix, 'item_type' => 'youtube', 'title' => 'Compost explained', 'youtube_id' => 'abcdefghijk'], $this->owner);
+        $package = $portability->exportCourse($this->course);
+        $names = array_column($package['course_items'], 'name', 'item_key');
+        self::assertSame([$typed, $this->code . ' Module 1 Video'], [$names['carried-deck-' . $this->suffix] ?? null, $names['carried-video-' . $this->suffix] ?? null], 'The package holds each name.');
+
+        // Replaced from the package: the typed name comes back as it was.
+        $portability->importChecked($portability->analysePackage($package, 'names.json'), 0, $this->owner, $this->course, $this->code);
+        $byKey = fn(string $key): string => (string) $this->db->fetchOne('SELECT name FROM course_items WHERE item_key = :k', ['k' => $key]);
+        self::assertSame($typed, $byKey('carried-deck-' . $this->suffix));
+        self::assertSame($this->code . ' Module 1 Video', $byKey('carried-video-' . $this->suffix));
+
+        // A package without names (an older one) is named after its places.
+        foreach ($package['course_items'] as &$item) { unset($item['name']); }
+        unset($item);
+        // And a name another item has by then is numbered, never refused.
+        $this->db->executeStatement('UPDATE course_items SET name = :n WHERE item_key = :k', ['n' => 'Renamed ' . $this->suffix, 'k' => 'carried-deck-' . $this->suffix]);
+        $other = $this->items->create(['name' => $typed] + $this->deck('carried-other-' . $this->suffix), $this->owner);
+        $withName = $portability->exportCourse($this->course);
+        foreach ($withName['course_items'] as &$item) { if ($item['item_key'] === 'carried-deck-' . $this->suffix) { $item['name'] = $typed; } }
+        unset($item);
+        $portability->importChecked($portability->analysePackage($withName, 'names.json'), 0, $this->owner, $this->course, $this->code);
+        self::assertSame($typed . ' 2', $byKey('carried-deck-' . $this->suffix), 'A taken name gets the first free number.');
+        self::assertSame($typed, $this->itemName($other));
+        $portability->importChecked($portability->analysePackage($package, 'names.json'), 0, $this->owner, $this->course, $this->code);
+        self::assertSame($this->code . ' Module 1 Presentation', $byKey('carried-deck-' . $this->suffix), 'No name: named after its place.');
     }
 
     public function testAPresentationsDescriptionIsOneLineInItsPlayersTopBar(): void

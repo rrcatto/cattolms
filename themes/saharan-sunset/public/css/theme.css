@@ -1,4 +1,4 @@
-/* Saharan Sunset 1.0.5 - Catto Learning theme stylesheet.
+/* Saharan Sunset 1.0.6 - Catto Learning theme stylesheet.
    Theme Package 4.0 / Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue,
    Course detail, Sign in): warm ivory ground, sand bands, near-black ink, terracotta accent,
    Cormorant Garamond headings and Jost text, square corners and tracked uppercase actions.
@@ -857,6 +857,10 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
    landing hero) is padded by its band, not by the container. */
 .ss-body.cl-width-full .cl-main > :is(.cl-hero, .cl-feature-band, .cl-flash-stack, .cl-page-head:has(> .cl-container)) { padding-inline: var(--ss-row-pad); }
 .ss-body.cl-width-full .cl-main > .cl-page-head > .cl-container { padding-inline: 0 !important; }
+/* The landing hero is a band across the window like Home's hero (1.0.6, 2026-10-30). Core holds a page head to the
+   cards' width, so with the band's padding inside that width a landing page's headline stood in a narrow column in
+   the middle of a wide screen. */
+.ss-body.cl-width-full .cl-main > .cl-page-head:has(> .cl-container) { width: 100% !important; max-width: none !important; margin-inline: 0 !important; }
 .ss-body.cl-width-full .cl-identity-head { background: var(--ss-paper); }
 
 .ss-body .cl-hero {

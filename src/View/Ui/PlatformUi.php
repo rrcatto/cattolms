@@ -120,7 +120,7 @@ final class PlatformUi
         $enums = [
             'tone' => $component === 'feedback.notice' ? ['info', 'success', 'warning', 'danger'] : ['neutral', 'info', 'success', 'warning', 'danger', 'permanent'],
             'variant' => $component === 'layout.surface' ? ['standard', 'compact'] : ['primary', 'secondary', 'quiet', 'danger'],
-            'size' => $component === 'overlay.modal' ? ['normal', 'wide'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
+            'size' => $component === 'overlay.modal' ? ['normal', 'wide', 'page'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
             'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
             'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],

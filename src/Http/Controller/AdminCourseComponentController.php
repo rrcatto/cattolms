@@ -165,9 +165,13 @@ final class AdminCourseComponentController extends BaseController
         $this->requireCsrf(); $courseId = $this->courseId(); $user = $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($courseId, $user): void {
             $report = $this->restructurer->arrange($courseId, $user->id);
+            $moved = array_values(array_filter([
+                $report['summaries'] > 0 ? sprintf('%d summar%s', $report['summaries'], $report['summaries'] === 1 ? 'y' : 'ies') : '',
+                $report['review_aids'] > 0 ? sprintf('%d review study aid%s', $report['review_aids'], $report['review_aids'] === 1 ? '' : 's') : '',
+            ]));
             $this->flash('success', $report['modules'] === 0
-                ? sprintf('%d summar%s moved out of the lessons into parts of their own.', $report['summaries'], $report['summaries'] === 1 ? 'y' : 'ies')
-                : sprintf('The course is arranged into %d modules%s. %d videos, %d summaries and %d practical work items became parts of their own.', $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['summaries'], $report['practicals']));
+                ? implode(' and ', $moved) . ' moved out of the lessons into parts of their own.'
+                : sprintf('The course is arranged into %d modules%s. %d videos, %d summaries, %d review study aids and %d practical work items became parts of their own.', $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['summaries'], $report['review_aids'], $report['practicals']));
             $this->redirect('/admin/courses/' . $courseId . '/content');
         }, '/admin/courses/' . $courseId . '/content');
     }

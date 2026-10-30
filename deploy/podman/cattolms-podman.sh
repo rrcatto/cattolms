@@ -180,7 +180,9 @@ build_site() {
     in_release "$version" "$target" php bin/console asset-map:compile --no-debug >/dev/null || fail "the browser assets were not compiled"
     cp -a "$target/public_html/." "$SITE/public_html/"
     find "$SITE/public_html" -type d -exec chmod 755 {} + ; find "$SITE/public_html" -type f -exec chmod 644 {} +
-    chmod -R u=rwX,g=rwX,o= "$SITE/storage"; chmod 755 "$SITE/themes"
+    # Only what the site's user owns: a file another user writes there, such as root's geoipupdate keeping the GeoIP
+    # databases in storage/geoip, cannot be changed by this user and would stop the install (2026-10-30).
+    find "$SITE/storage" -user "$(id -u)" -exec chmod u=rwX,g=rwX,o= {} +; chmod 755 "$SITE/themes"
     in_release "$version" "$target" php vendor/bin/phinx migrate -c phinx.php -e production -q || fail "the database's tables were not built"
     in_release "$version" "$target" php tools/install-bundled-themes.php >/dev/null || fail "the themes were not installed"
     in_release "$version" "$target" php tools/sync-themes.php >/dev/null || fail "the themes were not synchronised"

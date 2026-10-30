@@ -44,7 +44,8 @@ final class CourseController extends BaseController
         private readonly CourseReviewService $reviews,
         private readonly \CattoLearning\Bundle\BundleRepository $bundles,
         private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases,
-        private readonly \CattoLearning\Mailing\MailingConsents $mailing
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing,
+        private readonly \CattoLearning\Course\CoursePageView $coursePage
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -262,10 +263,15 @@ final class CourseController extends BaseController
         $reviewsPagination = Pagination::fixed($this->request()->query->get('reviews_page'), CourseReviewService::PUBLIC_PAGE_SIZE, $stars === null ? $rating->count : $rating->distribution[$stars]);
         $canReview = $user !== null && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, $courseId);
 
+        // The modules, how a module is made, what the course holds and its trailer (owner, 2026-10-30, the accepted mockup).
+        $page = $this->coursePage->view($course);
+
         return $this->render('course-detail', [
             'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow'),
             'title' => (string) $course['title'],
             'course' => $course,
+            'course_page' => $page,
+            'load_catwalk' => $page['trailer'] !== null,
             'has_access' => $enrolment !== null,
             // What the reader can do about the course: the same rules as its landing page and checkout.
             'purchase' => $this->purchases->for($course, $user, '/courses/' . (string) $course['slug'], $course['price_variants']),

@@ -18,6 +18,12 @@ a diagnostic and the final assessment stay where they are. Nothing is changed in
 modules, and nothing is written at all when any step is refused.
 
 Changelog:
+2026/10/30 SAST
+- The review study aid too (owner, 2026-10-30: "I think the Review Study Aid should be in its own course item"): the
+  "Review Study Aid" block a module lesson ends with (details.review-aid) becomes a Review Study Aid part placed before
+  the module's assessment, and Arrange into modules finishes an arranged course whose lessons still hold theirs.
+- Lessons are written back through CourseHtml::html: parsed without the HTML namespace and written directly, every
+  line break came back as <br></br> (two breaks in a browser, doubling at each arrangement) and a script's text escaped.
 2026/10/29 SAST
 - The summary too (owner, 2026-10-29: "The summary is still part of the html module but I would like them in their own
   separate course item"): a lesson's closing <section><h2>Summary</h2> becomes a Summary part after the lesson, and
@@ -42,6 +48,9 @@ final class CourseRestructurer
     /** A lesson's closing summary: a section opening with an h2 reading "Summary". */
     private const SUMMARY = '#<section\b[^>]*>\s*<h2\b[^>]*>\s*Summary\s*</h2>#i';
 
+    /** A lesson's review study aid: the details block with the class review-aid. */
+    private const REVIEW_AID = '#<details\b[^>]*\bclass="[^"]*\breview-aid\b#i';
+
     public function __construct(
         private readonly CourseItemService $items,
         private readonly CourseItemRepository $records,
@@ -59,7 +68,8 @@ final class CourseRestructurer
 
     /**
      * What Arrange into modules would do now: 'modules' for a course of the older shape (module lessons at the top and
-     * no module sections), 'summaries' for an arranged course whose module lessons still end with their summary, or null.
+     * no module sections), 'summaries' for an arranged course whose module lessons still end with their summary,
+     * 'review_aids' for one whose module lessons still hold their review study aid, or null.
      */
     public function arrangement(int $courseId): ?string
     {
@@ -67,11 +77,13 @@ final class CourseRestructurer
         $numbered = array_filter($rows, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered']));
         $lessons = array_filter($rows, static fn(array $row): bool => $row['parent_node_id'] === null && (string) ($row['item_type'] ?? '') === 'html_lesson');
         if ($numbered === [] && $lessons !== []) { return 'modules'; }
-        return $numbered !== [] && self::lessonsHoldingSummaries($rows) !== [] ? 'summaries' : null;
+        if ($numbered === []) { return null; }
+        if (self::lessonsHolding($rows, 'summary', self::SUMMARY) !== []) { return 'summaries'; }
+        return self::lessonsHolding($rows, 'review_study_aid', self::REVIEW_AID) !== [] ? 'review_aids' : null;
     }
 
     /**
-     * @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review:bool,sections:list<int>} What was done.
+     * @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review_aids:int,review:bool,sections:list<int>} What was done.
      */
     public function arrange(int $courseId, int $userId): array
     {
@@ -82,17 +94,18 @@ final class CourseRestructurer
         // parts made here, are named after where they now sit ("GDN-101 Module 1 Lesson"); a name typed by hand stays.
         $automatic = $this->items->automaticallyNamed($courseId);
         $newest = $this->records->highestItemId();
-        $report = $what === 'summaries' ? $this->separateSummaries($courseId, $userId) : $this->arrangeModules($courseId, $userId);
+        // An arranged course is finished in one step: its summaries, then its review study aids.
+        $report = $what === 'modules' ? $this->arrangeModules($courseId, $userId) : $this->separateParts($courseId, $userId);
         $made = array_values(array_filter($this->records->placedItemIds($courseId), static fn(int $id): bool => $id > $newest));
         $this->items->nameFromPlacements($courseId, array_merge($automatic, $made));
         return $report;
     }
 
-    /** @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review:bool,sections:list<int>} */
+    /** @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review_aids:int,review:bool,sections:list<int>} */
     private function arrangeModules(int $courseId, int $userId): array
     {
         return $this->transactions->run(function () use ($courseId, $userId): array {
-            $report = ['modules' => 0, 'videos' => 0, 'practicals' => 0, 'outcomes' => 0, 'summaries' => 0, 'review' => false, 'sections' => []];
+            $report = ['modules' => 0, 'videos' => 0, 'practicals' => 0, 'outcomes' => 0, 'summaries' => 0, 'review_aids' => 0, 'review' => false, 'sections' => []];
             $rows = $this->records->structure($courseId);
             $children = [];
             foreach ($rows as $row) { if ($row['parent_node_id'] !== null) { $children[(int) $row['parent_node_id']][] = $row; } }
@@ -110,15 +123,16 @@ final class CourseRestructurer
 
     /**
      * An arranged course's module lessons that still end with their summary, each given a Summary part of its own
-     * right after it.
+     * right after it, and those that still hold their review study aid, each given a Review Study Aid part of its own
+     * before the module's assessment.
      *
-     * @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review:bool,sections:list<int>}
+     * @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review_aids:int,review:bool,sections:list<int>}
      */
-    private function separateSummaries(int $courseId, int $userId): array
+    private function separateParts(int $courseId, int $userId): array
     {
         return $this->transactions->run(function () use ($courseId, $userId): array {
-            $report = ['modules' => 0, 'videos' => 0, 'practicals' => 0, 'outcomes' => 0, 'summaries' => 0, 'review' => false, 'sections' => []];
-            foreach (self::lessonsHoldingSummaries($this->records->structure($courseId)) as $lesson) {
+            $report = ['modules' => 0, 'videos' => 0, 'practicals' => 0, 'outcomes' => 0, 'summaries' => 0, 'review_aids' => 0, 'review' => false, 'sections' => []];
+            foreach (self::lessonsHolding($this->records->structure($courseId), 'summary', self::SUMMARY) as $lesson) {
                 $item = $this->items->item((int) $lesson['course_item_id']);
                 $taken = self::takeSummary((string) $item['content_source']);
                 if ($taken === null) { continue; }
@@ -127,30 +141,41 @@ final class CourseRestructurer
                 $report['summaries']++;
                 $report['sections'][] = (int) $lesson['parent_node_id'];
             }
-            $this->audit->record($userId, 'course_content.summaries_separated', ['course_id' => $courseId, 'summaries' => $report['summaries']]);
+            foreach (self::lessonsHolding($this->records->structure($courseId), 'review_study_aid', self::REVIEW_AID) as $lesson) {
+                $item = $this->items->item((int) $lesson['course_item_id']);
+                $taken = self::takeReviewAid((string) $item['content_source']);
+                if ($taken === null) { continue; }
+                $this->items->update((int) $lesson['course_item_id'], ['content_source' => $taken['lesson'], 'estimated_minutes' => (string) (CourseItemService::readingMinutes($taken['lesson']) ?? '')] + $item, $userId);
+                $this->addReviewAid($courseId, (int) $lesson['parent_node_id'], (string) $lesson['item_key'], $taken['aid'], $userId);
+                $report['review_aids']++;
+                $report['sections'][] = (int) $lesson['parent_node_id'];
+            }
+            $report['sections'] = array_values(array_unique($report['sections']));
+            if ($report['summaries'] > 0) { $this->audit->record($userId, 'course_content.summaries_separated', ['course_id' => $courseId, 'summaries' => $report['summaries']]); }
+            if ($report['review_aids'] > 0) { $this->audit->record($userId, 'course_content.review_aids_separated', ['course_id' => $courseId, 'review_aids' => $report['review_aids']]); }
             return $report;
         });
     }
 
     /**
-     * The module lessons (in a numbered section, not a summary or a review aid) whose section has no Summary part yet
-     * and whose content still ends with a summary.
+     * The module lessons (in a numbered section, not a summary or a review aid) whose section has no part of the role
+     * yet and whose content still holds one.
      *
      * @param list<array<string,mixed>> $rows
      * @return list<array<string,mixed>>
      */
-    private static function lessonsHoldingSummaries(array $rows): array
+    private static function lessonsHolding(array $rows, string $role, string $pattern): array
     {
         $numbered = [];
-        $withSummary = [];
+        $withPart = [];
         foreach ($rows as $row) {
             if ((string) $row['node_type'] === 'section' && !empty($row['numbered'])) { $numbered[(int) $row['id']] = true; }
-            if ((string) ($row['item_type'] ?? '') === 'html_lesson' && ($row['type_config']['presentation_role'] ?? '') === 'summary' && $row['parent_node_id'] !== null) { $withSummary[(int) $row['parent_node_id']] = true; }
+            if ((string) ($row['item_type'] ?? '') === 'html_lesson' && ($row['type_config']['presentation_role'] ?? '') === $role && $row['parent_node_id'] !== null) { $withPart[(int) $row['parent_node_id']] = true; }
         }
         return array_values(array_filter($rows, static fn(array $row): bool => (string) ($row['item_type'] ?? '') === 'html_lesson'
             && in_array((string) ($row['type_config']['presentation_role'] ?? ''), ['', 'lesson'], true)
-            && $row['parent_node_id'] !== null && isset($numbered[(int) $row['parent_node_id']]) && !isset($withSummary[(int) $row['parent_node_id']])
-            && preg_match(self::SUMMARY, (string) ($row['content_source'] ?? '')) === 1));
+            && $row['parent_node_id'] !== null && isset($numbered[(int) $row['parent_node_id']]) && !isset($withPart[(int) $row['parent_node_id']])
+            && preg_match($pattern, (string) ($row['content_source'] ?? '')) === 1));
     }
 
     /** A Summary part placed right after its lesson in the module's section. */
@@ -161,6 +186,20 @@ final class CourseRestructurer
         $this->items->createAttached($courseId, [
             'item_key' => $this->freeKey($lessonKey . '-summary'), 'item_type' => 'html_lesson', 'title' => 'Summary', 'lesson_role' => 'summary',
             'content_source' => $summary, 'parent_node_id' => (string) $section, 'insert_index' => (string) ($index === false ? count($ids) : $index + 1),
+        ], $userId);
+    }
+
+    /** A Review Study Aid part placed before the module's first assessment, or last when it has none. */
+    private function addReviewAid(int $courseId, int $section, string $lessonKey, string $aid, int $userId): void
+    {
+        $parts = array_values(array_filter($this->records->structure($courseId), static fn(array $row): bool => (int) ($row['parent_node_id'] ?? 0) === $section));
+        $index = count($parts);
+        foreach ($parts as $i => $row) {
+            if (in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) { $index = $i; break; }
+        }
+        $this->items->createAttached($courseId, [
+            'item_key' => $this->freeKey($lessonKey . '-review-aid'), 'item_type' => 'html_lesson', 'title' => 'Review Study Aid', 'lesson_role' => 'review_study_aid',
+            'content_source' => $aid, 'parent_node_id' => (string) $section, 'insert_index' => (string) $index,
         ], $userId);
     }
 
@@ -218,6 +257,13 @@ final class CourseRestructurer
             ], $userId);
             $report['practicals']++;
         }
+        if (!$review && $parts['review_aid'] !== null) {
+            $this->items->createAttached($courseId, [
+                'item_key' => $this->freeKey($key . '-review-aid'), 'item_type' => 'html_lesson', 'title' => 'Review Study Aid', 'lesson_role' => 'review_study_aid',
+                'content_source' => $parts['review_aid'], 'parent_node_id' => (string) $section,
+            ], $userId);
+            $report['review_aids']++;
+        }
         foreach ($assessments as $assessment) {
             $this->items->arrange($courseId, [(int) $assessment['id']], $section, null, $userId);
         }
@@ -241,14 +287,14 @@ final class CourseRestructurer
 
     /**
      * A module lesson taken apart: the outcomes, the first video, the practical tasks with their stock answers, the
-     * closing summary, and the lesson without them. A lesson with none of them comes back unchanged.
+     * closing summary, the review study aid, and the lesson without them. A lesson with none of them comes back unchanged.
      *
-     * @return array{lesson:string,changed:bool,outcomes:list<string>,video:array{id:string,title:string,caption:string}|null,practical:array{tasks:string,answers:string}|null,summary:string|null}
+     * @return array{lesson:string,changed:bool,outcomes:list<string>,video:array{id:string,title:string,caption:string}|null,practical:array{tasks:string,answers:string}|null,summary:string|null,review_aid:string|null}
      */
     public static function split(string $html): array
     {
-        $result = ['lesson' => $html, 'changed' => false, 'outcomes' => [], 'video' => null, 'practical' => null, 'summary' => null];
-        if (trim($html) === '' || (!str_contains($html, 'outcomes') && !str_contains($html, 'youtube') && !str_contains($html, 'practical') && preg_match(self::SUMMARY, $html) !== 1)) { return $result; }
+        $result = ['lesson' => $html, 'changed' => false, 'outcomes' => [], 'video' => null, 'practical' => null, 'summary' => null, 'review_aid' => null];
+        if (trim($html) === '' || (!str_contains($html, 'outcomes') && !str_contains($html, 'youtube') && !str_contains($html, 'practical') && preg_match(self::SUMMARY, $html) !== 1 && preg_match(self::REVIEW_AID, $html) !== 1)) { return $result; }
         $previous = libxml_use_internal_errors(true);
         try {
             $document = HTMLDocument::createFromString('<!doctype html><html><body><div id="cl-restructure-root">' . $html . '</div></body></html>', \Dom\HTML_NO_DEFAULT_NS, 'UTF-8');
@@ -291,9 +337,7 @@ final class CourseRestructurer
         }
 
         if ($result['changed']) {
-            $lesson = '';
-            foreach ($root->childNodes as $child) { $lesson .= $document->saveHtml($child); }
-            $result['lesson'] = trim($lesson);
+            $result['lesson'] = trim(CourseHtml::innerHtml($root));
         }
         $taken = self::takeSummary($result['lesson']);
         if ($taken !== null) {
@@ -301,7 +345,52 @@ final class CourseRestructurer
             $result['summary'] = $taken['summary'];
             $result['changed'] = true;
         }
+        $aid = self::takeReviewAid($result['lesson']);
+        if ($aid !== null) {
+            $result['lesson'] = $aid['lesson'];
+            $result['review_aid'] = $aid['aid'];
+            $result['changed'] = true;
+        }
         return $result;
+    }
+
+    /**
+     * A lesson's review study aid, the details block with the class review-aid: its summary's small line as the opening
+     * line, then what its inner block holds (or all it holds after its summary), and the lesson without it. The box it
+     * sat in goes too when nothing else is in it. Null when the lesson has none.
+     *
+     * @return array{lesson:string,aid:string}|null
+     */
+    public static function takeReviewAid(string $html): ?array
+    {
+        if (preg_match(self::REVIEW_AID, $html) !== 1) { return null; }
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document = HTMLDocument::createFromString('<!doctype html><html><body><div id="cl-restructure-root">' . $html . '</div></body></html>', \Dom\HTML_NO_DEFAULT_NS, 'UTF-8');
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $root = $document->getElementById('cl-restructure-root');
+        if (!$root instanceof Element) { return null; }
+        $xpath = new XPath($document);
+        $block = $xpath->query('.//details[contains(concat(" ", normalize-space(@class), " "), " review-aid ")]', $root)->item(0);
+        if (!$block instanceof Element) { return null; }
+        $line = self::text((string) $xpath->query('./summary//small', $block)->item(0)?->textContent);
+        $inner = $xpath->query('./*[contains(concat(" ", normalize-space(@class), " "), " block-inner ")]', $block)->item(0);
+        if ($inner instanceof Element) {
+            $aid = self::innerHtml($inner, $document);
+        } else {
+            $summary = $xpath->query('./summary', $block)->item(0);
+            if ($summary instanceof Element) { $summary->remove(); }
+            $aid = self::innerHtml($block, $document);
+        }
+        if (trim(strip_tags($aid)) === '') { return null; }
+        if ($line !== '') { $aid = '<p class="lead-in">' . self::e(rtrim($line, '.') . '.') . '</p>' . "\n" . $aid; }
+        $box = $block->parentElement;
+        $block->remove();
+        if ($box instanceof Element && $box !== $root && $box->firstElementChild === null && trim((string) $box->textContent) === '') { $box->remove(); }
+        return ['lesson' => self::innerHtml($root, $document), 'aid' => $aid];
     }
 
     /**
@@ -362,16 +451,15 @@ final class CourseRestructurer
                 }
                 continue;
             }
-            $html .= $document->saveHtml($child);
+            $html .= CourseHtml::html($child);
         }
         return trim($html);
     }
 
+    /** The document is parsed without the HTML namespace, so it is written back through CourseHtml (2026-10-30). */
     private static function innerHtml(Element $element, HTMLDocument $document): string
     {
-        $html = '';
-        foreach ($element->childNodes as $child) { $html .= $document->saveHtml($child); }
-        return trim($html);
+        return trim(CourseHtml::innerHtml($element));
     }
 
     private static function text(string $value): string

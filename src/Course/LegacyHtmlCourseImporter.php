@@ -11,6 +11,9 @@ Description:
 Provides course-domain functionality for legacy html course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/30 SAST
+- Writes the course's HTML back through CourseHtml::html: the document is parsed without the HTML namespace, and
+  written directly every line break came back as <br></br>, which a browser reads as two, and a script's text escaped.
 2026/10/23 SAST
 - Reads the course's code from <meta name="cattolms:course-code" content="GDN-101"> in the file's head (owner, 2026-10-23).
 2026/10/07 SAST
@@ -124,7 +127,7 @@ final class LegacyHtmlCourseImporter
                 if (!$introNode instanceof DOMElement || str_contains(' ' . $introNode->getAttribute('class') . ' ', ' masthead ')) {
                     continue;
                 }
-                $introductionHtml .= (string) $document->saveHTML($introNode);
+                $introductionHtml .= CourseHtml::html($introNode);
             }
         }
 
@@ -173,7 +176,7 @@ final class LegacyHtmlCourseImporter
             $workingXpath = new DOMXPath($workingDocument);
 
             $outcomes = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " outcomes ")][1]', $working)->item(0);
-            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes((string) $workingDocument->saveHTML($outcomes)) : '';
+            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes(CourseHtml::html($outcomes)) : '';
 
             $summaryElement = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " s-summary ")]//*[contains(concat(" ", normalize-space(@class), " "), " sub-inner ")][1]', $working)->item(0);
             $summaryHtml = $summaryElement instanceof DOMElement ? $this->courseHtml->preserve($this->innerHtml($summaryElement)) : '';
@@ -1115,15 +1118,8 @@ final class LegacyHtmlCourseImporter
 
     private function innerHtml(DOMElement $element): string
     {
-        $html = '';
-        $document = $element->ownerDocument;
-        if (!$document instanceof DOMDocument) {
-            throw new \LogicException('Course fragments require an HTML document.');
-        }
-        foreach ($element->childNodes as $child) {
-            $html .= $document->saveHtml($child);
-        }
-        return $html;
+        // Written back as HTML: the document was parsed without the HTML namespace (CourseHtml::html, 2026-10-30).
+        return CourseHtml::innerHtml($element);
     }
 
     private function extractJsonAssignment(string $source, string $variable): mixed

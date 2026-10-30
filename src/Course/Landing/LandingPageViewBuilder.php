@@ -57,6 +57,8 @@ final class LandingPageViewBuilder
         private readonly CoursePurchaseOptions $purchases,
         private readonly ?\CattoLearning\Course\Catwalk\DeckRenderer $decks = null,
         private readonly ?\CattoLearning\Course\Catwalk\NarrationRepository $narrations = null,
+        private readonly ?\CattoLearning\Course\CoursePageView $coursePage = null,
+        private readonly ?\CattoLearning\Course\CourseItemService $items = null,
     ) {
     }
 
@@ -179,7 +181,7 @@ final class LandingPageViewBuilder
             LandingSectionType::Audience, LandingSectionType::Outcomes => $common + ['items' => $data['items']],
             LandingSectionType::Benefits => $common + ['items' => array_map(static fn(array $item): array => ['title' => $item['title'], 'paragraphs' => LandingCopy::paragraphs($item['text'])], $data['items'])],
             LandingSectionType::Faq => $common + ['items' => array_map(static fn(array $item): array => ['question' => $item['question'], 'paragraphs' => LandingCopy::paragraphs($item['answer'])], $data['items'])],
-            LandingSectionType::Contents => $this->contents($common, $data, $outline ?? []),
+            LandingSectionType::Contents => $this->modules($common, $course) ?? $this->contents($common, $data, $outline ?? []),
             LandingSectionType::Reviews => $this->reviewsSection($common, $data, $course, $rating ?? ['count' => 0]),
             LandingSectionType::Pricing => $common + ['rating' => $rating, 'purchase' => $purchase],
             LandingSectionType::Cta => $common + ['purchase' => $purchase],
@@ -200,6 +202,22 @@ final class LandingPageViewBuilder
         foreach ($this->narrations?->forItem((int) $item['id']) ?? [] as $slide => $publicId) { $narrations[$slide] = '/narrations/' . rawurlencode($publicId); }
         $slug = rawurlencode((string) $course['slug']);
         return ($this->decks ?? new \CattoLearning\Course\Catwalk\DeckRenderer())->render((array) $item['type_config'], (string) $item['item_key'], \CattoLearning\Course\Catwalk\SlideDeck::barText((string) ($item['description_html'] ?? ''), (string) $item['title']), ['enrol' => '/courses/' . $slug, 'preview' => '/courses/' . $slug . '/preview', 'continue' => '/courses/' . $slug], $narrations);
+    }
+
+    /**
+     * A course of modules shows its modules, how a module is made and what follows, as its page does (owner, 2026-10-30:
+     * the long list of every part does not help anyone choose the course); null for a course without modules.
+     *
+     * @param array<string,mixed> $common
+     * @param array<string,mixed> $course
+     * @return array<string,mixed>|null
+     */
+    private function modules(array $common, array $course): ?array
+    {
+        if ($this->coursePage === null || $this->items === null) { return null; }
+        $view = $this->coursePage->view(['structure' => $this->items->availability((int) $course['id'], null, false)] + $course, false);
+        if ($view['modules'] === []) { return null; }
+        return $common + ['modules' => $view['modules'], 'paragraph' => $view['paragraph'], 'parts' => $view['parts'], 'after' => $view['after'], 'total' => $view['total'], 'course_slug' => (string) $course['slug']];
     }
 
     /**

@@ -549,6 +549,16 @@ It refuses to run when one of the courses is already on the site. Screenshots, `
 CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/one-learner-scenario.cjs
 ```
 
+## A course's page
+
+`course-page.cjs` (2026-10-30) opens a published course of two numbered modules with a cover, a price and a trailer in its free preview, in Chromium and Firefox at 1440 and 390px: the title over the cover, one buy box (under Course access), the modules in order with the paragraph on how a module is made and the free preview marked, no sideways scrolling; Watch course presentation opens the trailer in a window as wide as the page's box with its slides on screen, and Esc, the Close button, the × and the slides' Get this course (which then shows Course access) each close it; without JavaScript the button opens the trailer in the free preview. Its fixture makes the course through the services Course Content calls and removes it, and removes what it made if a step is refused.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-page.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php cleanup'
+```
+
 ## Every page, by following links
 
 `page-construction.cjs` holds the checks both share: one `h1`, only page rows in main, no words on the texture, the first card's edge on an unboxed page head's title, every painted notice, page head and identity band with the cards' edges (UX rule 1.7a), no sideways scrolling, nothing standing out of a table, and a pagination bar that fits a desktop line.

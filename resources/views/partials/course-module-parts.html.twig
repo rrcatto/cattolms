@@ -1,0 +1,11 @@
+{#
+	How a module of a course is made, for someone choosing it (owner, 2026-10-30): one paragraph worked out from the parts
+	the modules hold (Course\CoursePageView), then the parts in their order. Used by a course's page and by its landing
+	page's contents. Expects modules_view: CoursePageView::view().
+#}
+<p class="cl-course-module-paragraph">{{ modules_view.paragraph }}</p>
+<ol class="cl-course-module-parts" aria-label="The parts of a module">
+	{% for part in modules_view.parts %}
+		<li class="cl-course-module-part cl-course-module-part--{{ part.part }}"><span class="cl-course-module-part-icon" aria-hidden="true">{{ part.icon|raw }}</span>{{ part.label }}</li>
+	{% endfor %}
+</ol>

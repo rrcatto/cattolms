@@ -54,7 +54,7 @@ final class CourseArrangeCommand extends Command
             if (!$this->restructurer->needsArranging($id)) { $output->writeln($code . ': already arranged, left as it is.'); continue; }
             try {
                 $report = $this->restructurer->arrange($id, $actor);
-                $output->writeln(sprintf('%s: %d modules%s, %d videos, %d practical work items, %d summaries, %d outcome lists moved into their sections.', $code, $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['practicals'], $report['summaries'], $report['outcomes']));
+                $output->writeln(sprintf('%s: %d modules%s, %d videos, %d practical work items, %d summaries, %d review study aids, %d outcome lists moved into their sections.', $code, $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['practicals'], $report['summaries'], $report['review_aids'], $report['outcomes']));
             } catch (\InvalidArgumentException|\RuntimeException $exception) {
                 $failed++;
                 $output->writeln('<error>' . $code . ': ' . $exception->getMessage() . '</error>');

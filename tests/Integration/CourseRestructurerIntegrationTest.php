@@ -15,6 +15,10 @@ with their stock answers into Practical work after it, and the module's assessme
 an unnumbered section of its own. Nothing is deleted, and arranging twice changes nothing.
 
 Changelog:
+2026/10/30 SAST
+- A module lesson's review study aid becomes a Review Study Aid part before its assessment, on import and on an
+  arranged course (owner, 2026-10-30), and arranging keeps line breaks and pictures as written: a <br> came back as
+  <br></br>, which a browser reads as two, and doubled again at each arrangement.
 2026/10/28 SAST
 - Created.
 */
@@ -25,6 +29,7 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseItemRepository;
+use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CoursePortabilityService;
 use CattoLearning\Course\CourseRestructurer;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -53,7 +58,9 @@ final class CourseRestructurerIntegrationTest extends TestCase
                 . '<figure class="video"><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" title="Soil explained"></iframe><figcaption class="video-cap">A short film about soil.</figcaption></figure>'
                 . '<details class="block practical"><summary>Practical</summary><div class="block-inner"><p>Try these.</p><ol><li><span class="ex-t">Do a jar test</span> Fill a jar a third with soil.<span class="ex-out">A jar of settled layers</span></li></ol></div></details>'
                 . '<details class="block answers"><summary>Stock answers</summary><div class="block-inner"><ol><li><span class="ex-t">Do a jar test</span> Sand settles first, then silt, then clay.</li></ol></div></details>'
-                . '<section><h2>Summary</h2><ul><li>Roots need water, air and food from the soil.</li><li>A jar test shows sand, silt and clay.</li></ul></section>';
+                . '<div class="docmock"><div class="doc-bar">Specimen label</div><div class="doc-body"><p>Bed 3<br>Sown 14 October<br>Carrots</p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="A seed packet"></div></div>'
+                . '<section><h2>Summary</h2><ul><li>Roots need water, air and food from the soil.</li><li>A jar test shows sand, silt and clay.</li></ul></section>'
+                . '<div class="blocks"><details class="block review-aid"><summary class="block-head"><span>Review Study Aid<small>The points to fix in memory before the self assessment</small></span></summary><div class="block-inner"><h5>Words you must know</h5><ul class="keypoints"><li><strong>Loam</strong>: a balanced mix<br>of sand, silt and clay.</li></ul></div></details></div>';
             $html = '<!doctype html><html><head><title>Arranged ' . $suffix . ' - Interactive Course</title></head><body><header class="masthead"><h1>Arranged ' . $suffix . '</h1><p>Summary.</p></header>'
                 . $module('m1', 'Soil and compost', $first) . $module('m2', 'Planting', '<p>Plant in spring.</p>')
                 . '<script>const QUIZ={"m1":[{"q":"Question?","o":["Yes","No"],"a":0}],"m2":[{"q":"Second?","o":["Yes","No"],"a":0}],"final":[{"q":"Final?","o":["Yes","No"],"a":0}]};</script></body></html>';
@@ -67,8 +74,12 @@ final class CourseRestructurerIntegrationTest extends TestCase
             self::assertSame(['Soil and compost', 'Planting'], array_map(static fn(array $row): string => (string) $row['section_title'], array_slice($sections, 0, 2)));
             self::assertTrue((bool) $sections[0]['numbered'] && (bool) $sections[1]['numbered'], 'Each module is a numbered section.');
             $inFirst = array_values(array_filter($rows, static fn(array $row): bool => (int) $row['parent_node_id'] === (int) $sections[0]['id']));
-            self::assertSame(['youtube', 'html_lesson', 'html_lesson', 'practical', 'assessment'], array_map(static fn(array $row): string => (string) $row['item_type'], $inFirst),
-                'The video comes before the lesson, its summary and the practical work after it, then the assessment.');
+            self::assertSame(['youtube', 'html_lesson', 'html_lesson', 'practical', 'html_lesson', 'assessment'], array_map(static fn(array $row): string => (string) $row['item_type'], $inFirst),
+                'The video comes before the lesson, its summary, the practical work and the review study aid after it, then the assessment.');
+            $aid = $items->item((int) $inFirst[4]['course_item_id']);
+            self::assertSame(['Review Study Aid', 'review_study_aid'], [$aid['title'], $aid['type_config']['presentation_role'] ?? null]);
+            self::assertSame('<p class="lead-in">The points to fix in memory before the self assessment.</p>' . "\n" . '<h5>Words you must know</h5><ul class="keypoints"><li><strong>Loam</strong>: a balanced mix<br>of sand, silt and clay.</li></ul>',
+                (string) $aid['content_source'], 'The aid opens with its own line, then what its block held, its line break kept.');
             $summary = $items->item((int) $inFirst[2]['course_item_id']);
             self::assertSame(['Summary', 'summary'], [$summary['title'], $summary['type_config']['presentation_role'] ?? null]);
             self::assertSame('<ul><li>Roots need water, air and food from the soil.</li><li>A jar test shows sand, silt and clay.</li></ul>', (string) $summary['content_source'], 'The summary without its heading.');
@@ -76,15 +87,18 @@ final class CourseRestructurerIntegrationTest extends TestCase
 
             // Owner, 2026-10-30: imported and arranged items are named after their places, never twice the same.
             $code = (string) $db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $course]);
-            self::assertSame([$code . ' Module 1 Video', $code . ' Module 1 Lesson', $code . ' Module 1 Summary', $code . ' Module 1 Practical work', $code . ' Module 1 Assessment'],
+            self::assertSame([$code . ' Module 1 Video', $code . ' Module 1 Lesson', $code . ' Module 1 Summary', $code . ' Module 1 Practical work', $code . ' Module 1 Review study aid', $code . ' Module 1 Assessment'],
                 array_map(static fn(array $row): string => (string) $row['item_name'], $items->structure($course) ? $inFirst : []), 'Each part is named after its module and kind.');
             $video = $items->item((int) $inFirst[0]['course_item_id']);
             self::assertSame(['dQw4w9WgXcQ', 'Soil explained'], [$video['type_config']['youtube_id'] ?? null, $video['title']]);
             $lesson = (string) $items->item((int) $inFirst[1]['course_item_id'])['content_source'];
             self::assertStringContainsString('Roots need water, air and food.', $lesson, 'The lesson keeps its own words.');
-            foreach (['outcomes', 'youtube', 'block practical', 'block answers', '<h2>Summary</h2>'] as $moved) {
+            foreach (['outcomes', 'youtube', 'block practical', 'block answers', '<h2>Summary</h2>', 'review-aid', 'class="blocks"'] as $moved) {
                 self::assertStringNotContainsString($moved, $lesson, $moved . ' moved out of the lesson.');
             }
+            // Written back as HTML (2026-10-30): one line break stays one, and a picture gets no closing tag.
+            self::assertStringContainsString('<p>Bed 3<br>Sown 14 October<br>Carrots</p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="A seed packet"></div>', $lesson);
+            self::assertDoesNotMatchRegularExpression('#</(br|img|hr|input)>#', $lesson . $summary['content_source'] . $aid['content_source'], 'No void element is closed.');
             $practical = $items->item((int) $inFirst[3]['course_item_id']);
             self::assertStringContainsString('<h3>Do a jar test</h3>', (string) $practical['content_source']);
             self::assertStringContainsString('<strong>What you produce:</strong> A jar of settled layers', (string) $practical['content_source']);
@@ -102,6 +116,46 @@ final class CourseRestructurerIntegrationTest extends TestCase
                 @unlink($boot['instance_root'] . '/storage/imports/' . $key . '.meta.json');
             }
             $fixture->cleanup();
+        }
+    }
+
+    public function testAnArrangedCoursesReviewStudyAidsBecomePartsOfTheirOwnBeforeTheAssessment(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $db = $container->get(Database::class);
+        $items = $container->get(CourseItemService::class);
+        $records = $container->get(CourseItemRepository::class);
+        $restructurer = $container->get(CourseRestructurer::class);
+        $db->beginTransaction();
+        try {
+            $fixture = new DevelopmentFixture($db);
+            $suffix = $fixture->suffix();
+            $owner = $fixture->createUser('Review aid author ' . $suffix);
+            $company = $fixture->createCompany($owner, 'Review aids ' . $suffix, $suffix . '.example.test');
+            $course = $fixture->createCourse($owner, $company, 'review-aids-' . $suffix, 'Review aids ' . $suffix);
+            $module = $items->addSection($course, ['title' => 'Soil', 'show_outline' => '1', 'numbered' => '1'], $owner);
+            $in = ['parent_node_id' => (string) $module];
+            $aid = '<div class="blocks"><details class="block review-aid"><summary class="block-head"><span>Review Study Aid<small>Before the self assessment</small></span></summary><div class="block-inner"><p>Loam is a mix<br>of three.</p></div></details></div>';
+            $items->createAttached($course, $in + ['item_key' => 'aid-lesson-' . $suffix, 'item_type' => 'html_lesson', 'title' => 'Soil', 'content_source' => '<p>Roots need air.<br>And water.</p>' . $aid], $owner);
+            $items->createAttached($course, $in + ['item_key' => 'aid-summary-' . $suffix, 'item_type' => 'html_lesson', 'title' => 'Summary', 'lesson_role' => 'summary', 'content_source' => '<ul><li>Roots need air.</li></ul>'], $owner);
+            $assessment = $items->create(['item_key' => 'aid-assessment-' . $suffix, 'item_type' => 'assessment', 'title' => 'Soil assessment'], $owner);
+            $items->addExisting($course, $assessment, ['parent_node_id' => (string) $module], $owner);
+
+            self::assertSame('review_aids', $restructurer->arrangement($course), 'An arranged course whose lesson holds its review study aid is offered the step.');
+            $report = $restructurer->arrange($course, $owner);
+            self::assertSame([0, 0, 1], [$report['modules'], $report['summaries'], $report['review_aids']]);
+            $parts = array_values(array_filter($records->structure($course), static fn(array $row): bool => (int) $row['parent_node_id'] === $module));
+            self::assertSame(['Soil', 'Summary', 'Review Study Aid', 'Soil assessment'], array_map(static fn(array $row): string => (string) $row['item_title'], $parts), 'The aid goes before the assessment.');
+            self::assertSame('review', CourseItemService::part($parts[2]));
+            self::assertSame('<p class="lead-in">Before the self assessment.</p>' . "\n" . '<p>Loam is a mix<br>of three.</p>', (string) $items->item((int) $parts[2]['course_item_id'])['content_source']);
+            self::assertSame('<p>Roots need air.<br>And water.</p>', (string) $items->item((int) $parts[0]['course_item_id'])['content_source'], 'The lesson keeps everything else, as written.');
+            self::assertNull($restructurer->arrangement($course), 'Nothing is left to do.');
+            // The role survives the Course Item form's Save: it is one of the roles a lesson may have.
+            $saved = $items->item((int) $parts[2]['course_item_id']);
+            $items->update((int) $parts[2]['course_item_id'], ['lesson_role' => 'review_study_aid'] + $saved, $owner);
+            self::assertSame('review_study_aid', $items->item((int) $parts[2]['course_item_id'])['type_config']['presentation_role'] ?? null);
+        } finally {
+            if ($db->isTransactionActive()) { $db->rollBack(); }
         }
     }
 }

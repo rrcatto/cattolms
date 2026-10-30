@@ -96,7 +96,11 @@
       if (opener) { event.preventDefault(); openModal(opener.dataset.openModal, opener); return; }
       const closer = event.target.closest('[data-close-modal]');
       if (closer) { closeModal(closer.closest('.cl-ui-modal')); return; }
-      if (event.target.classList.contains('cl-ui-modal')) closeModal(event.target);
+      if (event.target.classList.contains('cl-ui-modal')) { closeModal(event.target); return; }
+      /* A link to a place on this page from inside a window, such as a presentation's Get this course on a course's
+         page (2026-10-30), closes the window so the place can be seen; the link then scrolls to it as usual. */
+      const inPage = event.target.closest('.cl-ui-modal.open a[href^="#"]');
+      if (inPage && inPage.getAttribute('href').length > 1) closeModal(inPage.closest('.cl-ui-modal'));
     });
 
     /* Escape closes the top-most open modal. Without this a keyboard user who opens the company
@@ -104,6 +108,9 @@
     document.addEventListener('keydown', event => {
       const open = document.querySelector('.cl-ui-modal.open');
       if (!open) return;
+      /* An Escape something in the window has already used (a presentation closing its Contents or leaving its own full
+         screen) leaves the window open; the next one closes it. */
+      if (event.key === 'Escape' && event.defaultPrevented) return;
       if (event.key === 'Escape') { event.preventDefault(); closeModal(open); }
       if (event.key === 'Tab') {
         const controls = [...open.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled):not([type="hidden"]),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')]
@@ -140,7 +147,7 @@
       if (menu && menu.open) closeDropdowns(menu);
     }, true);
     document.addEventListener('click', event => { const target = event.target instanceof Element ? event.target : null; if (!target || !target.closest(dropdownSelector)) closeDropdowns(); });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDropdowns(); document.querySelectorAll('.cl-ui-modal.open').forEach(closeModal); } });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !event.defaultPrevented) { closeDropdowns(); document.querySelectorAll('.cl-ui-modal.open').forEach(closeModal); } });
 
     const navToggle = document.querySelector('[data-cl-nav-toggle]');
     const primaryNav = document.getElementById('cl-primary-navigation');
