@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/31 SAST (landing page section widths)
+- course_landing_sections.width: half or full (owner, 2026-10-31); the hero is always full.
 2026/10/30 SAST (course page layouts)
 - courses.page_layout: the course's own layout of its catalogue page (Page Builder), NULL for the site's default.
 2026/10/28 SAST (course structure and CatWalk)
@@ -2825,10 +2827,13 @@ CREATE TABLE course_landing_sections (
     section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','reviews','pricing','faq','cta','presentation')),
     position INTEGER NOT NULL CHECK (position >= 0),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Half or full width on the page (owner, 2026-10-31): two half sections one after the other share a row.
+    width VARCHAR(8) NOT NULL DEFAULT 'full' CHECK (width IN ('half','full')),
     data JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(data) = 'object'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT course_landing_sections_hero_first CHECK ((section_type = 'hero') = (position = 0)),
+    CONSTRAINT course_landing_sections_hero_full CHECK (section_type <> 'hero' OR width = 'full'),
     CONSTRAINT course_landing_sections_position_key UNIQUE (landing_page_id, position) DEFERRABLE INITIALLY IMMEDIATE
 );
 -- Sections a page can hold only once. Benefits, FAQ and call-to-action sections may repeat.

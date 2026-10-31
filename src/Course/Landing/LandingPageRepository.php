@@ -151,6 +151,12 @@ final class LandingPageRepository
         );
     }
 
+    /** Half or full width on the page (owner, 2026-10-31). */
+    public function setWidth(int $sectionId, string $width): void
+    {
+        $this->db->executeStatement('UPDATE course_landing_sections SET width = :width, updated_at = NOW() WHERE id = :id', ['id' => $sectionId, 'width' => $width]);
+    }
+
     public function setEnabled(int $sectionId, bool $enabled): void
     {
         $this->db->executeStatement('UPDATE course_landing_sections SET enabled = :enabled, updated_at = NOW() WHERE id = :id', ['id' => $sectionId, 'enabled' => $enabled]);

@@ -187,7 +187,8 @@ final class AdminCourseController extends BaseController
         'people' => ['Owner & editors', 'COURSE.OWNERSHIP.MANAGE'],
         'pricing' => ['Pricing', 'COURSE.PRICING.MANAGE'],
         'content' => ['Course content', null],
-        'presentation' => ['Presentation', null],
+        // The course's own stylesheet (owner, 2026-10-31: rename the tab "css", as Presentation is now a kind of Course Item).
+        'css' => ['CSS', null],
         // The course's catalogue page, block by block (Page Builder, owner 2026-10-30).
         'page-layout' => ['Page layout', null],
         'grades' => ['Grades', null],
@@ -218,7 +219,7 @@ final class AdminCourseController extends BaseController
             [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
             $default = $action === 'reset' || ($action === 'save' && (string) ($_POST['source'] ?? 'own') === 'default');
             $this->pageLayouts->saveForCourse($courseId, $default ? null : $layout, $user->id);
-            $this->flash('success', $default ? 'This course\'s page follows the site\'s default layout.' : 'The layout of this course\'s page was saved.');
+            $this->flash('success', $default ? 'This course\'s page uses the default layout.' : 'The custom layout of this course\'s page was saved.');
             $this->redirect($back);
         }, $back);
     }
@@ -631,8 +632,8 @@ final class AdminCourseController extends BaseController
                 'Course presentation imported from ' . (string) $result['source_filename']
                 . ' (' . number_format((int) $result['css_bytes']) . ' CSS bytes).'
             );
-            $this->redirect(self::tabUrl($courseId, 'presentation'));
-        }, self::tabUrl($courseId, 'presentation'));
+            $this->redirect(self::tabUrl($courseId, 'css'));
+        }, self::tabUrl($courseId, 'css'));
     }
 
 
@@ -646,8 +647,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updatePresentationCss($courseId, (string) ($_POST['presentation_css'] ?? ''), $user->id);
             $this->flash('success', 'The course presentation stylesheet was saved.');
-            $this->redirect(self::tabUrl($courseId, 'presentation'));
-        }, self::tabUrl($courseId, 'presentation'));
+            $this->redirect(self::tabUrl($courseId, 'css'));
+        }, self::tabUrl($courseId, 'css'));
     }
 
 
@@ -716,7 +717,7 @@ final class AdminCourseController extends BaseController
     }
 
     /**
-     * The Page layout tab: whether the course has a layout of its own, the builder for the layout it uses, and the
+     * The Page layout tab: whether the course has a custom layout, the builder for the layout it uses, and the
      * site's default drawn small beside the choice (Page Builder, 2026-10-30).
      *
      * @return array<string,mixed>

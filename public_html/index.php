@@ -126,6 +126,11 @@ function catto_dotenv_entries(string $contents): array
             }
         }
     }
+    // A double-quoted value that never closes is an entry too, which the value's rules then refuse for its missing
+    // quote (phpdotenv 5.8; before it, the key was dropped).
+    if ($multiline) {
+        $entries[] = implode("\n", $buffer);
+    }
     return $entries;
 }
 

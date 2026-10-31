@@ -6,7 +6,8 @@
  * the platform's confirmation (data-confirm, which platform-overrides.js asks), and the status targets say so (their
  * data-changed and data-saved words). Sending a form ends its changes. A page drawn again from what was typed (a layout
  * chosen, a save refused) starts with its own form changed (dirty value). A recording is kept on its own, so choosing
- * an audio file is not a change. No markup is made here. */
+ * an audio file is not a change. A status target carries data-unsaved while its form's change is not saved, so a page can
+ * mark it. No markup is made here. */
 import { Controller } from '@hotwired/stimulus';
 
 const QUESTION = 'Your changes are not saved. Leave without saving them?';
@@ -55,8 +56,11 @@ export default class extends Controller {
             });
         }
         this.statusTargets.forEach((status) => {
-            const words = this.changedForms.has(this.element) ? status.dataset.changed : status.dataset.saved;
+            const unsaved = this.changedForms.has(this.element);
+            const words = unsaved ? status.dataset.changed : status.dataset.saved;
             if (words) status.textContent = words;
+            // A page can mark the words while they say the change is not saved (the Page Builder's save bar, 2026-10-31).
+            status.toggleAttribute('data-unsaved', unsaved);
         });
     }
 }

@@ -2,6 +2,28 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-10-31 — v1.0.3 Landing page section widths, the Page Builder's save bar, and every dependency updated
+
+### Installing and updating
+
+- **A clean installation is needed.** The baseline schema gains `course_landing_sections.width`.
+- **No new `.env` settings, scheduled jobs or legal text.** One address changed: the course editor's `?tab=presentation` is now `?tab=css`, with no redirect from the old one.
+- **Every dependency updated (owner, 2026-10-31).** Symfony 8.1.10 throughout, including `symfony/mailer` and `symfony/mime` 8.1.10 (CVE-2026-45070, e-mail header injection through MIME parameter names, fixed in 8.1.10; the floors in `composer.json` raised so an older one cannot be installed); `symfony/stimulus-bundle` 3.6.0; Doctrine DBAL 4.5.0 and DoctrineBundle 3.3.4; `vlucas/phpdotenv` 5.8.0; `mcp/sdk` 0.9.0; Guzzle 7.16.1 and the other packages they bring; for development PHPUnit 13.4.5 (from 12) and PHPStan 2.3.4. `composer audit` reports no advisories. `thecodingmachine/safe`, which none of them needs any more, is no longer installed.
+- **A `.env` value in double quotes that never closes now stops the site** with phpdotenv's "missing closing quote" message (phpdotenv 5.8; before it, that setting was quietly dropped). The front controller's reading of `APP_CODEBASE_PATH` follows the same rule.
+- **CKEditor 5 is shipped with the code** (49.0.1, `public_html/js/ckeditor5.umd.js` and `public_html/css/ckeditor5.css`, GPL version 2 or later with its licence files beside it). It had never been in the repository, so on an installed site the rich-text fields (lessons, certificate wording, mailing messages) were plain text boxes.
+- **htmx 4.0.0** (from 4.0.0-beta6) and **Lucide 1.65.0** for the icon library (145 more icons to choose from for categories and tags; 32 redrawn).
+
+### Landing pages
+
+- **Half or full width.** Every section of a landing page but the hero is half or full width, chosen in the editor's list and saved at once, with a sketch of the page beside the list. Two half sections one after the other share a row and are the same height, as on the course page; on a phone every section is full width. Without JavaScript the width's own button saves it.
+- **Add section** says which sections that may appear more than once (Benefits, FAQ, Call to action) are already on the page, as it does for the others.
+
+### The course editor
+
+- **The Page Builder's choices are Default layout and Custom layout,** and Reset is Reset to the default layout.
+- **Save layout beside the choice.** Choosing a layout changes nothing until Save layout is pressed, so a Save layout button now sits right under the two choices, with a line that turns into a notice ("Not saved yet. Press Save layout to keep this change.") as soon as anything changes. On Settings › Course pages the same bar opens the form.
+- **The Presentation tab is now CSS** (the course's own stylesheet), since Presentation is a kind of Course Item.
+
 ## 2026-10-30 — v1.0.2 The Page Builder for course pages, and the landing page's hero
 
 ### Installing and updating

@@ -15,6 +15,18 @@ const {execFileSync} = require('node:child_process');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(execFileSync('podman', ['exec', 'env_php_1', 'cat', '/tmp/catto-course-page-state.json'], {encoding: 'utf8'}));
 const page_url = `${base}/courses/${state.slug}`;
+// The rows the page should draw, from the site's default layout as the fixture found it (never assumed: the owner chooses
+// it; Course first when none is saved) and the blocks this course has something for: no review, no related course.
+const COURSE_FIRST = [['about', 'half'], ['how', 'half'], ['modules', 'full'], ['glance', 'half'], ['get', 'half'], ['reviews', 'full'], ['access', 'full'], ['start', 'full'], ['related', 'full']].map(([id, width]) => ({id, width, shown: true}));
+const PRESENT = ['about', 'how', 'modules', 'glance', 'get', 'access', 'start'];
+const rows = [];
+let open = null;
+for (const block of (state.default_layout ? JSON.parse(state.default_layout) : COURSE_FIRST).filter((b) => b.shown && PRESENT.includes(b.id))) {
+    if (block.width === 'half' && open !== null) { rows[open].push(block.id); open = null; continue; }
+    rows.push([block.id]);
+    open = block.width === 'half' ? rows.length - 1 : null;
+}
+const rowOf = (id) => rows.findIndex((row) => row.includes(id));
 const results = [];
 
 async function scenario(name, run) {
@@ -33,10 +45,14 @@ async function scenario(name, run) {
                 assert.equal((await page.goto(page_url, {waitUntil: 'networkidle'})).status(), 200);
                 assert.equal(await page.locator('.cl-course-purchase').count(), 1, 'one buy box');
                 assert.equal(await page.locator('.cl-page-section:has(#course-access) .cl-course-purchase').count(), 1, 'under Course access');
-                // The page in rows (owner, 2026-10-30): About beside How each module works, then the modules across the page.
-                const [about, how, modules] = await Promise.all(['h2:text-is("About this course")', 'h2:text-is("How each module works")', '#course-modules'].map((s) => page.locator(s).boundingBox()));
-                if (width === 1440) assert.ok(Math.abs(about.y - how.y) < 2 && how.x > about.x, 'About and How each module works share a row');
-                assert.ok(modules.y > about.y && modules.y > how.y, 'the modules come after them');
+                // The page in the layout's rows (owner, 2026-10-30): two half blocks side by side on a wide screen, every block
+                // in the layout's order, one above the other on a phone.
+                const at = Object.fromEntries(await Promise.all([['about', 'h2:text-is("About this course")'], ['how', 'h2:text-is("How each module works")'], ['modules', '#course-modules']].map(async ([id, s]) => [id, await page.locator(s).boundingBox()])));
+                for (const [a, b] of [['about', 'how'], ['about', 'modules'], ['how', 'modules']]) {
+                    const [first, second] = rowOf(a) < rowOf(b) || (rowOf(a) === rowOf(b) && rows[rowOf(a)].indexOf(a) < rows[rowOf(a)].indexOf(b)) ? [a, b] : [b, a];
+                    if (width === 1440 && rowOf(a) === rowOf(b)) assert.ok(Math.abs(at[a].y - at[b].y) < 2 && at[second].x > at[first].x, `${a} and ${b} share a row`);
+                    else assert.ok(at[second].y > at[first].y + 1, `${second} comes after ${first}`);
+                }
                 assert.equal(await page.locator('.cl-picture-head .cl-course-detail-headline h1').count(), 1, 'the title over the cover');
                 assert.deepEqual(await page.locator('.cl-course-modules .cl-course-module-title').allTextContents(), state.modules, 'the modules, in order');
                 assert.match(await page.locator('.cl-course-module-paragraph').textContent(), /^Every module opens with a presentation/, 'how a module is made');

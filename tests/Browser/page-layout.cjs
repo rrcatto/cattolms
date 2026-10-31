@@ -1,10 +1,12 @@
 /* The Page Builder for course pages (owner, 2026-10-30, the accepted mockup), in Chromium and Firefox, and without JavaScript:
-   - a course's Page layout tab: on the site's default the board shows it locked; A layout of its own unlocks it; a
+   - a course's Page layout tab: on the default layout the board shows it locked; Custom layout unlocks it, and beside the
+     choice a notice says it is not saved, with Save layout (2026-10-31); a
      template applied, a block hidden and shown, moved with its arrows, dragged by its handle and made full width, the
      sketch and the templates' In use following; leaving with changes asks first; Save layout keeps it;
    - the course's page draws its blocks in that order, two half blocks sharing a row, a block with nothing to show left out;
-   - Reset to the site's default and Save: the course follows Settings > Course pages again, where the default is changed
-     (Reviews first) and put back (Back to Course first);
+   - Reset to the default layout and Save: the course follows Settings > Course pages again, whatever the site's default
+     is (never assumed), where the default is changed (Reviews first) and set to Course first; the fixture puts the site's
+     own default back at cleanup;
    - without JavaScript every button sends the form and the server saves what it asks;
    - the tab and Settings are built as every page is (page-construction.cjs), at 1440 and 390px; on a phone the board is
      one column.
@@ -32,6 +34,18 @@ async function session(browser, options = {}) {
 const order = (page) => page.locator('#page-layout-form input[name="order"]').inputValue();
 const board = (page) => page.locator('#page-layout-form .cl-page-builder-board > [data-block]').evaluateAll((tiles) => tiles.map((tile) => tile.dataset.block));
 const shelf = (page) => page.locator('#page-layout-form .cl-page-builder-shelf [data-block]').evaluateAll((tiles) => tiles.map((tile) => tile.dataset.block));
+// The layout the builder shows, block by block: whatever the site's default is, never assumed (owner, 2026-10-24: no
+// check depends on a setting the owner chose).
+const layoutOf = (page) => page.evaluate(() => {
+    const form = document.querySelector('#page-layout-form');
+    return form.querySelector('input[name="order"]').value.split(',').map((id) => {
+        const tile = form.querySelector(`.cl-page-builder-tile[data-block="${id}"]`);
+        return {id, width: tile.dataset.width, shown: tile.querySelector('input[name^="shown["]').value === '1'};
+    });
+});
+// The fixture's course has no review and no related course, so those blocks are never drawn.
+const PRESENT = ['about', 'how', 'modules', 'glance', 'get', 'access', 'start'];
+const drawn = (layout) => layout.filter((block) => block.shown && PRESENT.includes(block.id)).map((block) => block.id).join(',');
 const inUse = (page) => page.locator('#page-layout-form .cl-page-builder-template[data-current="true"]').evaluateAll((cards) => cards.map((card) => card.dataset.template));
 
 // The course page's blocks in order, by their headings, and whether two of them share a row.
@@ -70,17 +84,22 @@ async function withScript(browserType, name) {
     await page.goto(tab, {waitUntil: 'networkidle'});
     check(`${name}: the course starts on the site's default, the board locked`, await page.locator('input[name="source"][value="default"]').isChecked()
         && await page.locator('#page-layout-form [data-locked]').count() === 2 && await page.locator('.cl-page-builder-board button[value^="move:"]:not(:disabled)').count() === 0);
-    check(`${name}: Course first is in use`, JSON.stringify(await inUse(page)) === '["course"]', JSON.stringify(await inUse(page)));
+    const siteDefault = await layoutOf(page);
+    check(`${name}: the course page follows the site's default`, (await blocks(page)).join(',') === drawn(siteDefault), (await blocks(page)).join(','));
+    await page.goto(tab, {waitUntil: 'networkidle'});
     await page.locator('label:has(input[name="source"][value="own"])').click();
-    check(`${name}: A layout of its own unlocks the board`, await page.locator('#page-layout-form [data-locked]').count() === 0);
-    check(`${name}: and the status says the change is not saved`, (await page.locator('.cl-page-builder-status').first().innerText()).startsWith('Changes not saved'));
+    check(`${name}: Custom layout unlocks the board`, await page.locator('#page-layout-form [data-locked]').count() === 0);
+    // Save layout beside the choice, with a notice that the choice is not saved yet (owner, 2026-10-31, option B).
+    const bar = page.locator('.cl-page-builder-part:has(#page-layout-source) .cl-page-builder-savebar');
+    check(`${name}: beside the choice, a notice says it is not saved, with Save layout`, (await bar.locator('.cl-page-builder-status').innerText()).startsWith('Not saved yet')
+        && await bar.locator('.cl-page-builder-status[data-unsaved]').count() === 1 && await bar.getByRole('button', {name: 'Save layout'}).isVisible());
     check(`${name}: leaving now asks first`, await page.locator('.cl-group-tab').first().getAttribute('data-confirm') !== null);
 
     await page.getByRole('button', {name: 'Start from Buy first'}).click();
     check(`${name}: Buy first applied in place`, await order(page) === 'access,about,glance,modules,how,get,reviews,start,related' && JSON.stringify(await inUse(page)) === '["buy"]', await order(page));
     await page.getByRole('button', {name: 'Hide Reviews'}).click();
     check(`${name}: Reviews hidden goes to the shelf, out of the sketch`, JSON.stringify(await shelf(page)) === '["reviews"]'
-        && await page.locator('.cl-page-builder-sketch [data-block="reviews"]').isHidden() && await page.locator('.cl-page-builder-shelf-empty').isHidden());
+        && await page.locator('.cl-page-sketch [data-block="reviews"]').isHidden() && await page.locator('.cl-page-builder-shelf-empty').isHidden());
     check(`${name}: no template is in use any more`, (await inUse(page)).length === 0);
     await page.getByRole('button', {name: 'Show Reviews'}).click();
     check(`${name}: Show puts it back in its place`, (await board(page)).join(',') === 'access,about,glance,modules,how,get,reviews,start,related' && await page.locator('.cl-page-builder-shelf-empty').isVisible());
@@ -92,9 +111,9 @@ async function withScript(browserType, name) {
     check(`${name}: a block dragged by its handle`, (await board(page)).join(',') === 'access,related,about,modules,glance,how,get,start', (await board(page)).join(','));
     await page.locator('[data-block="get"] label:has(input[value="full"])').click();
     check(`${name}: What you get made full width, in the sketch too`, await page.locator('.cl-page-builder-board [data-block="get"]').getAttribute('data-width') === 'full'
-        && await page.locator('.cl-page-builder-sketch [data-block="get"]').getAttribute('data-width') === 'full');
+        && await page.locator('.cl-page-sketch [data-block="get"]').getAttribute('data-width') === 'full');
     const arranged = await order(page);
-    await page.getByRole('button', {name: 'Save layout'}).click();
+    await page.getByRole('button', {name: 'Save layout'}).first().click();
     await page.waitForLoadState('networkidle');
     check(`${name}: Save layout keeps it`, await page.locator('input[name="source"][value="own"]').isChecked() && await order(page) === arranged
         && (await page.locator('.cl-flash-stack').last().innerText()).includes('was saved'), await order(page));
@@ -108,25 +127,24 @@ async function withScript(browserType, name) {
 
     // Back to the site's default.
     await page.goto(tab, {waitUntil: 'networkidle'});
-    await page.getByRole('button', {name: 'Reset to the site\'s default'}).click();
+    await page.getByRole('button', {name: 'Reset to the default layout'}).click();
     check(`${name}: Reset shows the default again, locked`, await page.locator('input[name="source"][value="default"]').isChecked() && await page.locator('#page-layout-form [data-locked]').count() === 2
-        && await order(page) === 'about,how,modules,glance,get,reviews,access,start,related');
-    await page.getByRole('button', {name: 'Save layout'}).click();
+        && await order(page) === siteDefault.map((block) => block.id).join(','));
+    await page.getByRole('button', {name: 'Save layout'}).first().click();
     await page.waitForLoadState('networkidle');
-    check(`${name}: saved, the course follows the default`, (await blocks(page)).join(',') === 'about,how,modules,glance,get,access,start', (await blocks(page)).join(','));
-    check(`${name}: About this course and How each module works share a row`, await shareRow(page, 'About this course', 'How each module works'));
+    check(`${name}: saved, the course follows the default`, (await blocks(page)).join(',') === drawn(siteDefault), (await blocks(page)).join(','));
 
     // The site's default, at Settings > Course pages.
     await page.goto(settings, {waitUntil: 'networkidle'});
-    check(`${name}: Settings has Course pages, Course first in use`, await page.locator('#settings-course-pages #page-layout-form').count() === 1 && JSON.stringify(await inUse(page)) === '["course"]');
+    check(`${name}: Settings has Course pages`, await page.locator('#settings-course-pages #page-layout-form').count() === 1);
     await page.getByRole('button', {name: 'Start from Reviews first'}).click();
-    await page.getByRole('button', {name: 'Save layout'}).click();
+    await page.getByRole('button', {name: 'Save layout'}).first().click();
     await page.waitForLoadState('networkidle');
     check(`${name}: a new default changes every course on it`, (await blocks(page)).join(',') === 'about,how,modules,get,glance,access,start', (await blocks(page)).join(','));
     await page.goto(settings, {waitUntil: 'networkidle'});
     await page.getByRole('button', {name: 'Back to Course first'}).click();
     check(`${name}: Back to Course first`, await order(page) === 'about,how,modules,glance,get,reviews,access,start,related');
-    await page.getByRole('button', {name: 'Save layout'}).click();
+    await page.getByRole('button', {name: 'Save layout'}).first().click();
     await page.waitForLoadState('networkidle');
     check(`${name}: and saved`, JSON.stringify(await inUse(page)) === '["course"]');
     await browser.close();
@@ -138,6 +156,7 @@ async function withoutScript() {
     const page = await context.newPage();
     await page.goto(tab, {waitUntil: 'load'});
     const press = async (label) => { await page.getByRole('button', {name: label}).click(); await page.waitForLoadState('load'); };
+    const siteDefault = (await layoutOf(page)).map((block) => block.id).join(',');
     await press('Start from Buy first');
     check('without JavaScript: a template is saved as the course\'s own layout', await page.locator('input[name="source"][value="own"]').isChecked() && await order(page) === 'access,about,glance,modules,how,get,reviews,start,related');
     await press('Move The modules up');
@@ -147,10 +166,11 @@ async function withoutScript() {
     await press('Show Reviews');
     check('without JavaScript: Show puts it back', (await shelf(page)).length === 0 && (await board(page)).includes('reviews'));
     await page.locator('[data-block="about"] label:has(input[value="full"])').click();
-    await press('Save layout');
+    await page.getByRole('button', {name: 'Save layout'}).first().click();
+    await page.waitForLoadState('load');
     check('without JavaScript: a width chosen and saved', await page.locator('.cl-page-builder-board [data-block="about"]').getAttribute('data-width') === 'full');
-    await press('Reset to the site\'s default');
-    check('without JavaScript: Reset puts the default back', await page.locator('input[name="source"][value="default"]').isChecked() && await order(page) === 'about,how,modules,glance,get,reviews,access,start,related');
+    await press('Reset to the default layout');
+    check('without JavaScript: Reset puts the default back', await page.locator('input[name="source"][value="default"]').isChecked() && await order(page) === siteDefault);
     await page.goto(settings, {waitUntil: 'load'});
     await press('Start from Buy first');
     check('without JavaScript: Settings saves a template', JSON.stringify(await inUse(page)) === '["buy"]');

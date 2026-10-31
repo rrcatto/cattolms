@@ -167,6 +167,8 @@ final class CourseReviewPageTest extends TestCase
             $this->post('/admin/course-reviews/' . $review['id'] . '/moderate', ['decision' => 'approve', 'revision' => (string) $review['revision'], 'return' => '/admin/course-reviews']);
         }
         $_COOKIE = $this->cookies;
+        // The course's own layout, Course first, so the order checked here is never the site's default the owner chose.
+        IntegrationContainer::get()->get(\CattoLearning\Course\CoursePageLayouts::class)->saveForCourse($this->course, \CattoLearning\Course\CoursePageLayout::template('course'), $this->admin);
         $page = $this->html('/courses/' . $this->slug);
         // A row of its own after what the course holds, before Course access (owner, 2026-10-30: the page in rows).
         self::assertGreaterThan(strpos($page, 'About this course'), (int) strpos($page, 'id="reviews"'), 'The Reviews card follows the course.');

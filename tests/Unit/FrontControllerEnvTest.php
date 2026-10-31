@@ -137,7 +137,8 @@ final class FrontControllerEnvTest extends TestCase
 
     public function testValuesPhpdotenvRejectsAreRefused(): void
     {
-        foreach (["APP_CODEBASE_PATH='/srv/unterminated" => 'closing quote', 'APP_CODEBASE_PATH=/srv/two words' => 'unexpected whitespace',
+        // A double quote that never closes is refused too since phpdotenv 5.8 (before it, the key was dropped).
+        foreach (["APP_CODEBASE_PATH='/srv/unterminated" => 'closing quote', 'APP_CODEBASE_PATH="/srv/unterminated' => 'closing quote', 'APP_CODEBASE_PATH=/srv/two words' => 'unexpected whitespace',
             'APP_CODEBASE_PATH="/srv/\\q"' => 'escape sequence'] as $line => $reason) {
             try {
                 Dotenv::parse($line . "\n");
@@ -149,10 +150,6 @@ final class FrontControllerEnvTest extends TestCase
             self::assertNull($value, $line);
             self::assertStringContainsString($reason, $why);
         }
-        // A double quote that never closes starts a multi-line value that never ends: phpdotenv
-        // drops the key altogether, and so does the reader.
-        self::assertArrayNotHasKey('APP_CODEBASE_PATH', Dotenv::parse("APP_CODEBASE_PATH=\"/srv/unterminated\n"));
-        self::assertSame([null, 'APP_CODEBASE_PATH is not defined'], \catto_codebase_path_from_env("APP_CODEBASE_PATH=\"/srv/unterminated\n"));
     }
 
     public function testAValidEnvReachesTheCodeRoot(): void

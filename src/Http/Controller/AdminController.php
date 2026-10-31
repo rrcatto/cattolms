@@ -1075,7 +1075,7 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user, $back): void {
             [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
             $this->coursePageLayouts->saveSiteDefault($action === 'reset' ? \CattoLearning\Course\CoursePageLayout::template('course') : $layout, $user->id);
-            $this->flash('success', 'The default layout was saved. Every course page without a layout of its own uses it now.');
+            $this->flash('success', 'The default layout was saved. Every course page without a custom layout uses it now.');
             $this->redirect($back);
         }, $back);
     }

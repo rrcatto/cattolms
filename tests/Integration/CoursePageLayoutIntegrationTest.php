@@ -137,12 +137,12 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         self::assertNull($settings->export($this->course)['page_layout'], 'A course on the default carries null.');
 
         $own = CoursePageLayout::template('buy');
-        self::assertSame(['Page layout: its own'], $settings->changes($course, ['page_layout' => $own], false));
-        self::assertSame(['Page layout: its own'], $settings->apply($this->course, ['page_layout' => $own], $this->admin, false));
+        self::assertSame(['Page layout: custom'], $settings->changes($course, ['page_layout' => $own], false));
+        self::assertSame(['Page layout: custom'], $settings->apply($this->course, ['page_layout' => $own], $this->admin, false));
         self::assertSame($own, $settings->export($this->course)['page_layout']);
         self::assertSame([], $settings->apply($this->course, ['page_layout' => $own], $this->admin, false), 'The same package again changes nothing.');
         self::assertSame([], $settings->apply($this->course, [], $this->admin, false), 'An older package without one leaves it as it is.');
-        self::assertSame(['Page layout: the site\'s default'], $settings->apply($this->course, ['page_layout' => null], $this->admin, false));
+        self::assertSame(['Page layout: default'], $settings->apply($this->course, ['page_layout' => null], $this->admin, false));
         self::assertFalse($this->layouts->forCourse($this->course)['own']);
     }
 

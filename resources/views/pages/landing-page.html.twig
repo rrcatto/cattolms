@@ -15,10 +15,22 @@
 		</section>
 	{% endif %}
 	{% include '@platform/partials/landing/hero.html.twig' with {hero: landing.hero} %}
+	{#
+		The sections in rows (owner, 2026-10-31): a full section alone, two half sections side by side at one height, a half
+		section with no half beside it in half a row (Support\HalfRows). On a phone every section is full width.
+	#}
 	{% if landing.sections %}
 		<div class="cl-page-section cl-landing-sections">
-			{% for section in landing.sections %}
-				{% include '@platform/partials/landing/section.html.twig' with {section: section} %}
+			{% for row in landing.rows %}
+				{% if row|length > 1 or row[0].width == 'half' %}
+					{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}
+{% block body %}
+					{% for section in row %}{% include '@platform/partials/landing/section.html.twig' with {section: section} %}{% endfor %}
+{% endblock %}
+					{% endembed %}
+				{% else %}
+					{% include '@platform/partials/landing/section.html.twig' with {section: row[0]} %}
+				{% endif %}
 			{% endfor %}
 		</div>
 	{% endif %}

@@ -242,7 +242,10 @@ final class CommerceRepository
         $this->db->executeStatement('INSERT INTO commerce_order_items(order_id,variant_id,course_id,beneficiary_user_id,amount_minor,discount_minor,access_period_seconds,snapshot) VALUES (:order,:variant,:course,:user,:amount,:discount,:duration,:snapshot)', ['order'=>$orderId,'variant'=>$snapshot['variant_id'],'course'=>$snapshot['course_id'],'user'=>$userId,'amount'=>$snapshot['unit_price_minor'],'discount'=>(int)($snapshot['discount_minor'] ?? 0),'duration'=>$snapshot['access_period_seconds'],'snapshot'=>self::json($snapshot)]);
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * @return array<string,mixed>
+     * @phpstan-impure an order changes as it is paid, fulfilled, cancelled or refunded
+     */
     public function order(int $id, bool $lock = false): array
     {
         return $this->db->fetchAssociative('SELECT * FROM commerce_orders WHERE id=:id' . ($lock ? ' FOR UPDATE' : ''), ['id'=>$id]) ?: throw new RuntimeException('Order not found.');

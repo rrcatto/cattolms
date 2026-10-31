@@ -4,10 +4,13 @@
  * and moves another with the keyboard, previews the page (purchase buttons inert, not indexed) and
  * publishes it. A visitor reads the published page - hero, outline without what is inside the
  * course, the approved review, both prices, a question that opens - and adds the course to the cart
- * from the hero, which returns to the page. A learner who has the course is sent to it; a course
- * with no active price offers nothing to buy. Without JavaScript the ⋯ menu moves a section and the
- * public page and its questions work. The page and the editor fit all five themes at desktop and
- * phone widths without sideways scrolling, Firefox repeats the visitor's page and a drag, and
+ * from Price and access, which returns to the page (the hero holds no buy box). A learner who has the
+ * course is sent to it; a course with no active price offers nothing to buy. Without JavaScript the ⋯
+ * menu moves a section and the public page and its questions work. ADMIN makes two sections half width
+ * in place (2026-10-31), the page shows them side by side at one height, and without JavaScript the
+ * width form saves too. The page and the editor fit every bundled theme at desktop and phone widths
+ * without sideways scrolling, the hero the cards' width with its cover filling it and the half sections
+ * side by side (one above the other on a phone); Firefox repeats the visitor's page and a drag, and
  * unpublishing takes the page down and keeps it.
  *
  * Run against the development instance with landing-pages-fixture.php (create before, cleanup
@@ -267,6 +270,46 @@ async function editSection(page, label) {
         await ctx.close();
     });
 
+    // Half or full width (owner, 2026-10-31: "the ability to choose between half and full width for each section, and the
+    // way you balance the height of half page sections").
+    await scenario('ADMIN makes two sections half width in place, the page shows them side by side at one height, and without JavaScript too', 'chromium', async () => {
+        const {ctx, page} = await open(chromium, state.tokens.admin);
+        await go(page, EDITOR);
+        // Two sections one after the other that the page shows: neither hidden nor waiting for content.
+        const rows = await page.locator('#landing-section-list li[data-node-id]').evaluateAll((items) => items.map((li) => ({name: li.querySelector('.cl-tree-name').textContent.trim(), shown: !li.querySelector('.cl-ui-badge')})));
+        const at = rows.findIndex((row, i) => row.shown && rows[i + 1] && rows[i + 1].shown);
+        assert.ok(at >= 0, 'two shown sections one after the other');
+        const pair = [rows[at].name, rows[at + 1].name];
+        let loads = 0;
+        page.on('load', () => { loads += 1; });
+        for (const name of pair) {
+            step = `half width: ${name}`;
+            await Promise.all([page.waitForResponse((r) => r.url().endsWith('/width') && r.status() === 200), rowOf(page, name).locator('label:has(input[value="half"])').click()]);
+            await page.waitForFunction((n) => [...document.querySelectorAll('#landing-section-list li[data-node-id]')].some((li) => li.querySelector('.cl-tree-name').textContent.trim() === n && li.querySelector('input[value="half"]').checked), name);
+        }
+        assert.equal(loads, 0, 'The width is saved without loading the page again');
+        const sketch = await page.locator('.cl-landing-sketch .cl-page-sketch > [data-width="half"]').allTextContents();
+        assert.deepEqual(sketch.map(clean), pair, 'The sketch draws the two halves');
+        await go(page, PUBLIC);
+        const cards = await page.evaluate(() => {
+            const grid = document.querySelector('.cl-landing-sections > .cl-ui-section-grid');
+            return grid ? [...grid.children].map((section) => { const r = section.querySelector('.cl-ui-surface').getBoundingClientRect(); return {left: r.left, top: r.top, height: r.height}; }) : [];
+        });
+        assert.equal(cards.length, 2, 'The two sections share one row');
+        assert.ok(cards[1].left > cards[0].left && Math.abs(cards[0].top - cards[1].top) <= 1 && Math.abs(cards[0].height - cards[1].height) <= 1, 'side by side at one height');
+        await ctx.close();
+
+        const plain = await open(chromium, state.tokens.admin, {js: false});
+        await go(plain.page, EDITOR);
+        for (const width of ['full', 'half']) {
+            await rowOf(plain.page, pair[1]).locator(`label:has(input[value="${width}"])`).click();
+            await submit(plain.page, rowOf(plain.page, pair[1]).getByRole('button', {name: `Set the width of ${pair[1]}`}), `set ${width} without JavaScript`);
+            await flash(plain.page, width === 'half' ? 'half width' : 'full width');
+            assert.ok(await rowOf(plain.page, pair[1]).locator(`input[value="${width}"]`).isChecked());
+        }
+        await plain.ctx.close();
+    });
+
     await scenario('the page, the editor and a section form fit every theme at desktop and phone widths', 'chromium', async () => {
         const {ctx, page} = await open(chromium, state.tokens.admin);
         await go(page, EDITOR);
@@ -308,6 +351,13 @@ async function editSection(page, label) {
                         assert.ok(hero.edges <= 2, `${theme} ${width}: the hero is as wide as the cards (${Math.round(hero.edges)}px off)`);
                         assert.ok(hero.gap <= 6, `${theme} ${width}: the cover fills the hero (${Math.round(hero.gap)}px of the head show)`);
                         assert.equal(hero.buttons, 0, `${theme} ${width}: no buy box in the hero`);
+                        // Two half sections: side by side at one height, or one above the other on a phone.
+                        const halves = await page.evaluate(() => [...(document.querySelector('.cl-landing-sections > .cl-ui-section-grid')?.children || [])].map((section) => {
+                            const r = section.querySelector('.cl-ui-surface').getBoundingClientRect(); return {left: r.left, top: r.top, bottom: r.bottom, height: r.height};
+                        }));
+                        assert.equal(halves.length, 2, `${theme} ${width}: the two half sections share a row`);
+                        assert.ok(width < 768 ? halves[1].top >= halves[0].bottom : (halves[1].left > halves[0].left && Math.abs(halves[0].top - halves[1].top) <= 1 && Math.abs(halves[0].height - halves[1].height) <= 1),
+                            `${theme} ${width}: the half sections are ${width < 768 ? 'one above the other' : 'side by side at one height'}`);
                     }
                     await page.screenshot({path: `${output}/${theme}-${width}-${name}.png`, fullPage: name === 'public'});
                 }

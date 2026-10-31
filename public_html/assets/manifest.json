@@ -1,6 +1,6 @@
 {
     "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-R6gfGoq.js",
-    "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
+    "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-OHfh7x6.js",
     "app.js": "\/assets\/app-we5Kv_X.js",
     "controllers\/catalogue_export_controller.js": "\/assets\/controllers\/catalogue_export_controller-93SjUjn.js",
     "controllers\/category_tree_controller.js": "\/assets\/controllers\/category_tree_controller-wWZLLo_.js",
@@ -15,7 +15,7 @@
     "controllers\/slide_editor_controller.js": "\/assets\/controllers\/slide_editor_controller-j7X-g74.js",
     "controllers\/slide_strip_controller.js": "\/assets\/controllers\/slide_strip_controller-lnFvWAP.js",
     "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-dxBxbzy.js",
-    "controllers\/unsaved_changes_controller.js": "\/assets\/controllers\/unsaved_changes_controller-m7vRlr1.js",
+    "controllers\/unsaved_changes_controller.js": "\/assets\/controllers\/unsaved_changes_controller-EeDIfI_.js",
     "lib\/sortable_tree_controller.js": "\/assets\/lib\/sortable_tree_controller-_P-gJwF.js",
     "vendor\/@hotwired\/stimulus\/stimulus.index.js": "\/assets\/vendor\/@hotwired\/stimulus\/stimulus.index-ryewcoo.js",
     "vendor\/TagCloud\/TagCloud.index.js": "\/assets\/vendor\/TagCloud\/TagCloud.index-r_BOY6F.js"

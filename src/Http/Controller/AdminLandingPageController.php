@@ -223,6 +223,22 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
+    /**
+     * A section's width, half or full (owner, 2026-10-31). The list's form posts with htmx and gets the saved list back, the
+     * sketch with it; without JavaScript the form's own button posts it and the page comes back.
+     */
+    #[Route('/admin/courses/{id}/landing/sections/{section}/width', name: 'admin_course_landing_section_width', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    public function width(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $course = $this->managedCourse($user);
+        $sectionId = (int) $this->param('section');
+        $width = $this->posted('width');
+        return $this->moved($user, $course, $sectionId, fn () => $this->landing->setSectionWidth((int) $course['id'], $sectionId, $width, $user->id),
+            $width === 'half' ? 'The section is half width: beside another half section, the two share a row.' : 'The section is full width.');
+    }
+
     /** The ⋯ menu without JavaScript: top, up, down or bottom. */
     #[Route('/admin/courses/{id}/landing/sections/{section}/move', name: 'admin_course_landing_section_move', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
     public function move(): Response
@@ -258,17 +274,17 @@ final class AdminLandingPageController extends BaseController
     }
 
     /**
-     * Runs one move. The list's script asks with HX-Request and gets the saved list back, or the
+     * Runs one move or width change. The list's script asks with HX-Request and gets the saved list back, or the
      * stored one and a 422 with the reason; a plain form post redirects.
      *
      * @param array<string,mixed> $course
      */
-    private function moved(CurrentUser $user, array $course, int $sectionId, callable $move): Response
+    private function moved(CurrentUser $user, array $course, int $sectionId, callable $move, string $done = 'The section was moved.'): Response
     {
         if (!$this->isHtmxRequest()) {
-            return $this->handle(function () use ($move, $course, $sectionId): void {
+            return $this->handle(function () use ($move, $course, $sectionId, $done): void {
                 $move();
-                $this->flash('success', 'The section was moved.');
+                $this->flash('success', $done);
                 $this->redirect(self::home($course) . '#landing-section-' . $sectionId);
             }, self::home($course) . '#landing-sections');
         }
@@ -305,7 +321,7 @@ final class AdminLandingPageController extends BaseController
         $others = array_values(array_filter($page['sections'], static fn(array $s): bool => $s['type'] !== LandingSectionType::Hero));
         $present = [];
         foreach ($page['sections'] as $section) {
-            $present[$section['type']->value] = true;
+            $present[$section['type']->value] = ($present[$section['type']->value] ?? 0) + 1;
             $index = array_search($section, $others, true);
             $rows[] = [
                 'id' => (int) $section['id'],
@@ -315,13 +331,18 @@ final class AdminLandingPageController extends BaseController
                 'enabled' => $section['enabled'],
                 'needs_content' => $section['invalid'] !== '' || $section['type']->missing($section['data']) !== [],
                 'is_hero' => $section['type'] === LandingSectionType::Hero,
+                // Half or full width on the page (owner, 2026-10-31); the hero is always full.
+                'width' => $section['type'] === LandingSectionType::Hero || (string) ($section['width'] ?? 'full') !== 'half' ? 'full' : 'half',
                 'is_first' => $index === 0,
                 'is_last' => $index === count($others) - 1,
             ];
         }
         $options = [];
         foreach (LandingSectionType::cases() as $type) {
-            $options[] = ['value' => $type->value, 'label' => $type->label(), 'description' => $type->description(), 'taken' => $type->once() && isset($present[$type->value])];
+            // A kind a page holds once is taken when it is there; one that may repeat says it is there and can be added again
+            // (owner, 2026-10-31: some sections on the page were not marked).
+            $options[] = ['value' => $type->value, 'label' => $type->label(), 'description' => $type->description(), 'taken' => $type->once() && isset($present[$type->value]),
+                'on_page' => !$type->once() && isset($present[$type->value])];
         }
         $values = $extra['settings_values'] ?? ['slug' => $page['slug'], 'meta_title' => $page['meta_title'] ?? '', 'meta_description' => $page['meta_description'] ?? ''];
         unset($extra['settings_values']);
@@ -338,6 +359,8 @@ final class AdminLandingPageController extends BaseController
                 'rows' => array_values(array_filter($rows, static fn(array $row): bool => !$row['is_hero'])),
                 'hero' => array_values(array_filter($rows, static fn(array $row): bool => $row['is_hero']))[0] ?? null,
                 'order' => array_map(static fn(array $s): int => (int) $s['id'], $others),
+                // The page as visitors see it, small: the shown sections after the hero in their rows.
+                'sketch' => \CattoLearning\Support\HalfRows::rows(array_values(array_filter($rows, static fn(array $row): bool => !$row['is_hero'] && $row['enabled']))),
                 'add_options' => $options,
             ],
             'settings_values' => ['slug' => (string) ($values['slug'] ?? ''), 'meta_title' => (string) ($values['meta_title'] ?? ''), 'meta_description' => (string) ($values['meta_description'] ?? '')],

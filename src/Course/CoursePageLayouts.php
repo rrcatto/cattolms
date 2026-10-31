@@ -68,7 +68,7 @@ final class CoursePageLayouts
         $layout = $layout === null ? null : CoursePageLayout::normalise($layout);
         $this->courses->setPageLayout($courseId, $layout);
         $this->courses->recordHistory($courseId, $userId, 'course.page_layout_saved', 'course', $courseId,
-            $layout === null ? 'The course page follows the site\'s default layout.' : 'The course page has a layout of its own.', ['layout' => $layout]);
+            $layout === null ? 'The course page uses the default layout.' : 'The course page has a custom layout.', ['layout' => $layout]);
     }
 
     /**

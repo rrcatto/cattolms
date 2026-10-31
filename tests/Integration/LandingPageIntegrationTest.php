@@ -28,6 +28,7 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\Landing\LandingPageService;
+use CattoLearning\Course\Landing\LandingSectionType;
 use CattoLearning\Course\ResourceLibraryService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -514,6 +515,47 @@ final class LandingPageIntegrationTest extends TestCase
     }
 
     /** Fills the sections a new page leaves empty, so the page can be published. */
+    /**
+     * Half or full width (owner, 2026-10-31): a section's width is saved under the page's lock and recorded, the hero is
+     * always full, two half sections one after the other share a row on the page, a script's change answers with the list
+     * and its sketch, and the Add section list marks a kind that may repeat when one is on the page.
+     */
+    public function testASectionIsHalfOrFullWidthAndTwoHalvesShareARow(): void
+    {
+        $this->landing->create($this->course, $this->owner);
+        $this->complete();
+        [$hero, $audience, $outcomes] = [$this->sectionOfType('hero'), $this->sectionOfType('audience'), $this->sectionOfType('outcomes')];
+        self::assertSame('full', $this->section($audience)['width'], 'A section starts full width.');
+        $this->landing->setSectionWidth($this->course, $audience, 'half', $this->owner);
+        self::assertSame('half', $this->section($audience)['width']);
+        $this->refused(fn() => $this->landing->setSectionWidth($this->course, $hero, 'half', $this->owner), 'always the full width');
+        $this->refused(fn() => $this->landing->setSectionWidth($this->course, $audience, 'wide', $this->owner), 'half or full');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_edit_history WHERE course_id=:c AND event_key='landing_page.section_width'", ['c' => $this->course]));
+
+        $this->signIn($this->owner);
+        $response = $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $outcomes . '/width', ['width' => 'half'], true);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('id="landing-section-list"', (string) $response->getContent(), 'A script\'s change answers with the saved list.');
+        self::assertStringContainsString('cl-landing-sketch', (string) $response->getContent(), 'And its sketch.');
+        self::assertSame('half', $this->section($outcomes)['width']);
+
+        $page = $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        $grid = strpos($page, 'class="cl-ui-section-grid" data-columns="2"');
+        $first = strpos($page, 'cl-landing-section--audience');
+        $second = strpos($page, 'cl-landing-section--outcomes');
+        $next = strpos($page, 'cl-landing-section--contents');
+        // The row holds the two of them alone: no second row starts before Course contents.
+        self::assertTrue($grid !== false && $first > $grid && $second > $first && $next > $second && strpos(substr($page, $grid + 30, $next - $grid - 30), 'cl-ui-section-grid') === false, 'Who it is for and what they learn share one row.');
+
+        $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $outcomes . '/width', ['width' => 'full']);
+        self::assertSame('full', $this->section($outcomes)['width'], 'Without JavaScript the form saves the width.');
+
+        $editor = $this->html('/admin/courses/' . $this->course . '/landing');
+        self::assertStringContainsString(LandingSectionType::Benefits->label() . ' (on the page, you can add another)', $editor, 'A kind that may repeat says it is on the page.');
+        self::assertStringContainsString(LandingSectionType::Audience->label() . ' (already on the page)', $editor);
+        $this->refusedSql(fn() => $this->db->executeStatement("UPDATE course_landing_sections SET width = 'half' WHERE id = :id", ['id' => $hero]), 'course_landing_sections_hero_full');
+    }
+
     private function complete(): void
     {
         $page = $this->landing->page($this->course);

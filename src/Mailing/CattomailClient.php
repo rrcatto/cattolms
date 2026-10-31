@@ -156,20 +156,21 @@ class CattomailClient
                 $response = $this->http->request($method, $this->base() . $path, $options);
                 $status = $response->getStatusCode();
                 $content = $response->getContent(false);
-                $data = $content === '' ? [] : (json_decode($content, true) ?? []);
-                if ($status < 300) return is_array($data) ? $data : [];
-                $type = is_array($data) ? (string) ($data['type'] ?? '') : '';
+                $decoded = $content === '' ? [] : json_decode($content, true);
+                $data = is_array($decoded) ? $decoded : [];
+                if ($status < 300) return $data;
+                $type = (string) ($data['type'] ?? '');
                 $slug = $type === '' ? '' : (string) substr($type, (int) strrpos($type, '/') + (str_contains($type, '/') ? 1 : 0));
-                $words = is_array($data) ? trim((string) ($data['detail'] ?? $data['title'] ?? '')) : '';
+                $words = trim((string) ($data['detail'] ?? $data['title'] ?? ''));
                 $last = 'catto-mail answered ' . $status . ($words !== '' ? ': ' . $words : '');
                 // A quota used up does not come back by asking again: it waits until catto-mail says it resets.
                 if ($status === 429 && $slug === 'quota-exceeded') {
-                    $resets = is_array($data) ? (string) ($data['quota']['resets_at'] ?? '') : '';
+                    $resets = (string) ($data['quota']['resets_at'] ?? '');
                     throw new CattomailQuotaExceeded($last, $resets !== '' && strtotime($resets) !== false ? new \DateTimeImmutable($resets) : null);
                 }
                 $busy = in_array($status, [408, 425, 429], true) || $status >= 500 || ($status === 409 && $slug === 'idempotency-in-progress');
                 if (!$busy) {
-                    foreach ((array) (is_array($data) ? ($data['errors'] ?? []) : []) as $error) if (is_array($error)) $last .= ' ' . trim((string) ($error['pointer'] ?? '') . ' ' . (string) ($error['message'] ?? ''));
+                    foreach ((array) ($data['errors'] ?? []) as $error) if (is_array($error)) $last .= ' ' . trim((string) ($error['pointer'] ?? '') . ' ' . (string) ($error['message'] ?? ''));
                     throw new MailingTransportRefused($last);
                 }
                 $wait = (int) ($response->getHeaders(false)['retry-after'][0] ?? 0);

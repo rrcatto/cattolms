@@ -2,7 +2,7 @@
 	The Page Builder for course pages (owner, 2026-10-30, from the accepted mockup): the blocks
 	under a course page's header, each dragged or moved with its arrows, half or full width, hidden or shown, with three
 	templates to start from and a sketch of the page as visitors see it. The course's Page layout tab (plb_scope
-	'course': the site's default or a layout of its own) and Settings > Course pages (plb_scope 'site') share it.
+	'course': the default layout or a custom layout; owner 2026-10-31: "Default layout" and "Custom layout") and Settings > Course pages (plb_scope 'site') share it.
 
 	Without JavaScript every button sends the whole form and the server acts on it and saves (a template, a move, a block
 	hidden or shown, Reset; CoursePageLayouts::fromForm). With JavaScript (page_layout_controller.js) the same buttons
@@ -21,18 +21,31 @@
 	<input type="hidden" name="csrf" value="{{ csrf }}">
 	<input type="hidden" name="order" value="{{ plb.order }}" data-page-layout-target="order">
 
-	<p class="cl-page-builder-status" role="status" data-unsaved-changes-target="status" data-saved="Saved. No changes yet." data-changed="Changes not saved yet. Save layout, at the foot, keeps them.">Saved. No changes yet.</p>
+	{#
+		Saving beside the choice (owner, 2026-10-31, option B: "it was not immediately clear ... whether the mere selection
+		changes the selection or whether I actually need to also click the Save layout button"): choosing changes nothing until
+		Save layout, so the notice says so as soon as anything changes, with the button beside it. The foot keeps the form's
+		action row as every form has.
+	#}
+	{% set save_bar %}
+		<div class="cl-page-builder-savebar">
+			<p class="cl-page-builder-status" role="status" data-unsaved-changes-target="status" data-saved="Saved. Choosing changes nothing until you press Save layout." data-changed="Not saved yet. Press Save layout to keep this change.">Saved. Choosing changes nothing until you press Save layout.</p>
+			{{ ui('action.button', {label: 'Save layout', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}
+		</div>
+	{% endset %}
 
+	{% if not plb_course %}{{ save_bar }}{% endif %}
 	{% if plb_course %}
 	<div class="cl-page-builder-part">
 		{{ ui('form.picture-choice', {name: 'source', legend: 'Which layout this course uses', id: 'page-layout-source', size: 'small', selected: plb_own ? 'own' : 'default', items: [
-			{value: 'default', label: 'The site\'s default layout',
+			{value: 'default', label: 'Default layout',
 				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
 				note: 'Set at Settings, Course pages. A change there changes this page too.'},
-			{value: 'own', label: 'A layout of its own',
+			{value: 'own', label: 'Custom layout',
 				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/></svg>',
-				note: 'Arranged below for this course only. Reset puts the site\'s default back.'},
+				note: 'Arranged below for this course only. Reset puts the default layout back.'},
 		]}) }}
+		{{ save_bar }}
 	</div>
 	{% endif %}
 
@@ -83,7 +96,7 @@
 						</span>
 					</div>
 					<div class="cl-page-builder-tile-tools">
-						<fieldset class="cl-page-builder-width"><legend class="cl-visually-hidden">Width of {{ block.name }}</legend>
+						<fieldset class="cl-width-switch"><legend class="cl-visually-hidden">Width of {{ block.name }}</legend>
 							<label><input type="radio" name="width[{{ block.id }}]" value="half"{% if block.width == 'half' %} checked{% endif %}><span>Half</span></label>
 							<label><input type="radio" name="width[{{ block.id }}]" value="full"{% if block.width == 'full' %} checked{% endif %}><span>Full width</span></label>
 						</fieldset>
@@ -100,15 +113,15 @@
 			{% if place == 'shelf' %}</div>{% endif %}
 			{% endfor %}
 			<div class="cl-page-builder-reset">
-				{{ ui('action.button', {label: plb_course ? 'Reset to the site\'s default' : 'Back to Course first', variant: 'quiet', size: 'normal', name: 'action', value: 'reset', icon: 'action-reset', stimulus_action: 'page-layout#reset'}) }}
+				{{ ui('action.button', {label: plb_course ? 'Reset to the default layout' : 'Back to Course first', variant: 'quiet', size: 'normal', name: 'action', value: 'reset', icon: 'action-reset', stimulus_action: 'page-layout#reset'}) }}
 			</div>
 		</div>
 
 		<aside class="cl-page-builder-part cl-page-builder-preview" aria-labelledby="page-layout-sketch">
 			<h3 class="h5" id="page-layout-sketch">The page, as visitors see it</h3>
-			<div class="cl-page-builder-sketch" aria-hidden="true" data-page-layout-target="sketch">
-				<span class="cl-page-builder-sketch-fixed">Cover, title and star</span>
-				<span class="cl-page-builder-sketch-fixed">Watch course presentation</span>
+			<div class="cl-page-sketch" aria-hidden="true" data-page-layout-target="sketch">
+				<span class="cl-page-sketch-fixed">Cover, title and star</span>
+				<span class="cl-page-sketch-fixed">Watch course presentation</span>
 				{% for block in plb.blocks %}<span data-block="{{ block.id }}" data-width="{{ block.width }}"{% if not block.shown %} hidden{% endif %}>{{ block.name }}</span>{% endfor %}
 			</div>
 			<p>On a phone every block takes the full width, in the same order. A block with nothing to show (Reviews before the first review, Ready to start without a free preview) stays out on its own.</p>

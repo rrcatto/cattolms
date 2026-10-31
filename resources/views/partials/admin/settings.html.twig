@@ -375,11 +375,11 @@
 
 {% endblock %}
 {% endembed %}
-    {# The default layout of every course page (Page Builder, owner 2026-10-30): a course without a layout of its own uses it. #}
+    {# The default layout of every course page (Page Builder, owner 2026-10-30): a course without a custom layout uses it. #}
     {% if course_page_layout|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Course pages', summary: 'The default layout of every course page: ' ~ (course_page_layout.template ? {course: 'Course first', buy: 'Buy first', reviews: 'Reviews first'}[course_page_layout.template] : 'arranged by hand') ~ '.', id: 'settings-course-pages', open: settings_open_section|default('') == 'course-pages'})} %}
 {% block body %}
-		<p>Every course without a layout of its own uses this one. A course is given its own on its Page layout tab.</p>
+		<p>Every course without a custom layout uses this one. A course is given a custom layout on its Page layout tab.</p>
 		{% if can_manage_settings|default(false) %}
 		{% include '@platform/partials/admin/page-layout-builder.html.twig' with {plb: course_page_layout.builder, plb_scope: 'site', plb_action: '/admin/settings/course-pages', plb_own: true, plb_default_json: ''} %}
 		{% else %}

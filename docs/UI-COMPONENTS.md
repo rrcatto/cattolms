@@ -128,7 +128,7 @@ Supported uses added in v0.8.8.x, each through the existing component rather tha
 
 Every button and button-styled link carries an icon before its label that says what it does (owner, 2026-10-21: "add an svg icon to the left of the Button title", table rows included). Every `ui('action.button')` and `ui('action.link')` call names its `icon`, every Actions menu (`action.row` with `menu` or `narrow_menu`) names its trigger's, and every section registry action (`actions()`) names one; `ActionIconContractTest` fails a call without one. `action.button`'s tick or arrow when no icon is named is only a safety net. The only button without an icon is a pagination page number, which is its own label. A label never repeats its icon (UX rule 3.3), so the reader's paging reads Previous and Next, not "← Previous" and "Next →". The reader's Download link, drawn by `CourseItemRenderer`, carries `action-download` the same way.
 
-One meaning has one symbol everywhere. The symbols are in `public_html/img/nav-icons.svg`, drawn from Lucide 1.52.0 (ISC, `resources/icons/lucide.json`); add a symbol there, named by its meaning, only for a meaning not listed here.
+One meaning has one symbol everywhere. The symbols are in `public_html/img/nav-icons.svg`, drawn from Lucide (ISC, `resources/icons/lucide.json`, 1.65.0 since 2026-10-31); add a symbol there, named by its meaning, only for a meaning not listed here.
 
 | Meaning (examples) | Symbol |
 | --- | --- |

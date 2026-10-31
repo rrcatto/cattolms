@@ -19,11 +19,15 @@ a row. Static rules, not a service.
 Changelog:
 2026/10/30 SAST
 - Created.
+2026/10/31 SAST
+- Rows by Support\HalfRows, which a landing page's sections share.
 */
 
 declare(strict_types=1);
 
 namespace CattoLearning\Course;
+
+use CattoLearning\Support\HalfRows;
 
 final class CoursePageLayout
 {
@@ -140,20 +144,8 @@ final class CoursePageLayout
      */
     public static function rows(array $layout, array $present): array
     {
-        $rows = [];
-        $open = null;
-        foreach ($layout as $block) {
-            if (!$block['shown'] || !in_array($block['id'], $present, true)) { continue; }
-            $cell = ['id' => $block['id'], 'width' => $block['width']];
-            if ($block['width'] === 'half' && $open !== null) {
-                $rows[$open][] = $cell;
-                $open = null;
-                continue;
-            }
-            $rows[] = [$cell];
-            $open = $block['width'] === 'half' ? count($rows) - 1 : null;
-        }
-        return $rows;
+        $drawn = array_values(array_filter($layout, static fn(array $block): bool => $block['shown'] && in_array($block['id'], $present, true)));
+        return HalfRows::rows(array_map(static fn(array $block): array => ['id' => $block['id'], 'width' => $block['width']], $drawn));
     }
 
     /** @param list<array{id:string,width:string,shown:bool}> $layout */

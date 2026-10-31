@@ -64,7 +64,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '1.0.2', 'composer.json version must be 1.0.2.');
+$need(($composer['version'] ?? '') === '1.0.3', 'composer.json version must be 1.0.3.');
 // PHP 8.5.12 or later (owner, 2026-10-22): 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution.
 $need(($composer['require']['php'] ?? '') === '>=8.5.12 <9.0', 'PHP runtime target must be >=8.5.12 <9.0.');
 $need(($composer['config']['platform']['php'] ?? '') === '8.5.12', 'Composer must resolve packages for PHP 8.5.12 (config.platform.php).');
@@ -191,7 +191,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '1.0.2'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '1.0.3'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

@@ -62,7 +62,7 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/rrcatto/cattolms/main/deploy/podman/cattolms-podman.sh
-bash cattolms-podman.sh install --version 1.0.2 --port 8081
+bash cattolms-podman.sh install --version 1.0.3 --port 8081
 ```
 
 It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600; `APP_ENV` keeps the site's existing value, `development` for a new site, and only the site's owner changes it to production), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes, copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
@@ -74,7 +74,7 @@ Then sign in at the site with the administrator's email address and open Adminis
 Before an update, fetch the script again (the `curl` line above), so the update runs the new release's kit, not the one you installed with.
 
 ```sh
-bash cattolms-podman.sh update --version 1.0.2    # the next release: code, packages, tables, themes, restart
+bash cattolms-podman.sh update --version 1.0.3    # the next release: code, packages, tables, themes, restart
 bash cattolms-podman.sh status                     # the service and the pod
 bash cattolms-podman.sh logs web|php|scheduler     # a container's log
 bash cattolms-podman.sh console about              # php bin/console in the running pod

@@ -282,7 +282,7 @@ final class CourseCatalogueSettings
     /** @param list<array{id:string,width:string,shown:bool}>|null $layout */
     private static function pageLayoutWords(?array $layout): string
     {
-        return 'Page layout: ' . ($layout === null ? 'the site\'s default' : 'its own');
+        return 'Page layout: ' . ($layout === null ? 'default' : 'custom');
     }
 
     private static function cover(mixed $svg, string $slug): ?string

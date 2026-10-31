@@ -16,7 +16,10 @@ final class CartService
 {
     public function __construct(private readonly AuthService $auth, private readonly OrderService $orders, private readonly CommerceRepository $records, private readonly PromotionService $promotions) {}
 
-    /** @return array<string,mixed> */
+    /**
+     * @return array<string,mixed>
+     * @phpstan-impure the cart changes as things are added and as a guest's cart joins the signed-in one
+     */
     public function summary(): array
     {
         $actor = $this->auth->currentUser();

@@ -10,7 +10,7 @@ Version: 0.9.6
 Description:
 The icon library published with the code (owner, 2026-10-20: "this codebase is for the public to use and I cannot
 expect someone else to have to use Claude code to create icons every time they add a category ... an icon library
-is the best option here"): Lucide 1.52.0 (ISC licence, resources/icons/LICENSE-lucide.txt), about 2,100 line icons
+is the best option here"): Lucide 1.65.0 (ISC licence, resources/icons/LICENSE-lucide.txt), about 2,300 line icons
 with their keywords, in resources/icons/lucide.json.
 
 - svg() draws an icon in the theme's colour (currentColor), at the size each place that shows it gives it.

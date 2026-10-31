@@ -99,6 +99,8 @@ final class LandingPageViewBuilder
                 'id' => $section['id'],
                 'type' => $type->value,
                 'anchor' => $anchor,
+                // Half or full width (owner, 2026-10-31); the page puts two halves side by side in one row.
+                'width' => (string) ($section['width'] ?? 'full') === 'half' ? 'half' : 'full',
             ];
             if ($resolved['omit'] ?? false) {
                 unset($anchors[$type->value]);
@@ -136,6 +138,7 @@ final class LandingPageViewBuilder
             'landing_page_id' => (int) $page['id'],
             'hero' => $hero,
             'sections' => $sections,
+            'rows' => \CattoLearning\Support\HalfRows::rows($sections),
             'purchase' => $purchase,
             'meta' => [
                 'title' => $title,

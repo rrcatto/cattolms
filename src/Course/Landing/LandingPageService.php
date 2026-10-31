@@ -245,6 +245,31 @@ final class LandingPageService
         });
     }
 
+    /**
+     * A section's width on the page, half or full (owner, 2026-10-31: "the ability to choose between half and full width
+     * for each section"). Two half sections one after the other share a row; the hero is always full width.
+     */
+    public function setSectionWidth(int $courseId, int $sectionId, string $width, int $userId): void
+    {
+        if (!in_array($width, ['half', 'full'], true)) {
+            throw new InvalidArgumentException('Choose half or full width.');
+        }
+        $this->transactions->run(function () use ($courseId, $sectionId, $width, $userId): void {
+            $page = $this->locked($courseId);
+            $section = $this->section($page, $sectionId);
+            if ($section['section_type'] === 'hero') {
+                throw new InvalidArgumentException('The hero is always the full width of the page.');
+            }
+            if ((string) $section['width'] === $width) {
+                return;
+            }
+            $this->pages->setWidth($sectionId, $width);
+            $this->pages->touch((int) $page['id'], $userId);
+            $label = LandingSectionType::from((string) $section['section_type'])->label();
+            $this->record($courseId, $userId, 'landing_page.section_width', $sectionId, 'Landing page section ' . ($width === 'half' ? 'made half width' : 'made full width') . ': ' . $label . '.', ['landing_page_id' => (int) $page['id'], 'section_id' => $sectionId, 'section_type' => (string) $section['section_type'], 'width' => $width]);
+        });
+    }
+
     public function removeSection(int $courseId, int $sectionId, int $userId): void
     {
         $this->transactions->run(function () use ($courseId, $sectionId, $userId): void {
