@@ -11,6 +11,10 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/11/01 SAST
+- A course is written as one HTML file (owner, 2026-11-01: one specification document, docs/COURSE-SPECIFICATION.md):
+  the zip course package 3.0 is no longer read; an HTML course's presentations and flash cards become parts beneath its
+  lessons for the arrangement into modules, and its cover is set. A refused upload is not kept.
 2026/10/30 SAST
 - A course package carries each Course Item's name, and an import keeps it (the first free number after it when the
   name is taken); only items that come without one are named after their places.
@@ -71,7 +75,8 @@ final class CoursePortabilityService
         private readonly string $bundledImportRoot,
         // A Presentation's narration travels with it (CatWalk, owner 2026-10-28): its list in the course file, its clips in a catalogue package.
         private readonly ?Catwalk\NarrationRepository $narrationRecords = null,
-        private readonly ?CourseRestructurer $restructurer = null
+        private readonly ?CourseRestructurer $restructurer = null,
+        private readonly ?CataloguePositions $positions = null
     ) {
     }
 
@@ -84,18 +89,17 @@ final class CoursePortabilityService
         $this->refuseSeedImporter($userId);
         $error = (int) ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error !== UPLOAD_ERR_OK) {
-            throw new InvalidArgumentException('Select a course: a course package (.zip), or an HTML or JSON course file.');
+            throw new InvalidArgumentException('Select a course file: a course written as one HTML file, or a course JSON file.');
         }
         $size = (int) ($uploadedFile['size'] ?? 0);
         if ($size < 1 || $size > 100 * 1024 * 1024) {
             throw new InvalidArgumentException('The course file must be between 1 byte and 100 MB.');
         }
         $name = basename((string) ($uploadedFile['name'] ?? 'course.html'));
-        if (!preg_match('/\.(?:html?|json|zip)$/i', $name)) {
-            throw new InvalidArgumentException('Import a course package (.zip), or an HTML or JSON course file.');
+        if (!preg_match('/\.(?:html?|json)$/i', $name)) {
+            throw new InvalidArgumentException('Import a course written as one HTML file, or a course JSON file.');
         }
-        // A course package 3.0 (owner, 2026-10-28, decision 5A): a zip of course.json and a folder per module.
-        $extension = preg_match('/\.zip$/i', $name) === 1 ? 'zip' : (preg_match('/\.json$/i', $name) === 1 ? 'json' : 'html');
+        $extension = preg_match('/\.json$/i', $name) === 1 ? 'json' : 'html';
         $temporary = (string) ($uploadedFile['tmp_name'] ?? '');
         if (!is_uploaded_file($temporary) && !is_file($temporary)) {
             throw new InvalidArgumentException('The uploaded course file is unavailable.');
@@ -115,7 +119,14 @@ final class CoursePortabilityService
             'staged_at' => date(DATE_ATOM),
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), LOCK_EX);
 
-        $analysis = $this->analysePath($path, $name, $extension);
+        try {
+            $analysis = $this->analysePath($path, $name, $extension);
+        } catch (\Throwable $refused) {
+            // A file refused has nothing to review: it is not kept (2026-11-01: every refused upload stayed for good).
+            @unlink($path);
+            @unlink($directory . '/' . $key . '.meta.json');
+            throw $refused;
+        }
         $analysis['import_key'] = $key;
         return $analysis;
     }
@@ -169,7 +180,8 @@ final class CoursePortabilityService
     /**
      * Imports a staged course file. $code is the course code the review gives it (owner, 2026-10-23); empty takes the
      * file's own, else one suggested from the title. A 2.1 package's catalogue settings follow (its tags, cover,
-     * position and related courses, and its prices for a new course only); the course stays a draft.
+     * position and related courses, and its prices for a new course only), and an HTML course's cover; the course stays a
+     * draft.
      */
     public function commitImport(string $key, int $categoryId, int $userId, ?int $replaceCourseId = null, string $code = ''): int
     {
@@ -190,6 +202,8 @@ final class CoursePortabilityService
             $this->catalogue->apply($courseId, $settings, $userId, $replaceCourseId === null);
             $this->catalogue->relate($courseId, $settings);
         }
+        // A course arriving with no position takes the next free number in its code's range (owner, 2026-11-01).
+        $this->positions?->fill($courseId, $userId);
         [$path] = $this->staged($key);
         @unlink($path);
         @unlink($this->storageRoot . '/imports/' . $key . '.meta.json');
@@ -619,14 +633,6 @@ final class CoursePortabilityService
     /** @return array<string,mixed> */
     private function analysePath(string $path, string $name, string $extension): array
     {
-        if ($extension === 'zip') {
-            // Read and checked as the course specification says, then imported as every course package is.
-            $read = Package\CoursePackage::read($path);
-            $analysis = $this->courseComponentAnalysis($this->jsonImporter->analyse($read['package'], $name));
-            $analysis['warnings'] = array_values(array_merge((array) ($analysis['warnings'] ?? []), $read['warnings']));
-            $analysis['package_version'] = '3.0';
-            return $analysis;
-        }
         $analysis = $extension === 'json'
             ? $this->jsonImporter->analyseFile($path, $name)
             : $this->htmlImporter->analyseFile($path, $name);
@@ -701,6 +707,11 @@ final class CoursePortabilityService
             if (!is_array($module)) { continue; }
             $moduleKey = $key((string) ($module['module_key'] ?? 'content-' . ($index + 1))); $moduleKeys[(string) ($module['module_key'] ?? 'content-' . ($index + 1))] = $moduleKey; $summary = trim((string) ($module['summary_html'] ?? '')); $content = (string) ($module['content_html'] ?? '') . ($summary === '' ? '' : '<section><h2>Summary</h2>' . $summary . '</section>'); $isReview = !empty($module['is_review']);
             $items[] = ['item_key' => $moduleKey, 'item_type' => 'html_lesson', 'title' => $isReview ? 'Review Study Aid' : (string) ($module['title'] ?? 'Course content'), 'description_html' => (string) ($module['subtitle'] ?? ''), 'content_source' => $content, 'type_config' => $isReview ? ['presentation_role' => 'review_study_aid'] : [], 'resource_id' => null]; $structure[] = ['node_key' => $moduleKey, 'item_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+            // The module's presentation and flash cards (owner, 2026-11-01), beneath its lesson like its assessment, for the
+            // arrangement into a module section to put in their places.
+            $source = (string) ($module['module_key'] ?? 'content-' . ($index + 1));
+            if (is_array($module['presentation'] ?? null)) { $deckKey = $key($source . '-presentation'); $items[] = ['item_key' => $deckKey, 'item_type' => 'slide_deck', 'title' => (string) $module['presentation']['title'], 'description_html' => '', 'content_source' => '', 'type_config' => (array) $module['presentation']['type_config'], 'estimated_minutes' => $module['presentation']['minutes'] ?? null, 'resource_id' => null]; $structure[] = ['item_key' => $deckKey, 'parent_node_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
+            if (is_array($module['flashcards'] ?? null) && $module['flashcards'] !== []) { $cardsKey = $key($source . '-flashcards'); $items[] = ['item_key' => $cardsKey, 'item_type' => 'flashcards', 'title' => 'Flash cards', 'description_html' => '', 'content_source' => '', 'type_config' => ['cards' => $module['flashcards']], 'resource_id' => null]; $structure[] = ['item_key' => $cardsKey, 'parent_node_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
             if (is_array($module['assessment'] ?? null)) { $assessmentKey = $key((string) ($module['module_key'] ?? 'assessment-' . ($index + 1)) . '-assessment'); $items[] = $this->importAssessmentItem((array) $module['assessment'], $assessmentKey, 'assessment'); $structure[] = ['item_key' => $assessmentKey, 'parent_node_key' => $moduleKey, 'assessment_role' => !empty($module['assessment_required']) ? 'graded' : 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
         }
         if (is_array($analysis['final_assessment'] ?? null)) { $finalKey = $key('final-assessment'); $items[] = $this->importAssessmentItem((array) $analysis['final_assessment'], $finalKey, 'assessment'); $structure[] = ['item_key' => $finalKey, 'assessment_role' => 'final', 'public_preview' => false, 'relative_delay_minutes' => 0]; }

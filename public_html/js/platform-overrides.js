@@ -23,36 +23,57 @@
     outlive the tab. Every access is wrapped, because a browser set to refuse site data throws on
     the property itself rather than returning nothing.
   */
-  const NAV_SCROLL_KEY = 'catto-learning:nav-scroll';
-  const navScroller = () => document.querySelector('.cl-sidebar, .cl-navigation, [data-theme-nav]');
+  /*
+    The course reader's Course Modules list keeps its place the same way (owner, 2026-11-01: "When I click in the
+    Course Modules sidebar, while previewing a course, the sidebar resets to the top and I must scroll back down").
+    Since every module lists its parts (v1.0.1) the list is long enough to scroll, and each part is its own page.
+    Its place is kept per course (a key for each /learn/<course> or /courses/<course>), and the part being read is
+    brought into view when it would be off the list (arriving by Next, or from elsewhere).
+  */
+  const courseOutlineKey = () => {
+    const match = location.pathname.match(/^\/(learn|courses)\/([^/]+)/);
+    return match ? `catto-learning:course-outline-scroll:${match[2]}` : null;
+  };
+  const SCROLLERS = [
+    {find: () => document.querySelector('.cl-sidebar, .cl-navigation, [data-theme-nav]'), key: () => 'catto-learning:nav-scroll'},
+    {find: () => document.querySelector('.cl-course-reader > .cl-course-outline'), key: courseOutlineKey, current: '[aria-current="page"], .is-current'},
+  ];
 
-  const restoreNavScroll = () => {
-    const nav = navScroller();
-    if (!nav) return false;
+  const keepScrollerPlace = scroller => {
+    const nav = scroller.find();
+    const key = nav ? scroller.key() : null;
+    if (!nav || !key || nav.dataset.keepsPlace === 'true') return Boolean(nav);
+    nav.dataset.keepsPlace = 'true';
     try {
-      const saved = Number(sessionStorage.getItem(NAV_SCROLL_KEY) || 0);
+      const saved = Number(sessionStorage.getItem(key) || 0);
       if (saved > 0 && nav.scrollHeight > nav.clientHeight) nav.scrollTop = saved;
     } catch (_) {}
+    // The entry being read, when the saved place leaves it out of sight.
+    const current = scroller.current ? nav.querySelector(scroller.current) : null;
+    if (current instanceof Element && nav.scrollHeight > nav.clientHeight) {
+      const box = nav.getBoundingClientRect(), at = current.getBoundingClientRect();
+      if (at.top < box.top || at.bottom > box.bottom) nav.scrollTop += at.top - box.top - (nav.clientHeight - at.height) / 2;
+    }
 
     let pending = 0;
     const remember = () => {
       if (pending) return;
       pending = requestAnimationFrame(() => {
         pending = 0;
-        try { sessionStorage.setItem(NAV_SCROLL_KEY, String(nav.scrollTop)); } catch (_) {}
+        try { sessionStorage.setItem(key, String(nav.scrollTop)); } catch (_) {}
       });
     };
     nav.addEventListener('scroll', remember, {passive:true});
     // pagehide rather than unload: unload is ignored by browsers that keep a page for the back
     // button, and this must be recorded on the way to the next page.
     window.addEventListener('pagehide', () => {
-      try { sessionStorage.setItem(NAV_SCROLL_KEY, String(nav.scrollTop)); } catch (_) {}
+      try { sessionStorage.setItem(key, String(nav.scrollTop)); } catch (_) {}
     });
 
     return true;
   };
 
-  if (!restoreNavScroll()) ready(restoreNavScroll);
+  SCROLLERS.forEach(scroller => { if (!keepScrollerPlace(scroller)) ready(() => keepScrollerPlace(scroller)); });
 
   ready(() => {
     let modalTrigger = null;
@@ -346,6 +367,8 @@
 
     window.CattoTreeSelect = { initialise: root => { initialiseTreeSelects(root); initialiseCategoryFields(root); } };
     initialiseTreeSelects(document);
+    // A picker drawn into the page by htmx (a course's row edited in place, 2026-11-01) is made ready like the others.
+    document.addEventListener('htmx:after:swap', () => initialiseTreeSelects(document));
 
     /* Feature cards that open a page (a form with data-choose-submits: the catalogue's categories, owner
        2026-10-20). A pointer choice, Space or Enter submits the form at once; arrow keys only move the choice.

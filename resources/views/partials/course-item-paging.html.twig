@@ -1,0 +1,21 @@
+{#
+The reader's paging row, one for every page of a course, the learner's and the public preview's alike (owner,
+2026-11-01): Previous at the left, the part's Mark complete toggle centred, Next at the right. Each sits in its own
+column, so a page without one of them (a section, an assessment, the first or last stop) keeps the others where they
+belong.
+
+  paging_base       where a stop's address starts: '/learn/<slug>/item/' or '/courses/<slug>/preview/'
+  paging_query      '?preview=1' for an author's preview, else ''
+  paging_previous   the stop before, or null
+  paging_next       the stop after, or null
+  paging_next_link  {href, label, icon} in place of Next (the course page's Begin course), optional
+  paging_complete   {action, done} for a part the reader may mark complete, optional
+  paging_label      the row's name for screen readers, optional
+#}
+{% set paging_complete = paging_complete|default(null) %}
+{% set paging_next_link = paging_next_link|default(null) %}
+<nav class="cl-course-item-paging" aria-label="{{ paging_label|default('Course Content') }}">
+<span class="cl-course-item-paging-previous">{% if paging_previous|default(null) %}{{ ui('action.link', {label: 'Previous', variant: 'primary', size: 'normal', href: paging_base ~ paging_previous.id ~ (paging_previous.item_type|default('') in ['assessment', 'diagnostic'] ? '/assessment/' ~ paging_previous.item_key : '/content') ~ paging_query|default(''), icon: 'action-previous'}) }}{% endif %}</span>
+{% if paging_complete %}<form class="cl-course-item-complete{% if paging_complete.done %} is-done{% endif %}" method="post" action="{{ paging_complete.action }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="completed" value="{{ paging_complete.done ? '0' : '1' }}">{{ ui('action.button', {label: paging_complete.done ? 'Completed' : 'Mark complete', variant: paging_complete.done ? 'primary' : 'secondary', size: 'normal', icon: 'action-done', title: paging_complete.done ? 'You marked this part complete. Select to unmark it.' : 'Mark this part complete', aria_label: paging_complete.done ? 'Completed. Select to unmark this part.' : 'Mark this part complete'}) }}</form>{% endif %}
+<span class="cl-course-item-paging-next">{% if paging_next_link %}{{ ui('action.link', {label: paging_next_link.label, variant: 'primary', size: 'normal', href: paging_next_link.href, icon: paging_next_link.icon}) }}{% elseif paging_next|default(null) %}{{ ui('action.link', {label: 'Next', variant: 'primary', size: 'normal', href: paging_base ~ paging_next.id ~ (paging_next.item_type|default('') in ['assessment', 'diagnostic'] ? '/assessment/' ~ paging_next.item_key : '/content') ~ paging_query|default(''), icon: 'action-next'}) }}{% endif %}</span>
+</nav>

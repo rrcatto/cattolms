@@ -460,6 +460,21 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-parts-fixture.php cleanup'
 ```
 
+`mark-complete.cjs` uses the same fixture (created first, cleaned up after) and checks a learner marking a part complete (owner, 2026-11-01) in Chromium and Firefox at 1440 and 390px and without JavaScript (60 checks): Mark complete sits centred between Previous and Next (above them on a phone); pressed, the page comes back with the part's big green tick in Course Modules, the button reading Completed in green and the progress counting one part more; pressed again, the tick goes and the count falls back; nothing scrolls sideways and no script errors.
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/mark-complete.cjs
+```
+
+`reader-preview.cjs` (owner, 2026-11-01) checks, in Chromium and Firefox, the paging row on a part, a section page, an assessment's start page and the course page, in the student preview and the public preview (Previous at the left at its own width, Next at the right, Mark complete centred on a part only, above them at 390px), a visitor marking a part complete and unmarking it with the tick and progress bar following, and a visitor's assessment run as a learner's: the start page with practice and graded, one question at a time with the timer, Skip for now and Finish now, a skipped question coming back with its own number, the result with its question report, the part ticked, practice feedback, and a readiness check ending Ready; and the toggle and an assessment without JavaScript (74 checks). Its fixture makes a published course with a public readiness check, a public first module (a lesson, a summary and an assessment with practice), a second module that is not public and the final assessment, through the authoring service, and removes it all.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/reader-preview-fixture.php create'
+podman cp env_php_1:/tmp/catto-reader-preview-state.json /tmp/catto-reader-preview-state.json
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/reader-preview.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/reader-preview-fixture.php cleanup'
+```
+
 ## Legal pages and terms acceptance
 
 `legal-pages.cjs` checks the public legal pages and the checkout acceptance box (77 checks):
@@ -560,7 +575,7 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php cleanup'
 ```
 
-`page-layout.cjs` (2026-10-30) checks the Page Builder on the same fixture (which also gives an administrator's session and puts back the site's default course page layout at cleanup), in Chromium and Firefox: a course's Page layout tab starts on the site's default with the board locked, A layout of its own unlocks it, a template, Hide and Show, the arrows, a drag by the handle and a width change act in place with the sketch and the templates' In use following, leaving with changes asks first, and Save layout keeps it; the course page then draws its blocks in that order with two half blocks sharing a row; Reset to the site's default; Settings > Course pages changes the default for every course on it and goes Back to Course first; without JavaScript every button saves what it asks; the tab and Settings are built as every page is at 1440 and 390px, the board one column on a phone.
+`page-layout.cjs` (2026-10-30; layouts of one's own, 2026-11-01) checks course page layouts on the same fixture (which also gives an administrator's session, keeps which layout is the default and its blocks, and at cleanup makes it the default again and removes the layouts the check made, whose names carry the run's mark), in Chromium and Firefox: Course Page Layouts lists the default layout and the check's course with what its page leaves out and why; New layout is arranged and saved on its own page, its sketch drawn for the course chosen; Copy, and Delete of the unused copy; the course's Page layout tab on the default layout shows it drawn for the course with no builder, One of your layouts chosen shows at once and saved is what the course page draws, Custom layout in its dashed frame takes Start again from, Hide and Show, the arrows, a drag by the handle and widths, is saved and drawn in that order; Save as a layout; back to Default layout with the custom layout kept; Make default changes every course on the default layout and the owner's default is made the default again; Apply to the ticked courses and the feature cards; without JavaScript every button saves what it asks; the three pages are built as every page is at 1440 and 390px, the board one column on a phone. 87 checks.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php create'

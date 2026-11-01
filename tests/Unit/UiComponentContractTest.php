@@ -202,17 +202,22 @@ final class UiComponentContractTest extends TestCase
             $source = $templates['resources/views/pages/' . $page . '.html.twig'];
             self::assertStringNotContainsString('<a href=', $source, $page . ' must not recreate course paging links.');
         }
-        foreach (['assessment-overview', 'assessment-public-preview'] as $page) {
+        // Every reader page has the one paging row (owner, 2026-11-01): Previous, Mark complete and Next each in its place.
+        foreach (['learn-course', 'learn-item', 'course-public-preview-item', 'assessment-overview'] as $page) {
             $source = $templates['resources/views/pages/' . $page . '.html.twig'];
-            self::assertStringContainsString('cl-course-item-paging', $source, $page . ' must provide course navigation.');
-            self::assertStringContainsString("ui('action.link'", $source, $page . ' must compose canonical navigation actions.');
+            self::assertStringContainsString("include '@platform/partials/course-item-paging.html.twig'", $source, $page . ' must provide course navigation through the one paging row.');
+            self::assertStringNotContainsString('<nav class="cl-course-item-paging"', $source, $page . ' must not build a paging row of its own.');
+        }
+        $paging = $templates['resources/views/partials/course-item-paging.html.twig'];
+        foreach (['cl-course-item-paging-previous', 'cl-course-item-complete', 'cl-course-item-paging-next', "ui('action.link'", "ui('action.button'"] as $part) {
+            self::assertStringContainsString($part, $paging, 'The paging row must hold ' . $part . '.');
         }
     }
 
     public function testEveryCourseItemPageComposesTheSameCoreArticleLayout(): void
     {
         $templates = self::templates();
-        foreach (['learn-item', 'course-public-preview-item', 'assessment-overview', 'assessment-question', 'assessment-session-result', 'assessment-public-preview'] as $page) {
+        foreach (['learn-item', 'course-public-preview-item', 'assessment-overview', 'assessment-question', 'assessment-session-result'] as $page) {
             $source = $templates['resources/views/pages/' . $page . '.html.twig'];
             self::assertStringContainsString("extends '@platform/layout/course-item.html.twig'", $source, $page . ' must use the standard Course Item page construction.');
             self::assertStringContainsString('block course_item_body', $source, $page . ' must render inside the standard Course Item article.');

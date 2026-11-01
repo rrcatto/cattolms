@@ -27,8 +27,8 @@ final class PlatformUi
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
         'layout.tabs' => ['template' => 'layout/tabs', 'defaults' => ['items' => null, 'current' => '', 'aria_label' => null]],
-        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'close_disclosure' => false, 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
-        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'form_action' => '', 'form_target' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
+        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'close_disclosure' => false, 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'swap' => 'innerHTML', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'icon_only' => false, 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
+        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'icon_only' => false, 'get' => '', 'target' => '', 'select' => '', 'swap' => 'innerHTML', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'form_action' => '', 'form_target' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
         'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false, 'narrow_menu' => false, 'label' => 'Actions', 'aria_label' => '', 'icon' => 'action-open', 'compact' => false]],
         'form.grid' => ['template' => 'forms/form-grid', 'defaults' => ['columns' => 'auto']],
@@ -38,8 +38,11 @@ final class PlatformUi
         // A choice made by picture: a radio group whose options are images with a label and an
         // optional note - certificate designs and where the words go on one.
         // columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row, further rows beneath, left-aligned.
-        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => null, 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => ''], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 4]]],
-        'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit']],
+        // multiple (owner, 2026-11-01, "Feature Card Checkbox Selectors"): each card a checkbox named by its value, the
+        // ticked ones listed in selected (a section's Show outline, Numbered module and Public preview).
+        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => '', 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => '', 'multiple' => false], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 4]]],
+        // form (field mode, owner 2026-11-01): the choice belongs to a form elsewhere on the page (a course's row edited in place).
+        'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit', 'form' => '']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
@@ -122,6 +125,9 @@ final class PlatformUi
             'variant' => $component === 'layout.surface' ? ['standard', 'compact'] : ['primary', 'secondary', 'quiet', 'danger'],
             'size' => $component === 'overlay.modal' ? ['normal', 'wide', 'page'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
+            // What a button or link's htmx GET replaces: its target's inside, or the target itself (a course's row edited
+            // in place, owner 2026-11-01).
+            'swap' => ['innerHTML', 'outerHTML'],
             'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
             'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
@@ -146,7 +152,8 @@ final class PlatformUi
             $values['value'] = max($values['min'], min($values['max'], $values['value']));
         }
         if ($component === 'form.tree-select') {
-            if (!is_string($values['id']) || preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1 || !is_string($values['name']) || $values['name'] === '' || !is_string($values['selected'])) {
+            if (!is_string($values['id']) || preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1 || !is_string($values['name']) || $values['name'] === '' || !is_string($values['selected'])
+                || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)) {
                 throw new InvalidArgumentException('A tree select needs an element ID, a field name and a selected value.');
             }
             if (!in_array($values['mode'], ['submit', 'field'], true)) throw new InvalidArgumentException('A tree select mode is submit or field.');
@@ -158,7 +165,11 @@ final class PlatformUi
             throw new InvalidArgumentException('A button posts its form only to a path on this site, into a named frame on the page.');
         }
         if ($component === 'form.picture-choice') {
-            if (!is_string($values['name']) || $values['name'] === '' || !is_string($values['legend']) || $values['legend'] === '' || !is_scalar($values['selected'])
+            $multiple = $values['multiple'];
+            if (!is_bool($multiple)
+                || (!$multiple && (!is_string($values['name']) || $values['name'] === '' || !is_scalar($values['selected'])))
+                || ($multiple && ($values['name'] !== '' || !is_array($values['selected']) || !array_is_list($values['selected']) || array_filter($values['selected'], static fn(mixed $value): bool => !is_string($value)) !== []))
+                || !is_string($values['legend']) || $values['legend'] === ''
                 || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)
                 || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)) {
                 throw new InvalidArgumentException('A picture choice needs a field name, a legend and a selected value.');
@@ -174,6 +185,8 @@ final class PlatformUi
                 // looks like): only DeckRenderer::thumbnail's markup, nothing that runs.
                 $drawing = in_array($keys, [['value', 'label', 'drawing'], ['value', 'label', 'drawing', 'note']], true);
                 if ((!$picture && !$icon && !$drawing) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '')
+                    // A checkbox is named by its value: a field name.
+                    || ($multiple && (!is_string($item['value']) || preg_match('/^[a-z][a-z0-9_]*$/', $item['value']) !== 1))
                     || ($picture && (!is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1))
                     || ($icon && !self::pictureOnly($item['icon']))
                     || ($drawing && !self::slideDrawing($item['drawing']))) {

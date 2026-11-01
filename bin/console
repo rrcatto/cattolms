@@ -17,6 +17,10 @@ into the wrong tree and disagree with the running site about which release it is
 The 17 scripts under tools/ become commands here as the migration reaches them.
 
 Changelog:
+2026/11/01 SAST
+- At least 512M of memory, as phpunit.xml gives the suite: cache:clear compiles every template in one process, which
+  outgrew PHP's default 128M (a PHP without a php.ini, as the development image is) once the templates passed 42 MB
+  compiled.
 2026/10/24 SAST
 - The kernel's environment and debugging come from Configuration\RunMode: APP_ENV alone, development unless it says
   production; APP_DEBUG is no longer read (owner, 2026-10-24).
@@ -33,6 +37,11 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Input\ArgvInput;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+
+// Warming the cache compiles every template in one process: never with less than 512M (a higher limit is kept).
+$memory = trim((string) ini_get('memory_limit'));
+$bytes = (int) $memory * match (strtolower(substr($memory, -1))) { 'g' => 1 << 30, 'm' => 1 << 20, 'k' => 1 << 10, default => 1 };
+if ($memory !== '-1' && $bytes < 512 << 20) ini_set('memory_limit', '512M');
 
 // Loads the instance .env and resolves the three roots exactly as every other CLI entry point does.
 $boot = CliBootstrap::boot();

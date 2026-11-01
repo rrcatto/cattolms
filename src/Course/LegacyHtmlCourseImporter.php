@@ -11,6 +11,27 @@ Description:
 Provides course-domain functionality for legacy html course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/11/01 SAST
+- The grading check reads the introduction's prose only: a table of an exam's domains and their weights had been
+  taken for grading weights.
+2026/11/01 SAST
+- A file whose first module is mod-m0 numbers the course's modules from 0, as the site does for a course whose first
+  module only sets it up, so a course written out as its file (CourseFile) and imported again keeps its numbering.
+2026/11/01 SAST
+- The introduction leaves out what is imported in its own right: a readiness check, which the original course files
+  (and the course specification, 4.2) place between the introduction and the modules, and a module, review or final
+  assessment written there. Courses had shown their readiness checks, and one its Module 0, as dead buttons and
+  hidden panels in their introductions.
+2026/11/01 SAST
+- Drift is named at the review (owner, 2026-11-01: "It continually makes up new names for things and then the importer
+  doesn't work properly"): a block that looks like a part under another name (workshop, exercises, stock answers, a
+  block headed "Practical Exercises"), practical tasks without their answers or the reverse, worked solutions hidden in
+  tasks, wording about submitting work or having it marked, and grading weights other than 50% and 50% each give a
+  warning naming the module and the specification's section.
+- The one HTML file carries every part of a module (owner, 2026-11-01: one specification, docs/COURSE-SPECIFICATION.md,
+  in place of the zip package): each module's presentation from PRESENTATIONS and flash cards from FLASHCARDS, read as
+  data like QUIZ and checked as CatWalk and the flash cards check them (a presentation or set of cards that fails is
+  left out with the reason as a warning), and the course's cover from an SVG drawing in the masthead's .course-cover.
 2026/10/30 SAST
 - Writes the course's HTML back through CourseHtml::html: the document is parsed without the HTML namespace, and
   written directly every line break came back as <br></br>, which a browser reads as two, and a script's text escaped.
@@ -32,7 +53,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Catwalk\SlideDeck;
+use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Slug;
+use CattoLearning\View\Artwork\UploadedSvg;
 use Dom\HTMLDocument as DOMDocument;
 use Dom\Element as DOMElement;
 use Dom\Node as DOMNode;
@@ -111,6 +135,11 @@ final class LegacyHtmlCourseImporter
         if (!is_array($quiz)) {
             throw new InvalidArgumentException('The importer could not find a valid QUIZ question bank.');
         }
+        // Each module's presentation and flash cards, by module key, read as data like QUIZ (owner, 2026-11-01).
+        $presentations = $this->extractJsonAssignment($html, 'PRESENTATIONS');
+        $presentations = is_array($presentations) ? $presentations : [];
+        $flashcards = $this->extractJsonAssignment($html, 'FLASHCARDS');
+        $flashcards = is_array($flashcards) ? $flashcards : [];
 
         $moduleNodes = $xpath->query('//section[contains(concat(" ", normalize-space(@class), " "), " module ") and starts-with(@id,"mod-") and @id!="mod-review"]');
         if ($moduleNodes->length === 0) {
@@ -125,6 +154,12 @@ final class LegacyHtmlCourseImporter
         if ($modulesContainer instanceof DOMElement) {
             foreach ($xpath->query('preceding-sibling::*', $modulesContainer) as $introNode) {
                 if (!$introNode instanceof DOMElement || str_contains(' ' . $introNode->getAttribute('class') . ' ', ' masthead ')) {
+                    continue;
+                }
+                // What is imported in its own right is never part of the introduction too: the readiness check, which
+                // the original course files place before the modules, and a module, review or final assessment
+                // written before them (2026-11-01: a course's introduction had held its Module 0 and its readiness check).
+                if (self::importedElsewhere($introNode)) {
                     continue;
                 }
                 $introductionHtml .= CourseHtml::html($introNode);
@@ -145,6 +180,7 @@ final class LegacyHtmlCourseImporter
             $warnings[] = 'The grading scale shown in the file does not match its grading script. The shown scale was used; check it on the Grades tab.';
         }
         [$introductionHtml, $standalone] = $this->withoutStandaloneParts($introductionHtml, $gradeScale['source'] !== 'default');
+        foreach (self::wordingDrift($introductionHtml, 'The introduction', true) as $warning) $warnings[] = $warning;
         foreach ($moduleNodes as $node) {
             if (!$node instanceof DOMElement) {
                 continue;
@@ -175,6 +211,8 @@ final class LegacyHtmlCourseImporter
             $workingDocument->appendChild($working);
             $workingXpath = new DOMXPath($workingDocument);
 
+            foreach (self::partDrift($workingXpath, $working, $moduleTitle) as $warning) $warnings[] = $warning;
+            foreach (self::wordingDrift(CourseHtml::innerHtml($working), $moduleTitle, false) as $warning) $warnings[] = $warning;
             $outcomes = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " outcomes ")][1]', $working)->item(0);
             $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes(CourseHtml::html($outcomes)) : '';
 
@@ -225,6 +263,8 @@ final class LegacyHtmlCourseImporter
                 'content_html' => $contentHtml,
                 'summary_html' => $summaryHtml,
                 'content_blocks' => $contentBlocks,
+                'presentation' => $this->presentation($presentations[$moduleKey] ?? null, $moduleTitle, false, $warnings),
+                'flashcards' => $this->flashcards($flashcards[$moduleKey] ?? null, $moduleTitle, $warnings),
                 'is_review' => false,
                 'assessment_required' => $assessmentRequired,
                 'assessment' => $questions === [] ? null : [
@@ -281,6 +321,8 @@ final class LegacyHtmlCourseImporter
                     'content_html' => $reviewHtml,
                     'settings' => [],
                 ]],
+                'presentation' => $this->presentation($presentations['review'] ?? null, $reviewTitle, true, $warnings),
+                'flashcards' => null,
                 'is_review' => true,
                 'assessment_required' => $reviewAssessmentRequired,
                 'assessment' => $reviewQuestions === [] ? null : [
@@ -306,6 +348,11 @@ final class LegacyHtmlCourseImporter
         }
 
         $knownQuestionBanks = array_fill_keys(array_map(static fn(array $module): string => (string) $module['module_key'], $modules), true);
+        foreach (['PRESENTATIONS' => $presentations, 'FLASHCARDS' => $flashcards] as $name => $data) {
+            foreach (array_keys($data) as $dataKey) {
+                if (!isset($knownQuestionBanks[(string) $dataKey])) $warnings[] = $name . '.' . $dataKey . ' is not one of the course\'s modules, so it was left out.';
+            }
+        }
         $knownQuestionBanks['final'] = true;
         $diagnosticAssessments = [];
         $diagnosticPosition = 1;
@@ -379,6 +426,9 @@ final class LegacyHtmlCourseImporter
                 'description_html' => $summary !== '' ? '<p>' . htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '',
                 'introduction_html' => $this->courseHtml->preserve($introductionHtml),
                 'level' => $this->detectLevel($xpath),
+                // A course whose first module is mod-m0, one that only sets the learner up, numbers its modules from 0
+                // (specification 4.4, section 8; owner, 2026-10-29).
+                'first_module_number' => (($modules[0]['module_key'] ?? '') === 'm0') ? 0 : 1,
                 'estimated_minutes' => null,
                 'default_access_period_seconds' => 31536000,
                 'module_weight' => 0.5,
@@ -389,6 +439,8 @@ final class LegacyHtmlCourseImporter
                 'source_filename' => $sourceFilename,
             ],
             'modules' => $modules,
+            // The course's cover, an SVG drawing in the masthead's .course-cover (owner, 2026-11-01), set after import.
+            'catalogue' => ($cover = $this->cover($xpath, $title, $warnings)) === null ? null : ['cover' => $cover],
             'diagnostic_assessments' => $diagnosticAssessments,
             'final_assessment' => $finalQuestions === [] ? null : [
                 'assessment_type' => 'final',
@@ -497,6 +549,15 @@ final class LegacyHtmlCourseImporter
             $bands[] = ['label' => $last[1] !== '' ? $last[1] : $last[3], 'code' => $last[2] !== '' ? $last[2] : null, 'minimum' => 0.0];
         }
         return $bands;
+    }
+
+    /** A section the importer takes in its own right: a module, the review, the final assessment or the readiness check. */
+    private static function importedElsewhere(DOMElement $node): bool
+    {
+        $class = ' ' . (string) preg_replace('/\s+/', ' ', (string) $node->getAttribute('class')) . ' ';
+        foreach (['module', 'review', 'final', 'diag'] as $name) { if (str_contains($class, ' ' . $name . ' ')) return true; }
+        $id = (string) $node->getAttribute('id');
+        return in_array($id, ['diagnostic', 'final', 'mod-review'], true) || str_starts_with($id, 'mod-');
     }
 
     /**
@@ -1120,6 +1181,132 @@ final class LegacyHtmlCourseImporter
     {
         // Written back as HTML: the document was parsed without the HTML namespace (CourseHtml::html, 2026-10-30).
         return CourseHtml::innerHtml($element);
+    }
+
+    /** Class names a writer has used for a part instead of the specification's names (2026-11-01). */
+    private const DRIFTED_CLASSES = ['workshop', 'exercise', 'exercises', 'activity', 'activities', 'lab', 'practice', 'solutions', 'stock-answers'];
+
+    /** Headings a writer has given a part instead of marking it with the specification's names. */
+    private const DRIFTED_HEADINGS = '/^(practical (work|exercises?|tasks?|workshop)|workshop|exercises|activities|stock answers|model answers|worked solutions?|solutions)\b/i';
+
+    /**
+     * A module's parts under names CattoLMS does not read, each a warning that says what the course loses (owner,
+     * 2026-11-01): such a block stays in the lesson as text.
+     *
+     * @return list<string>
+     */
+    private static function partDrift(DOMXPath $xpath, DOMElement $body, string $module): array
+    {
+        $class = static fn(string $name): string => 'contains(concat(" ", normalize-space(@class), " "), " ' . $name . ' ")';
+        $warnings = [];
+        $practical = $xpath->query('.//*[' . $class('practical') . ']', $body)->length;
+        $answers = $xpath->query('.//*[' . $class('answers') . ']', $body)->length;
+        foreach ($xpath->query('.//*[@class]', $body) as $element) {
+            if (!$element instanceof DOMElement) continue;
+            $classes = preg_split('/\s+/', strtolower(trim((string) $element->getAttribute('class')))) ?: [];
+            if (array_intersect($classes, ['practical', 'answers']) !== []) continue;
+            $named = array_values(array_intersect($classes, self::DRIFTED_CLASSES));
+            $heading = '';
+            if (strtolower($element->tagName) === 'details') {
+                $summary = $xpath->query('./summary', $element)->item(0);
+                $heading = $summary instanceof DOMElement ? trim((string) preg_replace('/\s+/u', ' ', (string) $summary->firstChild?->textContent)) : '';
+            }
+            if ($named !== []) {
+                $warnings[] = $module . ': a block called "' . $named[0] . '" is not a part CattoLMS reads, so it stays in the lesson as text. Practical tasks go in .practical and their model answers in .answers (specification, section 4.1).';
+            } elseif ($heading !== '' && preg_match(self::DRIFTED_HEADINGS, $heading) === 1) {
+                $warnings[] = $module . ': a block headed "' . mb_substr($heading, 0, 60) . '" is not marked as a part, so it stays in the lesson as text. Mark practical tasks .practical and their answers .answers (specification, section 4.1).';
+            }
+        }
+        if ($xpath->query('.//details[summary[contains(translate(normalize-space(.), "SHOWLUTIN", "showlutin"), "show") and contains(translate(normalize-space(.), "SOLUTIN", "solutin"), "solution")]]', $body)->length > 0) {
+            $warnings[] = $module . ': worked solutions are hidden inside tasks. CattoLMS does not read them as model answers: put each in .answers (specification, section 8.5).';
+        }
+        if (($practical > 0) !== ($answers > 0)) {
+            $warnings[] = $module . ($practical > 0 ? ': practical tasks have no .answers block, so they stay in the lesson. Give every task its model answer (specification, section 8.5).' : ': model answers have no .practical tasks, so they stay in the lesson (specification, section 8.5).');
+        }
+        return array_values(array_unique($warnings));
+    }
+
+    /**
+     * Wording a self-study course must not use (owner, 2026-11-01): work submitted or marked, and, where the course
+     * explains its grading, weights other than the fixed 50% for module assessments and 50% for the final assessment.
+     *
+     * @return list<string>
+     */
+    private static function wordingDrift(string $html, string $where, bool $grading): array
+    {
+        $text = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5)));
+        $warnings = [];
+        if (preg_match('/\b(?:submitted for (?:assessment|marking)|submit (?:it|them|this|your [a-z]+(?: [a-z]+)?) (?:for|to be) (?:assessment|marking|marked)|(?:month|week|module) \d+ submission|items? (?:is|are) submitted|assessed against (?:a|the) (?:published )?rubric|marked by (?:a|an|the|your) [a-z]+)\b/i', $text, $match) === 1) {
+            $warnings[] = $where . ' says "' . $match[0] . '". Nothing is submitted and nobody marks a learner\'s work on a self-study course: write what the learner completes and checks themselves (specification, section 2).';
+        }
+        // Grading is stated in prose: a table of exam domains and their weights is course content, not the course's grading.
+        $prose = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string) preg_replace('#<table\b.*?</table>#is', ' ', $html)), ENT_QUOTES | ENT_HTML5)));
+        foreach ($grading ? (preg_split('/(?<=[.!?])\s+/u', $prose) ?: []) : [] as $sentence) {
+            if (preg_match('/\b(weight(?:ed|ing)?|carries|counts? for|worth)\b/i', $sentence) === 1 && preg_match('/\b(grade|mark|result|assessment)/i', $sentence) === 1 && preg_match_all('/(\d{1,3})\s?%/', $sentence, $numbers) > 0 && array_diff(array_map('intval', $numbers[1]), [50, 100]) !== []) {
+                $warnings[] = $where . ' gives grading weights other than 50% for the module assessments and 50% for the final assessment: "' . mb_substr($sentence, 0, 140) . '" (specification, section 7).';
+                break;
+            }
+        }
+        return $warnings;
+    }
+
+    /**
+     * A module's presentation from PRESENTATIONS: its slides checked as CatWalk checks them, or left out with the reason.
+     *
+     * @param list<string> $warnings
+     * @return array{title:string,minutes:int|null,type_config:array<string,mixed>}|null
+     */
+    private function presentation(mixed $deck, string $moduleTitle, bool $review, array &$warnings): ?array
+    {
+        if ($deck === null) return null;
+        if (!is_array($deck) || !is_array($deck['slides'] ?? null)) {
+            $warnings[] = $moduleTitle . ': its presentation has no list of slides, so it was left out.';
+            return null;
+        }
+        $config = ['kind' => (string) ($deck['kind'] ?? ($review ? 'review' : 'intro')), 'theme' => (string) ($deck['theme'] ?? 'light'), 'slides' => array_values($deck['slides'])];
+        try {
+            $config = SlideDeck::validate($config);
+        } catch (InvalidArgumentException $refused) {
+            $warnings[] = $moduleTitle . ': its presentation was left out. ' . $refused->getMessage();
+            return null;
+        }
+        foreach (SlideDeck::warnings($config) as $warning) $warnings[] = $moduleTitle . ': ' . $warning;
+        $title = trim((string) ($deck['title'] ?? ''));
+        return ['title' => $title !== '' ? $title : 'What you will learn', 'minutes' => is_numeric($deck['minutes'] ?? null) ? max(1, (int) $deck['minutes']) : null, 'type_config' => $config];
+    }
+
+    /**
+     * A module's flash cards from FLASHCARDS, each with a front and a back, or left out with the reason.
+     *
+     * @param list<string> $warnings
+     * @return list<array<string,mixed>>|null
+     */
+    private function flashcards(mixed $cards, string $moduleTitle, array &$warnings): ?array
+    {
+        if ($cards === null) return null;
+        try {
+            return FlashCards::validate(is_array($cards) && isset($cards['cards']) ? $cards['cards'] : $cards);
+        } catch (InvalidArgumentException $refused) {
+            $warnings[] = $moduleTitle . ': its flash cards were left out. ' . $refused->getMessage();
+            return null;
+        }
+    }
+
+    /**
+     * The course's cover: the SVG drawing in the masthead's .course-cover, checked as an uploaded cover is.
+     *
+     * @param list<string> $warnings
+     */
+    private function cover(DOMXPath $xpath, string $title, array &$warnings): ?string
+    {
+        $svg = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " masthead ")]//*[contains(concat(" ", normalize-space(@class), " "), " course-cover ")]//svg[1]')->item(0);
+        if (!$svg instanceof DOMElement) return null;
+        try {
+            return UploadedSvg::validate(CourseHtml::html($svg), UploadedSvg::COVER_BYTES, 'cover of "' . $title . '"');
+        } catch (InvalidArgumentException $refused) {
+            $warnings[] = 'The cover picture was left out. ' . $refused->getMessage();
+            return null;
+        }
     }
 
     private function extractJsonAssignment(string $source, string $variable): mixed

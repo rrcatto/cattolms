@@ -37,11 +37,11 @@ final class LegacyHtmlCourseImporterTest extends TestCase
         }
 
         $html = <<<'HTML'
-<!doctype html><html><head><title>Accounts Payable Essentials</title></head><body>
+<!doctype html><html><head><title>Compost Making Essentials</title></head><body>
 <header class="masthead">
-  <h1>Accounts Payable Essentials</h1>
+  <h1>Compost Making Essentials</h1>
   <p class="course-subtitle">Professional Short Course</p>
-  <p class="course-summary">A practical introduction to the accounts payable cycle.</p>
+  <p class="course-summary">A practical introduction to making compost at home.</p>
 </header>
 <section class="module" id="mod-m1" data-assessment-required="false"><div class="m-titles"><span class="m-name">Introduction</span><small>LAST-MODULE-SUBTITLE-MARKER</small></div><div class="module-body"><p>Content.</p></div></section>
 <script>const QUIZ={"final":[{"q":"Final?","o":["Yes","No"],"a":0}]};</script>
@@ -50,9 +50,9 @@ HTML;
 
         $analysis = (new LegacyHtmlCourseImporter())->analyse($html, 'subtitle.html');
 
-        self::assertSame('Accounts Payable Essentials', $analysis['course']['title']);
+        self::assertSame('Compost Making Essentials', $analysis['course']['title']);
         self::assertSame('Professional Short Course', $analysis['course']['subtitle']);
-        self::assertSame('A practical introduction to the accounts payable cycle.', $analysis['course']['summary']);
+        self::assertSame('A practical introduction to making compost at home.', $analysis['course']['summary']);
         self::assertSame('LAST-MODULE-SUBTITLE-MARKER', $analysis['modules'][0]['subtitle']);
     }
 

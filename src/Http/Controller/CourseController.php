@@ -268,13 +268,13 @@ final class CourseController extends BaseController
         $page = $this->coursePage->view($course);
         $purchase = $this->purchases->for($course, $user, '/courses/' . (string) $course['slug'], $course['price_variants']);
         $related = $this->withFavourites($this->courses->relatedCourseCards($courseId));
-        // The page's blocks in the rows its layout gives (Page Builder, 2026-10-30), leaving out a block with nothing to show.
-        $present = array_keys(array_filter([
-            'about' => true, 'how' => $page['modules'] !== [], 'modules' => true, 'glance' => true, 'get' => $page['figures'] !== [],
-            'reviews' => $rating->count > 0, 'access' => true, 'start' => !empty($course['has_public_preview']) && ($purchase['state'] ?? '') !== 'owned',
-            'related' => $related !== [],
-        ]));
-        $rows = \CattoLearning\Course\CoursePageLayout::rows($this->layouts->forCourse($courseId)['layout'], $present);
+        // The page's blocks in the rows its layout gives (Page Builder, 2026-10-30; the layout the course uses, 2026-11-01),
+        // leaving out a block with nothing to show, by the rule the layouts' pages show (CoursePageLayout::present).
+        $present = \CattoLearning\Course\CoursePageLayout::present([
+            'modules' => count($page['modules']), 'figures' => count($page['figures']), 'reviews' => $rating->count,
+            'preview' => !empty($course['has_public_preview']), 'related' => count($related), 'owned' => ($purchase['state'] ?? '') === 'owned',
+        ]);
+        $rows = \CattoLearning\Course\CoursePageLayout::rows($this->layouts->forCourse($courseId)['blocks'], $present);
 
         return $this->render('course-detail', [
             'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow'),

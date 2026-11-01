@@ -168,6 +168,7 @@ final class AdminCourseComponentController extends BaseController
             $moved = array_values(array_filter([
                 $report['summaries'] > 0 ? sprintf('%d summar%s', $report['summaries'], $report['summaries'] === 1 ? 'y' : 'ies') : '',
                 $report['review_aids'] > 0 ? sprintf('%d review study aid%s', $report['review_aids'], $report['review_aids'] === 1 ? '' : 's') : '',
+                $report['practicals'] > 0 ? sprintf('%d practical work item%s with %s model answers', $report['practicals'], $report['practicals'] === 1 ? '' : 's', $report['practicals'] === 1 ? 'its' : 'their') : '',
             ]));
             $this->flash('success', $report['modules'] === 0
                 ? implode(' and ', $moved) . ' moved out of the lessons into parts of their own.'

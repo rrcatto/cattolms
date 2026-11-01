@@ -138,7 +138,7 @@ final class CourseReaderPresentationTest extends TestCase
         $download = $this->element($page->query('//section[contains(@class, "cl-course-item-download")]//a[@download]')->item(0), 'A started learner can download.');
         self::assertSame(CourseItemRenderer::DOWNLOAD_ACTION_CLASSES, $download->getAttribute('class'));
         self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/download/reader-pack-' . $this->suffix, $download->getAttribute('href'));
-        $paging = $page->query('//nav[contains(@class, "cl-course-item-paging")]/a');
+        $paging = $page->query('//nav[contains(@class, "cl-course-item-paging")]//a');
         self::assertSame(2, $paging->length, 'Previous and Next remain.');
         foreach ($paging as $link) {
             self::assertSame('cl-ui-action cl-ui-action--primary cl-ui-action--normal', $this->element($link)->getAttribute('class'));
@@ -260,7 +260,7 @@ final class CourseReaderPresentationTest extends TestCase
     private function paging(string $url): array
     {
         $links = [];
-        foreach ($this->page($url)->query('//nav[contains(@class, "cl-course-item-paging")]/a') as $link) {
+        foreach ($this->page($url)->query('//nav[contains(@class, "cl-course-item-paging")]//a') as $link) {
             if ($link instanceof \DOMElement) { $links[trim($link->textContent)] = $link->getAttribute('href'); }
         }
         return $links;

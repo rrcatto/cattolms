@@ -11,6 +11,8 @@ Description:
 Implements Catto Learning business and application logic for platform administration operations.
 
 Changelog:
+2026/11/01 SAST
+- An enrolment's progress counts every part the learner has done, not only the assessments (owner, 2026-11-01, 2A).
 2026/10/26 SAST
 - The company domain rule (owner, restated 2026-10-26: "no domain name, no company. And every person who belonged to
   the company had to use the same domain name"): Add person takes the company from the address and refuses an address
@@ -1213,6 +1215,17 @@ final class PlatformAdministrationService
         }
         unset($course);
         return $courses;
+    }
+
+    /**
+     * One course's row as the Administration list draws it, for a row edited in place and drawn again (owner, 2026-11-01).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function adminCourseRow(int $courseId): ?array
+    {
+        $row = $this->courses->adminCourse($courseId);
+        return $row === null ? null : self::withPrices(self::trimTimestamps([$row]))[0];
     }
 
     /** Total rows behind adminCoursePage() under the same scope, counted with the identical membership rule. */
@@ -3105,8 +3118,9 @@ final class PlatformAdministrationService
     private function normaliseEnrolments(array $rows): array
     {
         foreach ($rows as &$row) {
-            $total = max(0, (int) ($row['assessment_count'] ?? 0));
-            $done = max(0, (int) ($row['submitted_assessment_count'] ?? 0));
+            // Every part the learner has done, not only the assessments (owner, 2026-11-01, decision 2A).
+            $total = max(0, (int) ($row['part_count'] ?? 0));
+            $done = max(0, (int) ($row['done_part_count'] ?? 0));
             $row['progress_percentage'] = $total > 0 ? min(100, (int) round($done / $total * 100)) : 0;
         }
         unset($row);

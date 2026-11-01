@@ -7,6 +7,14 @@
    - flash cards turn over, "Again" brings a card back, and finishing says every card is known;
    - practical work keeps its model answer closed until it is opened;
    - the lesson, summary, flash cards and practical work download as PDFs;
+   - the Course Modules list keeps its place from page to page (owner, 2026-11-01: it had gone back to its top on every
+     click), in a window short enough for it to scroll;
+   - the course's own stylesheet styles its lesson but never the presentation player, which keeps its own design
+     (owner, 2026-11-01);
+   - the course downloaded as one HTML file, the course file (owner, 2026-11-01: "it must export an html file that can be
+     used on its own and also imports back in"), opened from the computer: every panel closed at first, the module and
+     its parts opening, the presentation, flash cards, quiz and model answers working, each video with its YouTube
+     address, nothing loaded from anywhere but the video, nothing sideways on a phone;
    - without JavaScript, a presentation reads as one page with every slide, and flash cards as a list;
    - a slide's narration, recorded on its page with a stand-in microphone (Chromium), is heard by the author, refused to a
      visitor, and offered by the reader. The presentation editor's own checks are presentation-editor.cjs.
@@ -72,6 +80,12 @@ async function reader(browserType, name, width) {
     check(`${at}: Continue leads to the next part`, (await page.locator('.cw-current a.cw-action').getAttribute('href')).includes('/content'));
     check(`${at}: nothing scrolls sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     check(`${at}: the reader offers no PDF of a presentation`, await page.locator('.cl-course-item-pdf').count() === 0);
+    const player = await page.evaluate(() => {
+        const heading = getComputedStyle(document.querySelector('.cw-deck h2'));
+        const button = getComputedStyle(document.querySelector('.cw-deck .cw-btn'));
+        return {colour: heading.color, font: heading.fontFamily, border: heading.borderBottomStyle, button: button.backgroundColor};
+    });
+    check(`${at}: the course's stylesheet leaves the player's design alone`, player.colour !== 'rgb(200, 0, 0)' && !player.font.includes('Courier') && player.border !== 'solid' && player.button !== 'rgb(200, 0, 0)', JSON.stringify(player));
 
     await page.goto(learn(state.lesson_node), {waitUntil: 'networkidle'});
     const decks = page.locator('.cw-deck.cw-ready');
@@ -81,6 +95,12 @@ async function reader(browserType, name, width) {
     const counters = await page.locator('.cw-counter').allInnerTexts();
     check(`${at}: each presentation answers only its own keys`, counters[0] === '2 / 4' && counters[1] === '1 / 4', counters.join(' | '));
     check(`${at}: the lesson offers its PDF`, await page.locator('.cl-course-item-pdf a').count() === 1);
+    const styled = await page.evaluate(() => {
+        const lesson = [...document.querySelectorAll('.cl-course-presentation h2')].find((h) => !h.closest('.cw-deck'));
+        const slide = document.querySelector('.cl-course-presentation .cw-deck h2');
+        return {lesson: lesson ? getComputedStyle(lesson).color : '', slide: slide ? getComputedStyle(slide).color : ''};
+    });
+    check(`${at}: the lesson takes the course's stylesheet and its presentations do not`, styled.lesson === 'rgb(200, 0, 0)' && styled.slide !== 'rgb(200, 0, 0)' && styled.slide !== '', JSON.stringify(styled));
 
     await page.goto(learn(state.flashcards_node), {waitUntil: 'networkidle'});
     check(`${at}: the flash cards show one card at a time`, await page.locator('.cl-flashcards-card').count() === 1 && await page.locator('.cl-flashcards-list').isHidden());
@@ -105,6 +125,19 @@ async function reader(browserType, name, width) {
         const body = await response.body();
         check(`${at}: the ${part} downloads as a PDF`, response.status() === 200 && response.headers()['content-type'] === 'application/pdf' && body.subarray(0, 4).toString() === '%PDF');
     }
+    // The Course Modules list keeps its place from page to page (owner, 2026-11-01), in a window short enough to scroll it.
+    await page.setViewportSize({width, height: 420});
+    await page.goto(learn(state.presentation_node), {waitUntil: 'networkidle'});
+    const list = page.locator('.cl-course-reader > .cl-course-outline');
+    const scrolls = await list.evaluate((nav) => nav.scrollHeight > nav.clientHeight + 20);
+    await list.evaluate((nav) => { nav.scrollTop = nav.scrollHeight; });
+    const kept = await list.evaluate((nav) => nav.scrollTop);
+    await Promise.all([page.waitForNavigation(), list.locator('a[href*="/content"]').last().click()]);
+    await page.waitForLoadState('networkidle');
+    const back = await list.evaluate((nav) => nav.scrollTop);
+    check(`${at}: the Course Modules list keeps its place from page to page`, scrolls && kept > 0 && Math.abs(back - kept) <= 2, `${kept} then ${back}${scrolls ? '' : ' (the list did not scroll)'}`);
+    await page.setViewportSize({width, height: 1000});
+
     check(`${at}: no script errors`, errors.length === 0, errors.join(' | '));
     await browser.close();
 }
@@ -117,6 +150,48 @@ async function withoutScript(browserType, name) {
     check(`${name} without JavaScript: the presentation reads as one page`, await page.locator('.cw-deck:not(.cw-ready) .cw-slide').count() === 4 && await page.locator('.cw-slide').nth(3).isVisible());
     await page.goto(learn(state.flashcards_node), {waitUntil: 'load'});
     check(`${name} without JavaScript: the flash cards are a list`, await page.locator('.cl-flashcards-list li').count() === state.cards && await page.locator('.cl-flashcard-back:not([open])').count() === state.cards);
+    await browser.close();
+}
+
+async function courseFile(browserType, name) {
+    // The course page's HTML download is the course file: it works on its own (every part in its own closed panel,
+    // the presentation, cards, quiz and answer key working, each video with its YouTube address) and imports back
+    // (CourseFileIntegrationTest).
+    const browser = await browserType.launch();
+    const context = await session(browser);
+    const response = await context.request.get(`${base}/admin/courses/${state.course_id}/course-file`);
+    const html = await response.text();
+    check(`${name} course file: downloaded`, response.status() === 200 && /attachment; filename=".+\.html"/.test(response.headers()['content-disposition'] || ''), response.status());
+    check(`${name} course file: in the specification's form`, /<meta name="cattolms:course-code" content="[A-Z0-9-]+">/.test(html) && html.includes('<section class="module" id="mod-m1"'));
+    const file = require('node:path').join(require('node:os').tmpdir(), `catto-course-file-${process.pid}-${name}.html`);
+    fs.writeFileSync(file, html);
+    try {
+        for (const width of [1440, 390]) {
+            const page = await browser.newPage({viewport: {width, height: 900}, reducedMotion: 'reduce'});
+            const errors = []; const outside = [];
+            page.on('pageerror', (e) => errors.push(e.message));
+            page.on('request', (r) => { if (!/^(file|data|blob):/.test(r.url()) && !/^https:\/\/(www\.)?youtube-nocookie\.com\//.test(r.url())) outside.push(r.url()); });
+            const at = `${name} course file ${width}`;
+            await page.goto('file://' + file, {waitUntil: 'load'});
+            const module = page.locator('#mod-m1 > details');
+            check(`${at}: every panel starts closed`, await page.evaluate(() => [...document.querySelectorAll('details.panel, details.sub, details.block')].every((d) => !d.open)));
+            await module.locator('> summary').click();
+            check(`${at}: the module opens`, await module.evaluate((d) => d.open));
+            for (const part of ['s-present', 's-cards']) await page.locator(`#mod-m1 details.${part} > summary`).click();
+            check(`${at}: the presentation shows a slide`, await page.locator('#mod-m1 .presentation .slide').isVisible());
+            check(`${at}: the flash cards show a card`, await page.locator('#mod-m1 .flashcards .card').isVisible());
+            check(`${at}: every quiz is drawn`, await page.locator('.quiz').count() === await page.locator('.quiz form').count());
+            await page.locator('#mod-m1 details.answers > summary').click();
+            check(`${at}: the model answers open`, await page.locator('#mod-m1 details.answers .answer').first().isVisible());
+            check(`${at}: every video can be opened on YouTube`, await page.locator('.video iframe').count() === await page.locator('.video .video-cap a[href^="https://www.youtube.com/watch?v="]').count());
+            check(`${at}: nothing scrolls sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+            check(`${at}: nothing is loaded from anywhere but the video`, outside.length === 0, outside.join(' | '));
+            check(`${at}: no script errors`, errors.length === 0, errors.join(' | '));
+            await page.close();
+        }
+    } finally {
+        fs.unlinkSync(file);
+    }
     await browser.close();
 }
 
@@ -151,6 +226,7 @@ async function narration() {
     for (const [type, name] of [[chromium, 'Chromium'], [firefox, 'Firefox']]) {
         for (const width of [1440, 390]) await reader(type, name, width);
         await withoutScript(type, name);
+        await courseFile(type, name);
     }
     await narration();
     const failures = results.filter((r) => !r.ok);

@@ -18,6 +18,18 @@ a diagnostic and the final assessment stay where they are. Nothing is changed in
 modules, and nothing is written at all when any step is refused.
 
 Changelog:
+2026/11/01 SAST
+- An import that lifts out the practical work and its answers removes the box they sat in when nothing else is left in
+  it, as a later arrangement already did, so a file built like the original courses (<div class="blocks">) leaves no
+  empty box in the lesson.
+2026/11/01 SAST
+- Practical work in an arranged course too (owner, 2026-11-01: "1B 2 Yes 3 Yes"): a module lesson that still holds its
+  .practical tasks and .answers becomes a lesson and a Practical work part, placed after the flash cards and before the
+  review study aid and the assessment, and Arrange into modules finishes such a course. A task's "Verifiable" line is
+  shown as "How to check:", not as what the learner produces.
+2026/11/01 SAST
+- A module's presentation and flash cards, which an HTML course now carries beneath its lesson (owner, 2026-11-01),
+  take their places: the presentation first in the module, the flash cards after the summary, the assessment last.
 2026/10/30 SAST
 - The review study aid too (owner, 2026-10-30: "I think the Review Study Aid should be in its own course item"): the
   "Review Study Aid" block a module lesson ends with (details.review-aid) becomes a Review Study Aid part placed before
@@ -79,7 +91,8 @@ final class CourseRestructurer
         if ($numbered === [] && $lessons !== []) { return 'modules'; }
         if ($numbered === []) { return null; }
         if (self::lessonsHolding($rows, 'summary', self::SUMMARY) !== []) { return 'summaries'; }
-        return self::lessonsHolding($rows, 'review_study_aid', self::REVIEW_AID) !== [] ? 'review_aids' : null;
+        if (self::lessonsHolding($rows, 'review_study_aid', self::REVIEW_AID) !== []) { return 'review_aids'; }
+        return self::lessonsHoldingPractical($rows) !== [] ? 'practicals' : null;
     }
 
     /**
@@ -150,7 +163,17 @@ final class CourseRestructurer
                 $report['review_aids']++;
                 $report['sections'][] = (int) $lesson['parent_node_id'];
             }
+            foreach (self::lessonsHoldingPractical($this->records->structure($courseId)) as $lesson) {
+                $item = $this->items->item((int) $lesson['course_item_id']);
+                $taken = self::takePractical((string) $item['content_source']);
+                if ($taken === null) { continue; }
+                $this->items->update((int) $lesson['course_item_id'], ['content_source' => $taken['lesson'], 'estimated_minutes' => (string) (CourseItemService::readingMinutes($taken['lesson']) ?? '')] + $item, $userId);
+                $this->addPractical($courseId, (int) $lesson['parent_node_id'], (string) $lesson['item_key'], $taken['tasks'], $taken['answers'], $userId);
+                $report['practicals']++;
+                $report['sections'][] = (int) $lesson['parent_node_id'];
+            }
             $report['sections'] = array_values(array_unique($report['sections']));
+            if ($report['practicals'] > 0) { $this->audit->record($userId, 'course_content.practicals_separated', ['course_id' => $courseId, 'practicals' => $report['practicals']]); }
             if ($report['summaries'] > 0) { $this->audit->record($userId, 'course_content.summaries_separated', ['course_id' => $courseId, 'summaries' => $report['summaries']]); }
             if ($report['review_aids'] > 0) { $this->audit->record($userId, 'course_content.review_aids_separated', ['course_id' => $courseId, 'review_aids' => $report['review_aids']]); }
             return $report;
@@ -189,6 +212,74 @@ final class CourseRestructurer
         ], $userId);
     }
 
+    /**
+     * The module lessons in a numbered section with no Practical work part yet, whose content still holds .practical
+     * tasks with their .answers.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private static function lessonsHoldingPractical(array $rows): array
+    {
+        $numbered = [];
+        $withPart = [];
+        foreach ($rows as $row) {
+            if ((string) $row['node_type'] === 'section' && !empty($row['numbered'])) { $numbered[(int) $row['id']] = true; }
+            if ((string) ($row['item_type'] ?? '') === 'practical' && $row['parent_node_id'] !== null) { $withPart[(int) $row['parent_node_id']] = true; }
+        }
+        $holds = static fn(string $html, string $name): bool => preg_match('#\bclass="[^"]*\b' . $name . '\b#', $html) === 1;
+        return array_values(array_filter($rows, static fn(array $row): bool => (string) ($row['item_type'] ?? '') === 'html_lesson'
+            && in_array((string) ($row['type_config']['presentation_role'] ?? ''), ['', 'lesson'], true)
+            && $row['parent_node_id'] !== null && isset($numbered[(int) $row['parent_node_id']]) && !isset($withPart[(int) $row['parent_node_id']])
+            && $holds((string) ($row['content_source'] ?? ''), 'practical') && $holds((string) ($row['content_source'] ?? ''), 'answers')));
+    }
+
+    /**
+     * A lesson's practical tasks and their model answers, as split() takes them, and the lesson without them. Null when
+     * the lesson does not hold both.
+     *
+     * @return array{lesson:string,tasks:string,answers:string}|null
+     */
+    public static function takePractical(string $html): ?array
+    {
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document = HTMLDocument::createFromString('<!doctype html><html><body><div id="cl-restructure-root">' . $html . '</div></body></html>', \Dom\HTML_NO_DEFAULT_NS, 'UTF-8');
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        $root = $document->getElementById('cl-restructure-root');
+        if (!$root instanceof Element) { return null; }
+        $xpath = new XPath($document);
+        $class = static fn(string $name): string => 'contains(concat(" ", normalize-space(@class), " "), " ' . $name . ' ")';
+        $practical = $xpath->query('.//*[' . $class('practical') . ']', $root)->item(0);
+        $answers = $xpath->query('.//*[' . $class('answers') . ']', $root)->item(0);
+        if (!$practical instanceof Element || !$answers instanceof Element) { return null; }
+        $tasks = self::tasks($xpath, $practical, 'task', $document);
+        $model = self::tasks($xpath, $answers, 'answer', $document);
+        if (trim(strip_tags($tasks)) === '' || trim(strip_tags($model)) === '') { return null; }
+        $box = $practical->parentElement;
+        $practical->remove();
+        $answers->remove();
+        if ($box instanceof Element && $box !== $root && $box->firstElementChild === null && trim((string) $box->textContent) === '') { $box->remove(); }
+        return ['lesson' => self::innerHtml($root, $document), 'tasks' => $tasks, 'answers' => $model];
+    }
+
+    /** A Practical work part placed before the module's review study aid or first assessment, or last when it has neither. */
+    private function addPractical(int $courseId, int $section, string $lessonKey, string $tasks, string $answers, int $userId): void
+    {
+        $parts = array_values(array_filter($this->records->structure($courseId), static fn(array $row): bool => (int) ($row['parent_node_id'] ?? 0) === $section));
+        $index = count($parts);
+        foreach ($parts as $i => $row) {
+            if (in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true) || ($row['type_config']['presentation_role'] ?? '') === 'review_study_aid') { $index = $i; break; }
+        }
+        $this->items->createAttached($courseId, [
+            'item_key' => $this->freeKey($lessonKey . '-practical'), 'item_type' => 'practical', 'title' => 'Practical work',
+            'content_source' => $tasks, 'answer_html' => $answers, 'parent_node_id' => (string) $section, 'insert_index' => (string) $index,
+        ], $userId);
+    }
+
     /** A Review Study Aid part placed before the module's first assessment, or last when it has none. */
     private function addReviewAid(int $courseId, int $section, string $lessonKey, string $aid, int $userId): void
     {
@@ -208,11 +299,14 @@ final class CourseRestructurer
      * assessment moved in after them.
      *
      * @param array<string,mixed> $lesson
-     * @param list<array<string,mixed>> $assessments
+     * @param list<array<string,mixed>> $beneath what sits beneath the lesson: its presentation, flash cards and assessments
      * @param array<string,mixed> $report
      */
-    private function arrangeModule(int $courseId, array $lesson, array $assessments, bool $review, int $userId, array &$report): int
+    private function arrangeModule(int $courseId, array $lesson, array $beneath, bool $review, int $userId, array &$report): int
     {
+        $of = static fn(string $type): array => array_values(array_filter($beneath, static fn(array $row): bool => (string) ($row['item_type'] ?? '') === $type));
+        [$decks, $cards] = [$of('slide_deck'), $of('flashcards')];
+        $assessments = array_values(array_filter($beneath, static fn(array $row): bool => !in_array((string) ($row['item_type'] ?? ''), ['slide_deck', 'flashcards'], true)));
         $parts = self::split((string) $lesson['content_source']);
         $title = (string) (($lesson['display_title_override'] ?? '') ?: $lesson['item_title']);
         $subtitle = trim(html_entity_decode(strip_tags((string) ($lesson['description_html'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
@@ -231,6 +325,9 @@ final class CourseRestructurer
             'insert_index' => (string) $position,
         ], $userId);
         $key = (string) $lesson['item_key'];
+        foreach ($decks as $deck) {
+            $this->items->arrange($courseId, [(int) $deck['id']], $section, null, $userId);
+        }
         if ($parts['video'] !== null) {
             $this->items->createAttached($courseId, [
                 'item_key' => $this->freeKey($key . '-video'), 'item_type' => 'youtube', 'title' => $parts['video']['title'] ?: 'Video',
@@ -249,6 +346,9 @@ final class CourseRestructurer
                 'content_source' => $parts['summary'], 'parent_node_id' => (string) $section,
             ], $userId);
             $report['summaries']++;
+        }
+        foreach ($cards as $set) {
+            $this->items->arrange($courseId, [(int) $set['id']], $section, null, $userId);
         }
         if ($parts['practical'] !== null) {
             $this->items->createAttached($courseId, [
@@ -331,8 +431,11 @@ final class CourseRestructurer
         $answers = $xpath->query('.//*[' . $class('answers') . ']', $root)->item(0);
         if ($practical instanceof Element && $answers instanceof Element) {
             $result['practical'] = ['tasks' => self::tasks($xpath, $practical, 'task', $document), 'answers' => self::tasks($xpath, $answers, 'answer', $document)];
+            // The box the blocks sat in (the original files' <div class="blocks">) goes too when nothing else is in it.
+            $box = $practical->parentElement;
             $practical->remove();
             $answers->remove();
+            if ($box instanceof Element && $box !== $root && $box->firstElementChild === null && trim((string) $box->textContent) === '') { $box->remove(); }
             $result['changed'] = true;
         }
 
@@ -433,6 +536,8 @@ final class CourseRestructurer
         $body = $inner instanceof Element ? $inner : $block;
         $html = '';
         foreach ($body->childNodes as $child) {
+            // The block's own heading, when it has no inner box, is the file's and not the part's (2026-11-01).
+            if ($child instanceof Element && strtolower($child->tagName) === 'summary') { continue; }
             if ($child instanceof Element && in_array(strtolower($child->tagName), ['ol', 'ul'], true) && $xpath->query('./li/*[contains(concat(" ", normalize-space(@class), " "), " ex-t ")]', $child)->length > 0) {
                 foreach ($xpath->query('./li', $child) as $li) {
                     if (!$li instanceof Element) { continue; }
@@ -443,8 +548,11 @@ final class CourseRestructurer
                     $produce = '';
                     if ($out instanceof Element) {
                         $label = $xpath->query('./b', $out)->item(0);
+                        // A "Verifiable" line says how to check a result, not what the learner produces (2026-11-01).
+                        $verifiable = $label instanceof Element && stripos((string) $label->textContent, 'verifiable') === 0;
                         if ($label instanceof Element) { $label->remove(); }
-                        $produce = '<p class="produce"><strong>What you produce:</strong> ' . self::innerHtml($out, $document) . '</p>';
+                        $produce = $verifiable ? '<p class="check"><strong>How to check:</strong> ' . self::innerHtml($out, $document) . '</p>'
+                            : '<p class="produce"><strong>What you produce:</strong> ' . self::innerHtml($out, $document) . '</p>';
                         $out->remove();
                     }
                     $html .= '<section class="' . $kind . '"><h3>' . self::e($title) . '</h3><div>' . self::innerHtml($li, $document) . '</div>' . $produce . '</section>';

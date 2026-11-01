@@ -68,6 +68,9 @@ if ($action === 'create') {
     $practical = $items->createAndPlace($id, $in + ['item_key' => $key . '-practical', 'item_type' => 'practical', 'title' => 'Practical work',
         'content_source' => '<section class="task"><h3>Task 1: Do a jar test</h3><p>Fill a jar a third with soil.</p></section>', 'answer_html' => '<section class="answer"><h3>Task 1: Do a jar test</h3><p>Sand settles first, then silt, then clay.</p></section>'], $admin['id']);
     $second = $items->addSection($id, ['title' => 'Planting', 'show_outline' => '1', 'numbered' => '1'], $admin['id']);
+    // A course stylesheet with loud rules for headings, paragraphs and buttons, confined as an import confines one: the
+    // lesson takes them and the presentation player keeps its own design (owner, 2026-11-01).
+    $container->get(\CattoLearning\Course\CourseService::class)->updatePresentationCss($id, '.cl-course-presentation h2, .cl-course-presentation h3 {color: rgb(200, 0, 0); font-family: "Courier New", monospace; border-bottom: 4px solid rgb(200, 0, 0)} .cl-course-presentation p {letter-spacing: 3px} .cl-course-presentation button {background: rgb(200, 0, 0)}', $admin['id']);
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Course parts browser', $admin['email']);
     $state = ['token' => $token, 'course_id' => $id, 'slug' => $course['slug'], 'module' => $module, 'second_module' => $second,

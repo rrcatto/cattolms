@@ -42,7 +42,7 @@
 {% block body %}
 
 								{{ session.diagnostic_message_html|raw }}
-								<p>This diagnostic does not affect your course grade, progress or certificate.</p>
+								<p>This diagnostic does not affect your course grade or certificate.</p>
 
 {% endblock %}
 {% endembed %}
@@ -57,7 +57,7 @@
 										{% for item in session.diagnostic_remediation_items %}
 											{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
-{% if item.node_id %}<a href="/learn/{{ session.slug }}/item/{{ item.node_id }}/content{{ is_preview ? '?preview=1' : '' }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
+{% if item.node_id %}<a href="{{ item_base|default('/learn/' ~ session.slug ~ '/item/') }}{{ item.node_id }}/content{{ item_query|default(is_preview ? '?preview=1' : '') }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
 {% endblock %}
 {% endembed %}
 										{% endfor %}

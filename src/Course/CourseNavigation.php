@@ -41,4 +41,53 @@ final class CourseNavigation
         if ($index === false) { return ['previous' => null, 'next' => null]; }
         return ['previous' => $sequence[$index - 1] ?? null, 'next' => $sequence[$index + 1] ?? null];
     }
+
+    /**
+     * The outline with each done part, and each section whose every part is done, marked is_done.
+     *
+     * @param list<array<string,mixed>> $structure
+     * @param array<int,true> $done
+     * @return list<array<string,mixed>>
+     */
+    public static function withDone(array $structure, array $done): array
+    {
+        $parts = [];
+        foreach ($structure as $row) {
+            if ((string) $row['node_type'] === 'item') { $parts[] = $row; }
+        }
+        $parentOf = [];
+        foreach ($structure as $row) { $parentOf[(int) $row['id']] = $row['parent_node_id'] === null ? null : (int) $row['parent_node_id']; }
+        $sections = [];
+        foreach ($parts as $part) {
+            for ($parent = $parentOf[(int) $part['id']] ?? null; $parent !== null; $parent = $parentOf[$parent] ?? null) {
+                $sections[$parent]['all'] = ($sections[$parent]['all'] ?? 0) + 1;
+                $sections[$parent]['done'] = ($sections[$parent]['done'] ?? 0) + (isset($done[(int) $part['id']]) ? 1 : 0);
+            }
+        }
+        foreach ($structure as &$row) {
+            $count = $sections[(int) $row['id']] ?? null;
+            $row['is_done'] = (string) $row['node_type'] === 'item' ? isset($done[(int) $row['id']]) : ($count !== null && $count['done'] === $count['all']);
+        }
+        unset($row);
+        return $structure;
+    }
+
+    /**
+     * A visitor's progress through a public preview (owner, 2026-11-01): every part in the outline they are shown, and
+     * how many of them are done. A learner's progress is counted by CourseItemRepository::partsProgressJoin().
+     *
+     * @param list<array<string,mixed>> $structure
+     * @param array<int,true> $done
+     * @return array{total:int,done:int,percentage:int}
+     */
+    public static function progress(array $structure, array $done): array
+    {
+        $total = 0; $count = 0;
+        foreach ($structure as $row) {
+            if ((string) ($row['node_type'] ?? '') !== 'item') { continue; }
+            $total++;
+            if (isset($done[(int) $row['id']])) { $count++; }
+        }
+        return ['total' => $total, 'done' => $count, 'percentage' => $total > 0 ? (int) round($count / $total * 100) : 0];
+    }
 }

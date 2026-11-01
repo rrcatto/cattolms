@@ -72,6 +72,9 @@ final class CatwalkSlideDeckTest extends TestCase
         yield 'cta in a module' => [['kind' => 'intro', 'slides' => [['layout' => 'cta', 'title' => 'Buy', 'heading' => 'Buy', 'text' => 'Now', 'actions' => ['enrol']]]], 'belongs only in a trailer'];
         yield 'trailer without cta' => [['kind' => 'trailer', 'slides' => [$deck['slides'][0]]], 'A trailer ends with a call to action'];
         yield 'too many slides' => [['kind' => 'intro', 'slides' => array_fill(0, 26, $deck['slides'][0])], 'at most 25 slides'];
+        // A field is named as the slide form names it, never "the what the picture shows" (2026-11-01).
+        yield 'description too long' => [['kind' => 'intro', 'slides' => [['layout' => 'picture', 'title' => 'P', 'alt' => str_repeat('a', 401), 'picture' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>']]], 'Slide 1 (Picture): "What the picture shows, for screen readers" may be at most 400 characters.'];
+        yield 'HTML in a phrase field' => [array_replace_recursive($deck, ['slides' => [2 => ['explanation' => 'Dry <b>leaves</b>']]]), 'Slide 3 (Quick question): "Why it is right" is plain text, without < or >.'];
         yield 'not a picture' => [['kind' => 'intro', 'slides' => [['layout' => 'picture', 'title' => 'P', 'alt' => 'A', 'picture' => 'https://example.test/x.png']]], 'SVG drawing, a PNG or a JPEG'];
     }
 

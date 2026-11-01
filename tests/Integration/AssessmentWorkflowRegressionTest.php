@@ -11,6 +11,9 @@ Description:
 Protects practice-vs-graded assessment semantics, attempt limits, module completion, final assessment calculation and learner course completion.
 
 Changelog:
+2026/11/01 SAST
+- Progress counts every part done (owner, 2026-11-01): a practice attempt leaves the assessment not done, a graded
+  submission makes it done.
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 
@@ -86,8 +89,9 @@ final class AssessmentWorkflowRegressionTest extends TestCase
                 ['enrolment_id' => $enrolmentId, 'assessment_id' => $moduleAssessmentId]
             );
             self::assertSame(0, (int) $attemptCount[0]['total']);
-            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->assessmentProgress($enrolmentId, $courseId);
-            self::assertSame(0, $progress['submitted']);
+            // A practice attempt leaves the assessment not done (progress counts parts done, owner 2026-11-01).
+            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->partsProgress($enrolmentId);
+            self::assertSame(0, $progress['done']);
 
             $graded = $assessments->startAttempt($learnerId, $slug, $gradedItem['node_id'], $gradedItem['key'], 'graded');
             $gradedResult = $assessments->respond(
@@ -108,9 +112,9 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             self::assertSame(100.0, (float) $attempt[0]['percentage']);
             self::assertContains($attempt[0]['passed'], [true, 1, '1', 't', 'true']);
 
-            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->assessmentProgress($enrolmentId, $courseId);
-            self::assertSame(1, $progress['submitted']);
-            self::assertSame(50, $progress['percentage']);
+            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->partsProgress($enrolmentId);
+            self::assertSame(1, $progress['done'], 'The submitted assessment is done.');
+            self::assertSame((int) round(100 / $progress['total']), $progress['percentage']);
 
             try {
                 $assessments->startAttempt($learnerId, $slug, $gradedItem['node_id'], $gradedItem['key'], 'graded');

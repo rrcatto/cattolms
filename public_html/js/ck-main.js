@@ -467,6 +467,11 @@
             if (instances.has(element) || element.dataset.ckeditorInitialising === '1') {
                 return;
             }
+            // An editor in a closed disclosure (each section's Edit section form on Course Content, 2026-11-01) starts
+            // when it is opened, so a page of many sections does not start an editor for each.
+            if (element.closest('details:not([open])')) {
+                return;
+            }
 
             element.dataset.ckeditorInitialising = '1';
             const config = {
@@ -520,6 +525,13 @@
     }, true);
 
     document.addEventListener('DOMContentLoaded', () => initialiseEditors(document));
+
+    // A disclosure opened: its editors start (toggle does not bubble, so it is heard on the way down).
+    document.addEventListener('toggle', event => {
+        if (event.target instanceof HTMLDetailsElement && event.target.open) {
+            initialiseEditors(event.target);
+        }
+    }, true);
 
     window.CattoLearningEditors = {
         initialise: initialiseEditors,

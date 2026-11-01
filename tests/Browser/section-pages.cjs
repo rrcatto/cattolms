@@ -23,14 +23,14 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter(slug => fs.exist
 const only = (process.env.CATTO_THEMES || '').split(',').filter(Boolean);
 const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
 
-// The 70 menu pages: Account, Company, Administration and Mailing (its own menu since 2026-10-28), as their menus list
-// them, and the fixture company's page.
+// The 71 menu pages: Account, Company, Administration and Mailing (its own menu since 2026-10-28), as their menus list
+// them (Course Page Layouts since 2026-11-01), and the fixture company's page.
 const pages = [
   '/account', '/account/dashboard', '/account/profile', '/account/billing', '/account/emails', '/account/social',
   '/account/courses', '/account/certificates', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
   '/company', '/company/dashboard', '/company/profile', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
   '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/orders', '/company/wallet', '/company/billing',
-  '/admin', '/admin/dashboard', '/admin/courses', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
+  '/admin', '/admin/dashboard', '/admin/courses', '/admin/courses/page-layouts', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
   '/admin/courses/tags', '/admin/course-reviews', '/admin/bundles', '/admin/certificates/designs', '/admin/course/requests',
   '/admin/course/enrolments', '/admin/people', '/admin/people/signup-attempts', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
   '/admin/commerce/orders', '/admin/commerce/refund-requests', '/admin/wallets', '/admin/promotions', '/admin/commerce/documents',

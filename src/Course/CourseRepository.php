@@ -13,6 +13,8 @@ The Administration course list and the public published catalogue are bounded an
 the home page asks for only the handful of courses it renders.
 
 Changelog:
+2026/11/01 SAST
+- My Courses' progress counts every part done (owner, 2026-11-01, decision 2A): CourseItemRepository::partsProgressJoin().
 2026/10/26 SAST
 - Administration -> Courses rows carry the course's cover (cover_svg) for its card in grid view (owner, 2026-10-26).
 2026/10/23 SAST
@@ -615,7 +617,7 @@ final class CourseRepository
     private static function courseAdministrationDetail(): string
     {
         return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position, c.cover_svg,
-                    c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id,
+                    c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id, c.category_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,
                     COALESCE(NULLIF(trim(concat_ws(' ',ou.first_name,ou.last_name)),''),ou.display_name,oue.email) AS owner_person_name,
@@ -627,7 +629,9 @@ final class CourseRepository
                     /* Order lines that bought the course, on its own or in a bundle: such a course is never deleted (owner, 2026-10-21). */
                     ((SELECT COUNT(*) FROM commerce_order_items oi WHERE oi.course_id=c.id) + (SELECT COUNT(*) FROM commerce_bundle_grants bg WHERE bg.course_id=c.id))::int AS bought_lines,
                     dpv.price_minor_units AS default_price_minor_units, dpv.was_price_minor_units AS default_was_price_minor_units,
-                    dpv.currency_code AS default_currency_code, dpv.access_period_seconds AS default_price_access_period_seconds
+                    dpv.currency_code AS default_currency_code, dpv.access_period_seconds AS default_price_access_period_seconds,
+                    /* Its default price and how many price options it has: a row edits the default price only while it is the one (owner, 2026-11-01). */
+                    dpv.id AS default_price_id, (SELECT COUNT(*)::int FROM course_price_variants pv WHERE pv.course_id=c.id) AS price_option_count
              FROM page
              JOIN courses c ON c.id=page.id
              LEFT JOIN course_categories cc ON cc.id=c.category_id
@@ -635,6 +639,20 @@ final class CourseRepository
              LEFT JOIN companies oc ON oc.id=c.owner_company_id
              LEFT JOIN users ou ON ou.id=c.owner_user_id
              LEFT JOIN user_emails oue ON oue.user_id=ou.id AND oue.is_primary=TRUE";
+    }
+
+    /**
+     * One course's Administration row, as the list draws it: what a row edited in place draws again (owner, 2026-11-01).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function adminCourse(int $courseId): ?array
+    {
+        $rows = $this->normaliseRows($this->db->fetchAllAssociative(
+            PageQuery::deferred('SELECT c.id FROM courses c WHERE c.id = :id', self::courseAdministrationDetail(), self::ADMIN_COURSE_ORDER, 1, 0),
+            ['id' => $courseId]
+        ));
+        return $rows[0] ?? null;
     }
 
     /** Total courses in the Administration list; every join above is a LEFT join, so membership is simply `courses`. */
@@ -1453,20 +1471,13 @@ final class CourseRepository
     }
 
     /**
-     * The course's own layout of its catalogue page, or null when it follows the site's default (Page Builder, 2026-10-30).
+     * Every position courses have in the catalogue, for the next free number in a range (CataloguePositions).
      *
-     * @return list<array{id:string,width:string,shown:bool}>|null
+     * @return list<int>
      */
-    public function pageLayout(int $courseId): ?array
+    public function cataloguePositions(): array
     {
-        $json = $this->db->fetchOne('SELECT page_layout FROM courses WHERE id = :id', ['id' => $courseId]);
-        return is_string($json) && $json !== '' ? CoursePageLayout::normalise(json_decode($json, true)) : null;
-    }
-
-    /** @param list<array{id:string,width:string,shown:bool}>|null $layout Null: the site's default. */
-    public function setPageLayout(int $courseId, ?array $layout): void
-    {
-        $this->db->executeStatement('UPDATE courses SET page_layout = CAST(:layout AS JSONB), updated_at = NOW() WHERE id = :id', ['layout' => $layout === null ? null : json_encode(CoursePageLayout::normalise($layout), JSON_THROW_ON_ERROR), 'id' => $courseId]);
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT catalogue_position FROM courses WHERE catalogue_position IS NOT NULL'));
     }
 
     public function setCataloguePosition(int $courseId, ?int $position): void
@@ -2237,18 +2248,18 @@ final class CourseRepository
 
         $detail = "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.level, c.status AS course_status,
                     cc.name AS category_name,
-                    assessment_progress.assessment_count,
-                    assessment_progress.submitted_assessment_count,
+                    part_progress.part_count,
+                    part_progress.done_part_count,
                     cr.overall_percentage, cr.grade_code AS overall_grade_code,
                     cert.public_id AS certificate_public_id,
                     (SELECT MIN(e.access_started_at) FROM commerce_entitlements e WHERE e.enrolment_id = ce.id AND e.access_started_at IS NOT NULL) AS access_started_at
              FROM %s
              LEFT JOIN course_categories cc ON cc.id = c.category_id
-             " . CourseItemRepository::assessmentProgressJoin() . "
+             " . CourseItemRepository::partsProgressJoin() . "
              LEFT JOIN course_results cr ON cr.enrolment_id = ce.id
              LEFT JOIN certificates cert ON cert.enrolment_id = ce.id AND cert.revoked_at IS NULL
              %s
-             GROUP BY ce.id, c.id, cc.name, cr.overall_percentage, cr.grade_code, cert.public_id,assessment_progress.assessment_count,assessment_progress.submitted_assessment_count";
+             GROUP BY ce.id, c.id, cc.name, cr.overall_percentage, cr.grade_code, cert.public_id,part_progress.part_count,part_progress.done_part_count";
 
         // A limit of zero means the learner's whole library, which the API, the MCP surface and the
         // administrator's view of a learner all ask for. There is nothing to defer then: every

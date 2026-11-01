@@ -19,9 +19,7 @@
 {% if ask_follow|default(false) %}<input type="hidden" name="course_id" value="{{ course.id }}">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me the updates written about this course by email. I can stop at any time.'})} %}{% block control %}<input type="checkbox" name="follow_course" value="1">{% endblock %}{% endembed %}{% endif %}
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit', icon: 'action-start'}) }}{% endblock %}{% endembed %}</form>
 {% elseif course.first_stop_path|default(null) %}
-<nav class="cl-course-item-paging" aria-label="Course content">
-<span></span>{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: course.first_stop_path ~ preview_query, icon: 'action-start'}) }}
-</nav>
+{% include '@platform/partials/course-item-paging.html.twig' with {paging_base: '', paging_previous: null, paging_next: null, paging_next_link: {href: course.first_stop_path ~ preview_query, label: 'Begin course →', icon: 'action-start'}} %}
 {% endif %}
 {% if not is_preview and course.certificate|default(null) %}
 <p class="cl-course-certificate-links">{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id, icon: 'action-view'}) }} {{ ui('action.link', {label: 'Download certificate PDF', variant: 'secondary', size: 'small', href: '/certificates/' ~ course.certificate.public_id ~ '/certificate.pdf', icon: 'action-download'}) }}{% if course.certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', size: 'small', href: '/transcripts/' ~ course.certificate.transcript_public_id, icon: 'action-view'}) }}{% endif %} {{ ui('action.link', {label: 'Who can see them', variant: 'quiet', size: 'small', href: '/account/certificates#certificate-' ~ course.certificate.id, icon: 'action-share'}) }}</p>

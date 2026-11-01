@@ -97,6 +97,10 @@ final class SectionCapabilityParityTest extends TestCase
         foreach (['/../../src/Http/ViewIdentity.php', '/../../src/Application/PlatformAdministrationService.php'] as $file) {
             $source .= (string) file_get_contents(__DIR__ . $file);
         }
+        // A partial drawn by another Administration page (a course's Page layout tab, 2026-11-01) has its flags set there.
+        foreach (glob(__DIR__ . '/../../src/Http/Controller/Admin*Controller.php') ?: [] as $file) {
+            $source .= (string) file_get_contents($file);
+        }
 
         $read = [];
         foreach (glob(__DIR__ . '/../../resources/views/partials/admin/*.twig') ?: [] as $file) {

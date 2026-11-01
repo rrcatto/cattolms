@@ -1,0 +1,73 @@
+{#
+	One course's row in Administration > Courses (shown in the list, and drawn again after it is edited in place,
+	owner 2026-11-01). Variables: course (the list's row), arrange (dragged into the catalogue's order),
+	can_delete_courses, courses_quick_edit (the reader may edit it here), courses_list_href (the list's address, to add
+	edit= to), csrf; course_saved marks a row just saved.
+#}
+									<tr id="course-{{ course.id }}" data-course-id="{{ course.id }}" data-course-title="{{ course.title }}"{% if course_saved|default(false) %} data-course-saved{% endif %}>
+										<td class="cl-course-position">
+											{% if arrange %}<button type="button" class="cl-row-handle" aria-label="Move {{ course.title }}" aria-describedby="course-order-keys" data-course-order-target="handle" data-action="pointerdown->course-order#arm keydown->course-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
+											<span data-position>{{ course.catalogue_position|default('') }}</span>
+										</td>
+										<td><code class="cl-course-code">{{ course.code }}</code></td>
+										{# The whole title wraps (owner, 2026-10-20): two courses that differ only at the end, such as the parts of a series, stay told apart. #}
+										<td class="cell-text">
+											<strong><a href="/admin/courses/{{ course.id }}">{{ course.title }}</a></strong>{% if course_saved|default(false) %}<span class="visually-hidden" role="status">Saved</span>{% endif %}
+										</td>
+										<td>
+											{# What the course is sold at now, first, then its was price struck through and its period; blank when no price is set (owner, 2026-10-20). #}
+											{% if course.price %}<strong class="cl-price-now">{{ course.price.price_label }}</strong><br><small class="cl-text-muted">{% if course.price.was_label %}<s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s> · {% endif %}{{ course.price.period_label }}</small>{% endif %}
+										</td>
+										<td>
+											{{ ui('feedback.badge', {label: (course.status|ucfirst), tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}
+										</td>
+										<td>
+											{{ course.learner_count }}
+										</td>
+										<td>
+											{{ course.updated_at }}
+										</td>
+										<td>
+											{{ ui('feedback.badge', {label: (course.category_name ?: 'Uncategorised'), tone: 'neutral'}) }}
+										</td>
+										<td title="{{ course.owner_company_name }}">
+											<strong>{{ course.owner_company_name ?: '—' }}</strong>
+											<br>
+											<small class="cl-text-muted">{% if course.owner_user_id %}{{ ui('data.person', {name: course.owner_person_name, reference: course.owner_person_reference|default(''), href: '/admin/people/' ~ course.owner_user_id}) }}{% else %}—{% endif %}</small>
+										</td>
+										<td class="cell-actions">
+	{# Edited in place (owner, 2026-11-01): the row becomes its form, without JavaScript the list again with the row open. #}
+	{% if courses_quick_edit|default(false) %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ course.title ~ ' here', title: 'Edit the code, title, price and category here', icon: 'action-edit', icon_only: true, variant: 'quiet', size: 'small', href: courses_list_href ~ 'edit=' ~ course.id ~ '#course-' ~ course.id, get: '/admin/courses/' ~ course.id ~ '/row?mode=edit&view=list' ~ (arrange ? '&arrange=1' : ''), target: 'closest tr', swap: 'outerHTML'}) }}{% endif %}
+											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
+{% block body %}
+
+													{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id), icon: 'action-manage'}) }}
+													{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/preview', icon: 'action-preview'}) }}
+													{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/export', icon: 'action-export'}) }}
+													{% if arrange %}
+														{% for move in [['up', 'Move up', 'action-move-up'], ['down', 'Move down', 'action-move-down'], ['top', 'Move to the top', 'action-move-top']] %}
+														<form action="/admin/courses/{{ course.id }}/catalogue-move" method="post">
+															<input type="hidden" name="csrf" value="{{ csrf }}">
+															<input type="hidden" name="direction" value="{{ move[0] }}">
+															{{ ui('action.button', {label: move[1], variant: 'secondary', size: 'small', type: 'submit', icon: move[2]}) }}
+														</form>
+														{% endfor %}
+													{% endif %}
+													{% if can_delete_courses %}
+														<form action="/admin/courses/{{ course.id }}/reset" method="post">
+															<input type="hidden" name="csrf" value="{{ csrf }}">
+															{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'submit', confirm: 'Reset ' ~ (course.title) ~ '? This removes all course content and learner test data but keeps the empty course shell for re-import.', icon: 'action-reset'}) }}
+														</form>
+														{# Never for a course that was bought: its orders, invoices and receipts are kept for good (owner, 2026-10-21). #}
+														{% if not course.bought_lines %}
+														<form action="/admin/courses/{{ course.id }}/delete" method="post">
+															<input type="hidden" name="csrf" value="{{ csrf }}">
+															{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Permanently delete ' ~ (course.title) ~ ' and all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}
+														</form>
+														{% endif %}
+													{% endif %}
+
+{% endblock %}
+{% endembed %}
+										</td>
+									</tr>

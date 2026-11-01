@@ -16,7 +16,7 @@
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 {% block body %}
 {% if assessment.assessment_type == 'diagnostic' %}
-{{ ui('data.stat-card', {label: 'Course grade', value: 'Not affected'}) }}{{ ui('data.stat-card', {label: 'Assessment progress', value: 'Not affected'}) }}{{ ui('data.stat-card', {label: 'Attempts', value: assessment.maximum_attempts ? assessment.maximum_attempts : 'Unlimited'}) }}{{ ui('data.stat-card', {label: 'Passing result', value: 'Readiness guidance'}) }}
+{{ ui('data.stat-card', {label: 'Course grade', value: 'Not affected'}) }}{{ ui('data.stat-card', {label: 'Course progress', value: 'Ticked once finished'}) }}{{ ui('data.stat-card', {label: 'Attempts', value: assessment.maximum_attempts ? assessment.maximum_attempts : 'Unlimited'}) }}{{ ui('data.stat-card', {label: 'Passing result', value: 'Readiness guidance'}) }}
 {% else %}
 {{ ui('data.stat-card', {label: 'Recorded result', value: assessment.score_policy|ucfirst ~ ' score'}) }}{{ ui('data.stat-card', {label: 'Incorrect answers', value: assessment.negative_marking ? 'Configured negative points' : 'Zero points'}) }}{{ ui('data.stat-card', {label: 'Skipped', value: 'Zero points'}) }}{{ ui('data.stat-card', {label: 'Minimum result', value: '0%'}) }}
 {% endif %}
@@ -41,8 +41,6 @@
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info', section_spacing: true})} %}{% block surface_body %}<h2 class="h4">Commit to the assessment</h2><p>Your result policy is <strong>{{ assessment.score_policy|ucfirst }}</strong>. {% if attempts_limited %}You may make {{ assessment.maximum_attempts }} graded attempt{{ assessment.maximum_attempts == 1 ? '' : 's' }}.{% else %}{{ assessment.practice ? 'Practice attempts are unlimited and do not affect your course grade.' : 'Graded attempts are unlimited.' }}{% endif %}</p>{% if can_start_graded %}<form action="{{ start_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="graded">{{ ui('action.button', {label: assessment.practice ? 'Start practice assessment' : 'Start graded assessment', variant: 'primary', size: 'large', type: 'submit', icon: 'action-start'}) }}</form>{% else %}{{ ui('feedback.notice', {tone: 'warning', heading: 'No graded attempts remain.'}) }}{% endif %}{% endblock %}{% endembed %}
 {% endif %}
 {% endif %}
-<nav class="cl-course-item-paging" aria-label="Course Content">
-{% if assessment.previous_node %}{% set previous_is_assessment = assessment.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Previous', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ assessment.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ assessment.previous_node.item_key : '/content') ~ preview_query, icon: 'action-previous'}) }}{% endif %}
-{% if assessment.next_node %}{% set next_is_assessment = assessment.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ assessment.next_node.id ~ (next_is_assessment ? '/assessment/' ~ assessment.next_node.item_key : '/content') ~ preview_query, icon: 'action-next'}) }}{% endif %}
-</nav>
+{% set public_preview = is_public_preview|default(false) %}
+{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_base: public_preview ? '/courses/' ~ course.slug ~ '/preview/' : '/learn/' ~ course.slug ~ '/item/', paging_query: public_preview ? course.public_preview_query|default('') : preview_query, paging_previous: assessment.previous_node, paging_next: assessment.next_node} %}
 {% endblock %}

@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for assessment records.
 
 Changelog:
+2026/11/01 SAST
+- A skipped question keeps its number and waits behind the others, the skipped ones coming back in the order they
+  were skipped: renumbering it had shown "Question 4 of 3".
 2026/09/08 19:52 SAST
 - The session question's options are fetched with a named list parameter that DBAL expands, rather than hand-built positional placeholders.
 2026/08/12 23:56 SAST
@@ -182,7 +185,7 @@ final class AssessmentRepository
                  FROM assessment_session_questions sq
                  JOIN assessment_questions q ON q.id=sq.question_id
                  WHERE sq.session_id=:session_id AND sq.response_status='skipped'
-                 ORDER BY sq.sequence LIMIT 1",
+                 ORDER BY sq.submitted_at NULLS FIRST, sq.sequence LIMIT 1",
                 ['session_id' => $sessionId]
             );
         }
@@ -236,17 +239,13 @@ final class AssessmentRepository
         }
         $row = $this->normalise($rows[0]);
         if ($skip) {
-            $this->db->fetchAllAssociative(
-                "WITH next_sequence AS (
-                     SELECT COALESCE(MAX(sequence),0)+1 AS value
-                     FROM assessment_session_questions
-                     WHERE session_id=:session_id
-                 )
-                 UPDATE assessment_session_questions
+            // A skipped question keeps its number and waits behind the others, the skipped ones coming back in the order
+            // they were skipped (nextQuestion); renumbering it had shown "Question 4 of 3" (2026-11-01).
+            $this->db->executeStatement(
+                "UPDATE assessment_session_questions
                  SET response_status='skipped', selected_option_id=NULL, is_correct=NULL,
                      points_awarded=0, submitted_at=NOW(),
-                     response_seconds=GREATEST(0, EXTRACT(EPOCH FROM (NOW()-COALESCE(presented_at,NOW())))::int),
-                     sequence=(SELECT value FROM next_sequence)
+                     response_seconds=GREATEST(0, EXTRACT(EPOCH FROM (NOW()-COALESCE(presented_at,NOW())))::int)
                  WHERE session_id=:session_id AND question_id=:question_id",
                 ['session_id' => $sessionId, 'question_id' => $questionId]
             );

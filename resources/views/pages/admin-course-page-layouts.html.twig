@@ -1,0 +1,124 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		Administration → Courses → Course Page Layouts (owner, 2026-11-01, the accepted mockup: "templates I can create,
+		name, edit and apply to my courses"). The layouts as cards, drawn small, the default marked, and every course with
+		the layout its page uses and the blocks its page leaves out, by feature cards, with Apply to the ticked courses.
+		Every form works without JavaScript.
+	#}
+	{% set ph_kicker = 'Courses' %}
+	{% set ph_title = 'Course Page Layouts' %}
+	{% set ph_lead = 'Your layouts for a course\'s catalogue page, under its header. Every course uses one of them, or a custom layout of its own.' %}
+	{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New layout', href: '/admin/courses/page-layouts/new', variant: 'primary', size: 'normal', icon: 'action-add'}) }}{% endset %}{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'How a course gets its layout', heading_level: 2, summary: 'Each course chooses one of three on its Page layout tab. A block with nothing to show on a course is left out of that course\'s page.'}) }}
+			<ul class="cl-page-layout-kinds">
+				<li>{{ ui('feedback.badge', {label: 'Default layout', tone: 'info'}) }}<strong>The default layout</strong><span>Every course that has not chosen another. A new course starts on it. Make default chooses which layout it is.</span></li>
+				<li>{{ ui('feedback.badge', {label: 'Your layout', tone: 'neutral'}) }}<strong>One of your layouts</strong><span>Chosen by name on the course's Page layout tab, or given to many courses below. Editing the layout changes every course that uses it.</span></li>
+				<li data-kind="custom">{{ ui('feedback.badge', {label: 'Custom · this course only', tone: 'warning'}) }}<strong>A custom layout</strong><span>Made on one course's Page layout tab, for that course alone. Nothing on this page changes it, and it can be saved as one of your layouts.</span></li>
+			</ul>
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'your-layouts'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Your layouts', heading_level: 2, summary: 'Name, edit and copy them here. A layout no course uses can be deleted, except the default.'}) }}
+			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Your layouts'})} %}{% block body %}
+				{% for lay in layouts %}
+				{% embed ui_template('data.card') with {props: ui_props('data.card', {title: lay.name, href: '/admin/courses/page-layouts/' ~ lay.id, picture: 'square'})} %}
+				{% block picture %}<span class="cl-page-sketch cl-page-sketch--card" aria-hidden="true"><span class="cl-page-sketch-fixed">Header</span>{% for cell in lay.cells %}<span data-block="{{ cell.id }}" data-width="{{ cell.width }}">{{ cell.name }}</span>{% endfor %}</span>{% endblock %}
+				{% block details %}
+					<div class="role-list">{% if lay.is_default %}{{ ui('feedback.badge', {label: 'Default layout', tone: 'info'}) }}{% endif %}</div>
+					{% if lay.purpose %}<p class="cl-ui-card-line">{{ lay.purpose }}</p>{% endif %}
+					<p class="cl-ui-card-line">Used by {{ lay.courses }} {{ lay.courses == 1 ? 'course' : 'courses' }} · Changed {{ lay.updated_at|date('j M Y') }}</p>
+					{% if lay.hidden %}<p class="cl-ui-card-line cl-ui-card-quiet">Hidden in this layout: {{ lay.hidden|join(', ') }}</p>{% endif %}
+					{% if can_manage and (lay.is_default or lay.courses > 0) %}<p class="cl-ui-card-line cl-ui-card-quiet">{{ lay.is_default ? 'The default layout cannot be deleted. Make another the default first.' : 'Used by ' ~ lay.courses ~ (lay.courses == 1 ? ' course' : ' courses') ~ ': give ' ~ (lay.courses == 1 ? 'it' : 'them') ~ ' another layout before deleting it.' }}</p>{% endif %}
+				{% endblock %}
+				{% block actions %}
+					{{ ui('action.link', {label: can_manage ? 'Edit' : 'Open', href: '/admin/courses/page-layouts/' ~ lay.id, variant: 'secondary', size: 'small', icon: can_manage ? 'action-edit' : 'action-open', aria_label: (can_manage ? 'Edit ' : 'Open ') ~ lay.name}) }}
+					{% if can_manage %}
+					<form action="/admin/courses/page-layouts/{{ lay.id }}/copy" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Copy', variant: 'secondary', size: 'small', icon: 'action-copy', aria_label: 'Copy ' ~ lay.name}) }}</form>
+					{% if not lay.is_default %}
+					<form action="/admin/courses/page-layouts/{{ lay.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', icon: 'action-default', aria_label: 'Make ' ~ lay.name ~ ' the default layout'}) }}</form>
+					{% endif %}
+					<form action="/admin/courses/page-layouts/{{ lay.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', icon: 'action-remove', aria_label: 'Delete ' ~ lay.name, disabled: lay.is_default or lay.courses > 0, confirm: 'Delete the layout "' ~ lay.name ~ '"? This cannot be undone.'}) }}</form>
+					{% endif %}
+				{% endblock %}
+				{% endembed %}
+				{% endfor %}
+			{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
+	</section>
+
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'courses-layouts'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Courses and their layouts', heading_level: 2, summary: 'What each course\'s page uses, and the blocks its page leaves out because the course has nothing for them. Open a course for its Page layout tab.'}) }}
+			{% set pl_icons = {
+				all: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+				default: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
+				layout: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/></svg>',
+				custom: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
+			} %}
+			{% set pl_cards = [] %}
+			{% for value, label in show_choices %}
+				{% set pl_cards = pl_cards|merge([{value: value, label: label, icon: pl_icons[value], note: show_counts[value] == 1 ? '1 course' : show_counts[value] ~ ' courses'}]) %}
+			{% endfor %}
+			<form class="cl-library-lists" method="get" action="/admin/courses/page-layouts#courses-layouts" data-choose-submits>
+				{{ ui('form.picture-choice', {name: 'show', legend: 'Which courses to show', id: 'page-layout-show', size: 'small', columns: 'auto', selected: show, items: pl_cards}) }}
+				<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+			</form>
+			{% if courses %}
+			<form action="/admin/courses/page-layouts/apply" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="show" value="{{ show }}">
+				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every course in catalogue order with the layout its page uses'})} %}
+{% block header %}
+					<tr>
+						{% if can_manage %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Tick'}} %}{% endif %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Code'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Course'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Layout in use'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 28, label: 'Left out on its page'}} %}
+					</tr>
+{% endblock %}
+{% block body %}
+					{% for course in courses %}
+					<tr>
+						{% if can_manage %}<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Tick'})} %}{% block control %}<input type="checkbox" name="courses[]" value="{{ course.id }}" aria-label="Tick {{ course.code }} {{ course.title }}">{% endblock %}{% endembed %}</td>{% endif %}
+						<td><code class="cl-course-code">{{ course.code }}</code></td>
+						<td class="cell-text"><a href="/admin/courses/{{ course.id }}?tab=page-layout">{{ course.title }}</a>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: course.status == 'draft' ? 'neutral' : 'warning', size: 'small'}) }}{% endif %}</td>
+						<td>{% if course.choice == 'custom' %}{{ ui('feedback.badge', {label: 'Custom · this course only', tone: 'warning'}) }}{% elseif course.choice == 'default' %}{{ ui('feedback.badge', {label: 'Default layout: ' ~ course.layout_name, tone: 'info'}) }}{% else %}{{ ui('feedback.badge', {label: course.layout_name, tone: 'neutral'}) }}{% endif %}</td>
+						<td class="cell-text">{{ course.left_out ? course.left_out|map(block => block.name ~ ' (' ~ block.reason ~ ')')|join(', ') : 'Nothing' }}</td>
+					</tr>
+					{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% if can_manage %}
+				<div class="cl-page-layout-apply">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Give the ticked courses', for: 'page-layout-apply', help: 'A course with a custom layout keeps it, to choose again on its Page layout tab.'})} %}
+{% block control %}<select class="cl-select" id="page-layout-apply" name="layout" {{ ui_field_attrs(props) }}>
+						<option value="0">The default layout (whichever it is)</option>
+						{% for lay in layouts %}<option value="{{ lay.id }}">{{ lay.name }}{{ lay.is_default ? ' (by name)' : '' }}</option>{% endfor %}
+					</select>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Apply', variant: 'primary', size: 'normal', icon: 'action-done'}) }}{% endblock %}
+{% endembed %}
+				</div>
+				{% endif %}
+			</form>
+			{% else %}
+			<p>{{ show == 'all' ? 'There are no courses on this site yet.' : 'No course uses this kind of layout.' }}</p>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

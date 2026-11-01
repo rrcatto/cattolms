@@ -27,40 +27,6 @@ final class AssessmentService
     {
     }
 
-    /**
-     * Anonymous preview deliberately writes no enrolment, attempt, progress or grade records.
-     * @param array<int|string,mixed>|null $answers
-     * @return array<string,mixed>
-     */
-    public function publicPreview(string $slug, int $nodeId, string $key, ?array $answers = null, bool $authorisedDraftPreview = false): array
-    {
-        $course = $this->courses->findBySlug(Slug::validate($slug), !$authorisedDraftPreview);
-        if ($course === null) { throw new InvalidArgumentException('The course does not exist.'); }
-        $context = $this->itemRecords->placement((int) $course['id'], $nodeId);
-        if ($context === null || !$context['public_preview']) { throw new InvalidArgumentException('This Course Item is not public.'); }
-        $assessment = null;
-        foreach ($this->itemRecords->reachableItems((int) $context['course_item_id']) as $item) {
-            if ($item['item_key'] === $key && in_array($item['item_type'], ['assessment','diagnostic'], true)) { $assessment = $item; break; }
-        }
-        if ($assessment === null) { throw new InvalidArgumentException('This assessment is not part of the public Course Item.'); }
-        $questions = $this->itemRecords->questions((int) $assessment['id'], true);
-        $score = 0.0; $possible = 0.0;
-        foreach ($questions as &$question) {
-            $selected = (int) ($answers[(int) $question['id']] ?? 0); $correct = false; $valid = false;
-            foreach ($question['options'] as $option) {
-                if ((int) $option['id'] === $selected) { $valid = true; $correct = (bool) $option['is_correct']; }
-            }
-            if ($selected !== 0 && !$valid) { throw new InvalidArgumentException('An answer does not belong to this question.'); }
-            $possible += (float) $question['points'];
-            $score += $correct ? (float) $question['points'] : ($selected && $assessment['negative_marking'] ? (float) $question['incorrect_points'] : 0);
-            $question['selected_option_id'] = $selected;
-            $question['answered_correctly'] = $correct;
-        }
-        unset($question);
-        $course['structure'] = $this->items->availability((int) $course['id'], null, true);
-        return ['course' => $course, 'assessment' => $assessment, 'questions' => $questions, 'submitted' => $answers !== null, 'percentage' => $possible > 0 ? round(max(0, $score) / $possible * 100, 2) : 0.0];
-    }
-
     /** @return array<string,mixed> */
     public function overview(int $userId, string $slug, int $nodeId, string $itemKey, bool $preview = false): array
     {
@@ -83,7 +49,7 @@ final class AssessmentService
         $attemptMode = $assessment['assessment_type'] === 'diagnostic' ? 'diagnostic' : 'graded';
         $used = $this->assessments->completedAttemptCount((int) $enrolment['id'], $assessment['id'], $nodeId, $attemptMode);
         $maximum = !empty($assessment['practice']) || $assessment['maximum_attempts'] === null || $assessment['maximum_attempts'] === '' ? null : (int) $assessment['maximum_attempts'];
-        return ['course' => $course, 'enrolment' => $enrolment, 'assessment' => $assessment, 'attempts_used' => $used, 'attempts_remaining' => $maximum === null ? null : max(0, $maximum - $used), 'attempts_limited' => $maximum !== null, 'can_start_graded' => $maximum === null || $used < $maximum, 'is_preview' => $preview, 'is_diagnostic' => $assessment['assessment_type'] === 'diagnostic', 'time_limit_label' => $this->durationLabel((int) ($assessment['time_limit_seconds'] ?? 1800))];
+        return ['course' => $course, 'enrolment' => $enrolment, 'assessment' => $assessment, 'attempts_used' => $used, 'attempts_remaining' => $maximum === null ? null : max(0, $maximum - $used), 'attempts_limited' => $maximum !== null, 'can_start_graded' => $maximum === null || $used < $maximum, 'is_preview' => $preview, 'is_diagnostic' => $assessment['assessment_type'] === 'diagnostic', 'time_limit_label' => self::durationLabel((int) ($assessment['time_limit_seconds'] ?? 1800))];
     }
 
     /** @return array<string,mixed> */
@@ -98,7 +64,7 @@ final class AssessmentService
         $active = $this->assessments->activeSession((int) $enrolment['id'], (int) $assessment['id'], $nodeId, $mode);
         if ($active !== null) { return $active; }
         if ($mode !== 'practice' && !$overview['can_start_graded']) { throw new InvalidArgumentException($diagnostic ? 'No diagnostic attempts remain.' : 'No graded assessment attempts remain.'); }
-        $questions = $this->selectQuestions($assessment, $mode);
+        $questions = $this->drawQuestions($assessment, $mode);
         if ($questions === []) { throw new InvalidArgumentException('No eligible questions are available for this assessment.'); }
         $session = $this->transactions->run(fn(): array => $this->assessments->createSession((int) $enrolment['id'], $assessment, $mode, $questions));
         $this->audit->record($userId, 'assessment.started', ['course_item_id' => (int) $assessment['id'], 'structure_node_id' => $nodeId, 'session_id' => (int) $session['id'], 'mode' => $mode, 'preview' => (bool) $enrolment['is_preview']]);
@@ -115,7 +81,7 @@ final class AssessmentService
         $question = $this->assessments->nextQuestion((int) $session['id']);
         if ($question === null) { return $this->finalise($session, false); }
         $this->assessments->markPresented((int) $session['id'], (int) $question['question_id']);
-        $session['question'] = $question; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['remaining_seconds'] = $this->remainingSeconds($session); $session['timer_label'] = $this->timerLabel($session['remaining_seconds']);
+        $session['question'] = $question; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['remaining_seconds'] = $this->remainingSeconds($session); $session['timer_label'] = self::timerLabel($session['remaining_seconds']);
         return $session;
     }
 
@@ -145,16 +111,18 @@ final class AssessmentService
     {
         $session = $this->requireSession($userId, $publicId); $responses = $this->assessments->sessionResponses((int) $session['id']);
         foreach ($responses as &$response) { $response['has_response_seconds'] = $response['response_seconds'] !== null && $response['response_seconds'] !== ''; } unset($response);
-        $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = $this->timerLabel($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
+        $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = self::timerLabel($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
         if ($session['is_diagnostic']) { $passed = (float) ($session['percentage'] ?? 0) + .0001 >= (float) ($session['pass_mark'] ?? 50); $session['diagnostic_passed'] = $passed; $session['diagnostic_message_html'] = $passed ? (string) ($session['result_pass_html'] ?? '') : (string) ($session['result_fail_html'] ?? ''); $session['diagnostic_remediation_items'] = $this->remediationItems($responses, (int) $session['course_id']); }
         return $session;
     }
 
     /**
+     * The questions an attempt in this mode asks, for a learner's attempt and a visitor's in the public preview alike.
+     *
      * @param array<string,mixed> $assessment
      * @return list<array<string,mixed>>
      */
-    private function selectQuestions(array $assessment, string $mode): array
+    public function drawQuestions(array $assessment, string $mode): array
     {
         $all = $this->itemRecords->questions((int) $assessment['id'], true); $poolMode = (string) ($assessment['practice_pool_mode'] ?? 'both');
         // A diagnostic asks every question it holds: it never counts towards a grade, so it has no graded or practice pool,
@@ -275,12 +243,19 @@ final class AssessmentService
      * @param list<array<string,mixed>> $bands
      * @return array<string,mixed>
      */
-    private function band(float $percentage, array $bands): array { foreach ($bands as $band) { if ($percentage + .0001 >= (float) $band['minimum_percentage']) { return $band; } } return ['grade_code' => 'N/A', 'grade_label' => 'Not graded', 'is_passing' => false]; }
+    private function band(float $percentage, array $bands): array { return self::gradeBand($percentage, $bands); }
+    /**
+     * The course's grade band a percentage falls in, for a learner's attempt and a visitor's in the public preview.
+     *
+     * @param list<array<string,mixed>> $bands
+     * @return array<string,mixed>
+     */
+    public static function gradeBand(float $percentage, array $bands): array { foreach ($bands as $band) { if ($percentage + .0001 >= (float) $band['minimum_percentage']) { return $band; } } return ['grade_code' => 'N/A', 'grade_label' => 'Not graded', 'is_passing' => false]; }
     /** @param array<string,mixed> $session */
     private function remainingSeconds(array $session): int { return max(0, (strtotime((string) $session['deadline_at']) ?: time()) - time()); }
     /** @param array<string,mixed> $session */
     private function elapsedSeconds(array $session): int { $start = strtotime((string) $session['started_at']) ?: time(); $end = strtotime((string) ($session['completed_at'] ?? '')) ?: time(); return max(0, $end - $start); }
-    private function timerLabel(int $seconds): string { return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60); }
+    public static function timerLabel(int $seconds): string { return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60); }
     /** A time limit in the words every length of time is stated in (Support\Duration, owner 2026-10-26): "1 hour 30 minutes". */
-    private function durationLabel(int $seconds): string { return Duration::ofSeconds(max(1, $seconds))->words(); }
+    public static function durationLabel(int $seconds): string { return Duration::ofSeconds(max(1, $seconds))->words(); }
 }

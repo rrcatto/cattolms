@@ -1,0 +1,92 @@
+{#
+	A course's Page layout tab (owner, 2026-11-01, the accepted Course Page Layouts mockup; "courses should definitely be
+	able to have custom layouts, but it's need to be clear"): what the page uses now, then the three choices with Save
+	beside them (owner, 2026-10-31, option B: choosing changes nothing until Save). The default layout or one of the
+	layouts is drawn for this course, with the blocks it leaves out and why, and a link to edit it there, since editing
+	it changes every course that uses it. A custom layout, for this course only, is the Page Builder in a dashed frame;
+	it is kept while another is chosen. Without JavaScript Save sends the choice and the page drawn again shows it; with
+	it (page_layout_choice_controller.js) choosing shows what it means at once. Variables: pl (AdminCourseController::
+	pageLayoutView), course, csrf.
+#}
+{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{% set pl_now = pl.choice == 'custom' ? 'its custom layout' : (pl.choice == 'default' ? 'the default layout, ' ~ pl.shared.name : pl.shared.name) %}
+<form id="page-layout-form" class="cl-page-layout-form" action="/admin/courses/{{ course.id }}/page-layout" method="post" autocomplete="off"
+	data-controller="page-layout-choice unsaved-changes"
+	data-page-layout-choice-layouts-value="{{ pl.layouts_json }}" data-page-layout-choice-default-id-value="{{ pl.default.id }}" data-page-layout-choice-present-value="{{ pl.present }}"
+	data-unsaved-changes-leave-value="nav[aria-label='Course tools'] a, [data-page-layout-leave] a, a[data-page-layout-leave]">
+	<input type="hidden" name="csrf" value="{{ csrf }}">
+
+	<div class="cl-page-builder-part">
+		<p class="cl-page-layout-now"><strong>This course's page uses</strong>
+			{% if pl.choice == 'custom' %}{{ ui('feedback.badge', {label: 'Custom · this course only', tone: 'warning'}) }}<span>Its own layout, changed here only.</span>
+			{% elseif pl.choice == 'default' %}{{ ui('feedback.badge', {label: 'Default layout', tone: 'info'}) }}<span>{{ pl.shared.name }}, which {{ pl.shared.courses }} {{ pl.shared.courses == 1 ? 'course uses' : 'courses use' }}.</span>
+			{% else %}{{ ui('feedback.badge', {label: pl.shared.name, tone: 'neutral'}) }}<span>One of your layouts, which {{ pl.shared.courses }} {{ pl.shared.courses == 1 ? 'course uses' : 'courses use' }}.</span>{% endif %}
+			{% if pl.can_view_layouts %}<span data-page-layout-leave>{{ ui('action.link', {label: 'Course Page Layouts', href: '/admin/courses/page-layouts', variant: 'quiet', size: 'small', icon: 'action-view-list'}) }}</span>{% endif %}
+		</p>
+		{{ ui('form.picture-choice', {name: 'source', legend: 'Choose the layout', id: 'page-layout-source', size: 'small', selected: pl.choice, items: [
+			{value: 'default', label: 'Default layout',
+				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
+				note: 'Follows whichever layout is the default, now ' ~ pl.default.name ~ '. Changes to it reach this course.'},
+			{value: 'layout', label: 'One of your layouts',
+				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/></svg>',
+				note: 'Follows the layout chosen below. Changes to it reach this course and every other course that uses it.'},
+			{value: 'custom', label: 'Custom layout',
+				icon: '<svg ' ~ icon_attributes ~ '><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+				note: 'For this course only. Nothing else changes it, and it changes nothing else.'},
+		]}) }}
+		{# Always shown without JavaScript; with it, only while One of your layouts is chosen. #}
+		<div class="cl-page-layout-which" data-page-layout-choice-target="which">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Which of your layouts', for: 'page-layout-layout', help: 'Used when One of your layouts is chosen.'})} %}
+{% block control %}<select class="cl-select" id="page-layout-layout" name="layout_id" data-page-layout-choice-target="select" {{ ui_field_attrs(props) }}>
+			{% for lay in pl.layouts %}<option value="{{ lay.id }}"{% if lay.id == pl.layout_id %} selected{% endif %}>{{ lay.name }}{{ lay.is_default ? ' (the default layout)' : '' }}</option>{% endfor %}
+		</select>{% endblock %}
+{% endembed %}
+		</div>
+		<div class="cl-page-builder-savebar">
+			<p class="cl-page-builder-status" role="status" data-unsaved-changes-target="status" data-saved="Saved. This course uses {{ pl_now }}. Choosing changes nothing until you press Save." data-changed="Not saved yet. Press Save to keep this change.">Saved. This course uses {{ pl_now }}. Choosing changes nothing until you press Save.</p>
+			{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}
+		</div>
+		{% if pl.choice != 'custom' and pl.has_custom %}<p class="help">This course has a custom layout kept from before. Choose Custom layout and Save to use it again.</p>{% endif %}
+	</div>
+
+	{# The default layout or one of the layouts, drawn for this course. #}
+	<div class="cl-page-builder-part cl-page-layout-shared" data-page-layout-choice-target="shared"{% if pl.choice == 'custom' %} hidden{% endif %}>
+		<div class="cl-page-builder-work">
+			<div>
+				<h3 class="h5" data-page-layout-choice-target="name">{{ pl.shared.name }}</h3>
+				<p data-kind="default" data-page-layout-choice-target="kind"{% if pl.choice != 'default' %} hidden{% endif %}>The default layout. If another layout is made the default, this course follows it.</p>
+				<p data-kind="layout" data-page-layout-choice-target="kind"{% if pl.choice != 'layout' %} hidden{% endif %}>One of your layouts, chosen by name: this course keeps it whichever layout is the default.</p>
+				<p data-page-layout-choice-target="courses">{{ pl.shared.courses == 1 ? '1 course uses it.' : pl.shared.courses ~ ' courses use it.' }}</p>
+				<p>Nothing to arrange here: this course follows the layout. Editing the layout changes every course that uses it. To change this course alone, choose Custom layout.</p>
+				{% if pl.can_view_layouts %}<span data-page-layout-leave data-page-layout-choice-target="edit" data-base="/admin/courses/page-layouts/">{{ ui('action.link', {label: pl.can_manage_layouts ? 'Edit this layout' : 'Open this layout', href: '/admin/courses/page-layouts/' ~ pl.shared.id, variant: 'secondary', size: 'normal', icon: pl.can_manage_layouts ? 'action-edit' : 'action-open'}) }}</span>{% endif %}
+			</div>
+			<aside class="cl-page-builder-preview" aria-labelledby="page-layout-shared-sketch">
+				<h3 class="h5" id="page-layout-shared-sketch">This course's page, as visitors see it</h3>
+				{% include '@platform/partials/admin/page-sketch.html.twig' with {ps: pl.shared.sketch, ps_target: 'page-layout-choice'} %}
+			</aside>
+		</div>
+	</div>
+
+	{# Its custom layout, for this course only, in a dashed frame. #}
+	<div class="cl-page-builder-part cl-page-layout-custom" data-page-layout-choice-target="custom"{% if pl.choice != 'custom' %} hidden{% endif %}>
+		<div class="cl-page-layout-custom-head">
+			{{ ui('feedback.badge', {label: 'Custom · this course only', tone: 'warning'}) }}
+			<h3 class="h5">{{ course.code }}'s custom layout</h3>
+			<p>Changes here change this course's page and no other. Editing your layouts on Course Page Layouts never changes it.</p>
+		</div>
+		{% include '@platform/partials/admin/page-layout-builder.html.twig' with {plb: pl.builder, plb_sketch: pl.sketch, plb_present: pl.present, plb_start_layouts: pl.layouts, plb_layouts_json: pl.layouts_json} %}
+		{% if pl.can_manage_layouts %}
+		<div class="cl-page-layout-save-as">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Save it as one of your layouts', for: 'page-layout-new-name', help: 'A name for the layout. This course then uses it, other courses can too, and the custom layout is kept.'})} %}
+{% block control %}<input class="cl-input" id="page-layout-new-name" type="text" name="layout_name" maxlength="80" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{{ ui('action.button', {label: 'Save as a layout', variant: 'secondary', size: 'normal', name: 'action', value: 'save_as', icon: 'action-copy'}) }}
+		</div>
+		{% endif %}
+	</div>
+
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{% if course.status == 'published' %}<span data-page-layout-leave>{{ ui('action.link', {label: 'View the page', variant: 'secondary', size: 'normal', href: '/courses/' ~ course.slug, icon: 'action-preview'}) }}</span>{% endif %}<span data-page-layout-leave>{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: '/admin/courses/' ~ course.id ~ '?tab=page-layout', icon: 'action-cancel'}) }}</span>{% endblock %}
+{% endembed %}
+</form>

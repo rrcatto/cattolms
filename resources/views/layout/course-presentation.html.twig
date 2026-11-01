@@ -6,7 +6,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} · {{ app.name }}</title>
 {% for resourceUrl in platform.styles %}<link rel="stylesheet" href="{{ resourceUrl }}">{% endfor %}
-{% if course.presentation_css|default('') %}<style>{{ course.presentation_css|raw }}</style>{% endif %}
+{# The course's own styles, kept away from the presentation player (owner, 2026-11-01: "make the player keep its own design"). #}
+{% if course.presentation_css|default('') %}<style>{{ course.presentation_css|course_styles|raw }}</style>{% endif %}
 </head>
 <body class="cl-course-presentation-shell" data-cl-course-reader="1">
 {% set public_preview = is_public_preview|default(false) %}
@@ -19,7 +20,7 @@
 <strong>{{ course.title }}</strong>
 {% if course.remaining_access_label|default('') %}<span>Access remaining: {{ course.remaining_access_label }}</span>{% endif %}
 </header>
-{% if course.progress|default(null) %}<div class="cl-course-reader-progress progress-strip"><div class="ps-inner"><div class="ps-row"><span class="ps-label">Course progress, <b>{{ course.progress.submitted|default(0) }} of {{ course.progress.total|default(0) }} assessed items</b></span><span class="ps-pct">{{ course.progress.percentage|default(0) }}%</span></div>{{ ui('feedback.progress', {value: course.progress.percentage|default(0), label: 'Course progress', size: 'normal'}) }}</div></div>{% endif %}
+{% if course.progress|default(null) %}<div class="cl-course-reader-progress progress-strip"><div class="ps-inner"><div class="ps-row"><span class="ps-label">Course progress, <b>{{ course.progress.done|default(0) }} of {{ course.progress.total|default(0) }} parts done</b></span><span class="ps-pct">{{ course.progress.percentage|default(0) }}%</span></div>{{ ui('feedback.progress', {value: course.progress.percentage|default(0), label: 'Course progress', size: 'normal'}) }}</div></div>{% endif %}
 <div class="cl-course-reader">
 <nav class="cl-course-outline" aria-label="Course outline">
 <h2 class="cl-course-outline-title">Course Modules</h2>
@@ -27,7 +28,7 @@
 <a class="cl-course-outline-introduction{% if on_introduction %} is-current{% endif %}"{% if on_introduction %} aria-current="page"{% endif %} href="{{ public_preview ? '/courses/' ~ course.slug ~ '/preview' ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ presentation_query }}">Course introduction</a>
 {% for node in course.structure|default([]) %}
 {# A section is labelled "Section: <title>" and carries cl-course-outline-section, which styles its label however it is rendered (link, plain or locked). The prefix is presentation only. #}
-<div class="cl-course-outline-item cl-course-depth-{{ node.depth }}{% if node.node_type == 'section' %} cl-course-outline-section{% endif %}{% if node.assessment_role|default('content') == 'graded' %} cl-course-outline-assessment{% endif %}{% if course.current_node_id|default(0) == node.id %} is-current{% endif %}">
+<div class="cl-course-outline-item cl-course-depth-{{ node.depth }}{% if node.node_type == 'section' %} cl-course-outline-section{% endif %}{% if node.assessment_role|default('content') == 'graded' %} cl-course-outline-assessment{% endif %}{% if course.current_node_id|default(0) == node.id %} is-current{% endif %}{% if node.is_done|default(false) %} is-done{% endif %}">
 {% set node_title = node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) %}
 {% set is_assessment = node.node_type == 'item' and node.item_type in ['assessment', 'diagnostic'] %}
 {# A module's section is numbered by the site, "Module 3: Evidence" (owner, 2026-10-28, decision 4A); the parts in it carry their kind above the title and their time below it. #}
@@ -36,7 +37,8 @@
 {% set node_part = node.node_type == 'item' and node.module_of|default(null) is not null ? part_labels[node.part|default('')]|default('') : '' %}
 {% set node_time = node.node_type == 'section' ? (node.section_number|default(null) is not null ? node.total_minutes_label|default('') : '') : (node.module_of|default(null) is not null ? node.minutes_label|default('') : '') %}
 {% set node_href = is_assessment ? (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/assessment/' ~ node.item_key ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/assessment/' ~ node.item_key ~ presentation_query) : (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/content' ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/content' ~ presentation_query) %}
-{% set node_inner %}{% if node_part %}<span class="cl-course-outline-part">{{ node_part }}</span>{% endif %}{{ node_label }}{% if node_time %}<span class="cl-course-outline-time">{{ node_time }}</span>{% endif %}{% endset %}
+{# A big green tick on each part the learner has done, and on a section once every part in it is (owner, 2026-11-01). #}
+{% set node_inner %}{% if node.is_done|default(false) %}<span class="cl-course-outline-done" role="img" aria-label="Completed"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg></span>{% endif %}{% if node_part %}<span class="cl-course-outline-part">{{ node_part }}</span>{% endif %}{{ node_label }}{% if node_time %}<span class="cl-course-outline-time">{{ node_time }}</span>{% endif %}{% endset %}
 {% if node.is_locked and not is_preview|default(false) %}
 <span>Locked: {{ node_inner }}</span><small>Available in {{ node.remaining_delay_label }} ({{ node.unlock_at }})</small>
 {% elseif node.node_type == 'section' and not node.section_introduction_html and not node.show_outline %}

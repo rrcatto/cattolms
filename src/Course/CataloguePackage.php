@@ -77,6 +77,7 @@ final class CataloguePackage
         private readonly AuditRepository $audit,
         private readonly string $storageRoot,
         private readonly ?Catwalk\Narrations $narrations = null,
+        private readonly ?CataloguePositions $positions = null,
     ) {}
 
     /**
@@ -286,6 +287,9 @@ final class CataloguePackage
                         $this->settings->apply($courseId, array_diff_key($block, ['category' => true]), $userId, $prices));
                     $narrated = $this->installNarrations($path, $package['narrations'], $data[$row['file']], $userId);
                     if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
+                    // A new course the package gives no position takes the next free number in its code's range (owner, 2026-11-01).
+                    $placed = $this->positions?->fill($courseId, $userId);
+                    if ($placed !== null) $details[] = 'Position in the catalogue: ' . $placed . ', by its code\'s range';
                     $outcome = array_replace($outcome, ['course_id' => $courseId, 'outcome' => 'imported', 'details' => $details]);
                     $report['counts']['imported']++;
                     $done[$courseId] = ['block' => $block, 'new' => true];

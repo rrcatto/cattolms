@@ -11,6 +11,13 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/11/01 SAST (parts marked complete)
+- course_part_completions: the parts of a course a learner has marked complete (owner, 2026-11-01), counted with the
+  assessments they have submitted in the course's progress.
+2026/11/01 SAST (course page layouts of your own)
+- course_page_layouts: named layouts of course pages that ADMIN makes, edits and deletes, one of them the default
+  (owner, 2026-11-01), the first named Default; courses.page_layout_choice (default, layout or custom) and
+  courses.page_layout_id; courses.page_layout keeps the course's custom layout while another is chosen.
 2026/10/31 SAST (landing page section widths)
 - course_landing_sections.width: half or full (owner, 2026-10-31); the hero is always full.
 2026/10/30 SAST (course page layouts)
@@ -982,6 +989,26 @@ CREATE INDEX tags_name_idx ON tags(name);
 -- generator, which draws them from the category the course is filed under - so every tag that
 -- exists is a tag something wears.
 
+-- Layouts of course pages (owner, 2026-11-01: "templates I can create, name, edit and apply to my courses"): each a
+-- name, a line saying what it is for and its blocks in order (Course\CoursePageLayout: id, width, shown). Exactly one
+-- is the default, which every course on the default layout follows; the service keeps one and refuses to delete it.
+CREATE TABLE course_page_layouts (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(80) NOT NULL CHECK (btrim(name) <> ''),
+    purpose VARCHAR(160) NOT NULL DEFAULT '',
+    blocks JSONB NOT NULL CHECK (jsonb_typeof(blocks) = 'array'),
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX course_page_layouts_name ON course_page_layouts (lower(name));
+CREATE UNIQUE INDEX course_page_layouts_one_default ON course_page_layouts (is_default) WHERE is_default;
+INSERT INTO course_page_layouts (name, purpose, blocks, is_default) VALUES ('Default', '',
+    '[{"id":"about","width":"half","shown":true},{"id":"how","width":"half","shown":true},{"id":"modules","width":"full","shown":true},{"id":"glance","width":"half","shown":true},{"id":"get","width":"half","shown":true},{"id":"reviews","width":"full","shown":true},{"id":"access","width":"full","shown":true},{"id":"start","width":"full","shown":true},{"id":"related","width":"full","shown":true}]',
+    TRUE);
+
 CREATE TABLE courses (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
@@ -1003,9 +1030,14 @@ CREATE TABLE courses (
     default_access_period_seconds INTEGER NOT NULL DEFAULT 31536000 CHECK (default_access_period_seconds > 0),
     -- The number of a course's first module section: 1, or 0 for a course whose first module sets it up (owner, 2026-10-29).
     first_module_number SMALLINT NOT NULL DEFAULT 1 CHECK (first_module_number IN (0, 1)),
-    -- The course's own layout of its catalogue page, block by block (Page Builder, owner 2026-10-30); NULL follows the
-    -- site's default (Settings > Course pages).
+    -- Which layout the course's catalogue page uses (owner, 2026-11-01): the default layout, one of the layouts
+    -- (page_layout_id), or its custom layout, for this course only (page_layout). The custom layout is kept while
+    -- another is chosen, so choosing Custom layout again brings it back.
+    page_layout_choice VARCHAR(16) NOT NULL DEFAULT 'default' CHECK (page_layout_choice IN ('default','layout','custom')),
+    page_layout_id BIGINT NULL REFERENCES course_page_layouts(id) ON DELETE RESTRICT,
     page_layout JSONB NULL CHECK (page_layout IS NULL OR jsonb_typeof(page_layout) = 'array'),
+    CONSTRAINT courses_page_layout_chosen CHECK ((page_layout_choice = 'layout') = (page_layout_id IS NOT NULL)
+        AND (page_layout_choice <> 'custom' OR page_layout IS NOT NULL)),
     certificate_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     -- The course's own certificate data: an optional accreditation or CPD line, and the design its
     -- certificates are drawn in (a certificate document template). The wording, signatory and look
@@ -1359,6 +1391,16 @@ CREATE TABLE assessment_attempts (
     UNIQUE (enrolment_id, course_item_id, structure_node_id, attempt_number)
 );
 CREATE INDEX assessment_attempts_enrolment_idx ON assessment_attempts(enrolment_id, submitted_at DESC);
+
+-- The parts of a course a learner has marked complete (owner, 2026-11-01): their own tick in the reader's outline, counted
+-- with the assessments they have finished in the course's progress, and never part of grading or a certificate.
+CREATE TABLE course_part_completions (
+    enrolment_id BIGINT NOT NULL REFERENCES course_enrolments(id) ON DELETE CASCADE,
+    structure_node_id BIGINT NOT NULL REFERENCES course_structure_nodes(id) ON DELETE CASCADE,
+    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (enrolment_id, structure_node_id)
+);
+CREATE INDEX course_part_completions_node_idx ON course_part_completions(structure_node_id);
 
 CREATE TABLE assessment_responses (
     attempt_id BIGINT NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,

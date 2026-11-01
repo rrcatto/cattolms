@@ -1,0 +1,18 @@
+import controller_0 from "../../controllers/catalogue_export_controller.js";
+import controller_1 from "../../controllers/category_tree_controller.js";
+import controller_2 from "../../controllers/certificate_preview_controller.js";
+import controller_3 from "../../controllers/course_content_controller.js";
+import controller_4 from "../../controllers/course_order_controller.js";
+import controller_5 from "../../controllers/landing_sections_controller.js";
+import controller_6 from "../../controllers/page_layout_choice_controller.js";
+import controller_7 from "../../controllers/page_layout_controller.js";
+import controller_8 from "../../controllers/popular_courses_controller.js";
+import controller_9 from "../../controllers/presentation_slides_controller.js";
+import controller_10 from "../../controllers/profile_image_controller.js";
+import controller_11 from "../../controllers/slide_editor_controller.js";
+import controller_12 from "../../controllers/slide_strip_controller.js";
+import controller_13 from "../../controllers/tag_cloud_controller.js";
+import controller_14 from "../../controllers/unsaved_changes_controller.js";
+export const eagerControllers = {"catalogue-export": controller_0, "category-tree": controller_1, "certificate-preview": controller_2, "course-content": controller_3, "course-order": controller_4, "landing-sections": controller_5, "page-layout-choice": controller_6, "page-layout": controller_7, "popular-courses": controller_8, "presentation-slides": controller_9, "profile-image": controller_10, "slide-editor": controller_11, "slide-strip": controller_12, "tag-cloud": controller_13, "unsaved-changes": controller_14};
+export const lazyControllers = {};
+export const isApplicationDebug = true;

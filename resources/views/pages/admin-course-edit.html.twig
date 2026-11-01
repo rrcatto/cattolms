@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{# The Page Builder's controller (page_layout, owner 2026-10-30) on the Page layout tab. #}
+{# The Page layout tab's controllers (page_layout_choice and page_layout, owner 2026-10-30 and 2026-11-01). #}
 {% if active_tab == 'page-layout' %}{{ importmap() }}{% endif %}
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
@@ -16,6 +16,7 @@
 			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate', icon: 'action-edit'}) }}{% endif %}
 			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status), icon: 'action-edit'}) }}
 			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
+			{{ ui('action.link', {label: 'Download as one HTML file', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-file', icon: 'action-download', title: 'One HTML file of the whole course: it works on its own in a browser, and importing it gives the course back'}) }}
 			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import', icon: 'action-import'}) }}
 {% endblock %}
 {% endembed %}</nav>
@@ -338,8 +339,8 @@
 			{% endif %}
 
 			{% if active_tab == 'page-layout' %}
-				{{ ui('layout.section-head', {heading: 'Page layout', heading_level: 2, summary: 'How this course\'s catalogue page is laid out under its header. The header itself stays as it is.'}) }}
-				{% include '@platform/partials/admin/page-layout-builder.html.twig' with {plb: page_layout.builder, plb_scope: 'course', plb_action: '/admin/courses/' ~ course.id ~ '/page-layout', plb_own: page_layout.own, plb_default_json: page_layout.default_json, plb_view_href: course.status == 'published' ? '/courses/' ~ course.slug : ''} %}
+				{{ ui('layout.section-head', {heading: 'Page layout', heading_level: 2, summary: 'Which layout this course\'s catalogue page uses under its header. The header itself stays as it is.'}) }}
+				{% include '@platform/partials/admin/course-page-layout-tab.html.twig' with {pl: page_layout} %}
 			{% endif %}
 
 			{% if active_tab == 'grades' %}

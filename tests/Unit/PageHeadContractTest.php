@@ -70,7 +70,6 @@ final class PageHeadContractTest extends TestCase
         'bundle-detail.html.twig' => 'The bundle is the hero, as a course is on its own page.',
         'landing-page.html.twig' => 'A course landing page opens with its hero in the page-head band, as the course page does.',
         'learn-course.html.twig' => 'The core-owned full-screen Course Presentation carries its own compact course header.',
-        'assessment-public-preview.html.twig' => 'The core-owned public assessment preview uses the compact course header.',
         'assessment-overview.html.twig' => 'The core-owned assessment presentation carries its own compact assessment heading.',
         'learn-item.html.twig' => 'The core-owned full-screen Course Presentation carries its own compact course header.',
         'course-public-preview.html.twig' => 'The public Course Presentation preview carries its own compact course header.',

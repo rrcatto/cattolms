@@ -11,6 +11,12 @@ Description:
 Implements Catto Learning business and application logic for learning operations.
 
 Changelog:
+2026/11/01 SAST
+- The outline's ticks come from CourseNavigation::withDone(), which the public preview shares; an assessment ticks itself
+  once finished (a graded attempt, a readiness check, or practice on a practice-only assessment).
+- A learner marks each part of a course complete, and unmarks it (owner, 2026-11-01, decisions 1A and 2A): markPart();
+  the outline carries is_done on each done part and on each section whose every part is done; progress counts every
+  part done (a part ticked, an assessment submitted), not only the assessments, in the reader and in My Courses.
 2026/10/07 SAST
 - The course home's certificate comes from CertificateRepository and is omitted when revoked; certificate() was removed, as CertificateController reads the repository (Phase J).
 2026/08/31 19:05 SAST
@@ -186,9 +192,10 @@ final class LearningService
         foreach ($items as &$item) {
             // What the course card says about its timing (owner, 2026-10-17).
             $item['timing'] = CourseTiming::of($item, new \DateTimeImmutable());
-            $assessmentCount = max(0, (int) ($item['assessment_count'] ?? 0));
-            $assessed = max(0, (int) ($item['submitted_assessment_count'] ?? 0));
-            $item['progress_percentage'] = $assessmentCount > 0 ? min(100, (int) round($assessed / $assessmentCount * 100)) : 0;
+            // Every part done, not only the assessments (owner, 2026-11-01, decision 2A).
+            $parts = max(0, (int) ($item['part_count'] ?? 0));
+            $done = max(0, (int) ($item['done_part_count'] ?? 0));
+            $item['progress_percentage'] = $parts > 0 ? min(100, (int) round($done / $parts * 100)) : 0;
             $item['is_started'] = !empty($item['started_at']);
             $item['is_expired'] = $this->expired($item);
             $item['access_period_label'] = $this->durationLabel((int) $item['access_period_seconds']);
@@ -228,7 +235,11 @@ final class LearningService
         // "Why two click throughs? There should only be one!").
         $first = CourseNavigation::sequence((array) $course['structure'])[0] ?? null;
         $course['first_stop_path'] = $first === null || (!$preview && !empty($first['is_locked'])) ? null : self::stopPath((string) $course['slug'], $first);
-        $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
+        // Every part done counts, not only the assessments (owner, 2026-11-01, decisions 1A and 2A): each part the learner
+        // has marked complete or, for an assessment, submitted carries a tick in the outline, and a section carries one
+        // once every part in it is done.
+        $course['progress'] = $this->courseItemRecords->partsProgress((int) $enrolment['id']);
+        $course['structure'] = CourseNavigation::withDone((array) $course['structure'], $this->courseItemRecords->doneParts((int) $enrolment['id']));
         $course['is_preview'] = $preview;
         $course['access_period_label'] = $this->durationLabel((int) ($enrolment['access_period_seconds'] ?? 0));
         // Whose refund starting ends, for the start page (owner, 2026-10-29): the learner's own when they bought it, their
@@ -348,6 +359,20 @@ final class LearningService
         $course['item'] = $node;
         $course['current_node_id'] = $nodeId;
         return $course;
+    }
+
+    /**
+     * A learner's own tick on a part of the course (owner, 2026-11-01: "a mark complete button which could be a toggle,
+     * so a student could unmark it"), on a part they may open now. An assessment ticks itself once submitted, so it is
+     * never marked by hand (decision 1A); a section ticks itself once every part in it is done.
+     */
+    public function markPart(int $userId, string $slug, int $nodeId, bool $completed, bool $preview = false): void
+    {
+        $course = $this->item($userId, $slug, $nodeId, $preview);
+        $node = (array) $course['item'];
+        if ((string) ($node['node_type'] ?? '') !== 'item') { throw new InvalidArgumentException('A section is complete once every part in it is.'); }
+        if (in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) { throw new InvalidArgumentException('An assessment is complete once you submit it.'); }
+        $this->courseItemRecords->markPart((int) $course['enrolment']['id'], $nodeId, $completed);
     }
 
     /** @param array<string,mixed> $enrolment */

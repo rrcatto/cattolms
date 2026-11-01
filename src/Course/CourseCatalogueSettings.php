@@ -23,8 +23,10 @@ CourseService and the course repository, as ADMIN does on the course's pages:
 
   the category only when the course has none (a category chosen on the site is kept);
   its tags, made exactly the block's (a tag the site lacks is made, with the icon that fits its name);
-  its cover, its catalogue position and its page layout (Page Builder, 2026-10-30: the course's own, a list of
-  {"id", "width", "shown"} blocks, or null for the site's default);
+  its cover, its catalogue position and its page layout (Page Builder, 2026-10-30; owner 2026-11-01): null for the
+  default layout, a list of {"id", "width", "shown"} blocks for its custom layout, or one of the layouts as
+  {"name", "purpose", "blocks"}, which an import finds here by its name, or makes when the site has none of that name
+  (a layout already here keeps its arrangement);
   its prices only for a course the import has just created, and only when asked (owner, 2026-10-23: "use the file's
   prices for new courses only"), never for a course already on the site.
 
@@ -36,6 +38,8 @@ Changelog:
 - Created with the catalogue package.
 2026/10/30 SAST
 - The course's page layout (Page Builder).
+2026/11/01 SAST
+- The page layout names one of the layouts by name, with its blocks, when the course uses one.
 */
 
 declare(strict_types=1);
@@ -55,6 +59,8 @@ final class CourseCatalogueSettings
     public function __construct(
         private readonly CourseService $courses,
         private readonly CourseRepository $repository,
+        private readonly CoursePageLayouts $pageLayouts,
+        private readonly CoursePageLayoutRepository $layoutRepository,
     ) {}
 
     /**
@@ -93,7 +99,7 @@ final class CourseCatalogueSettings
             'position' => $course['catalogue_position'] === null ? null : (int) $course['catalogue_position'],
             'related' => $related,
             'status' => (string) $course['status'],
-            'page_layout' => $this->repository->pageLayout($courseId),
+            'page_layout' => $this->pageLayoutOf($courseId),
             'prices' => $prices,
         ];
     }
@@ -149,7 +155,7 @@ final class CourseCatalogueSettings
             if ($position !== $current) $changes[] = 'Position in the catalogue: ' . ($position ?? 'none');
         }
         $layout = self::pageLayout($block);
-        if ($layout !== false && $layout !== $this->repository->pageLayout($courseId)) $changes[] = self::pageLayoutWords($layout);
+        if ($layout !== false && !$this->usesLayout($courseId, $layout)) $changes[] = $this->pageLayoutWords($layout);
         $missing = array_diff($this->relatedIds($block), $this->repository->relatedCourseIds($courseId));
         if ($missing !== []) $changes[] = 'Related courses: ' . count($missing) . ' added';
         if ($prices && $this->repository->priceVariants($courseId) === [] && (array) ($block['prices'] ?? []) !== []) {
@@ -194,9 +200,14 @@ final class CourseCatalogueSettings
             }
         }
         $layout = self::pageLayout($block);
-        if ($layout !== false && $layout !== $this->repository->pageLayout($courseId)) {
-            $this->repository->setPageLayout($courseId, $layout);
-            $done[] = self::pageLayoutWords($layout);
+        if ($layout !== false && !$this->usesLayout($courseId, $layout)) {
+            $done[] = $this->pageLayoutWords($layout);
+            $layoutId = null;
+            if ($layout['choice'] === 'layout') {
+                $layoutId = $this->layoutRepository->findByName($layout['name'])['id']
+                    ?? $this->pageLayouts->create($layout['name'], $layout['purpose'], $layout['blocks'], $actor);
+            }
+            $this->pageLayouts->choose($courseId, $layout['choice'], $layoutId, $layout['choice'] === 'custom' ? $layout['blocks'] : null, $actor);
         }
         if ($prices && $this->repository->priceVariants($courseId) === []) {
             foreach (self::prices($block) as $price) {
@@ -267,22 +278,61 @@ final class CourseCatalogueSettings
     }
 
     /**
-     * The block's page layout made whole, null for the site's default, or false when the block says nothing of it (an
-     * older package), which leaves the course as it is.
+     * The layout the course's page uses, as the block carries it: null for the default layout, its custom layout's
+     * blocks, or one of the layouts with its name, purpose and blocks.
      *
-     * @param array<string,mixed> $block
-     * @return list<array{id:string,width:string,shown:bool}>|null|false
+     * @return list<array{id:string,width:string,shown:bool}>|array{name:string,purpose:string,blocks:list<array{id:string,width:string,shown:bool}>}|null
      */
-    private static function pageLayout(array $block): array|null|false
+    private function pageLayoutOf(int $courseId): ?array
     {
-        if (!array_key_exists('page_layout', $block)) return false;
-        return is_array($block['page_layout']) ? CoursePageLayout::normalise($block['page_layout']) : null;
+        $uses = $this->pageLayouts->forCourse($courseId);
+        if ($uses['choice'] === 'custom') return $uses['blocks'];
+        if ($uses['choice'] === 'layout' && $uses['layout'] !== null) {
+            $layout = $this->layoutRepository->find($uses['layout']['id']);
+            return ['name' => $uses['layout']['name'], 'purpose' => (string) ($layout['purpose'] ?? ''), 'blocks' => $uses['blocks']];
+        }
+        return null;
     }
 
-    /** @param list<array{id:string,width:string,shown:bool}>|null $layout */
-    private static function pageLayoutWords(?array $layout): string
+    /**
+     * The block's page layout made whole: the default layout (null), a custom layout (a list of blocks) or one of the
+     * layouts by name (an object); false when the block says nothing of it (an older package), which leaves the course
+     * as it is.
+     *
+     * @param array<string,mixed> $block
+     * @return array{choice:string,name:string,purpose:string,blocks:list<array{id:string,width:string,shown:bool}>}|false
+     */
+    private static function pageLayout(array $block): array|false
     {
-        return 'Page layout: ' . ($layout === null ? 'default' : 'custom');
+        if (!array_key_exists('page_layout', $block)) return false;
+        $layout = $block['page_layout'];
+        if (!is_array($layout)) return ['choice' => 'default', 'name' => '', 'purpose' => '', 'blocks' => []];
+        if (array_is_list($layout)) return ['choice' => 'custom', 'name' => '', 'purpose' => '', 'blocks' => CoursePageLayout::normalise($layout)];
+        $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($layout['name'] ?? '')));
+        if ($name === '') return ['choice' => 'default', 'name' => '', 'purpose' => '', 'blocks' => []];
+        return ['choice' => 'layout', 'name' => mb_substr($name, 0, CoursePageLayouts::NAME_MAX), 'purpose' => mb_substr(trim((string) ($layout['purpose'] ?? '')), 0, CoursePageLayouts::PURPOSE_MAX),
+            'blocks' => CoursePageLayout::normalise($layout['blocks'] ?? null)];
+    }
+
+    /** @param array{choice:string,name:string,purpose:string,blocks:list<array{id:string,width:string,shown:bool}>} $layout */
+    private function usesLayout(int $courseId, array $layout): bool
+    {
+        $uses = $this->pageLayouts->forCourse($courseId);
+        return match ($layout['choice']) {
+            'default' => $uses['choice'] === 'default',
+            'custom' => $uses['choice'] === 'custom' && $uses['blocks'] === $layout['blocks'],
+            default => $uses['choice'] === 'layout' && mb_strtolower((string) ($uses['layout']['name'] ?? '')) === mb_strtolower($layout['name']),
+        };
+    }
+
+    /** @param array{choice:string,name:string,purpose:string,blocks:list<array{id:string,width:string,shown:bool}>} $layout */
+    private function pageLayoutWords(array $layout): string
+    {
+        return 'Page layout: ' . match ($layout['choice']) {
+            'default' => 'default',
+            'custom' => 'custom',
+            default => $layout['name'] . ($this->layoutRepository->findByName($layout['name']) === null ? ' (made by this import)' : ''),
+        };
     }
 
     private static function cover(mixed $svg, string $slug): ?string

@@ -1,0 +1,18 @@
+{#
+	A course page drawn small under a layout (owner, 2026-11-01, the accepted Course Page Layouts mockup): the fixed head,
+	then every block of the layout in its order (CoursePageLayouts::sketch), a block hidden in the layout or left out
+	for this course not drawn; then the blocks the layout shows that this course leaves out, each with why. A script
+	(lib/page_sketch.js) redraws the cells it is given and the list from its <template>, so ps_target names the
+	controller whose targets they are. Variables: ps (cells, left_out), ps_target.
+#}
+<div class="cl-page-sketch" aria-hidden="true" data-{{ ps_target }}-target="sketch">
+	<span class="cl-page-sketch-fixed">Cover, title and star</span>
+	<span class="cl-page-sketch-fixed">Watch course presentation</span>
+	{% for cell in ps.cells %}<span data-block="{{ cell.id }}" data-width="{{ cell.width }}" data-reason="{{ cell.reason }}"{% if not cell.drawn %} hidden{% endif %}>{{ cell.name }}</span>{% endfor %}
+</div>
+<div class="cl-page-sketch-left-out" data-{{ ps_target }}-target="leftOut"{% if not ps.left_out %} hidden{% endif %}>
+	<strong>Left out on this course's page</strong>
+	<ul>{% for block in ps.left_out %}<li>{{ block.name }} ({{ block.reason }})</li>{% endfor %}</ul>
+	<p>These blocks have nothing to show on this course, so the blocks after them move up.</p>
+	<template><li></li></template>
+</div>

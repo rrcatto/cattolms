@@ -10,6 +10,9 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/01 SAST (v1.0.4)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.4.
+- Administration -> Courses -> Course Page Layouts, straight under Courses (owner, 2026-11-01).
 2026/10/31 SAST (v1.0.3)
 - Advanced PLATFORM_ASSET_VERSION to 1.0.3.
 2026/10/30 SAST (v1.0.2)
@@ -134,7 +137,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.3';
+    private const PLATFORM_ASSET_VERSION = '1.0.4';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -661,6 +664,11 @@ final class ThemeRenderer
                 $section = $visibleSections[$sectionKey];
                 $grandchildren[] = $child('admin-' . $sectionKey, $section['label'], $section['route'], $section['icon']);
 
+                // The layouts of course pages, straight under Courses (owner, 2026-11-01: "a menu item for Course page
+                // layouts in Administration>Courses, and put the menu-item under Courses").
+                if ($sectionKey === 'courses' && $this->can($data, 'COURSE.MANAGEMENT.VIEW')) {
+                    $grandchildren[] = $child('admin-course-page-layouts', 'Course Page Layouts', '/admin/courses/page-layouts', 'courses');
+                }
                 if ($sectionKey === 'courses' && $this->can($data, 'COURSE.MANAGEMENT.VIEW')) {
                     $grandchildren[] = $child('admin-course-items', 'Course Item Library', '/admin/course-items', 'courses');
                     $grandchildren[] = $child('admin-resources', 'Resource Library', '/admin/resources', 'courses');

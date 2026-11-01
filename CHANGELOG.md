@@ -2,6 +2,42 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-01 — v1.0.4 Mark complete, the public preview as the course itself, course page layouts of your own, and a course as one HTML file
+
+### Installing and updating
+
+- **A clean installation is needed.** The baseline schema gains `course_page_layouts` (named layouts of course pages, one of them the default; a new site starts with one named Default, the starting arrangement), `courses.page_layout_choice` and `courses.page_layout_id`, and `course_part_completions` (the parts of a course a learner has marked complete).
+- **No new `.env` settings, packages, scheduled jobs, third parties or legal text.** Lucide 1.66.0 for the icon library (ISC licence, as before): 17 more icons to choose from for categories and tags, 6 redrawn, none removed.
+- **Removed:** Settings › Course pages (its form, `POST /admin/settings/course-pages`, and the saved `course_page.layout` option, which is no longer read), replaced by Administration › Courses › Course Page Layouts. The course package 3.0 (a zip per course), its schema `resources/course-package/package.schema.json` and `docs/COURSE-PACKAGE.md`: a course is imported as one HTML file written to `docs/COURSE-SPECIFICATION.md`, or as a course JSON 2.1, and catalogue packages are unchanged. Answers posted to a public preview assessment's own address (`POST /courses/{slug}/preview/{node_id}/assessment/{key}`): the public preview now has the learner's assessment pages.
+- **New addresses:** `/admin/courses/page-layouts` (with `/new`, `/{id}`, `/{id}/copy`, `/{id}/default`, `/{id}/delete` and `/apply`), `/admin/courses/{id}/row` (a course edited in place), `/admin/courses/{id}/course-file` (Download as one HTML file), `POST /admin/settings/course-positions`, `POST /learn/{slug}/item/{node_id}/complete`, `POST /courses/{slug}/preview/{node_id}/complete`, `POST /courses/{slug}/preview/{node_id}/assessment/{key}/start` and `/courses/{slug}/preview/assessment/{attempt}` with `/respond`, `/finish` and `/result`.
+- **Progress now counts every part of a course.** A learner's progress figure, everywhere it is shown, is the parts done out of all the course's parts, so learners who had only submitted assessments see a lower figure than before.
+
+### Learning
+
+- **Mark complete.** At the foot of every part of a course, centred between Previous and Next, Mark complete gives the part a big green tick in Course Modules and reads Completed in green. Pressed again, it unmarks the part. A module gets its own tick once every part in it is done. An assessment ticks itself once it is finished (a graded attempt, a readiness check, or practice on an assessment that is practice only) and cannot be ticked by hand. It works without JavaScript.
+- **Progress counts every part done,** not only the assessments: the course's progress bar ("3 of 5 parts done"), My Courses, the Dashboard, Administration's enrolment lists and person page, and the Company workspace. A course presentation (trailer) is not a part. Grading, completion and certificates are unchanged. Help says how it works.
+- **The public preview gives a visitor the course itself.** Mark complete with its ticks and a progress bar, and the learner's own assessment pages: the start page with practice and graded (or the readiness check), one question at a time with the timer, Skip for now and Finish assessment now, practice feedback after each answer, and the result with its question report. Nothing a visitor does is saved anywhere but their own browser session.
+- **Previous, Mark complete and Next keep their places** on every page of a course, in the course, the author's preview and the public preview: Previous at the left, Mark complete centred, Next at the right, Mark complete above them on a phone.
+- **A skipped question keeps its number** when it comes back ("Question 1 of 3", never "Question 4 of 3"), and the skipped questions come back in the order they were skipped.
+- **Course Modules keeps its place** from page to page (it had gone back to its top on every click since v1.0.1).
+- **A course's own stylesheet never reaches the presentation player:** its rules style the lessons, never the slides.
+- **The PDFs of a lesson, summary, flash cards and practical work print code** in a fixed-width type, wrapped at the margin.
+
+### Courses in Administration
+
+- **Course Page Layouts** (Administration › Courses › Course Page Layouts, straight under Courses): your own named layouts of course pages, each with a line on what it is for, made, edited, copied and deleted when unused, one of them the default; every course listed with its layout and what its page leaves out and why, filtered by feature cards, with Apply to the ticked courses; a layout's page with its builder and a sketch for a chosen course. A course's Page layout tab chooses Default layout, One of your layouts, or Custom layout for this course only (kept while another is chosen), with Start again from and Save as a layout. Catalogue packages carry a course's layout by name.
+- **Courses edited in place:** a pencil on each row and card of Administration › Courses turns it into fields for its code, title, category, catalogue position, default price, was price and access period, saved or cancelled without reloading the page. A course without a price gets its default price option there, and a new title keeps the course's web address.
+- **Automatic catalogue positions** (Settings › Course positions): a course arriving with no position takes the next free number in its code prefix's range, in steps of 100, never moving a numbered course.
+- **Section forms:** a section's introduction is written in the rich text editor, and its three switches (Show outline, Numbered module, Public preview) come first as feature-card checkboxes, as does a placement's Public preview.
+- **Download as one HTML file** on the course page gives the course file: one HTML file of the whole course in the course specification's form, which works on its own in a browser and gives the course back when it is imported.
+- **The import review warns of drift:** a part under another name than its fixed one, solutions hidden inside tasks, tasks without model answers, and wording about submitting or marking work. Course Content lifts practical work left in an arranged course's lessons into Practical work parts.
+- **Import fixes:** the course introduction leaves out a readiness check, module, review or final assessment written before the modules (they are imported in their own right); a file whose first module is Module 0 numbers the modules from 0; the grading check reads the introduction's prose only, never a table; the import review no longer stops with an error page for a course JSON; a refused upload's file is no longer kept.
+- **CatWalk's refusals name a field as the slide form does,** in quotes (it read "the what the picture shows, for screen readers").
+
+### Writing courses
+
+- **One document:** `docs/COURSE-SPECIFICATION.md` (version 4.4, with its version, date and author) is all a writer needs, with a complete example the tests import. A course is one HTML file: every module and every part in it, the readiness check, the review and the final assessment each a panel (`<details>` with its `<summary>`), closed at first; a module of a week, about 15 hours; a checked YouTube video in every module; SVG drawings in every lesson; code as `<pre><code>`; each part's fixed name; Module 0 and a module's review study aid. `docs/COURSES.md` describes how CattoLMS handles courses, for developers.
+
 ## 2026-10-31 — v1.0.3 Landing page section widths, the Page Builder's save bar, and every dependency updated
 
 ### Installing and updating

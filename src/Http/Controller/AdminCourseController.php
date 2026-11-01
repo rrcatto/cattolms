@@ -11,6 +11,10 @@ Description:
 Handles web requests for admin course operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/01 SAST
+- Download as one HTML file gives the course file (CourseFile, /admin/courses/{id}/course-file), which works on its own
+  and imports back (owner: "it must export an html file that can be used on its own and also imports back in"); the
+  earlier file, which could not be imported, and its address are gone.
 2026/10/23 SAST
 - The import review gives the course its code (the file's, a replaced course's, else a suggestion), offers the course
   with the file's code for replacement and chooses a course package's category (owner, 2026-10-23).
@@ -84,7 +88,9 @@ final class AdminCourseController extends BaseController
         private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages,
         private readonly \CattoLearning\Course\CourseCatalogueSettings $catalogueSettings,
         private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
-        private readonly \CattoLearning\Course\CoursePageLayouts $pageLayouts
+        private readonly \CattoLearning\Course\CoursePageLayouts $pageLayouts,
+        private readonly \CattoLearning\Course\CourseQuickEdit $quickEdit,
+        private readonly \CattoLearning\Course\CourseFile $courseFile
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -204,8 +210,10 @@ final class AdminCourseController extends BaseController
 
 
     /**
-     * The course's page layout (Page Builder, owner 2026-10-30): its own, or the site's default again. Without JavaScript
-     * a template, a move or Reset is sent with the whole form and saved at once (CoursePageLayouts::fromForm).
+     * Which layout the course's page uses (Page Builder, owner 2026-10-30; owner 2026-11-01): the default layout, one of
+     * the layouts, or its custom layout, for this course only. Save sends the choice; without JavaScript a move, a block
+     * hidden or shown, or Start again from changes the custom layout and saves it at once (CoursePageLayouts::fromForm).
+     * Save as one of your layouts makes the custom layout a layout of its own, which the course then uses.
      */
     #[Route('/admin/courses/{id}/page-layout', name: 'admin_course_page_layout', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function savePageLayout(): Response
@@ -217,11 +225,113 @@ final class AdminCourseController extends BaseController
         $back = self::tabUrl($courseId, 'page-layout') . '#page-layout-form';
         return $this->handle(function () use ($courseId, $user, $back): void {
             [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
-            $default = $action === 'reset' || ($action === 'save' && (string) ($_POST['source'] ?? 'own') === 'default');
-            $this->pageLayouts->saveForCourse($courseId, $default ? null : $layout, $user->id);
-            $this->flash('success', $default ? 'This course\'s page uses the default layout.' : 'The custom layout of this course\'s page was saved.');
+            if ((string) ($_POST['action'] ?? '') === 'save_as') {
+                if (!$user->hasPermission('SYSTEM.SETTING.MANAGE')) throw new InvalidArgumentException('Making a layout needs permission to manage settings.');
+                $name = trim((string) ($_POST['layout_name'] ?? ''));
+                $this->pageLayouts->saveAsLayout($courseId, $name, $layout, $user->id);
+                $this->flash('success', 'The custom layout is one of your layouts now, "' . $name . '", and this course uses it. Its custom layout is kept.');
+            } elseif (str_starts_with($action, 'start:')) {
+                $from = $this->pageLayouts->layout((int) substr($action, 6));
+                $this->pageLayouts->choose($courseId, 'custom', null, $from['blocks'], $user->id);
+                $this->flash('success', 'The custom layout starts again from "' . $from['name'] . '" and was saved. Change it below.');
+            } elseif ($action !== 'save') {
+                $this->flash('success', $this->pageLayouts->choose($courseId, 'custom', null, $layout, $user->id));
+            } else {
+                $source = (string) ($_POST['source'] ?? 'default');
+                $this->flash('success', $this->pageLayouts->choose($courseId, $source, (int) ($_POST['layout_id'] ?? 0) ?: null, $source === 'custom' ? $layout : null, $user->id));
+            }
             $this->redirect($back);
         }, $back);
+    }
+
+    /**
+     * A course's row (or, with view=grid, its card) in Administration > Courses, edited in place (owner, 2026-11-01):
+     * mode=edit draws it as its form, otherwise as it is (Cancel). For htmx only that row or card is sent; an ordinary
+     * request (no JavaScript) goes back to the list, with the row open for mode=edit.
+     */
+    #[Route('/admin/courses/{id}/row', name: 'admin_course_row', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function courseRow(): Response
+    {
+        $user = $this->requirePermission('COURSE.EDIT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        $edit = ($_GET['mode'] ?? '') === 'edit';
+        if (!$this->isHtmxRequest()) {
+            $this->redirect('/admin/courses' . ($edit ? '?edit=' . $courseId : '') . '#course-' . $courseId);
+        }
+        return $this->courseRowFragment($user, $courseId, $edit, (string) ($_GET['view'] ?? 'list'), !empty($_GET['arrange']), self::listHref((string) ($_SERVER['HTTP_HX_CURRENT_URL'] ?? '')));
+    }
+
+    /**
+     * Saves a row edited in place: the code, title and category, and the default price when the row may change it
+     * (CourseQuickEdit). For htmx the row or card comes back as it now is, or as it was typed with why it was refused;
+     * without JavaScript the list comes back with a message.
+     */
+    #[Route('/admin/courses/{id}/row', name: 'admin_course_row_save', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function saveCourseRow(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        $list = self::listHref((string) ($_POST['return'] ?? ''));
+        $view = (string) ($_POST['view'] ?? 'list');
+        $back = rtrim($list, '?&') . '#course-' . $courseId;
+        try {
+            $this->quickEdit->save($courseId, $_POST, $user->id, $user->hasPermission('COURSE.PRICING.MANAGE'));
+        } catch (InvalidArgumentException|\RuntimeException $refused) {
+            if (!$this->isHtmxRequest()) {
+                $this->flash('danger', $refused->getMessage());
+                $this->redirect($list . 'edit=' . $courseId . '#course-' . $courseId);
+            }
+            return $this->courseRowFragment($user, $courseId, true, $view, !empty($_POST['arrange']), $list, $refused->getMessage(), $_POST, 422);
+        }
+        if (!$this->isHtmxRequest()) {
+            $this->flash('success', 'The course was saved.');
+            $this->redirect($back);
+        }
+        return $this->courseRowFragment($user, $courseId, false, $view, !empty($_POST['arrange']), $list, saved: true);
+    }
+
+    /**
+     * The row or card, shown or as its form, with what was typed and why it was refused after a refused save.
+     *
+     * @param array<string,mixed> $typed
+     */
+    private function courseRowFragment(\CattoLearning\Auth\CurrentUser $user, int $courseId, bool $edit, string $view, bool $arrange, string $list,
+        string $error = '', array $typed = [], int $status = 200, bool $saved = false): Response
+    {
+        $course = $this->platformAdministration->adminCourseRow($courseId) ?? throw $this->notFound('The course could not be found.');
+        $form = $edit ? $this->quickEdit->form($course, $user->hasPermission('COURSE.PRICING.MANAGE')) : null;
+        if ($form !== null && $typed !== []) {
+            // What was typed stays in the form, so a refused save loses nothing.
+            $form['code'] = (string) ($typed['code'] ?? $form['code']);
+            $form['title'] = (string) ($typed['title'] ?? $form['title']);
+            $form['category']['selected'] = (string) (int) ($typed['category_id'] ?? $form['category']['selected']);
+            foreach (['price' => 'now', 'was_price' => 'was', 'access_period_value' => 'period_value', 'access_period_unit' => 'period_unit'] as $field => $key) {
+                if (array_key_exists($field, $typed)) $form['price'][$key] = (string) $typed[$field];
+            }
+        }
+        $grid = $view === 'grid';
+        $template = 'partials/admin/course-' . ($grid ? 'card' : 'row') . ($edit ? '-edit' : '');
+        return $this->renderFragment($template, [
+            'course' => $course, 'course_edit' => $form, 'course_error' => $error, 'course_saved' => $saved,
+            'arrange' => $arrange && !$grid, 'can_delete_courses' => $user->hasPermission('COURSE.DELETE'),
+            'courses_quick_edit' => true, 'courses_list_href' => $list,
+        ], $status);
+    }
+
+    /**
+     * The course list's address to come back to, ready for another parameter: an address on this site's course list only
+     * (the page the row was on, its page, sort, search and view kept), else the list itself; never with edit= in it.
+     */
+    private static function listHref(string $address): string
+    {
+        $path = (string) parse_url($address, PHP_URL_PATH);
+        if ($path !== '/admin/courses') return '/admin/courses?';
+        parse_str((string) parse_url($address, PHP_URL_QUERY), $query);
+        unset($query['edit']);
+        return '/admin/courses?' . ($query === [] ? '' : http_build_query($query) . '&');
     }
 
     #[Route('/admin/courses/{id}/preview', name: 'admin_course_preview', requirements: ['id' => '\\d+'], methods: ['GET'])]
@@ -472,6 +582,13 @@ final class AdminCourseController extends BaseController
             unset($module);
             $analysis['display_module_count'] = (int) ($analysis['statistics']['module_count'] ?? count((array) ($analysis['modules'] ?? [])));
 
+            // A course JSON (2.1) keeps its assessments as Course Items: the review shows and counts them as it does an HTML
+            // course's (2026-11-01: the review stopped with an error page for every course JSON).
+            $package = self::packageAssessments($analysis);
+            if ($package !== null) {
+                $analysis['diagnostic_assessments'] = $package['diagnostics'];
+                $analysis['final_assessment'] = $package['final'];
+            }
             $moduleAssessmentCount = 0;
             $moduleQuestionCount = 0;
             foreach ((array) ($analysis['modules'] ?? []) as $module) {
@@ -480,6 +597,10 @@ final class AdminCourseController extends BaseController
                 }
                 $moduleAssessmentCount++;
                 $moduleQuestionCount += count((array) ($module['assessment']['questions'] ?? []));
+            }
+            foreach ($package['graded'] ?? [] as $assessment) {
+                $moduleAssessmentCount++;
+                $moduleQuestionCount += count($assessment['questions']);
             }
 
             $diagnostics = (array) ($analysis['diagnostic_assessments'] ?? []);
@@ -504,7 +625,9 @@ final class AdminCourseController extends BaseController
             $analysis['display_final_assessment_count'] = $finalAssessment === null ? 0 : 1;
             $analysis['display_final_question_count'] = $finalQuestionCount;
             $analysis['display_question_count'] = (int) ($analysis['statistics']['question_count'] ?? ($moduleQuestionCount + $diagnosticQuestionCount + $finalQuestionCount));
-            $analysis['display_format'] = strtoupper((string) ($analysis['format'] ?? 'HTML'));
+            // Named as people know it: "JSON 2.1" or "HTML", never the format's long internal name, which ran out of its
+            // card (2026-11-01).
+            $analysis['display_format'] = ($analysis['format'] ?? '') === 'catto-learning-course' ? trim('JSON ' . (string) ($analysis['schema_version'] ?? '')) : strtoupper((string) ($analysis['format'] ?? 'HTML'));
             $analysis['display_grade_scale'] = GradeScale::ranges(array_values((array) ($analysis['grade_bands'] ?? [])));
             $analysis['grade_scale'] = (array) ($analysis['grade_scale'] ?? []) + ['source' => 'package', 'function_agrees' => null, 'placeholder_inserted' => false, 'reset_button_removed' => false, 'storage_sentences_removed' => 0];
             $analysis['display_presentation_css_bytes'] = strlen((string) ($analysis['course']['presentation_css'] ?? ''));
@@ -556,6 +679,32 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/import');
     }
 
+
+    /**
+     * A course JSON's assessments, by what they are: diagnostics, the final assessment and the module assessments,
+     * each as the review shows an HTML course's; null for a course that is not a set of Course Items.
+     *
+     * @param array<string,mixed> $analysis
+     * @return array{diagnostics:list<array<string,mixed>>,final:array<string,mixed>|null,graded:list<array{title:string,assessment_key:string,questions:array<mixed>,pass_mark:mixed,required:bool}>}|null
+     */
+    private static function packageAssessments(array $analysis): ?array
+    {
+        if (!is_array($analysis['course_items'] ?? null) || !is_array($analysis['structure'] ?? null) || isset($analysis['modules'])) return null;
+        $roles = [];
+        foreach ($analysis['structure'] as $node) {
+            if (is_array($node) && isset($node['item_key'])) $roles[(string) $node['item_key']] = (string) ($node['assessment_role'] ?? 'content');
+        }
+        $found = ['diagnostics' => [], 'final' => null, 'graded' => []];
+        foreach ($analysis['course_items'] as $item) {
+            if (!is_array($item) || !in_array($item['item_type'] ?? '', ['assessment', 'diagnostic'], true)) continue;
+            $key = (string) ($item['item_key'] ?? '');
+            $assessment = ['title' => (string) ($item['title'] ?? ''), 'assessment_key' => $key, 'questions' => (array) ($item['questions'] ?? []), 'pass_mark' => $item['pass_mark'] ?? null, 'required' => true];
+            if ($item['item_type'] === 'diagnostic') $found['diagnostics'][] = $assessment;
+            elseif (($roles[$key] ?? '') === 'final') $found['final'] = $assessment;
+            else $found['graded'][] = $assessment;
+        }
+        return $found;
+    }
 
     #[Route('/admin/courses/import/commit', name: 'admin_course_commit_import', methods: ['POST'])]
     public function commitImport(): Response
@@ -652,6 +801,28 @@ final class AdminCourseController extends BaseController
     }
 
 
+    /**
+     * A course on the site as one HTML file in the course specification's form (owner, 2026-11-01: "it must export an
+     * html file that can be used on its own and also imports back in"): it works in a browser on its own, and importing
+     * it gives the course back.
+     */
+    #[Route('/admin/courses/{id}/course-file', name: 'admin_course_file', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function courseFile(): Response
+    {
+        $this->requirePermission('COURSE.EXPORT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        return $this->handle(function () use ($courseId): Response {
+            $file = $this->courseFile->fromCourse($courseId);
+            return $this->htmlFile($file['html'], $file['filename']);
+        }, '/admin/courses/' . $courseId);
+    }
+
+    private function htmlFile(string $html, string $filename): Response
+    {
+        return new Response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="' . $filename . '"', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
     #[Route('/admin/courses/{id}/export', name: 'admin_course_export', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function export(): Response
     {
@@ -717,17 +888,38 @@ final class AdminCourseController extends BaseController
     }
 
     /**
-     * The Page layout tab: whether the course has a custom layout, the builder for the layout it uses, and the
-     * site's default drawn small beside the choice (Page Builder, 2026-10-30).
+     * The Page layout tab (owner, 2026-11-01, the accepted mockup): what the course's page uses now; the three choices;
+     * for the default layout or one of the layouts, that layout drawn for this course with what it leaves out and why;
+     * for its custom layout, the builder. Every layout goes to the page's script (layouts_json) so choosing another, or
+     * Start again from, draws it without a page load.
      *
      * @return array<string,mixed>
      */
     private function pageLayoutView(int $courseId): array
     {
-        $current = $this->pageLayouts->forCourse($courseId);
-        return $current + ['builder' => \CattoLearning\Course\CoursePageLayouts::builder($current['layout']),
-            // The site's default, which the builder shows again when the default is chosen.
-            'default_json' => json_encode($this->pageLayouts->siteDefault(), JSON_THROW_ON_ERROR)];
+        $uses = $this->pageLayouts->forCourse($courseId);
+        $layouts = $this->pageLayouts->all();
+        $default = $this->pageLayouts->defaultLayout();
+        $present = \CattoLearning\Course\CoursePageLayout::present($this->pageLayouts->facts($courseId));
+        $custom = $uses['custom'] ?? $uses['blocks'];
+        $shared = $uses['choice'] === 'custom' ? $default : ($uses['layout'] ?? $default);
+        $count = array_column($layouts, 'courses', 'id');
+        $json = [];
+        foreach ($layouts as $layout) $json[(string) $layout['id']] = ['name' => $layout['name'], 'courses' => $layout['courses'], 'blocks' => $layout['blocks']];
+        return [
+            'choice' => $uses['choice'],
+            'layout_id' => $uses['choice'] === 'layout' ? (int) ($uses['layout']['id'] ?? 0) : (int) $default['id'],
+            'default' => ['id' => $default['id'], 'name' => $default['name'], 'courses' => (int) ($count[$default['id']] ?? 0)],
+            'shared' => ['id' => $shared['id'], 'name' => $shared['name'], 'courses' => (int) ($count[$shared['id']] ?? 0), 'sketch' => \CattoLearning\Course\CoursePageLayouts::sketch($shared['blocks'], $present)],
+            'layouts' => $layouts,
+            'layouts_json' => json_encode($json, JSON_THROW_ON_ERROR),
+            'has_custom' => $uses['custom'] !== null,
+            'builder' => \CattoLearning\Course\CoursePageLayouts::builder($custom),
+            'sketch' => \CattoLearning\Course\CoursePageLayouts::sketch($custom, $present),
+            'present' => implode(',', $present),
+            'can_view_layouts' => $this->currentUser()?->hasPermission('COURSE.MANAGEMENT.VIEW') ?? false,
+            'can_manage_layouts' => $this->currentUser()?->hasPermission('SYSTEM.SETTING.MANAGE') ?? false,
+        ];
     }
 
     private function courseId(): int

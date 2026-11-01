@@ -153,7 +153,8 @@ final class AdminController extends BaseController
         private readonly \CattoLearning\Application\CompanyOverview $companyOverview,
         private readonly SeedDatabaseService $seedDatabase,
         private readonly \CattoLearning\Maintenance\LogArchive $logArchive,
-        private readonly \CattoLearning\Course\CoursePageLayouts $coursePageLayouts
+        private readonly \CattoLearning\Course\CataloguePositions $cataloguePositions,
+        private readonly \CattoLearning\Course\CourseQuickEdit $courseQuickEdit
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -1062,24 +1063,6 @@ final class AdminController extends BaseController
     }
 
     /** Settings > Maintenance (owner, 2026-10-27): how long the application log's archives are kept. */
-    /**
-     * The default layout of every course page (Page Builder, owner 2026-10-30). Without JavaScript a template, a move,
-     * a block hidden or shown, or Back to Course first is sent with the whole form and saved at once.
-     */
-    #[Route('/admin/settings/course-pages', name: 'admin_save_course_pages', methods: ['POST'])]
-    public function saveCoursePages(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        $back = '/admin/settings?section=course-pages#settings-course-pages';
-        return $this->handle(function () use ($user, $back): void {
-            [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
-            $this->coursePageLayouts->saveSiteDefault($action === 'reset' ? \CattoLearning\Course\CoursePageLayout::template('course') : $layout, $user->id);
-            $this->flash('success', 'The default layout was saved. Every course page without a custom layout uses it now.');
-            $this->redirect($back);
-        }, $back);
-    }
-
     #[Route('/admin/settings/log-archives', name: 'admin_save_log_archives', methods: ['POST'])]
     public function saveLogArchives(): Response
     {
@@ -1091,6 +1074,23 @@ final class AdminController extends BaseController
             $this->flash('success', 'Log archives are now kept for ' . \CattoLearning\Support\Duration::parse($keep)->words() . '.');
             $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
         }, '/admin/settings?section=maintenance#settings-maintenance');
+    }
+
+    /**
+     * Settings > Course positions (owner, 2026-11-01: "yes, build automatic ranges"): each course code prefix and the
+     * number its range starts at. A course arriving with no position takes the next free number in its range.
+     */
+    #[Route('/admin/settings/course-positions', name: 'admin_save_course_positions', methods: ['POST'])]
+    public function saveCoursePositions(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $ranges = $this->cataloguePositions->save((array) ($_POST['prefix'] ?? []), (array) ($_POST['start'] ?? []), $user->id);
+            $this->auditLog->record($user->id, 'settings.course_positions_saved', ['ranges' => $ranges]);
+            $this->flash('success', $ranges === [] ? 'No ranges are set: a new course goes to the end of the catalogue until it is given a position.' : 'Course positions saved: ' . $this->cataloguePositions->view()['summary']);
+            $this->redirect('/admin/settings?section=course-positions#settings-course-positions');
+        }, '/admin/settings?section=course-positions#settings-course-positions');
     }
 
     /** Removes the saved keep period: log archives follow LOG_ARCHIVES_KEPT_FOR in .env again. */
@@ -1268,6 +1268,21 @@ final class AdminController extends BaseController
                     'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band']), 'href' => '/admin/people/signup-attempts/' . $check['id']];
             }
         }
+        // A course's row or card edited in place (owner, 2026-11-01): the pencil for whoever edits courses, the list's own
+        // address for the links that work without JavaScript, and the row open as its form when the address says edit=.
+        if ($key === 'courses' && isset($data['courses']) && is_array($data['courses'])) {
+            $query = $_GET;
+            unset($query['edit']);
+            $data['courses_quick_edit'] = $user->hasPermission('COURSE.EDIT');
+            $data['courses_list_href'] = '/admin/courses?' . ($query === [] ? '' : http_build_query($query) . '&');
+            $editing = (int) ($_GET['edit'] ?? 0);
+            foreach ($data['courses'] as $row) {
+                if ($data['courses_quick_edit'] && is_array($row) && (int) ($row['id'] ?? 0) === $editing && $editing > 0) {
+                    $data['courses_editing'] = $editing;
+                    $data['course_edit'] = $this->courseQuickEdit->form($row, $user->hasPermission('COURSE.PRICING.MANAGE'));
+                }
+            }
+        }
         // Each company's logo, or its drawn picture (owner, 2026-10-26), for its row and its Edit window.
         foreach (['companies', 'company_creators'] as $companyRows) {
             if ($key === $companyRows && isset($data[$companyRows]) && is_array($data[$companyRows]) && array_is_list($data[$companyRows])) {
@@ -1365,16 +1380,14 @@ final class AdminController extends BaseController
                 'archive_size' => \CattoLearning\Maintenance\LogArchive::size($logs['archive_bytes']), 'keep' => $this->logArchive->keep(),
                 'keep_words' => \CattoLearning\Support\Duration::parse($this->logArchive->keep())->words(), 'source' => $this->logArchive->source(),
                 'environment' => $this->logArchive->environmentKeep(), 'how' => \CattoLearning\Support\Duration::HOW];
+            // The course position ranges (owner, 2026-11-01).
+            $data['course_positions'] = $this->cataloguePositions->view();
             // Each scheduled job's last run, the payment methods and identity verification (owner, 2026-10-19).
             $data['scheduled_jobs'] = $this->scheduledJobs->jobs();
             $data['payment_methods'] = $this->paymentMethods->settingsView();
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
                 'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
-            // The default layout of every course page (Page Builder, owner 2026-10-30).
-            $default = $this->coursePageLayouts->siteDefault();
-            $data['course_page_layout'] = ['builder' => \CattoLearning\Course\CoursePageLayouts::builder($default),
-                'template' => array_values(array_filter(array_keys(\CattoLearning\Course\CoursePageLayout::TEMPLATES), static fn(string $key): bool => \CattoLearning\Course\CoursePageLayout::isTemplate($default, $key)))[0] ?? null];
             // How news is sent and the sending discipline (mailing, step 2; owner, 2026-10-26).
             // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
             $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);

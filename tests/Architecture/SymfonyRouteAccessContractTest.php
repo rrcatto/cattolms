@@ -25,8 +25,14 @@ The first half is the platform's rule that an API call requires its transport sc
 business permission the equivalent web operation requires. Stating only one of them is the same bug
 in slower motion.
 
+A route's name is the router's key: a second route of the same name silently takes the first one's place, so one of
+them answers 404. Every name is used once.
+
 Changelog:
 
+2026/11/01 SAST
+- Every route name once: a new page's GET route was named as the course tab's Save already was, and the Save answered
+  404.
 2026/09/08 22:15 SAST
 - Created after #[IsGranted] was imported from a namespace that no longer exists, which silently
   disabled authorization on the first ported authenticated route.
@@ -99,6 +105,18 @@ final class SymfonyRouteAccessContractTest extends TestCase
      * newInstance() is the assertion: an attribute naming a class that does not exist throws here
      * and is inert everywhere else.
      */
+    public function testEveryRouteNameIsUsedOnce(): void
+    {
+        $seen = [];
+        foreach ($this->routes() as [$method, $route]) {
+            $name = (string) $route->name;
+            if ($name === '') continue;
+            $seen[$name][] = $method->getDeclaringClass()->getShortName() . '::' . $method->getName();
+        }
+        self::assertNotSame([], $seen);
+        self::assertSame([], array_filter($seen, static fn(array $where): bool => count($where) > 1), 'A route name used twice: the later route replaces the earlier.');
+    }
+
     public function testEveryRouteAttributeNamesAClassThatExists(): void
     {
         $instantiated = 0;

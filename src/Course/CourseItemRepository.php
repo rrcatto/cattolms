@@ -415,22 +415,55 @@ final class CourseItemRepository
         return $this->boolean($this->db->fetchOne('SELECT numbered FROM course_sections WHERE node_id=:id', ['id' => $nodeId]));
     }
 
-    /** SQL join for a paged enrolment row named ce, including embedded assessments once per placement. */
-    public static function assessmentProgressJoin(): string
+    /**
+     * SQL join for an enrolment row named ce: its parts and how many are done (owner, 2026-11-01: "update the progress
+     * bar based on every thing they mark as completed, not just their assessments"). A part is every Course Item placed
+     * in the course but a trailer, which a learner never meets; it is done when the learner has marked it complete, or,
+     * for an assessment or readiness check, once they have finished it (decision 1A: those tick themselves): a graded
+     * attempt, a readiness check, or practice on an assessment that is practice only. Practice on a graded assessment
+     * does not count. FINISHED_ATTEMPT is the one rule for this join and doneParts().
+     */
+    /** A finished attempt that ticks its assessment, over assessment_sessions s. */
+    private const FINISHED_ATTEMPT = "s.status IN ('submitted','timed_out') AND (s.attempt_mode <> 'practice' OR EXISTS (SELECT 1 FROM course_item_assessments only_practice WHERE only_practice.course_item_id=s.course_item_id AND only_practice.practice))";
+
+    public static function partsProgressJoin(): string
     {
         return " LEFT JOIN LATERAL (
-            WITH RECURSIVE reachable(node_id,item_id) AS (
-                SELECT p.node_id,p.course_item_id FROM course_item_placements p WHERE p.course_id=ce.course_id
-                UNION
-                SELECT x.node_id,target.id FROM reachable x JOIN course_items source ON source.id=x.item_id
-                JOIN course_item_references r ON r.source_course_item_id=source.id
-                JOIN course_items target ON target.item_key=r.referenced_key WHERE source.item_type='html_lesson'
-            )
-            SELECT COUNT(*)::int AS assessment_count,
-                   COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM assessment_attempts aa WHERE aa.enrolment_id=ce.id AND aa.structure_node_id=x.node_id AND aa.course_item_id=x.item_id))::int AS submitted_assessment_count
-            FROM reachable x JOIN course_items ci ON ci.id=x.item_id JOIN course_item_assessments a ON a.course_item_id=x.item_id
-            WHERE ci.item_type='assessment' AND a.practice=FALSE
-        ) assessment_progress ON TRUE ";
+            SELECT COUNT(*)::int AS part_count,
+                   COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM course_part_completions pc WHERE pc.enrolment_id=ce.id AND pc.structure_node_id=p.node_id)
+                       OR (ci.item_type IN ('assessment','diagnostic') AND EXISTS (SELECT 1 FROM assessment_sessions s WHERE s.enrolment_id=ce.id AND s.structure_node_id=p.node_id AND s.course_item_id=p.course_item_id AND " . self::FINISHED_ATTEMPT . ")))::int AS done_part_count
+            FROM course_item_placements p JOIN course_items ci ON ci.id=p.course_item_id
+            WHERE p.course_id=ce.course_id AND NOT (ci.item_type='slide_deck' AND COALESCE(ci.type_config->>'kind','')='trailer')
+        ) part_progress ON TRUE ";
+    }
+
+    /** @return array{total:int,done:int,percentage:int} An enrolment's parts done, as the progress bar shows them. */
+    public function partsProgress(int $enrolmentId): array
+    {
+        $row = $this->db->fetchAssociative('SELECT part_progress.part_count, part_progress.done_part_count FROM course_enrolments ce' . self::partsProgressJoin() . 'WHERE ce.id=:id', ['id' => $enrolmentId]);
+        $total = (int) ($row['part_count'] ?? 0);
+        $done = min($total, (int) ($row['done_part_count'] ?? 0));
+        return ['total' => $total, 'done' => $done, 'percentage' => $total > 0 ? (int) round($done / $total * 100) : 0];
+    }
+
+    /**
+     * @return array<int,true> The placements an enrolment has done, by partsProgressJoin()'s rule: marked complete, or an
+     * assessment placed there and finished (one shown inside a lesson does not tick the lesson).
+     */
+    public function doneParts(int $enrolmentId): array
+    {
+        $ids = $this->db->fetchFirstColumn('SELECT structure_node_id FROM course_part_completions WHERE enrolment_id=:enrolment
+            UNION SELECT s.structure_node_id FROM assessment_sessions s JOIN course_item_placements p ON p.node_id=s.structure_node_id AND p.course_item_id=s.course_item_id
+            WHERE s.enrolment_id=:enrolment AND ' . self::FINISHED_ATTEMPT, ['enrolment' => $enrolmentId]);
+        return array_fill_keys(array_map('intval', $ids), true);
+    }
+
+    /** A learner's own tick on a part, or its removal. */
+    public function markPart(int $enrolmentId, int $nodeId, bool $completed): void
+    {
+        $completed
+            ? $this->db->executeStatement('INSERT INTO course_part_completions (enrolment_id, structure_node_id) VALUES (:enrolment, :node) ON CONFLICT DO NOTHING', ['enrolment' => $enrolmentId, 'node' => $nodeId])
+            : $this->db->executeStatement('DELETE FROM course_part_completions WHERE enrolment_id=:enrolment AND structure_node_id=:node', ['enrolment' => $enrolmentId, 'node' => $nodeId]);
     }
 
     public function hasActiveLearners(int $courseId): bool
@@ -461,15 +494,6 @@ final class CourseItemRepository
              WHERE ci.item_type='assessment' AND a.practice=FALSE",
             ['course' => $courseId, 'enrolment' => $enrolmentId]
         ));
-    }
-
-    /** @return array{total:int,submitted:int,percentage:int} */
-    public function assessmentProgress(int $enrolmentId, int $courseId): array
-    {
-        $contexts = $this->assessmentContexts($courseId, $enrolmentId);
-        $total = count($contexts);
-        $submitted = count(array_filter($contexts, static fn(array $row): bool => (bool) $row['submitted']));
-        return ['total' => $total, 'submitted' => $submitted, 'percentage' => $total > 0 ? (int) round($submitted / $total * 100) : 0];
     }
 
     public function precedingGradedAssessmentsSubmitted(int $enrolmentId, int $courseId, int $finalNodeId): bool

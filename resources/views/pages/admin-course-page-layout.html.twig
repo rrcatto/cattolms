@@ -1,0 +1,76 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		One of the layouts of course pages, or a new one (owner, 2026-11-01, the accepted Course Page Layouts mockup): its
+		name, a line saying what it is for and its blocks in the Page Builder, beside a sketch of the page for a course
+		chosen there. Saving changes every course that uses it, which the head says. The builder's controller and the
+		unsaved-changes controller need Stimulus.
+	#}
+	{{ importmap() }}
+	{% set pl_new = pl_layout.id == 0 %}
+	{% set ph_kicker = 'Course Page Layouts' %}
+	{% set ph_title = pl_new ? 'New layout' : pl_layout.name %}
+	{% set ph_lead = pl_new
+		? 'A new layout starts as the default layout, ' ~ pl_layout.default_name ~ '. Name it and change it, then give it to courses.'
+		: (pl_layout.is_default
+			? 'The default layout. Every course on the default layout, ' ~ pl_layout.courses ~ ' ' ~ (pl_layout.courses == 1 ? 'course' : 'courses') ~ ' in all, shows what you save here. Courses with a custom layout are not affected.'
+			: (pl_layout.courses > 0 ? 'Used by ' ~ pl_layout.courses ~ ' ' ~ (pl_layout.courses == 1 ? 'course' : 'courses') ~ '. Saving changes ' ~ (pl_layout.courses == 1 ? 'its page' : 'all ' ~ pl_layout.courses ~ ' pages') ~ ' at once.' : 'No course uses this layout yet. Give it to courses on Course Page Layouts or on a course\'s Page layout tab.')) %}
+	{% if pl_layout.is_default %}{% set ph_badges %}{{ ui('feedback.badge', {label: 'Default layout', tone: 'info'}) }}{% endset %}{% endif %}
+	{% set ph_actions %}<span data-page-layout-leave>{{ ui('action.link', {label: 'All layouts', href: '/admin/courses/page-layouts', variant: 'secondary', size: 'normal', icon: 'action-view-list'}) }}</span>{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			{% if not can_manage %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Read only', section_spacing: true})} %}{% block body %}<p>Changing a layout needs permission to manage settings.</p>{% endblock %}{% endembed %}
+			{% endif %}
+			<form id="page-layout-form" class="cl-page-layout-form" action="/admin/courses/page-layouts/{{ pl_new ? 'new' : pl_layout.id }}" method="post" autocomplete="off"
+				data-controller="unsaved-changes" data-unsaved-changes-leave-value="nav a, [data-page-layout-leave] a, a[data-page-layout-leave]">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% if can_manage %}
+				{# Choosing changes nothing until Save layout (owner, 2026-10-31, option B): the notice says so as soon as anything changes. #}
+				<div class="cl-page-builder-savebar">
+					<p class="cl-page-builder-status" role="status" data-unsaved-changes-target="status" data-saved="{{ pl_new ? 'Not made yet. Press Save layout to make it.' : 'Saved. Every change waits here until you press Save layout.' }}" data-changed="{{ pl_new or pl_layout.courses == 0 ? 'Not saved yet. Press Save layout to keep it.' : 'Not saved yet. Press Save layout to change the ' ~ (pl_layout.courses == 1 ? 'course page' : pl_layout.courses ~ ' course pages') ~ '.' }}">{{ pl_new ? 'Not made yet. Press Save layout to make it.' : 'Saved. Every change waits here until you press Save layout.' }}</p>
+					{{ ui('action.button', {label: 'Save layout', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}
+				</div>
+				{% endif %}
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}
+{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'page-layout-name', required: true, help: 'At most ' ~ name_max ~ ' letters, and no other layout\'s name.'})} %}
+{% block control %}<input class="cl-input" id="page-layout-name" type="text" name="name" value="{{ pl_layout.name }}" maxlength="{{ name_max }}" required{% if not can_manage %} disabled{% endif %} {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for (optional)', for: 'page-layout-purpose', help: 'One line, to tell your layouts apart.'})} %}
+{% block control %}<input class="cl-input" id="page-layout-purpose" type="text" name="purpose" value="{{ pl_layout.purpose }}" maxlength="{{ purpose_max }}"{% if not can_manage %} disabled{% endif %} {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				{% include '@platform/partials/admin/page-layout-builder.html.twig' with {plb: builder, plb_sketch: sketch, plb_present: sketch_present, plb_locked: not can_manage, plb_courses: sketch_courses, plb_course_form: 'page-layout-course-form'} %}
+				{% if can_manage %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save layout', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}<span data-page-layout-leave>{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: pl_new ? '/admin/courses/page-layouts' : '/admin/courses/page-layouts/' ~ pl_layout.id, icon: 'action-cancel'}) }}</span>{% endblock %}
+{% endembed %}
+				{% endif %}
+			</form>
+			{# Draws the sketch for another course without JavaScript (the chooser's Show). #}
+			<form id="page-layout-course-form" method="get" action="/admin/courses/page-layouts/{{ pl_new ? 'new' : pl_layout.id }}#page-layout-sketch"></form>
+{% endblock %}
+{% endembed %}
+	</section>
+
+	{% if not pl_new %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'courses-using'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Courses using it', heading_level: 2, summary: pl_layout.is_default ? 'The courses on the default layout, and any that chose it by name.' : 'The courses that chose this layout on their Page layout tab or on Course Page Layouts.'}) }}
+			{% if using %}
+			<ul class="cl-page-layout-courses">{% for course in using %}<li><code class="cl-course-code">{{ course.code }}</code> <a href="/admin/courses/{{ course.id }}?tab=page-layout" data-page-layout-leave>{{ course.title }}</a></li>{% endfor %}</ul>
+			{% else %}
+			<p>None yet. Give it to courses on <a href="/admin/courses/page-layouts#courses-layouts">Course Page Layouts</a>.</p>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+{% endblock %}

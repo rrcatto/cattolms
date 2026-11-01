@@ -117,7 +117,8 @@ final class CourseService
         private readonly CoursePopularityRepository $popularity,
         private readonly CertificateDesignRepository $certificateDesigns,
         private readonly CategoryHierarchyService $categoryHierarchy,
-        private readonly \CattoLearning\View\Artwork\IconLibrary $icons = new \CattoLearning\View\Artwork\IconLibrary()
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons = new \CattoLearning\View\Artwork\IconLibrary(),
+        private readonly ?CataloguePositions $positions = null
     ) {
     }
 
@@ -1067,6 +1068,8 @@ final class CourseService
                 'Course created.',
                 $data
             );
+            // A new course takes the next free number in its code's range (owner, 2026-11-01).
+            $this->positions?->fill($courseId, $userId);
 
             return $courseId;
         });

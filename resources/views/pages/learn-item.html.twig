@@ -5,8 +5,6 @@
 {% if item.node_type == 'item' and item.part|default('') in ['lesson', 'summary', 'review', 'flashcards', 'practical'] %}<p class="cl-course-item-pdf">{{ ui('action.link', {label: 'Download as PDF', variant: 'secondary', size: 'small', href: '/learn/' ~ course.slug ~ '/item/' ~ item.id ~ '/pdf' ~ preview_query, icon: 'action-download'}) }}</p>{% endif %}
 <div class="cl-course-item-body cl-course-presentation catto-standalone">{{ item.rendered_html|raw }}</div>
 {% include '@platform/partials/course-section-outline.html.twig' %}
-<nav class="cl-course-item-paging" aria-label="Course Content">
-{% if item.previous_node %}{% set previous_is_assessment = item.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Previous', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ item.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ item.previous_node.item_key : '/content') ~ preview_query, icon: 'action-previous'}) }}{% endif %}
-{% if item.next_node %}{% set next_is_assessment = item.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ item.next_node.id ~ (next_is_assessment ? '/assessment/' ~ item.next_node.item_key : '/content') ~ preview_query, icon: 'action-next'}) }}{% endif %}
-</nav>
+{# Previous, the learner's own tick on this part (a toggle, owner 2026-11-01; a section ticks itself once every part in it is) and Next. #}
+{% include '@platform/partials/course-item-paging.html.twig' with {paging_base: '/learn/' ~ course.slug ~ '/item/', paging_query: preview_query, paging_previous: item.previous_node, paging_next: item.next_node, paging_complete: item.node_type == 'item' and item.item_type|default('') not in ['assessment', 'diagnostic'] ? {action: '/learn/' ~ course.slug ~ '/item/' ~ item.id ~ '/complete' ~ preview_query, done: item.is_done|default(false)} : null} %}
 {% endblock %}

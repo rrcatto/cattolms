@@ -1,80 +1,39 @@
 {#
-	The Page Builder for course pages (owner, 2026-10-30, from the accepted mockup): the blocks
-	under a course page's header, each dragged or moved with its arrows, half or full width, hidden or shown, with three
-	templates to start from and a sketch of the page as visitors see it. The course's Page layout tab (plb_scope
-	'course': the default layout or a custom layout; owner 2026-10-31: "Default layout" and "Custom layout") and Settings > Course pages (plb_scope 'site') share it.
+	The Page Builder for course pages (owner, 2026-10-30, from the accepted mockup; layouts of one's own, 2026-11-01): the
+	blocks under a course page's header, each dragged or moved with its arrows, half or full width, hidden or shown,
+	beside a sketch of the page as visitors see it, for one course, with the blocks that course leaves out and why. A
+	layout's page (Administration > Courses > Course Page Layouts) and a course's custom layout share it, inside their
+	own form, which saves it.
 
-	Without JavaScript every button sends the whole form and the server acts on it and saves (a template, a move, a block
-	hidden or shown, Reset; CoursePageLayouts::fromForm). With JavaScript (page_layout_controller.js) the same buttons
-	change the page in place by moving the blocks drawn here, and only Save layout sends it. Course access is always
-	shown. Variables: plb (CoursePageLayouts::builder), plb_scope, plb_action, plb_own and plb_default_json (course),
-	plb_view_href (optional), csrf.
+	Without JavaScript every button sends the whole form and the server acts on it and saves (a move, a block hidden or
+	shown; CoursePageLayouts::fromForm). With JavaScript (page_layout_controller.js) the same buttons change the page in
+	place by moving the blocks drawn here. Course access is always shown. Variables: plb (CoursePageLayouts::builder),
+	plb_sketch (CoursePageLayouts::sketch), plb_present (the blocks with something to show on the course drawn, joined
+	by commas), plb_locked (a layout the reader may not change); on a layout's page plb_courses (the courses the sketch
+	may be drawn for) with plb_course_form (the id of the form that draws it for another without JavaScript); on a
+	course's custom layout plb_start_layouts and plb_layouts_json (the layouts Start again from copies in).
 #}
-{% set plb_course = plb_scope == 'course' %}
-{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
-<form id="page-layout-form" class="cl-page-builder" action="{{ plb_action }}" method="post"
-	data-controller="page-layout unsaved-changes"
-	data-page-layout-templates-value="{{ plb.templates_json }}"
-	data-page-layout-default-value="{{ plb_default_json|default('') }}"
-	data-page-layout-locked-value="{{ plb_course and not plb_own ? 'true' : 'false' }}"
-	data-unsaved-changes-leave-value=".cl-group-tab, nav[aria-label='Course tools'] a, .cl-back-link, [data-page-layout-leave] a">
-	<input type="hidden" name="csrf" value="{{ csrf }}">
+<div class="cl-page-builder" data-controller="page-layout" data-page-layout-present-value="{{ plb_present }}" data-page-layout-locked-value="{{ plb_locked|default(false) ? 'true' : 'false' }}"{% if plb_layouts_json|default('') %} data-page-layout-layouts-value="{{ plb_layouts_json }}"{% endif %}>
 	<input type="hidden" name="order" value="{{ plb.order }}" data-page-layout-target="order">
-
-	{#
-		Saving beside the choice (owner, 2026-10-31, option B: "it was not immediately clear ... whether the mere selection
-		changes the selection or whether I actually need to also click the Save layout button"): choosing changes nothing until
-		Save layout, so the notice says so as soon as anything changes, with the button beside it. The foot keeps the form's
-		action row as every form has.
-	#}
-	{% set save_bar %}
-		<div class="cl-page-builder-savebar">
-			<p class="cl-page-builder-status" role="status" data-unsaved-changes-target="status" data-saved="Saved. Choosing changes nothing until you press Save layout." data-changed="Not saved yet. Press Save layout to keep this change.">Saved. Choosing changes nothing until you press Save layout.</p>
-			{{ ui('action.button', {label: 'Save layout', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}
-		</div>
-	{% endset %}
-
-	{% if not plb_course %}{{ save_bar }}{% endif %}
-	{% if plb_course %}
-	<div class="cl-page-builder-part">
-		{{ ui('form.picture-choice', {name: 'source', legend: 'Which layout this course uses', id: 'page-layout-source', size: 'small', selected: plb_own ? 'own' : 'default', items: [
-			{value: 'default', label: 'Default layout',
-				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
-				note: 'Set at Settings, Course pages. A change there changes this page too.'},
-			{value: 'own', label: 'Custom layout',
-				icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="18" height="7" rx="1"/></svg>',
-				note: 'Arranged below for this course only. Reset puts the default layout back.'},
-		]}) }}
-		{{ save_bar }}
-	</div>
-	{% endif %}
-
-	<div class="cl-page-builder-part" data-page-layout-target="lockable">
-		<div class="cl-page-builder-part-head">
-			<h3 class="h5">Start from a template</h3>
-			<p>A template sets every block's place, width and whether it shows. Change anything afterwards.</p>
-		</div>
-		<div class="cl-page-builder-templates">
-			{% for template in plb.templates %}
-			<div class="cl-page-builder-template" data-page-layout-target="template" data-template="{{ template.key }}" data-current="{{ template.current ? 'true' : 'false' }}">
-				<div class="cl-page-builder-wire" aria-hidden="true">
-					<span class="cl-page-builder-wire-head"></span>
-					{% for cell in template.cells %}<span data-block="{{ cell.id }}" data-width="{{ cell.width }}">{{ cell.name }}</span>{% endfor %}
-				</div>
-				<strong>{{ template.name }} <span class="cl-page-builder-in-use">In use</span></strong>
-				<p>{{ template.note }}</p>
-				{{ ui('action.button', {label: 'Start from this', variant: 'secondary', size: 'small', name: 'action', value: 'template:' ~ template.key, icon: 'action-copy', stimulus_action: 'page-layout#template', aria_label: 'Start from ' ~ template.name}) }}
-			</div>
-			{% endfor %}
-		</div>
-	</div>
-
+	{# The course the sketch is drawn for, so a save comes back to it. #}
+	{% if plb_courses|default([]) %}<input type="hidden" name="course" value="{{ (plb_courses|filter(c => c.selected)|first).id|default('') }}" data-page-layout-target="courseField">{% endif %}
 	<div class="cl-page-builder-work">
 		<div class="cl-page-builder-part" data-page-layout-target="lockable">
 			<div class="cl-page-builder-part-head">
 				<h3 class="h5">Arrange the page</h3>
 				<p>Drag a block by its handle, or move it with its arrows. Half-width blocks side by side share a row and match each other's height.</p>
 			</div>
+			{% if plb_start_layouts|default([]) %}
+			{# A course's custom layout starts again from one of the layouts, copied in (saved with the form). #}
+			<div class="cl-page-builder-start">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Start again from', for: 'page-layout-start-from'})} %}
+{% block control %}<select class="cl-select" id="page-layout-start-from" name="start_from" data-page-layout-target="startFrom" {{ ui_field_attrs(props) }}>
+					{% for start in plb_start_layouts %}<option value="{{ start.id }}">{{ start.name }}{{ start.is_default ? ' (the default layout)' : '' }}</option>{% endfor %}
+				</select>{% endblock %}
+{% endembed %}
+				{{ ui('action.button', {label: 'Copy it in', variant: 'secondary', size: 'small', name: 'action', value: 'start', icon: 'action-copy', stimulus_action: 'page-layout#start', title: 'The custom layout takes that layout\'s blocks. Nothing is saved until you press Save.'}) }}
+			</div>
+			{% endif %}
 			<div class="cl-page-builder-fixed"><span><strong>Page header</strong><span>The cover with the title and the favourite star, then Watch course presentation. Always first, as it is.</span></span><span class="cl-page-builder-fixed-tag">Fixed</span></div>
 			{% set tiles = {board: plb.blocks|filter(block => block.shown), shelf: plb.blocks|filter(block => not block.shown)} %}
 			{% for place, blocks in tiles %}
@@ -112,26 +71,21 @@
 			</ol>
 			{% if place == 'shelf' %}</div>{% endif %}
 			{% endfor %}
-			<div class="cl-page-builder-reset">
-				{{ ui('action.button', {label: plb_course ? 'Reset to the default layout' : 'Back to Course first', variant: 'quiet', size: 'normal', name: 'action', value: 'reset', icon: 'action-reset', stimulus_action: 'page-layout#reset'}) }}
-			</div>
 		</div>
 
 		<aside class="cl-page-builder-part cl-page-builder-preview" aria-labelledby="page-layout-sketch">
 			<h3 class="h5" id="page-layout-sketch">The page, as visitors see it</h3>
-			<div class="cl-page-sketch" aria-hidden="true" data-page-layout-target="sketch">
-				<span class="cl-page-sketch-fixed">Cover, title and star</span>
-				<span class="cl-page-sketch-fixed">Watch course presentation</span>
-				{% for block in plb.blocks %}<span data-block="{{ block.id }}" data-width="{{ block.width }}"{% if not block.shown %} hidden{% endif %}>{{ block.name }}</span>{% endfor %}
-			</div>
-			<p>On a phone every block takes the full width, in the same order. A block with nothing to show (Reviews before the first review, Ready to start without a free preview) stays out on its own.</p>
+			{% if plb_courses|default([]) %}
+			{# Drawn for one course at a time: a block with nothing to show on that course is left out of its page. #}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show it for', for: 'page-layout-course'})} %}
+{% block control %}<select class="cl-select" id="page-layout-course" name="course" form="{{ plb_course_form }}" data-action="change->page-layout#course" {{ ui_field_attrs(props) }}>
+					{% for course in plb_courses %}<option value="{{ course.id }}" data-present="{{ course.present|join(',') }}"{% if course.selected %} selected{% endif %}>{{ course.label }}</option>{% endfor %}
+				</select>{% endblock %}
+{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', form: plb_course_form, icon: 'action-filter'}) }}</noscript>
+			{% endif %}
+			{% include '@platform/partials/admin/page-sketch.html.twig' with {ps: plb_sketch, ps_target: 'page-layout'} %}
+			<p>On a phone every block takes the full width, in the same order.</p>
 		</aside>
 	</div>
-
-	{# Saved where every form is saved: the shared action row at its foot. #}
-	<p class="cl-page-builder-status" aria-hidden="true" data-unsaved-changes-target="status" data-saved="Saved. No changes yet." data-changed="Changes not saved yet. Save layout keeps them.">Saved. No changes yet.</p>
-	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save layout', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}{% endblock %}
-{% block secondary_actions %}{% if plb_view_href|default('') %}<span data-page-layout-leave>{{ ui('action.link', {label: 'View the page', variant: 'secondary', size: 'normal', href: plb_view_href, icon: 'action-preview'}) }}</span>{% endif %}{% endblock %}
-{% endembed %}
-</form>
+</div>

@@ -208,14 +208,17 @@ final class SlideDeck
     private static function checkField(string $where, string $name, array $field, mixed $value): void
     {
         $label = strtolower((string) $field['label']);
+        // The field as the slide form names it: some labels are phrases ("What the picture shows, for screen readers"),
+        // which "the <label>" turned into "the what the picture shows" (2026-11-01).
+        $quoted = '"' . $field['label'] . '"';
         $required = (bool) ($field['required'] ?? false);
         switch ($field['kind']) {
             case 'text':
             case 'long':
                 $text = (string) ($value ?? '');
                 if ($required && $text === '') { throw new InvalidArgumentException($where . ' needs ' . self::article($label) . '.'); }
-                if (isset($field['max']) && mb_strlen($text) > $field['max']) { throw new InvalidArgumentException($where . ': the ' . $label . ' may be at most ' . $field['max'] . ' characters.'); }
-                self::plain($where, $label, $text);
+                if (isset($field['max']) && mb_strlen($text) > $field['max']) { throw new InvalidArgumentException($where . ': ' . $quoted . ' may be at most ' . $field['max'] . ' characters.'); }
+                self::plain($where, $quoted, $text);
                 return;
             case 'lines':
                 $lines = is_array($value) ? $value : [];
@@ -223,7 +226,7 @@ final class SlideDeck
                 if (isset($field['most']) && count($lines) > $field['most']) { throw new InvalidArgumentException($where . ' may have at most ' . $field['most'] . ' ' . self::plural($name) . '.'); }
                 foreach ($lines as $line) {
                     if (isset($field['max']) && mb_strlen((string) $line) > $field['max']) { throw new InvalidArgumentException($where . ': each line may be at most ' . $field['max'] . ' characters.'); }
-                    self::plain($where, $label, (string) $line);
+                    self::plain($where, $quoted, (string) $line);
                 }
                 if ($name === 'options' && count(array_unique(array_map('mb_strtolower', $lines))) !== count($lines)) { throw new InvalidArgumentException($where . ': two options are the same.'); }
                 return;
@@ -234,7 +237,7 @@ final class SlideDeck
                 foreach ($events as $event) {
                     if ($event['when'] === '' || $event['what'] === '') { throw new InvalidArgumentException($where . ': every event needs when and what, written when | what.'); }
                     if (mb_strlen($event['when']) > 40 || mb_strlen($event['what']) > 200) { throw new InvalidArgumentException($where . ': an event\'s when may be 40 characters and its what 200.'); }
-                    self::plain($where, 'events', $event['when'] . $event['what']);
+                    self::plain($where, 'the events', $event['when'] . $event['what']);
                 }
                 return;
             case 'columns':
@@ -245,7 +248,7 @@ final class SlideDeck
                     if ($column['heading'] === '') { throw new InvalidArgumentException($where . ': ' . $which . ' needs a heading.'); }
                     if (!isset($column['points']) && !isset($column['text'])) { throw new InvalidArgumentException($where . ': ' . $which . ' needs points or a line of text.'); }
                     if (count($column['points'] ?? []) > 4) { throw new InvalidArgumentException($where . ': ' . $which . ' may have at most 4 points.'); }
-                    self::plain($where, 'columns', $column['heading'] . implode('', $column['points'] ?? []) . ($column['text'] ?? ''));
+                    self::plain($where, 'the columns', $column['heading'] . implode('', $column['points'] ?? []) . ($column['text'] ?? ''));
                 }
                 return;
             case 'picture':
@@ -265,9 +268,9 @@ final class SlideDeck
         return preg_match('/^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i', $picture) === 1 || preg_match('#^data:image/(png|jpeg);base64,[A-Za-z0-9+/=\s]+$#', $picture) === 1;
     }
 
-    private static function plain(string $where, string $label, string $text): void
+    private static function plain(string $where, string $field, string $text): void
     {
-        if (str_contains($text, '<') || str_contains($text, '>')) { throw new InvalidArgumentException($where . ': the ' . $label . ' is plain text, without < or >.'); }
+        if (str_contains($text, '<') || str_contains($text, '>')) { throw new InvalidArgumentException($where . ': ' . $field . ' is plain text, without < or >.'); }
     }
 
     private static function article(string $label): string

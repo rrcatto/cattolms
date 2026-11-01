@@ -18,6 +18,9 @@ has a recording, a part as common to every module only when every module has it.
 Changelog:
 2026/10/30 SAST
 - Created.
+2026/11/01 SAST
+- facts(): what the page's blocks need to know (modules, figures, free preview), counted by the same tally as view(),
+  for the layouts' pages (CoursePageLayouts), which say what each course's page leaves out.
 */
 
 declare(strict_types=1);
@@ -51,43 +54,13 @@ final class CoursePageView
     public function view(array $course, bool $withTrailer = true): array
     {
         $rows = (array) ($course['structure'] ?? []);
-        $modules = [];
-        $moduleOf = [];
-        foreach ($rows as $row) {
-            if ((string) $row['node_type'] === 'section' && !empty($row['numbered']) && ($row['section_number'] ?? null) !== null) {
-                $moduleOf[(int) $row['id']] = count($modules);
-                $modules[] = ['number' => (int) $row['section_number'], 'title' => (string) $row['section_title'], 'minutes' => 0, 'preview' => !empty($row['public_preview']), 'parts' => []];
-            }
+        ['modules' => $modules, 'presentations' => $presentations, 'videos' => $videos, 'cards' => $cards, 'tasks' => $tasks,
+            'moduleQuestions' => $moduleQuestions, 'finalQuestions' => $finalQuestions, 'courseMinutes' => $courseMinutes,
+            'trailer' => $trailer, 'moduleOf' => $moduleOf, 'presentationItems' => $presentationItems] = self::tally($rows);
+        $narrated = false;
+        foreach ($presentationItems as $itemId) {
+            if ($this->narrations->forItem($itemId) !== []) { $narrated = true; break; }
         }
-        $presentations = 0; $videos = 0; $cards = 0; $tasks = 0; $moduleQuestions = 0; $finalQuestions = 0; $narrated = false; $courseMinutes = 0;
-        $trailer = null;
-        foreach ($rows as $row) {
-            if ((string) $row['node_type'] !== 'item') { continue; }
-            $part = CourseItemService::part($row);
-            $config = is_array($row['type_config'] ?? null) ? $row['type_config'] : [];
-            $parent = $row['parent_node_id'] === null ? null : (int) $row['parent_node_id'];
-            $in = $parent !== null && isset($moduleOf[$parent]) ? $moduleOf[$parent] : null;
-            if ($part === 'presentation' && ($config['kind'] ?? '') === 'trailer') {
-                if ($trailer === null && !empty($row['public_preview'])) { $trailer = $row; }
-                continue;
-            }
-            $courseMinutes += CourseItemService::itemMinutes($row) ?? 0;
-            if ($in !== null) {
-                $modules[$in]['minutes'] += CourseItemService::itemMinutes($row) ?? 0;
-                $modules[$in]['parts'][$part] = true;
-            }
-            match ($part) {
-                'presentation' => $in !== null ? $presentations++ : null,
-                'video' => $videos++,
-                'flashcards' => $cards += count((array) ($config['cards'] ?? [])),
-                'practical' => $tasks += substr_count((string) ($row['content_source'] ?? ''), '<section class="task"'),
-                'assessment' => $in !== null ? $moduleQuestions += (int) ($row['question_count'] ?? 0) : null,
-                'final' => $finalQuestions += (int) ($row['question_count'] ?? 0),
-                default => null,
-            };
-            if ($part === 'presentation' && $in !== null && !$narrated) { $narrated = $this->narrations->forItem((int) $row['course_item_id']) !== []; }
-        }
-
         $count = count($modules);
         $total = array_sum(array_column($modules, 'minutes'));
         $common = [];
@@ -120,6 +93,78 @@ final class CoursePageView
             'free' => $free,
             'trailer' => $trailer === null || !$withTrailer ? null : $this->trailer($trailer, $course),
         ];
+    }
+
+    /**
+     * What a course's page needs to know of its blocks (owner, 2026-11-01): its modules, how many figures What you get
+     * counts and whether it has a free preview, as view() counts them. The layouts' pages ask it of every course.
+     *
+     * @param list<array<string,mixed>> $rows The course's structure (CourseItemService::availability).
+     * @return array{modules:int,figures:int,preview:bool}
+     */
+    public static function facts(array $rows): array
+    {
+        $t = self::tally($rows);
+        $preview = false;
+        foreach ($rows as $row) {
+            // As CourseService::publicCourse decides has_public_preview: any item in the free preview.
+            if ((string) $row['node_type'] === 'item' && !empty($row['public_preview'])) { $preview = true; break; }
+        }
+        return [
+            'modules' => count($t['modules']),
+            'figures' => count(array_filter([$t['presentations'], $t['videos'], $t['cards'], $t['tasks'], $t['moduleQuestions'], $t['finalQuestions']])),
+            'preview' => $preview,
+        ];
+    }
+
+    /**
+     * The course's modules and parts counted: what view() draws and facts() reports.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return array{modules:list<array{number:int,title:string,minutes:int,preview:bool,parts:array<string,bool>}>,moduleOf:array<int,int>,presentations:int,videos:int,cards:int,tasks:int,moduleQuestions:int,finalQuestions:int,courseMinutes:int,trailer:array<string,mixed>|null,presentationItems:list<int>}
+     */
+    private static function tally(array $rows): array
+    {
+        $modules = [];
+        $moduleOf = [];
+        foreach ($rows as $row) {
+            if ((string) $row['node_type'] === 'section' && !empty($row['numbered']) && ($row['section_number'] ?? null) !== null) {
+                $moduleOf[(int) $row['id']] = count($modules);
+                $modules[] = ['number' => (int) $row['section_number'], 'title' => (string) $row['section_title'], 'minutes' => 0, 'preview' => !empty($row['public_preview']), 'parts' => []];
+            }
+        }
+        $presentations = 0; $videos = 0; $cards = 0; $tasks = 0; $moduleQuestions = 0; $finalQuestions = 0; $courseMinutes = 0; $presentationItems = [];
+        $trailer = null;
+        foreach ($rows as $row) {
+            if ((string) $row['node_type'] !== 'item') { continue; }
+            $part = CourseItemService::part($row);
+            $config = is_array($row['type_config'] ?? null) ? $row['type_config'] : [];
+            $parent = $row['parent_node_id'] === null ? null : (int) $row['parent_node_id'];
+            $in = $parent !== null && isset($moduleOf[$parent]) ? $moduleOf[$parent] : null;
+            if ($part === 'presentation' && ($config['kind'] ?? '') === 'trailer') {
+                if ($trailer === null && !empty($row['public_preview'])) { $trailer = $row; }
+                continue;
+            }
+            $courseMinutes += CourseItemService::itemMinutes($row) ?? 0;
+            if ($in !== null) {
+                $modules[$in]['minutes'] += CourseItemService::itemMinutes($row) ?? 0;
+                $modules[$in]['parts'][$part] = true;
+            }
+            match ($part) {
+                'presentation' => $in !== null ? $presentations++ : null,
+                'video' => $videos++,
+                'flashcards' => $cards += count((array) ($config['cards'] ?? [])),
+                'practical' => $tasks += substr_count((string) ($row['content_source'] ?? ''), '<section class="task"'),
+                'assessment' => $in !== null ? $moduleQuestions += (int) ($row['question_count'] ?? 0) : null,
+                'final' => $finalQuestions += (int) ($row['question_count'] ?? 0),
+                default => null,
+            };
+            if ($part === 'presentation' && $in !== null) { $presentationItems[] = (int) $row['course_item_id']; }
+        }
+
+        return ['modules' => $modules, 'moduleOf' => $moduleOf, 'presentations' => $presentations, 'videos' => $videos, 'cards' => $cards,
+            'tasks' => $tasks, 'moduleQuestions' => $moduleQuestions, 'finalQuestions' => $finalQuestions, 'courseMinutes' => $courseMinutes,
+            'trailer' => $trailer, 'presentationItems' => $presentationItems];
     }
 
     /**

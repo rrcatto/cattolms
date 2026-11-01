@@ -120,6 +120,35 @@ final class PictureChoiceContractTest extends TestCase
         }
     }
 
+    /**
+     * Feature card checkboxes (owner, 2026-11-01: "Feature Card Checkbox Selectors each with their own svg icon, title and
+     * short description"): every card a native checkbox named by its value, sent as 1 when ticked.
+     */
+    public function testMultipleMakesEachCardACheckboxNamedByItsValue(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>';
+        $items = [
+            ['value' => 'show_outline', 'label' => 'Show outline', 'icon' => $icon, 'note' => 'List its parts.'],
+            ['value' => 'numbered', 'label' => 'Numbered module', 'icon' => $icon, 'note' => 'Module 1, Module 2.'],
+            ['value' => 'public_preview', 'label' => 'Public preview', 'icon' => $icon, 'note' => 'In the free preview.'],
+        ];
+        $xpath = self::xpath(ComponentHarness::render('form.picture-choice', ['multiple' => true, 'legend' => 'Section options', 'size' => 'small', 'selected' => ['numbered', 'public_preview'], 'items' => $items]));
+        self::assertSame(1, $xpath->query('//fieldset[contains(@class,"cl-ui-picture-choice--multiple") and contains(@class,"cl-ui-picture-choice--cards")]')->length);
+        self::assertSame(['show_outline', 'numbered', 'public_preview'], array_map(static fn(\DOMElement $input): string => $input->getAttribute('name'), iterator_to_array($xpath->query('//label/input[@type="checkbox" and @value="1"]'))));
+        self::assertSame(['numbered', 'public_preview'], array_map(static fn(\DOMElement $input): string => $input->getAttribute('name'), iterator_to_array($xpath->query('//input[@checked]'))));
+        self::assertSame(0, $xpath->query('//input[@type="radio"]')->length);
+
+        $ui = new PlatformUi();
+        foreach ([['selected' => 'numbered'], ['selected' => [1]], ['name' => 'flags', 'selected' => []], ['selected' => [], 'items' => [['value' => 'Bad name', 'label' => 'A', 'icon' => $icon]]], ['multiple' => 'yes', 'name' => 'a']] as $broken) {
+            try {
+                $ui->properties('form.picture-choice', $broken + ['multiple' => true, 'legend' => 'Section options', 'items' => $items]);
+                self::fail('Accepted ' . json_encode($broken));
+            } catch (\InvalidArgumentException $refused) {
+                self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage());
+            }
+        }
+    }
+
     /** columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row. */
     public function testFourColumnsIsAVariantAndNothingElseIs(): void
     {

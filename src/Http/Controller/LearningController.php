@@ -11,6 +11,9 @@ Description:
 Handles web requests for learning operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/01 SAST
+- POST /learn/{slug}/item/{node_id}/complete: a learner marks a part complete or unmarks it (owner, 2026-11-01), a plain
+  form returning to the same part.
 2026/09/03 03:18 SAST
 - Fixed the ALL-universe SQL error on Administration Courses search, the undefined universe 500 on Account routes, and rebuilt the Switch Company picker on the shared search, the shared pagination and the standard universe query parameter.
 2026/08/31 19:05 SAST
@@ -168,6 +171,25 @@ final class LearningController extends BaseController
      * names the course, the placement and the item key, so a copied link is useless to anyone the
      * same checks would refuse.
      */
+    /**
+     * A learner marks a part complete, or unmarks it (owner, 2026-11-01: "a mark complete button which could be a toggle,
+     * so a student could unmark it"). A plain form, so it works without JavaScript; it returns to the same part.
+     */
+    #[Route('/learn/{slug}/item/{node_id}/complete', name: 'learning_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['POST'])]
+    public function markPart(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+        $slug = (string) $this->param('slug');
+        $nodeId = (int) $this->param('node_id');
+        $preview = $this->previewMode();
+        $back = '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/content' . ($preview ? '?preview=1' : '');
+        return $this->handle(function () use ($user, $slug, $nodeId, $preview, $back): void {
+            $this->learning->markPart($user->id, $slug, $nodeId, $this->posted('completed') === '1', $preview);
+            $this->redirect($back);
+        }, $back);
+    }
+
     #[Route('/learn/{slug}/item/{node_id}/download/{item_key}', name: 'learning_course_download', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'item_key' => '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}'], methods: ['GET'])]
     public function download(): Response
     {

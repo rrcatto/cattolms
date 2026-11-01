@@ -1,0 +1,19 @@
+{#
+	A section's three options as feature card checkboxes in one row, first in its form (owner, 2026-11-01: "I would prefer
+	all 3 checkboxes to come first in the form, and they can be placed in a single row", each card with an SVG icon, a
+	title and a short description): Show outline, Numbered module and Public preview, sent as show_outline, numbered and
+	public_preview. Edit section and Add section share it. Variables: so_id (the fieldset's id), so_selected (the ticked
+	ones' names).
+#}
+{% set so_icon = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{{ ui('form.picture-choice', {multiple: true, legend: 'Section options', id: so_id, size: 'small', selected: so_selected, items: [
+	{value: 'show_outline', label: 'Show outline',
+		icon: '<svg ' ~ so_icon ~ '><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+		note: 'Lists the section\'s parts at its start.'},
+	{value: 'numbered', label: 'Numbered module',
+		icon: '<svg ' ~ so_icon ~ '><path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>',
+		note: 'Numbered in course order: Module 1, Module 2. Leave it off for Before you start or Review.'},
+	{value: 'public_preview', label: 'Public preview',
+		icon: '<svg ' ~ so_icon ~ '><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+		note: 'Shown in the free preview. Its items appear there only when they are previews too.'},
+]}) }}

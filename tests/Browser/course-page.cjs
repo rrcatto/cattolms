@@ -15,13 +15,13 @@ const {execFileSync} = require('node:child_process');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(execFileSync('podman', ['exec', 'env_php_1', 'cat', '/tmp/catto-course-page-state.json'], {encoding: 'utf8'}));
 const page_url = `${base}/courses/${state.slug}`;
-// The rows the page should draw, from the site's default layout as the fixture found it (never assumed: the owner chooses
-// it; Course first when none is saved) and the blocks this course has something for: no review, no related course.
+// The rows the page should draw, from the default layout as the fixture found it (never assumed: the owner chooses it and
+// arranges it at Course Page Layouts) and the blocks this course has something for: no review, no related course.
 const COURSE_FIRST = [['about', 'half'], ['how', 'half'], ['modules', 'full'], ['glance', 'half'], ['get', 'half'], ['reviews', 'full'], ['access', 'full'], ['start', 'full'], ['related', 'full']].map(([id, width]) => ({id, width, shown: true}));
 const PRESENT = ['about', 'how', 'modules', 'glance', 'get', 'access', 'start'];
 const rows = [];
 let open = null;
-for (const block of (state.default_layout ? JSON.parse(state.default_layout) : COURSE_FIRST).filter((b) => b.shown && PRESENT.includes(b.id))) {
+for (const block of (state.default_layout_blocks || COURSE_FIRST).filter((b) => b.shown && PRESENT.includes(b.id))) {
     if (block.width === 'half' && open !== null) { rows[open].push(block.id); open = null; continue; }
     rows.push([block.id]);
     open = block.width === 'half' ? rows.length - 1 : null;

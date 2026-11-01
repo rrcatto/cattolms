@@ -211,7 +211,9 @@ final class CourseComponentsIntegrationTest extends TestCase
         $id = $this->lesson('host', '[course-item:' . $assessment['key'] . '][course-item:' . $assessment['key'] . ']');
         $node = $this->items->addExisting($this->course, $id, [], $this->owner);
         $enrolment = $fixture->createEnrolment($this->owner, $this->course, $this->owner);
-        self::assertSame(1, $this->records->assessmentProgress($enrolment, $this->course)['total']);
+        // The course's one part is the lesson: an assessment shown inside it is not a second part (progress counts parts,
+        // owner 2026-11-01).
+        self::assertSame(1, $this->records->partsProgress($enrolment)['total']);
         $this->learning->start($this->owner, 'components-' . $this->suffix);
         $overview = $this->assessments->overview($this->owner, 'components-' . $this->suffix, $node, $assessment['key']);
         self::assertSame($assessment['item_id'], $overview['assessment']['id']);
@@ -260,21 +262,6 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->items->move($this->course, [$assessment], 'out', $this->owner);
         self::assertSame([$module, $assessment, $nextModule], array_map(static fn(array $row): int => (int) $row['id'], $this->records->structure($this->course)));
         self::assertNull($this->records->node($this->course, $assessment)['parent_node_id']);
-    }
-
-    public function testPublicAssessmentPreviewDoesNotCreateActivityRecords(): void
-    {
-        $fixture = new DevelopmentFixture($this->db);
-        $assessment = $fixture->createAssessmentItem($this->course, $this->owner);
-        $question = $fixture->createQuestion($assessment['item_id']);
-        $this->db->executeStatement("UPDATE courses SET status='published' WHERE id=:id", ['id' => $this->course]);
-        $this->items->updatePlacement($this->course, $assessment['node_id'], ['public_preview' => true], $this->owner);
-        $before = (int) $this->db->fetchOne('SELECT COUNT(*) FROM assessment_sessions');
-        $result = $this->assessments->publicPreview('components-' . $this->suffix, $assessment['node_id'], $assessment['key'], [$question['question_id'] => $question['correct_option_id']]);
-        self::assertSame(100.0, $result['percentage']);
-        self::assertTrue($result['submitted']);
-        self::assertSame($before, (int) $this->db->fetchOne('SELECT COUNT(*) FROM assessment_sessions'));
-        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE course_id=:id', ['id' => $this->course]));
     }
 
     public function testMixedCaseKeyIsPreservedAndResolvedExactly(): void

@@ -14,9 +14,8 @@ population, so no Administration or Company surface can truncate silently or rep
 that disagrees with the rows beneath it.
 
 Changelog:
-
-
-
+2026/11/01 SAST
+- Enrolment lists count every part the learner has done (owner, 2026-11-01, decision 2A): partsProgressJoin().
 
 2026/09/07 23:45 SAST
 
@@ -718,15 +717,15 @@ SQL;
                     c.id AS course_id, c.title AS course_title, c.slug,
                     u.id AS user_id, COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
-                    assessment_progress.submitted_assessment_count,
-                    assessment_progress.assessment_count
+                    part_progress.done_part_count,
+                    part_progress.part_count
              FROM page
              JOIN course_enrolments ce ON ce.id=page.id
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
 
-        $detail .= \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin();
+        $detail .= \CattoLearning\Course\CourseItemRepository::partsProgressJoin();
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -976,11 +975,11 @@ SQL;
             'SELECT ce.id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,ce.access_removed_at,
                     c.id AS course_id,c.title AS course_title,c.slug,
                     (EXISTS (SELECT 1 FROM course_credit_allocations a JOIN course_credits cr ON cr.id = a.credit_id WHERE a.enrolment_id = ce.id AND cr.company_id = :company_id) OR c.owner_company_id = :company_id) AS company_funded,
-                    assessment_progress.submitted_assessment_count,assessment_progress.assessment_count
+                    part_progress.done_part_count,part_progress.part_count
              FROM course_enrolments ce
              JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id AND cu.status=\'active\'
              JOIN courses c ON c.id=ce.course_id'
-             . \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin() .
+             . \CattoLearning\Course\CourseItemRepository::partsProgressJoin() .
             ' WHERE ce.user_id=:user_id AND ce.is_preview=FALSE ORDER BY ce.assigned_at DESC, ce.id DESC',
             ['company_id' => $companyId, 'user_id' => $userId]
         );
@@ -1086,15 +1085,15 @@ SQL;
                     ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
                     u.id AS user_id,COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
-                    assessment_progress.submitted_assessment_count,
-                    assessment_progress.assessment_count
+                    part_progress.done_part_count,
+                    part_progress.part_count
              FROM page
              JOIN course_enrolments ce ON ce.id=page.id
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
 
-        $detail .= \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin();
+        $detail .= \CattoLearning\Course\CourseItemRepository::partsProgressJoin();
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),

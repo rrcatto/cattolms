@@ -11,6 +11,14 @@ Description:
 Protects the presence of the core Catto Learning briefing documents without imposing a maximum document count in the repository root or docs/.
 
 Changelog:
+2026/11/01 16:03 SAST
+- The course specification opens with its version, publication date and time, and author (owner: "The course
+  specification absolutely needs a version number and a date of publication!"), and this test fails without them.
+2026/11/01 SAST
+- The course specification is one document (owner, 2026-11-01: "I want one source of truth", then "What I wanted was
+  ONE specification document to give to Claude, not a whole kit"): docs/COURSE-SPECIFICATION.md, describing the one
+  HTML file a course is written as, whose example the tests import. docs/COURSES.md is for developers. No kit, schema,
+  package document or second specification may return.
 2026/08/20 06:17 SAST
 - Replaced the invented closed-set documentation restriction with presence checks for the required core briefing documents.
 */
@@ -35,6 +43,7 @@ final class DocumentationLayoutTest extends TestCase
         // kept privately, outside the repository, and must not return to it.
         $required = [
             'COURSE-SPECIFICATION.md',
+            'COURSES.md',
             'OPERATIONS.md',
             'THEME-SDK.md',
             'UI-COMPONENTS.md',
@@ -52,5 +61,32 @@ final class DocumentationLayoutTest extends TestCase
             self::assertNotContains($private, $docs, 'The development log ' . $private . ' is kept outside the public repository.');
         }
         self::assertFileExists($root . '/install/README.md');
+    }
+
+    /**
+     * The course specification is one document in docs/, and nothing beside it can drift from it: no second
+     * specification, no package document or schema, no course kit and no old-format document anywhere in the
+     * repository.
+     */
+    public function testTheCourseSpecificationIsOneDocument(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $found = [];
+        $walk = new \RecursiveIteratorIterator(new \RecursiveCallbackFilterIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+            static fn(\SplFileInfo $file): bool => !in_array($file->getFilename(), ['vendor', 'node_modules', 'var', '.git'], true)
+        ), \RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($walk as $file) {
+            if ($file instanceof \SplFileInfo && in_array($file->getFilename(), ['COURSE-SPECIFICATION.md', 'COURSE-PACKAGE.md', 'LEGACY-HTML-COURSES.md', 'package.schema.json', 'course-kit', 'check_package.py'], true)) {
+                $found[] = substr($file->getPathname(), strlen($root) + 1);
+            }
+        }
+        sort($found);
+        self::assertSame(['docs/COURSE-SPECIFICATION.md'], $found, 'One course specification, in docs/, and nothing beside it.');
+        $specification = (string) file_get_contents($root . '/docs/COURSE-SPECIFICATION.md');
+        self::assertStringContainsString('## 14. A complete example', $specification, 'It carries the example the tests import.');
+        // Its version, date and author open it, so two copies can be compared (owner, 2026-11-01: "The course
+        // specification absolutely needs a version number and a date of publication!").
+        self::assertMatchesRegularExpression('/\A# CattoLMS Course Specification (\d+\.\d+)\n\n\*\*Version \1\*\* · \d{1,2} \w+ \d{4}, \d{2}:\d{2} SAST · Authored by [^\n·]+\S/', $specification, 'The specification opens with its version, the date and time it was published, and its author.');
     }
 }
