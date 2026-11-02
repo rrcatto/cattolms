@@ -1,0 +1,8 @@
+{#
+The learner's own tick on a part, a toggle (owner, 2026-11-01). A plain form, so it works without JavaScript; with it, htmx
+sends the form and the page does not reload or move (owner, 2026-11-02: "I don't want to have to scroll to the bottom of
+the page again"), and the answer is this form with the outline's ticks and the progress (partials/course-part-done).
+
+  paging_complete  {action, done}
+#}
+<form id="cl-course-item-complete" class="cl-course-item-complete{% if paging_complete.done %} is-done{% endif %}" method="post" action="{{ paging_complete.action }}" hx-post="{{ paging_complete.action }}" hx-target="this" hx-swap="outerHTML" hx-status:4xx="swap:none" hx-status:5xx="swap:none"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="completed" value="{{ paging_complete.done ? '0' : '1' }}">{{ ui('action.button', {label: paging_complete.done ? 'Completed' : 'Mark complete', variant: paging_complete.done ? 'primary' : 'secondary', size: 'normal', icon: 'action-done', id: 'cl-course-item-complete-button', title: paging_complete.done ? 'You marked this part complete. Select to unmark it.' : 'Mark this part complete', aria_label: paging_complete.done ? 'Completed. Select to unmark this part.' : 'Mark this part complete'}) }}</form>

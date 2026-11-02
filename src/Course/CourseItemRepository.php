@@ -22,6 +22,17 @@ final class CourseItemRepository
         return $row === false ? null : $this->normalise($row);
     }
 
+    /**
+     * The Presentation that introduces the site: the most recently saved of its kind.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function sitePresentation(): ?array
+    {
+        $row = $this->db->fetchAssociative($this->itemSelect() . " WHERE ci.item_type='slide_deck' AND ci.type_config->>'kind'='site' ORDER BY ci.updated_at DESC, ci.id DESC LIMIT 1");
+        return $row === false ? null : $this->normalise($row);
+    }
+
     /** @return array<string,mixed>|null */
     public function itemByKey(string $key): ?array
     {

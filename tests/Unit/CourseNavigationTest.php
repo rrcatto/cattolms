@@ -45,4 +45,40 @@ final class CourseNavigationTest extends TestCase
             ['id' => 7, 'node_type' => 'item', 'item_type' => 'html_lesson'],
         ];
     }
+
+    /** The sidebar opens only the way to the current stop (owner, 2026-11-02), each section holding its rows. */
+    public function testATickChangesThePartsRowAndThoseOfTheSectionsHoldingIt(): void
+    {
+        $row = static fn(int $id, ?int $parent): array => ['id' => $id, 'parent_node_id' => $parent];
+        $structure = [$row(1, null), $row(2, null), $row(3, 2), $row(4, 2), $row(5, 4), $row(6, 4)];
+        self::assertSame([5, 4, 2], array_column(CourseNavigation::rowsUpTo($structure, 5), 'id'), 'The part, then each section up from it.');
+        self::assertSame([1], array_column(CourseNavigation::rowsUpTo($structure, 1), 'id'), 'A part outside any section is its own row.');
+        self::assertSame([], CourseNavigation::rowsUpTo($structure, 99), 'A row the outline does not hold changes nothing.');
+    }
+
+    public function testTheOutlineOpensOnlyTheSectionYouAreIn(): void
+    {
+        $row = static fn(int $id, ?int $parent, string $type): array => ['id' => $id, 'parent_node_id' => $parent, 'node_type' => $type];
+        $structure = [$row(1, null, 'item'), $row(2, null, 'section'), $row(3, 2, 'item'), $row(4, 2, 'section'), $row(5, 4, 'item'), $row(6, null, 'section'), $row(7, 6, 'item'), $row(8, null, 'section')];
+        $open = static function (array $rows) use (&$open): array {
+            $ids = [];
+            foreach ($rows as $node) { if ($node['is_open']) { $ids[] = $node['id']; } $ids = [...$ids, ...$open($node['children'])]; }
+            return $ids;
+        };
+
+        $outline = CourseNavigation::outline($structure, 7);
+        self::assertSame([1, 2, 6, 8], array_column($outline, 'id'), 'Each section holds its rows, in order.');
+        self::assertSame([3, 4], array_column($outline[1]['children'], 'id'));
+        self::assertSame([5], array_column($outline[1]['children'][1]['children'], 'id'), 'However deep.');
+        self::assertSame([6], $open($outline), 'A part opens its section, and only that.');
+        self::assertSame([2, 4], $open(CourseNavigation::outline($structure, 5)), 'A part deep inside opens the whole way to it.');
+        self::assertSame([6], $open(CourseNavigation::outline($structure, 6)), 'A section\'s own page opens it.');
+        self::assertSame([], $open(CourseNavigation::outline($structure, 8)), 'A section with nothing in it has nothing to open.');
+        self::assertSame([], $open(CourseNavigation::outline($structure, 1)), 'A part in no section opens none.');
+        self::assertSame([], $open(CourseNavigation::outline($structure, null)), 'The course introduction opens none.');
+        self::assertSame([], $open(CourseNavigation::outline($structure, 99)), 'A stop not in the outline opens none.');
+
+        // The public preview shows a part whose section is not public: it stands at the top level.
+        self::assertSame([3], array_column(CourseNavigation::outline([$row(3, 2, 'item')], 3), 'id'));
+    }
 }

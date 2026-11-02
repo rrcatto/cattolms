@@ -40,6 +40,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
+use CattoLearning\Course\CourseNavigation;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Course\ResourceUnavailable;
 use CattoLearning\Http\FileDownload;
@@ -51,6 +52,7 @@ use CattoLearning\View\ThemeRenderer;
 use CattoLearning\Auth\AuthService;
 
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -178,16 +180,41 @@ final class LearningController extends BaseController
     #[Route('/learn/{slug}/item/{node_id}/complete', name: 'learning_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function markPart(): Response
     {
-        $this->requireCsrf();
-        $user = $this->requirePermission('LEARNING.COURSE.VIEW');
         $slug = (string) $this->param('slug');
         $nodeId = (int) $this->param('node_id');
-        $preview = $this->previewMode();
-        $back = '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/content' . ($preview ? '?preview=1' : '');
-        return $this->handle(function () use ($user, $slug, $nodeId, $preview, $back): void {
+        $query = (string) ($_GET['preview'] ?? '') === '1' ? '?preview=1' : '';
+        // A plain form comes back to the buttons it was pressed at, not the top of the page.
+        $back = '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/content' . $query . '#cl-course-item-paging';
+        if (!$this->isHtmxRequest()) {
+            $this->requireCsrf();
+            $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+            $preview = $this->previewMode();
+            return $this->handle(function () use ($user, $slug, $nodeId, $preview, $back): void {
+                $this->learning->markPart($user->id, $slug, $nodeId, $this->posted('completed') === '1', $preview);
+                $this->redirect($back);
+            }, $back);
+        }
+        // With JavaScript the page does not reload or move (owner, 2026-11-02). Whatever cannot be swapped into it, a
+        // signed-out reader, an expired form or a refusal, reloads the page instead, which says why.
+        if ($this->currentUser() === null) { return $this->htmxReloadPage(); }
+        try {
+            $this->requireCsrf();
+            $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+            $preview = $this->previewMode();
             $this->learning->markPart($user->id, $slug, $nodeId, $this->posted('completed') === '1', $preview);
-            $this->redirect($back);
-        }, $back);
+            $course = $this->learning->courseHome($user->id, $slug, $preview);
+        } catch (HttpExceptionInterface) {
+            return $this->htmxReloadPage();
+        } catch (\RuntimeException|\InvalidArgumentException $refused) {
+            $this->flash('danger', $refused->getMessage());
+            return $this->htmxReloadPage();
+        }
+        $course['current_node_id'] = $nodeId;
+        $rows = CourseNavigation::rowsUpTo((array) $course['structure'], $nodeId);
+        return $this->renderFragment('partials/course-part-done', [
+            'course' => $course, 'public_preview' => false, 'presentation_query' => $query, 'is_preview' => $preview, 'rows' => $rows,
+            'paging_complete' => ['action' => '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/complete' . $query, 'done' => !empty($rows[0]['is_done'])],
+        ]);
     }
 
     #[Route('/learn/{slug}/item/{node_id}/download/{item_key}', name: 'learning_course_download', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'item_key' => '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}'], methods: ['GET'])]

@@ -1,4 +1,4 @@
-/* CatWalk 1.0.0, the presentation engine (owner, 2026-10-28, decision 7A; DEVDOCS "Catwalk Presentation Engine -
+/* CatWalk 1.0.1, the presentation engine (owner, 2026-10-28, decision 7A; DEVDOCS "Catwalk Presentation Engine -
    Specification"). Plays a div.cw-deck of section.cw-slide elements, phone first: the deck reflows to its box and its
    text scales with it (container query units). Without JavaScript, and in print, every slide shows in order with all
    its steps, a readable page. A deck's look comes only from the --cw- tokens below, which a course may set: colours are
@@ -9,13 +9,17 @@
   --cw-bg-alt: #F2ECE0;
   --cw-ink: #1B1B1F;
   --cw-muted: #5C5A55;
-  --cw-accent: #8A6A1F;
+  --cw-accent: #82641D;
   --cw-accent-2: #9A2F42;
   --cw-good: #2E7A4A;
   --cw-bar: #EFE8DA;
   --cw-font-display: "Libre Caslon Text", Georgia, "Times New Roman", serif;
   --cw-font-body: "Libre Franklin", system-ui, -apple-system, "Segoe UI", sans-serif;
   --cw-radius: 12px;
+  /* The deck's own colours, kept for a slide on the accent background, which swaps them. */
+  --cw-deck-bg: var(--cw-bg);
+  --cw-deck-ink: var(--cw-ink);
+  --cw-deck-accent: var(--cw-accent);
   position: relative;
   container-type: inline-size;
   container-name: cw;
@@ -53,10 +57,24 @@
   min-width: 0;
 }
 .cw-slide[data-cw-tone="alt"] { background: var(--cw-bg-alt); }
-.cw-slide[data-cw-tone="accent"] { background: var(--cw-accent); color: var(--cw-bg); }
-.cw-slide[data-cw-tone="accent"] .cw-kicker,
-.cw-slide[data-cw-tone="accent"] .cw-source,
-.cw-slide[data-cw-tone="accent"] .cw-label { color: var(--cw-bg); }
+/* On the accent background the deck's colours swap, so that everything a layout draws stays readable: what was ink, muted
+   or accent is the deck's page colour, and what was the page is the accent. A box on it, a case's outcome or a question's
+   option, keeps the deck's own page and ink. */
+.cw-slide[data-cw-tone="accent"] {
+  --cw-bg: var(--cw-deck-accent);
+  --cw-ink: var(--cw-deck-bg);
+  --cw-muted: var(--cw-deck-bg);
+  --cw-accent: var(--cw-deck-bg);
+  background: var(--cw-bg);
+  color: var(--cw-ink);
+}
+.cw-slide[data-cw-tone="accent"] .cw-outcome,
+.cw-slide[data-cw-tone="accent"] .cw-choice {
+  --cw-bg: var(--cw-deck-bg);
+  --cw-bg-alt: var(--cw-deck-bg);
+  --cw-ink: var(--cw-deck-ink);
+  color: var(--cw-ink);
+}
 .cw-deck:not(.cw-ready) .cw-slide + .cw-slide { border-top: 1px solid rgb(127 127 127 / 25%); }
 .cw-slide > * { margin: 0; max-width: 62ch; }
 .cw-slide h2 {
@@ -67,7 +85,7 @@
   text-wrap: balance;
   color: inherit;
 }
-.cw-slide h3 { font-size: clamp(1rem, 2.4cqi, 1.3rem); margin: 0 0 0.4rem; }
+.cw-slide h3 { font-size: clamp(1rem, 2.4cqi, 1.3rem); margin: 0 0 0.4rem; color: inherit; }
 .cw-slide p,
 .cw-slide li { font-size: clamp(1rem, 2.4cqi, 1.35rem); }
 .cw-kicker { text-transform: uppercase; letter-spacing: 0.1em; font-size: clamp(0.75rem, 1.6cqi, 0.95rem) !important; color: var(--cw-accent); font-weight: 600; }
@@ -123,7 +141,13 @@
 }
 .cw-ready .cw-slide.cw-current { visibility: visible; opacity: 1; transform: none; transition: opacity 350ms ease, transform 350ms ease, visibility 0s; }
 .cw-ready .cw-step { transition: opacity 250ms ease; }
-/* In the player a picture takes the room its slide has left under the heading and above the caption. */
+/* A slide fuller than its frame shrinks to fit (the player sets --cw-fit). */
+.cw-ready .cw-slide > * { zoom: var(--cw-fit, 1); }
+/* In the player a picture takes the room its slide has left under the heading and above the caption, with a narrow
+   margin so that words in a drawing stay big enough to read. A picture alone fills its slide. */
+.cw-ready .cw-slide[data-cw-layout="picture"] { padding: clamp(0.4rem, 1.6cqi, 1rem); }
+.cw-ready .cw-slide[data-cw-layout="picture"]:not(:has(> h2)):not(:has(figcaption)) { padding: 0; }
+.cw-deck[data-cw-theme="dark"] .cw-slide[data-cw-layout="picture"]:not(:has(> h2)):not(:has(figcaption)) { background: #000000; }
 .cw-ready .cw-slide[data-cw-layout="picture"] .cw-figure { flex: 1 1 auto; min-height: 0; }
 .cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg { flex: 1 1 auto; min-height: 0; display: flex; }
 .cw-ready .cw-slide[data-cw-layout="picture"] .cw-svg svg { width: 100%; height: 100%; max-height: none; }
@@ -166,7 +190,7 @@
   position: absolute; inset: 2.4rem 0 auto auto; width: min(22rem, 100%); max-height: calc(100% - 6rem); overflow-y: auto; z-index: 3;
   background: var(--cw-bg); color: var(--cw-ink); border: 1px solid rgb(127 127 127 / 35%); border-radius: var(--cw-radius); padding: 0.75rem; box-shadow: 0 8px 30px rgb(0 0 0 / 25%);
 }
-.cw-contents h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.cw-contents h3 { margin: 0 0 0.5rem; font-size: 1rem; color: inherit; }
 .cw-contents ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .cw-contents button { width: 100%; text-align: left; min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; padding: 0.35rem 0.6rem; cursor: pointer; }
 .cw-contents button:hover,

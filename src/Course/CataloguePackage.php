@@ -54,6 +54,8 @@ use ZipArchive;
 final class CataloguePackage
 {
     public const CATALOGUE = 'catalogue.json';
+    /** The presentation that introduces the site, so that a rebuilt site gets it back with its courses (owner, 2026-11-02). */
+    public const SITE_PRESENTATION = 'site-presentation.json';
     public const COURSES = 'courses/';
     public const RESOURCES = 'resources/';
     /** Each Presentation's recorded narration, one clip per slide (CatWalk, owner 2026-10-28). */
@@ -78,6 +80,7 @@ final class CataloguePackage
         private readonly string $storageRoot,
         private readonly ?Catwalk\Narrations $narrations = null,
         private readonly ?CataloguePositions $positions = null,
+        private readonly ?CourseItemService $courseItems = null,
     ) {}
 
     /**
@@ -133,6 +136,10 @@ final class CataloguePackage
         }
         [$categories, $tags] = $this->taxonomyOf($chosen);
         $zip->addFromString(self::CATALOGUE, self::json($this->file->export($categories, $tags) + ['courses' => $codes]));
+        $site = $this->items->sitePresentation();
+        if ($site !== null) {
+            $zip->addFromString(self::SITE_PRESENTATION, self::json(['item_key' => $site['item_key'], 'name' => $site['name'], 'title' => $site['title'], 'description_html' => $site['description_html'], 'deck' => $site['type_config']]));
+        }
         if (!$zip->close()) throw new RuntimeException('The catalogue package could not be written.');
         $this->audit->record($userId, 'catalogue.exported', ['courses' => count($codes), 'categories' => count($categories), 'tags' => count($tags), 'files' => count($files),
             'every_course' => $courseIds === null]);
@@ -227,6 +234,7 @@ final class CataloguePackage
             'filename' => (string) $meta['original_filename'],
             'kind' => (string) $meta['extension'],
             'catalogue' => $this->file->plan($package['catalogue']),
+            'site_presentation' => !isset($package['site_presentation']) ? '' : ($this->items->sitePresentation() === null ? 'new' : 'here'),
             'files_new' => count(array_filter(array_keys($inPackage), fn(string $id): bool => $this->items->resourceByPublicId($id) === null)),
             'courses' => [],
             'counts' => ['new' => 0, 'update' => 0, 'unchanged' => 0, 'skip' => 0],
@@ -258,7 +266,7 @@ final class CataloguePackage
         $replace = array_map([CourseCode::class, 'normalise'], (array) ($choices['replace'] ?? []));
         $prices = (bool) ($choices['prices'] ?? true);
         $publish = (bool) ($choices['publish'] ?? true);
-        $report = ['filename' => $plan['filename'], 'catalogue' => $this->file->import($package['catalogue'], $userId), 'files_installed' => 0,
+        $report = ['filename' => $plan['filename'], 'catalogue' => $this->file->import($package['catalogue'], $userId), 'files_installed' => 0, 'site_presentation' => $this->installSitePresentation($package['site_presentation'] ?? null, $userId),
             'courses' => [], 'counts' => ['imported' => 0, 'updated' => 0, 'replaced' => 0, 'unchanged' => 0, 'left_out' => 0, 'skipped' => 0, 'failed' => 0]];
         $report['files_installed'] = $this->installFiles($path, $package['files'], $package['courses'], $userId);
 
@@ -336,6 +344,21 @@ final class CataloguePackage
         $this->audit->record($userId, 'catalogue.imported', ['filename' => $plan['filename'], 'catalogue' => $report['catalogue'], 'files_installed' => $report['files_installed'], 'counts' => $report['counts']]);
         $this->discard($key);
         return $report;
+    }
+
+    /**
+     * Gives a site without one the package's presentation. A site that has one keeps it, as a course here keeps its prices.
+     *
+     * @param array<string,mixed>|null $site
+     */
+    private function installSitePresentation(?array $site, int $userId): string
+    {
+        if ($site === null) return '';
+        if ($this->items->sitePresentation() !== null || $this->courseItems === null) return 'here';
+        $deck = (array) ($site['deck'] ?? []);
+        $this->courseItems->create(['item_key' => (string) ($site['item_key'] ?? 'site-presentation'), 'name' => (string) ($site['name'] ?? ''), 'item_type' => 'slide_deck', 'title' => (string) ($site['title'] ?? ''),
+            'description_html' => (string) ($site['description_html'] ?? ''), 'deck_kind' => 'site', 'deck_theme' => (string) ($deck['theme'] ?? 'dark'), 'slides' => (array) ($deck['slides'] ?? [])], $userId);
+        return 'new';
     }
 
     /** Forgets a staged package (the review's Cancel). */
@@ -507,7 +530,7 @@ final class CataloguePackage
     /**
      * The package's catalogue file, its courses' packages in catalogue order and its files.
      *
-     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string,data:array<string,mixed>}>,files:array<string,string>,narrations:array<string,string>}
+     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string,data:array<string,mixed>}>,files:array<string,string>,site_presentation?:array<string,mixed>,narrations:array<string,string>}
      */
     private function read(string $path, string $extension): array
     {
@@ -532,7 +555,7 @@ final class CataloguePackage
                 $unpacked += (int) $stat['size'];
                 if ($unpacked > self::MAXIMUM_UNPACKED_BYTES) throw new InvalidArgumentException('The package unpacks to more than ' . intdiv(self::MAXIMUM_UNPACKED_BYTES, 1024 * 1024) . ' MB.');
                 if (str_ends_with($name, '/')) continue;
-                if ($name === self::CATALOGUE) continue;
+                if ($name === self::CATALOGUE || $name === self::SITE_PRESENTATION) continue;
                 if (preg_match('#^courses/([A-Za-z0-9][A-Za-z0-9._-]{0,120})\.json$#', $name) === 1) { $courses[] = $name; continue; }
                 if (preg_match('#^resources/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/([A-Za-z0-9][A-Za-z0-9._ -]{0,499})$#', $name, $match) === 1) { $files[$match[1]] = $name; continue; }
                 if (preg_match('#^narrations/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(webm|ogg|m4a|mp3|wav)$#', $name, $match) === 1) { $narrations[$match[1]] = $name; continue; }
@@ -550,7 +573,8 @@ final class CataloguePackage
             foreach ($courses as $name) {
                 $packages[] = ['name' => $name, 'data' => self::decode((string) $zip->getFromName($name), $name)];
             }
-            return ['catalogue' => $catalogue, 'courses' => $packages, 'files' => $files, 'narrations' => $narrations];
+            $site = $zip->getFromName(self::SITE_PRESENTATION);
+            return ['catalogue' => $catalogue, 'courses' => $packages, 'files' => $files, 'narrations' => $narrations] + ($site === false ? [] : ['site_presentation' => self::decode($site, self::SITE_PRESENTATION)]);
         } finally {
             $zip->close();
         }

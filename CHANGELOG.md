@@ -2,6 +2,40 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-02 — v1.0.5 Every slide readable, a presentation that introduces the site, and Mark complete without a reload
+
+### Installing and updating
+
+- **No clean installation is needed from v1.0.4:** the schema is unchanged, so a v1.0.4 site updates in place. A site on v1.0.3 or earlier needs v1.0.4's clean installation.
+- **No new `.env` settings, packages, scheduled jobs, permissions, third parties or legal text.** Nothing is removed.
+- **New address:** `/presentation`, a public page that answers 404 until a site has a presentation of the kind Introducing the site.
+- **htmx 4.0.1** (from 4.0.0, BSD Zero Clause as before) and **CatWalk 1.0.1**, the presentation player, whose light look has a slightly darker accent colour, `#82641D`.
+- **A catalogue package can now hold `site-presentation.json`.** v1.0.4 and earlier refuse a package holding it, so export for an older site from that site's own release. The package carries the presentation's slides, without recorded narration.
+
+### Presentations: every slide can be read
+
+- **The accent background:** a case's outcome was near-white on near-white, and other parts took colours that vanish on the accent. On the accent background the deck's colours now swap, so every layout stays readable.
+- **Headings on dark presentations:** in the reader a compare slide's headings and the Contents heading took the page's dark blue, which could not be read on a dark presentation. They now take the deck's colour.
+- **A full slide shrinks a little to fit** before it scrolls, and a step or an answer it reveals is brought into view, where it could appear below the frame, out of sight.
+- **A drawing has more room on its slide,** a picture with no heading or caption fills its slide, on black in the dark look, and the light look's accent is dark enough for small text on every background.
+- **A new browser check,** `tests/Browser/presentation-readable.cjs`, measures every word on every slide of every presentation against the real pixels behind it: its contrast, its size as drawn, whether it is cut off, overlapped or out of view, in the place it is read, with every layout on every background in every bundled theme.
+
+### A presentation that introduces the site
+
+- **A new kind of Presentation, Introducing the site,** is edited in Administration like any other and placed in no course. The most recently saved is the site's, played at `/presentation`, with **Watch presentation** on the front page while there is one, which goes straight to the player.
+- **Its call to action** offers Register, left out for someone signed in, and Browse the courses, and may be followed by a closing picture.
+- **A catalogue package carries it:** a site with none gets it on import, and a site with its own keeps that.
+
+### Learning
+
+- **Mark complete no longer reloads the page or jumps to the top.** The button, the part's tick, its module's tick and the progress bar change where they are, in the course, the author's preview and the public preview, and sections opened or closed by hand stay as they were. Without JavaScript the page reloads and comes back to the buttons.
+- **Sections open and close in Course Modules.** Only the section the reader is in starts open, so the list follows them through the course, and the arrow beside a section opens or closes it by hand.
+- **An assessment's question and result pages mark the assessment as the current part** in Course Modules, where the course introduction had been marked.
+
+### Writing courses
+
+- **Course specification 4.5** gives the cover's canvas: 640 by 360, which fills the course page's head and the catalogue's card alike, with the part always showing named. A course needs one cover, not one for each.
+
 ## 2026-11-01 — v1.0.4 Mark complete, the public preview as the course itself, course page layouts of your own, and a course as one HTML file
 
 ### Installing and updating

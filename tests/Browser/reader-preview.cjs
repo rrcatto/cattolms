@@ -12,6 +12,9 @@
      with its question report, and ticks its part; practice gives feedback after an answer; a readiness check ends Ready
      or Review and ticks its part;
    - Mark complete and the assessment work without JavaScript;
+   - in Course Modules only the section the reader is in starts open: none on the course introduction or a part in no
+     section, the next one as the reader moves into it, and any section opened or closed by hand with its arrow, without
+     a new page (owner, 2026-11-02), on a phone and without JavaScript too;
    - nothing scrolls sideways and no script errors.
    Fixture: php tests/Browser/reader-preview-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -67,7 +70,63 @@ const progress = async (page) => {
 };
 const ticked = (page, node) => page.locator(`.cl-course-outline-item.is-done a[href*="/preview/${node}/"] .cl-course-outline-done`).count();
 const press = (page, locator) => Promise.all([page.waitForNavigation(), locator.click()]);
+/* Mark complete answers in place with JavaScript (owner, 2026-11-02). */
+const markInPlace = async (page, reads) => {
+    await page.locator('.cl-course-item-complete button').click();
+    await page.waitForFunction((text) => document.querySelector('.cl-course-item-complete button')?.innerText.includes(text), reads);
+};
 const badge = async (page) => (await page.locator('.cl-question-focus').getByText(/^Question \d+ of \d+$/).first().innerText()).trim();
+
+/* A section in the outline, by the link to its own page. */
+const group = (page, node) => page.locator(`.cl-course-outline-group:has(> summary a[href*="/${node}/content"])`);
+const isOpen = (page, node) => group(page, node).evaluate((details) => details.open);
+const toggle = (page, node) => group(page, node).locator('> summary > .cl-course-outline-toggle').click();
+const openCount = (page) => page.locator('.cl-course-outline details[open]').count();
+
+/* The student preview: only the current section open, moving with the reader, and opened and closed by hand. */
+async function studentSections(page, name) {
+    const at = `${name} student preview`;
+    await page.goto(`${base}/learn/${state.slug}?preview=1`, {waitUntil: 'load'});
+    check(`${at}: the course introduction opens no section`, await openCount(page) === 0);
+    await page.goto(learn(`${state.lesson_node}/content`), {waitUntil: 'load'});
+    check(`${at}: a part opens its own section and no other`, await isOpen(page, state.module) && await openCount(page) === 1);
+    check(`${at}: the parts of a closed section are out of sight`, await page.locator(`.cl-course-outline a[href*="/${state.second_lesson_node}/content"]`).isHidden());
+    await toggle(page, state.second_module);
+    check(`${at}: the arrow opens another section, with no new page`, await isOpen(page, state.second_module) && await isOpen(page, state.module) && page.url().includes(`/${state.lesson_node}/`));
+    await toggle(page, state.module);
+    check(`${at}: the arrow closes the current one too`, !await isOpen(page, state.module) && await page.locator(`.cl-course-outline a[href*="/${state.lesson_node}/content"]`).isHidden());
+    await press(page, page.locator(`.cl-course-outline a[href*="/${state.second_lesson_node}/content"]`));
+    check(`${at}: moving into another section opens it and closes the last`, await isOpen(page, state.second_module) && !await isOpen(page, state.module) && await openCount(page) === 1);
+    await press(page, group(page, state.module).locator('> summary a'));
+    check(`${at}: a section's title goes to its page, and opens it`, page.url().includes(`/${state.module}/content`) && await isOpen(page, state.module) && await openCount(page) === 1);
+    await press(page, page.locator('.cl-course-item-paging-next a'));
+    check(`${at}: Next moves on with its section open`, await isOpen(page, state.module) && await openCount(page) === 1);
+    await page.goto(learn(`${state.final_node}/assessment/${state.final_key}`), {waitUntil: 'load'});
+    check(`${at}: a part in no section opens none`, await openCount(page) === 0);
+    await page.goto(learn(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
+    check(`${at}: an assessment's start page opens its section`, await isOpen(page, state.module) && await openCount(page) === 1);
+    await press(page, page.locator('button:has-text("Start practice assessment")'));
+    check(`${at}: so does its question page, the assessment marked as the current part`, await isOpen(page, state.module) && await page.locator(`.cl-course-outline-item.is-current a[href*="/${state.assessment_node}/assessment/"]`).count() === 1 && await page.locator('.cl-course-outline-introduction.is-current').count() === 0);
+}
+
+/* The public preview, the same; a visitor, with or without JavaScript, or on a phone. */
+async function visitorSections(page, at) {
+    await page.goto(pub('').replace(/\/$/, ''), {waitUntil: 'load'});
+    check(`${at}: the course introduction opens no section`, await openCount(page) === 0);
+    await page.goto(pub(`${state.lesson_node}/content`), {waitUntil: 'load'});
+    check(`${at}: a part opens its own section`, await isOpen(page, state.module) && await openCount(page) === 1);
+    const box = await group(page, state.module).locator('> summary > .cl-course-outline-toggle').boundingBox();
+    check(`${at}: the arrow is big enough to press`, box.width >= 32 && box.height >= 32, JSON.stringify(box));
+    const arrow = () => group(page, state.module).locator('> summary > .cl-course-outline-toggle').evaluate((e) => { const a = getComputedStyle(e, '::before'); return {w: parseFloat(a.width), h: parseFloat(a.height), right: parseFloat(a.borderRightWidth), bottom: parseFloat(a.borderBottomWidth), turn: new DOMMatrix(a.transform).b}; });
+    const down = await arrow();
+    check(`${at}: the arrow is drawn as an arrow, pointing down while open`, down.w >= 8 && Math.abs(down.w - down.h) < 1 && down.right > 0 && down.bottom > 0 && down.turn > 0, JSON.stringify(down));
+    await toggle(page, state.module);
+    check(`${at}: the arrow closes it, staying on the page`, !await isOpen(page, state.module) && page.url().includes(`/${state.lesson_node}/`));
+    check(`${at}: and then points sideways`, (await arrow()).turn < 0);
+    await toggle(page, state.module);
+    check(`${at}: and opens it again`, await isOpen(page, state.module));
+    check(`${at}: nothing scrolls sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+}
 
 async function visitorAssessment(page, at) {
     await page.goto(pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
@@ -108,10 +167,20 @@ async function visitorTicks(page, at) {
     await page.goto(pub(`${state.lesson_node}/content`), {waitUntil: 'load'});
     const before = await progress(page);
     check(`${at}: the public preview shows the progress bar and Mark complete`, before !== null && await page.locator('.cl-course-item-complete button').innerText().then((t) => t.includes('Mark complete')));
-    await press(page, page.locator('.cl-course-item-complete button'));
+    // Down at the buttons, with a closed section opened by hand: the page must not reload or move (owner, 2026-11-02).
+    const closed = page.locator('.cl-course-outline-group:not([open]) > summary .cl-course-outline-toggle').first();
+    if (await closed.count() && await closed.isVisible()) await closed.click();
+    await page.evaluate(() => { window.__sameDocument = true; window.scrollTo(0, document.documentElement.scrollHeight); });
+    const place = () => page.evaluate(() => ({same: window.__sameDocument === true, y: window.scrollY, open: [...document.querySelectorAll('.cl-course-outline-group')].filter((g) => g.open).length}));
+    const held = await place();
+    await markInPlace(page, 'Completed');
+    await page.waitForTimeout(200);
+    const stayed = await place();
+    // Without JavaScript the plain form reloads the page, and comes back to the same place at the buttons.
+    check(`${at}: Mark complete ${at.includes('without JavaScript') ? 'comes back to the buttons' : 'does not reload or move the page'}`, (at.includes('without JavaScript') || (stayed.same && stayed.open === held.open)) && held.y > 0 && Math.abs(stayed.y - held.y) <= 1, JSON.stringify({held, stayed}));
     const after = await progress(page);
     check(`${at}: marked complete, the part gets its big green tick and the bar counts it`, await ticked(page, state.lesson_node) === 1 && (await page.locator('.cl-course-item-complete button').innerText()).includes('Completed') && after && after.done === before.done + 1, JSON.stringify({before, after}));
-    await press(page, page.locator('.cl-course-item-complete button'));
+    await markInPlace(page, 'Mark complete');
     const undone = await progress(page);
     check(`${at}: pressed again, the tick goes and the count falls back`, await ticked(page, state.lesson_node) === 0 && undone && undone.done === before.done, JSON.stringify({before, undone}));
 }
@@ -128,6 +197,7 @@ async function run(browserType, name) {
     await row(student, `${name} student preview, a section`, learn(`${state.module}/content`), {previous: true, next: true, complete: false});
     await row(student, `${name} student preview, an assessment`, learn(`${state.assessment_node}/assessment/${state.assessment_key}`), {previous: true, next: true, complete: false});
     await row(student, `${name} student preview, the course page`, `${base}/learn/${state.slug}?preview=1`, {next: true});
+    await studentSections(student, name);
 
     // The public preview, as a visitor who is not signed in.
     const visitor = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'})).newPage());
@@ -135,16 +205,19 @@ async function run(browserType, name) {
     await row(visitor, `${name} public preview, a section`, pub(`${state.module}/content`), {previous: true, next: true, complete: false});
     await row(visitor, `${name} public preview, an assessment`, pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {previous: true, complete: false});
     await visitorTicks(visitor, `${name} public preview`);
+    await visitorSections(visitor, `${name} public preview`);
     await visitorAssessment(visitor, `${name} public preview`);
     check(`${name}: nothing scrolls sideways`, await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
     const phone = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 390, height: 844}, reducedMotion: 'reduce'})).newPage());
     await row(phone, `${name} public preview at 390, a part`, pub(`${state.lesson_node}/content`), {complete: 'above'});
     check(`${name} at 390: nothing scrolls sideways`, await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+    await visitorSections(phone, `${name} at 390`);
 
     // Without JavaScript the toggle and the assessment are plain forms.
     const plain = await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, javaScriptEnabled: false, reducedMotion: 'reduce'})).newPage();
     await visitorTicks(plain, `${name} without JavaScript`);
+    await visitorSections(plain, `${name} without JavaScript`);
     await plain.goto(pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
     await press(plain, plain.locator('button:has-text("Start graded assessment")'));
     for (let turn = 0; turn < 4 && /\/preview\/assessment\/[0-9a-f-]+(\?|$)/.test(plain.url()); turn++) {

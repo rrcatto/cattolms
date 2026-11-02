@@ -173,6 +173,12 @@ abstract class BaseController
      * fragment or a full page; behaviour and authorisation never depend on it, so a client
      * that omits or forges the header simply gets the full page.
      */
+    /** Tells htmx to reload the page it asked from, for an answer it must not swap into it. */
+    protected function htmxReloadPage(): Response
+    {
+        return new Response('', 200, ['HX-Refresh' => 'true']);
+    }
+
     protected function isHtmxRequest(): bool
     {
         return strtolower((string) ($_SERVER['HTTP_HX_REQUEST'] ?? '')) === 'true';

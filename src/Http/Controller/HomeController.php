@@ -34,6 +34,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\Catwalk\SitePresentation;
 use CattoLearning\Course\CourseFavouriteService;
 use CattoLearning\Course\CourseService;
 use CattoLearning\View\ThemeRenderer;
@@ -48,7 +49,8 @@ final class HomeController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly CourseFavouriteService $favourites
+        private readonly CourseFavouriteService $favourites,
+        private readonly SitePresentation $presentation
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -75,7 +77,17 @@ final class HomeController extends BaseController
             'popular_rotation_seconds' => CourseService::POPULAR_ROTATION_SECONDS,
             'can_favourite' => $user !== null,
             'favourite_return' => '/',
+            'site_presentation' => $this->presentation->ready(),
         ]);
+    }
+
+    /** The presentation that introduces the site, which the home page links to while there is one. */
+    #[Route('/presentation', name: 'home_presentation', methods: ['GET'])]
+    public function presentation(): Response
+    {
+        $presentation = $this->presentation->page($this->currentUser() !== null);
+        if ($presentation === null) { throw $this->notFound('There is no presentation on this site yet.'); }
+        return $this->render('site-presentation', ['title' => $presentation['title'], 'presentation' => $presentation, 'load_catwalk' => true]);
     }
 
     #[Route('/about', name: 'home_about', methods: ['GET'])]

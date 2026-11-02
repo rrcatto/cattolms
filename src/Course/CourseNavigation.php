@@ -90,4 +90,58 @@ final class CourseNavigation
         }
         return ['total' => $total, 'done' => $count, 'percentage' => $total > 0 ? (int) round($count / $total * 100) : 0];
     }
+
+    /**
+     * The outline as the sidebar draws it (owner, 2026-11-02: "only the current section open ... as you progress through
+     * the course, the sections open and close"): each row with its children, and is_open on the sections on the way to
+     * the current stop. A row whose section is not shown, as in the public preview, stands at the top level.
+     *
+     * @param list<array<string,mixed>> $structure Rows in tree order.
+     * @return list<array<string,mixed>>
+     */
+    public static function outline(array $structure, int|string|null $currentNodeId = null): array
+    {
+        $parentOf = [];
+        foreach ($structure as $row) { $parentOf[(int) $row['id']] = ($row['parent_node_id'] ?? null) === null ? null : (int) $row['parent_node_id']; }
+        $open = [];
+        for ($id = (int) $currentNodeId; $id > 0 && array_key_exists($id, $parentOf); $id = (int) $parentOf[$id]) { $open[$id] = true; }
+        $children = [];
+        foreach ($structure as $row) {
+            $parent = $parentOf[(int) $row['id']];
+            $children[$parent !== null && array_key_exists($parent, $parentOf) ? $parent : 0][] = $row;
+        }
+        return self::outlineBranch($children, 0, $open);
+    }
+
+    /**
+     * @param array<int,list<array<string,mixed>>> $children
+     * @param array<int,true> $open
+     * @return list<array<string,mixed>>
+     */
+    private static function outlineBranch(array $children, int $parent, array $open): array
+    {
+        $rows = [];
+        foreach ($children[$parent] ?? [] as $row) {
+            $id = (int) $row['id'];
+            $row['children'] = self::outlineBranch($children, $id, $open);
+            $row['is_open'] = isset($open[$id]) && $row['children'] !== [];
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
+     * The rows a tick on a part changes: the part's own and those of the sections holding it, as far as the outline shows them.
+     *
+     * @param list<array<string,mixed>> $structure
+     * @return list<array<string,mixed>>
+     */
+    public static function rowsUpTo(array $structure, int $nodeId): array
+    {
+        $byId = [];
+        foreach ($structure as $row) { $byId[(int) $row['id']] = $row; }
+        $rows = [];
+        for ($row = $byId[$nodeId] ?? null; $row !== null; $row = ($row['parent_node_id'] ?? null) === null ? null : ($byId[(int) $row['parent_node_id']] ?? null)) { $rows[] = $row; }
+        return $rows;
+    }
 }

@@ -132,7 +132,7 @@ async function reader(browserType, name, width) {
     const scrolls = await list.evaluate((nav) => nav.scrollHeight > nav.clientHeight + 20);
     await list.evaluate((nav) => { nav.scrollTop = nav.scrollHeight; });
     const kept = await list.evaluate((nav) => nav.scrollTop);
-    await Promise.all([page.waitForNavigation(), list.locator('a[href*="/content"]').last().click()]);
+    await Promise.all([page.waitForNavigation(), list.locator('.cl-course-outline-group[open] a[href*="/content"]').last().click()]);
     await page.waitForLoadState('networkidle');
     const back = await list.evaluate((nav) => nav.scrollTop);
     check(`${at}: the Course Modules list keeps its place from page to page`, scrolls && kept > 0 && Math.abs(back - kept) <= 2, `${kept} then ${back}${scrolls ? '' : ' (the list did not scroll)'}`);

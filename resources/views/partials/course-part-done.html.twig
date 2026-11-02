@@ -1,0 +1,11 @@
+{#
+The answer to Mark complete when htmx sends it (owner, 2026-11-02): the form in its new state, and only what the tick
+changed elsewhere on the page: the progress, the part's row in Course Modules and the rows of the sections holding it.
+Each is drawn as the full page draws it. The sections' panels stay as the reader left them, because only their heading
+rows are replaced.
+#}
+{% import '@platform/layout/course-presentation.html.twig' as reader %}
+{% include '@platform/partials/course-item-complete.html.twig' %}
+{% if course.progress|default(null) %}<hx-partial hx-target="#cl-course-reader-progress" hx-swap="outerHTML">{% include '@platform/partials/course-reader-progress.html.twig' %}</hx-partial>{% endif %}
+{% for row in rows %}<hx-partial hx-target="#cl-outline-row-{{ row.id }}" hx-swap="outerHTML">{{ reader.outline_row(row, row.node_type == 'section' ? 'summary' : 'div', course, public_preview, presentation_query, is_preview) }}</hx-partial>
+{% endfor %}

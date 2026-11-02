@@ -2069,11 +2069,22 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-course-outline-item.is-current .cl-course-outline-time{color:#d8e7f7}
 /* Parts the learner has done (owner, 2026-11-01): a big green tick on each in the outline, and on a section once every
    part in it is; the Mark complete toggle sits centred between Previous and Next, green once the part is done. */
+/* A section that holds parts opens and closes in the outline (owner, 2026-11-02), a <details> the browser runs: its title
+   stays a link to its page, and the arrow in its own column opens and closes it. */
+.cl-course-outline-group>summary{display:grid;grid-template-columns:minmax(0,1fr) 2.25rem;align-items:start;cursor:pointer;list-style:none}
+.cl-course-outline-group>summary::-webkit-details-marker{display:none}
+.cl-course-outline-group>summary>small{grid-column:1}
+.cl-course-outline-group>summary:focus-visible{outline:2px solid #145da0;outline-offset:2px;border-radius:.5rem}
+.cl-course-outline-group>summary>.cl-course-outline-toggle{grid-column:2;grid-row:1;display:grid;place-items:center;width:2.25rem;height:2.75rem;padding:0;border-radius:.5rem;color:#5f6875}
+.cl-course-outline-toggle::before{content:"";display:block;width:.6rem;height:.6rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg)}
+.cl-course-outline-group[open]>summary>.cl-course-outline-toggle::before{transform:rotate(45deg)}
+.cl-course-outline-group>summary:hover>.cl-course-outline-toggle{background:#edf4fb;color:#145da0}
 .cl-course-outline-done{float:right;display:grid;place-items:center;width:1.65rem;height:1.65rem;margin:0 0 .25rem .5rem;border-radius:50%;background:#1b8a4b;box-shadow:0 0 0 2px #fff}
 .cl-course-outline-done svg{width:1.05rem;height:1.05rem;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
 /* Every reader page has the one paging row (partials/course-item-paging): each slot keeps its own column, so a page
    without Mark complete (a section, an assessment) or without Previous or Next leaves the others in place. */
 .cl-course-item-paging{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+#cl-course-item-paging{scroll-margin-top:11rem}
 .cl-course-item-paging-previous{grid-column:1;grid-row:1;justify-self:start}
 .cl-course-item-complete{grid-column:2;grid-row:1;justify-self:center;margin:0}
 .cl-course-item-paging-next{grid-column:3;grid-row:1;justify-self:end}
@@ -2140,6 +2151,7 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-slide-thumb .cw-ready .cw-slide{overflow:hidden;transition:none;cursor:default}
 .cl-presentation-preview{max-width:68rem;margin-inline:auto}
 .cl-presentation-preview .cw-deck{margin:0}
+.cl-site-presentation .cw-deck{max-width:max(20rem,calc((100dvh - 13rem) * 16 / 9));margin-inline:auto}
 .cl-slide-tree .cl-slide-row{gap:.5rem .9rem;padding:.6rem .25rem}
 .cl-slide-number{flex:0 0 auto;min-width:1.6rem;font-weight:700;font-size:1.15rem;text-align:center}
 .cl-slide-picture{display:block;flex:0 0 auto;border-radius:.4rem;color:inherit}

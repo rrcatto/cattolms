@@ -22,6 +22,7 @@ templates keep the semantics they were written against and this supplies them.
 
 Changelog:
 2026/11/01 SAST
+- course_outline: the course reader's sidebar, each section holding its rows
 - course_styles: a course's own stylesheet as the reader prints it, kept away from the presentation player
   (Course\CourseStyles, owner 2026-11-01: "yes, make the player keep its own design").
 2026/09/09 02:10 SAST
@@ -49,6 +50,8 @@ final class PlatformExtension extends AbstractExtension
             new TwigFilter('item_type_label', self::itemTypeLabel(...)),
             // A course's own stylesheet kept away from the presentation player (owner, 2026-11-01).
             new TwigFilter('course_styles', \CattoLearning\Course\CourseStyles::forReader(...)),
+            // The sidebar's outline, each section holding its rows, only the way to the current stop open (owner, 2026-11-02).
+            new TwigFilter('course_outline', \CattoLearning\Course\CourseNavigation::outline(...)),
         ];
     }
 

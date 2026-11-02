@@ -40,7 +40,7 @@ async function crawl(browser, who, cookie, width) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}});
     if (cookie) await context.addCookies([{name: 'catto_learning_session', value: cookie, url: base, secure: true}]);
     const page = await context.newPage();
-    const queue = ['/', '/courses', '/courses/tags', '/bundles', '/help', '/faq', '/contact', '/terms', '/refunds', '/privacy',
+    const queue = ['/', '/courses', '/courses/tags', '/bundles', '/presentation', '/help', '/faq', '/contact', '/terms', '/refunds', '/privacy',
         ...(cookie ? ['/admin', '/account', '/company'] : ['/login', '/register'])];
     const seen = new Set(queue), perPattern = new Map(), results = [], from = new Map();
     while (queue.length && results.length < LIMIT) {

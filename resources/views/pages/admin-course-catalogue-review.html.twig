@@ -24,6 +24,7 @@
 			{% endblock %}{% endembed %}
 			{{ ui('data.key-value-list', {items: [
 				{label: 'Categories', value: (plan.catalogue.categories_new ? plan.catalogue.categories_new|length ~ ' new: ' ~ plan.catalogue.categories_new|join(', ') : 'None new') ~ (plan.catalogue.categories_kept ? ' · ' ~ plan.catalogue.categories_kept ~ ' already here' : '')},
+				{label: 'Site presentation', value: plan.site_presentation == 'new' ? 'It will be added, and the front page will link to it' : (plan.site_presentation == 'here' ? 'This site keeps its own' : 'None in the package')},
 				{label: 'Tags', value: (plan.catalogue.tags_new ? plan.catalogue.tags_new|length ~ ' new: ' ~ plan.catalogue.tags_new|join(', ') : 'None new') ~ (plan.catalogue.tags_kept ? ' · ' ~ plan.catalogue.tags_kept ~ ' already here' : '')},
 				{label: 'Resource Library files', value: plan.files_new ? plan.files_new ~ ' new' : 'None new'},
 			]}) }}

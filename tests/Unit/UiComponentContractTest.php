@@ -208,7 +208,11 @@ final class UiComponentContractTest extends TestCase
             self::assertStringContainsString("include '@platform/partials/course-item-paging.html.twig'", $source, $page . ' must provide course navigation through the one paging row.');
             self::assertStringNotContainsString('<nav class="cl-course-item-paging"', $source, $page . ' must not build a paging row of its own.');
         }
-        $paging = $templates['resources/views/partials/course-item-paging.html.twig'];
+        $complete = "include '@platform/partials/course-item-complete.html.twig'";
+        self::assertStringContainsString($complete, $templates['resources/views/partials/course-item-paging.html.twig'], 'The paging row must hold Mark complete, from its one partial.');
+        // Mark complete is its own partial because the answer to pressing it draws the same form (owner, 2026-11-02).
+        self::assertStringContainsString($complete, $templates['resources/views/partials/course-part-done.html.twig'], 'The answer to Mark complete must draw the same form.');
+        $paging = $templates['resources/views/partials/course-item-paging.html.twig'] . $templates['resources/views/partials/course-item-complete.html.twig'];
         foreach (['cl-course-item-paging-previous', 'cl-course-item-complete', 'cl-course-item-paging-next', "ui('action.link'", "ui('action.button'"] as $part) {
             self::assertStringContainsString($part, $paging, 'The paging row must hold ' . $part . '.');
         }

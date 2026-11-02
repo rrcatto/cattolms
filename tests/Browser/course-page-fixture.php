@@ -76,7 +76,7 @@ if ($action === 'create') {
         $modules[] = $title;
     }
     // A cover, so the title stands over it as on a real course's page.
-    $db->executeStatement('UPDATE courses SET cover_svg = :svg WHERE id = :id', ['id' => $id, 'svg' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="A garden bed"><rect width="640" height="360" fill="#2f4a2a"/><circle cx="500" cy="90" r="50" fill="#e8c35a"/><rect y="250" width="640" height="110" fill="#5a3b22"/></svg>']);
+    $db->executeStatement('UPDATE courses SET cover_svg = :svg WHERE id = :id', ['id' => $id, 'svg' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A garden bed"><rect width="640" height="360" fill="#2f4a2a"/><circle cx="500" cy="90" r="50" fill="#e8c35a"/><rect y="250" width="640" height="110" fill="#5a3b22"/></svg>']);
     $db->executeStatement(
         "INSERT INTO course_price_variants (public_id,course_id,access_period_seconds,price_minor_units,currency_code,position,is_active,is_default,created_by_user_id,updated_by_user_id) VALUES (gen_random_uuid(),:c,31536000,150000,'ZAR',1,TRUE,TRUE,:u,:u)",
         ['c' => $id, 'u' => $admin['id']]

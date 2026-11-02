@@ -33,12 +33,13 @@ final class PresentationPages
     private const TONES = ['' => 'Plain', 'alt' => 'Shaded', 'accent' => 'Accent colour'];
 
     /** What a presentation is for, as feature cards: the icon of each. */
-    private const KIND_ICONS = ['intro' => 'door-open', 'review' => 'rotate-ccw', 'overview' => 'map', 'trailer' => 'clapperboard'];
+    private const KIND_ICONS = ['intro' => 'door-open', 'review' => 'rotate-ccw', 'overview' => 'map', 'trailer' => 'clapperboard', 'site' => 'presentation'];
     private const KIND_NOTES = [
         'intro' => 'Opens a module, ending with Up next.',
         'review' => 'Goes over the whole course.',
         'overview' => 'What a part of the course covers.',
         'trailer' => 'For the landing page, ending with a call to action.',
+        'site' => 'Introduces the whole site, from a link on the front page.',
     ];
 
     public function __construct(
@@ -188,7 +189,8 @@ final class PresentationPages
         foreach (SlideLayouts::GROUPS as $legend => $names) {
             $items = [];
             foreach ($names as $name) {
-                if ($name === 'cta' && $deck['kind'] !== 'trailer') { continue; }
+                if ($name === 'cta' && !in_array($deck['kind'], ['trailer', 'site'], true)) { continue; }
+                if ($name === 'next' && $deck['kind'] === 'site') { continue; }
                 $items[] = ['value' => $name, 'label' => SlideLayouts::LAYOUTS[$name]['label'], 'drawing' => $this->decks->thumbnail(['layout' => $name] + SlideLayouts::SAMPLES[$name], $deck['theme'], 'medium'), 'note' => SlideLayouts::LAYOUTS[$name]['use']];
             }
             if ($items !== []) { $groups[] = ['legend' => $legend, 'items' => $items]; }

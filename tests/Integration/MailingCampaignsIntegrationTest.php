@@ -248,6 +248,8 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $consents->subscribe($perList, 'course', $course, 'follow_button');
         $consents->subscribe($perList, 'category', $child, 'follow_button');
         $consents->chooseHow($perList, 'per_list', 'daily');
+        // They followed before the release on this test's frozen clock: an update never goes to someone who followed after it.
+        $this->db->executeStatement("UPDATE mailing_subscriptions SET changed_at = '2026-11-02 09:00:00+00' WHERE user_id IN (:a, :b, :c)", ['a' => $instant, 'b' => $weekly, 'c' => $perList]);
 
         $updates = $this->get(UpdateRepository::class);
         $about = $updates->create('recorded', 'first_published', $course, null, 'New course: Tax for Small Businesses', 'From R1 200,00.', 'https://example.test/courses/tax', null);

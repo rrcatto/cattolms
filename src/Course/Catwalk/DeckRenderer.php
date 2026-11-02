@@ -27,13 +27,14 @@ final class DeckRenderer
 {
     /**
      * @param array<string,mixed> $deck The deck as stored (kind, theme, slides).
-     * @param array{continue?:string,enrol?:string,preview?:string} $links Where the action buttons lead.
+     * @param array{continue?:string,enrol?:string,preview?:string,register?:string,courses?:string} $links Where the action buttons lead.
      * @param array<string,string> $narrations Each narrated slide's audio address, by slide id.
      */
     public function render(array $deck, string $key, string $title, array $links = [], array $narrations = [], string $language = 'en-ZA'): string
     {
         $deck = SlideDeck::normalise($deck);
         $hostLinks = array_filter($links, static fn(string $link): bool => $link !== '');
+        $links += ['register' => '/register', 'courses' => '/courses'];
         $html = '<div class="cw-deck" tabindex="0" data-cw-key="' . self::e($key) . '" data-cw-kind="' . self::e($deck['kind']) . '" data-cw-title="' . self::e($title)
             . '" data-cw-version="1" data-cw-theme="' . self::e($deck['theme']) . '" lang="' . self::e($language) . '"'
             . ($hostLinks === [] ? '' : ' data-cw-host-links="' . self::e((string) json_encode($hostLinks, JSON_UNESCAPED_SLASHES)) . '"') . '>';

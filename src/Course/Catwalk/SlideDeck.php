@@ -170,7 +170,7 @@ final class SlideDeck
     public static function validate(array $deck): array
     {
         $deck = self::normalise($deck);
-        if (!isset(SlideLayouts::KINDS[$deck['kind']])) { throw new InvalidArgumentException('Choose what the presentation is for: a module opening, a review, an overview or a trailer.'); }
+        if (!isset(SlideLayouts::KINDS[$deck['kind']])) { throw new InvalidArgumentException('Choose what the presentation is for: a module opening, a review, an overview, a trailer or introducing the site.'); }
         if (!isset(SlideLayouts::THEMES[$deck['theme']])) { throw new InvalidArgumentException('Choose a light or a dark presentation.'); }
         $count = count($deck['slides']);
         if ($count === 0) { throw new InvalidArgumentException('A presentation needs at least one slide.'); }
@@ -195,8 +195,11 @@ final class SlideDeck
             }
             if ($layout === 'cta' && ($slide['actions'] ?? []) === []) { throw new InvalidArgumentException($where . ': choose at least one button.'); }
             $last = $index === $count - 1;
-            if ($layout === 'cta' && $deck['kind'] !== 'trailer') { throw new InvalidArgumentException($where . ': a call to action belongs only in a trailer.'); }
-            if (in_array($layout, ['next', 'cta'], true) && !$last) { throw new InvalidArgumentException($where . ': an Up next or call to action slide comes last.'); }
+            if ($layout === 'cta' && !in_array($deck['kind'], ['trailer', 'site'], true)) { throw new InvalidArgumentException($where . ': a call to action belongs only in a trailer or the presentation that introduces the site.'); }
+            if ($layout === 'next' && $deck['kind'] === 'site') { throw new InvalidArgumentException($where . ': an Up next slide hands back to a course, and this presentation is in none.'); }
+            // The presentation that introduces the site may close on a picture after its call to action (owner, 2026-11-02).
+            $beforeClosingPicture = $layout === 'cta' && $deck['kind'] === 'site' && $index === $count - 2 && $deck['slides'][$count - 1]['layout'] === 'picture';
+            if (in_array($layout, ['next', 'cta'], true) && !$last && !$beforeClosingPicture) { throw new InvalidArgumentException($where . ': an Up next or call to action slide comes last.'); }
         }
         if ($deck['kind'] === 'trailer' && $deck['slides'][$count - 1]['layout'] !== 'cta') { throw new InvalidArgumentException('A trailer ends with a call to action slide.'); }
         return $deck;

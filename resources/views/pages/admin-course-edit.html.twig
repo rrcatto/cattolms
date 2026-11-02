@@ -82,7 +82,7 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Number the modules from', for: 'first-module-number', help: 'Choose 0 when the first module sets up the course, such as a practice environment and a readiness check: it is then Module 0, and the rest follow from Module 1.'})} %}
 {% block control %}<select class="cl-input" id="first-module-number" name="first_module_number" {{ ui_field_attrs(props) }}><option value="1"{{ course.first_module_number|default(1) == 1 ? ' selected' : '' }}>1</option><option value="0"{{ course.first_module_number|default(1) == 0 ? ' selected' : '' }}>0</option></select>{% endblock %}
 {% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover picture (an SVG file, optional)', for: 'course-cover', full_width: true, help: 'Shown at the top of the course\'s catalogue card and on its landing page. Leave it empty to keep the current picture.'})} %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover picture (an SVG file, optional)', for: 'course-cover', full_width: true, help: 'Shown on the course\'s catalogue card, course page and landing page. Draw it on a canvas of 640 by 360, with viewBox="0 0 640 360" and preserveAspectRatio="xMidYMid slice" on its svg tag, so that it fills each of them. Leave it empty to keep the current picture.'})} %}
 {% block control %}
 						{% if course.cover_svg|default('') %}<span class="cl-course-cover-preview" aria-hidden="true">{{ course.cover_svg|raw }}</span>{% endif %}
 						<input class="cl-input" type="file" id="course-cover" name="cover" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>

@@ -1,4 +1,4 @@
-/* CatWalk 1.0.0, the presentation engine (owner, 2026-10-28, decision 7A; DEVDOCS "Catwalk Presentation Engine -
+/* CatWalk 1.0.1, the presentation engine (owner, 2026-10-28, decision 7A; DEVDOCS "Catwalk Presentation Engine -
    Specification", sections 7, 9 and 10). Turns each div.cw-deck into a player: one slide at a time, points that build
    with Next, quick questions answered on the slide, a progress bar by chapter, a contents list, full screen, narration
    and a transcript. Keys act only while focus is in the deck, so two decks on a page never answer the same key. The
@@ -7,7 +7,7 @@
    its addresses in data-cw-host-links and listens for the cw: events if it wants them. */
 (function (root) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.0.1';
   var players = new WeakMap();
 
   function el(tag, className, text) {
@@ -162,6 +162,11 @@
     deck.addEventListener('click', this.onAction, true);
     this.onFullChange = function () { self.fullButton.textContent = document.fullscreenElement === deck ? 'Exit full screen' : 'Full screen'; };
     document.addEventListener('fullscreenchange', this.onFullChange);
+    // A larger or smaller frame, the window's or full screen's, fits the slide showing afresh.
+    if (window.ResizeObserver) {
+      this.resizing = new ResizeObserver(function () { self.fit(self.slides[self.index]); });
+      this.resizing.observe(this.viewport);
+    }
   };
 
   Player.prototype.swipe = function () {
@@ -207,6 +212,8 @@
           else if (j === i) { b.classList.add('cw-wrong'); b.appendChild(el('span', 'cw-mark', '✗ your answer')); }
         });
         if (explain) { explain.classList.add('cw-explain-locked'); explain.open = true; }
+        self.fit(slide);
+        if (explain) { self.bringIntoView(slide, explain); }
         var correct = items[answer] ? items[answer].textContent.replace(/✓ right answer$/, '').trim() : '';
         self.say(right ? 'Right.' : 'Not quite. The answer is ' + correct + '.');
         self.emit('cw:check', {key: self.key, index: index, chosen: i, correct: right});
@@ -258,6 +265,23 @@
       this.emit('cw:complete', {key: this.key, seconds: Math.round((Date.now() - this.started) / 1000)});
     }
     self.slides[n].scrollTop = 0;
+    this.fit(slide);
+  };
+
+  /* A slide fuller than its frame shrinks a little to fit, never so far that its words become hard to read. A slide
+     still too full scrolls, and bringIntoView shows what a step or an answer has just added. */
+  Player.prototype.fit = function (slide) {
+    var fit = 1;
+    slide.style.removeProperty('--cw-fit');
+    while (slide.scrollHeight > slide.clientHeight + 1 && fit > 0.72) {
+      fit = Math.round((fit - 0.04) * 100) / 100;
+      slide.style.setProperty('--cw-fit', String(fit));
+    }
+  };
+
+  Player.prototype.bringIntoView = function (slide, element) {
+    var frame = slide.getBoundingClientRect(), box = element.getBoundingClientRect();
+    if (box.bottom > frame.bottom) { slide.scrollTop += box.bottom - frame.bottom + 12; }
   };
 
   Player.prototype.next = function () {
@@ -265,7 +289,9 @@
     if (this.revealed < groups.length) {
       this.revealed++;
       this.showSteps(this.index, this.revealed);
-      var shown = groups[this.revealed - 1].map(function (s) { return s.textContent.trim(); }).join(' ');
+      var added = groups[this.revealed - 1];
+      this.bringIntoView(this.slides[this.index], added[added.length - 1]);
+      var shown = added.map(function (s) { return s.textContent.trim(); }).join(' ');
       this.say(shown);
       this.nextButton.disabled = this.index === this.total - 1 && this.revealed >= groups.length;
       return;
@@ -427,6 +453,7 @@
     deck.removeEventListener('click', this.onClick);
     deck.removeEventListener('click', this.onAction, true);
     document.removeEventListener('fullscreenchange', this.onFullChange);
+    if (this.resizing) { this.resizing.disconnect(); }
     this.slides.forEach(function (slide) {
       ['role', 'aria-roledescription', 'aria-label', 'inert', 'aria-hidden'].forEach(function (a) { slide.removeAttribute(a); });
       slide.classList.remove('cw-current');

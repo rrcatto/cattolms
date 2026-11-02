@@ -1,0 +1,18 @@
+{% extends layout %}
+{#
+The presentation that introduces the site, the page the front page links to (owner, 2026-11-02). The deck plays here;
+without JavaScript every slide shows in order, as a page.
+#}
+{% block page_body %}
+	{% set ph_title = presentation.title %}
+	{% set ph_lead = presentation.lead %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			{# The front page's link comes straight to the player, the whole of it in view, its buttons included. #}
+			<div id="presentation" class="cl-site-presentation">{{ presentation.html|raw }}</div>
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

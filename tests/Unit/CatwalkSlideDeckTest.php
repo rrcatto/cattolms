@@ -95,7 +95,7 @@ final class CatwalkSlideDeckTest extends TestCase
         self::assertContains('A module opening usually has 5 to 9 slides. This one has 1.', $warnings);
         self::assertContains('A module opening has at least one quick question.', $warnings);
         self::assertSame(1, SlideDeck::estimatedMinutes($deck));
-        self::assertSame(['intro', 'review', 'overview', 'trailer'], array_keys(SlideLayouts::KINDS));
+        self::assertSame(['intro', 'review', 'overview', 'trailer', 'site'], array_keys(SlideLayouts::KINDS));
         self::assertCount(12, SlideLayouts::LAYOUTS, 'Twelve layouts, as the engine specification has.');
     }
 
@@ -141,5 +141,27 @@ final class CatwalkSlideDeckTest extends TestCase
         self::assertSame(['points', 'title', 'check', 'next'], array_column($moved['slides'], 'layout'));
         $removed = CourseItemService::deckDraft($input + ['slide_action' => 'remove:2']);
         self::assertSame(['title', 'points', 'next'], array_column($removed['slides'], 'layout'));
+    }
+
+    public function testThePresentationThatIntroducesTheSiteMayCloseOnAPictureAfterItsCallToAction(): void
+    {
+        $picture = ['layout' => 'picture', 'title' => 'The emblem', 'picture' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"></svg>', 'alt' => 'An emblem'];
+        $title = ['layout' => 'title', 'title' => 'Welcome', 'heading' => 'Welcome'];
+        $cta = ['layout' => 'cta', 'title' => 'Start', 'heading' => 'Start', 'text' => 'Join us.', 'actions' => ['register', 'courses']];
+        $site = SlideDeck::validate(['kind' => 'site', 'theme' => 'dark', 'slides' => [$title, $cta, $picture]]);
+        self::assertSame(['register', 'courses'], $site['slides'][1]['actions']);
+        self::assertSame('Register', SlideLayouts::ACTIONS['register']);
+        foreach ([
+            'comes last' => ['kind' => 'site', 'slides' => [$cta, $title, $picture]],
+            'hands back to a course' => ['kind' => 'site', 'slides' => [$title, ['layout' => 'next', 'title' => 'Next', 'heading' => 'Next', 'text' => 'Read on.']]],
+            'belongs only in a trailer or' => ['kind' => 'intro', 'slides' => [$title, $cta]],
+        ] as $refusal => $deck) {
+            try {
+                SlideDeck::validate($deck + ['theme' => 'dark']);
+                self::fail('It should have been refused: ' . $refusal);
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString($refusal, $refused->getMessage());
+            }
+        }
     }
 }

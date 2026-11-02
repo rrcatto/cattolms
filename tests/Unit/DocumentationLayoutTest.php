@@ -31,6 +31,31 @@ use PHPUnit\Framework\TestCase;
 
 final class DocumentationLayoutTest extends TestCase
 {
+    /**
+     * The course specification states the cover's canvas and what each frame shows of it (section 6.1): worked out here
+     * from the shapes the stylesheet gives the frames, so a frame changed there cannot leave the document wrong again
+     * (2026-11-02: 16:10 was stated from the card alone, and a cover drawn to it left bars on the course page).
+     */
+    public function testTheCoverSizeTheSpecificationStatesFitsTheFramesTheSiteDraws(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
+        $spec = (string) file_get_contents($root . '/docs/COURSE-SPECIFICATION.md');
+        self::assertMatchesRegularExpression('/\.cl-picture-head\{[^}]*aspect-ratio:32\/15/', $css, 'The course page\'s frame.');
+        self::assertMatchesRegularExpression('/@media \(max-width:700px\)\{\.cl-picture-head\{aspect-ratio:1\/1\}/', $css, 'The course page\'s frame on a phone.');
+        self::assertMatchesRegularExpression('/\.cl-course-card-header\{[^}]*aspect-ratio:16\/10/', $css, 'The card\'s frame.');
+        self::assertStringContainsString('viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice"', $spec);
+        self::assertStringNotContainsString('viewBox="0 0 1600 1000"', $spec, 'The size that left bars is gone, from the example too.');
+        $shown = static fn(float $canvas, float $frame): array => [($canvas - $frame) / 2, ($canvas + $frame) / 2];
+        self::assertSame([30.0, 330.0], $shown(360, 640 * 15 / 32));
+        self::assertStringContainsString('32:15, about 1230 by 577 pixels on a wide screen | The whole width, and y from 30 to 330', $spec);
+        self::assertSame([32.0, 608.0], $shown(640, 360 * 16 / 10));
+        self::assertStringContainsString('16:10 | The whole height, and x from 32 to 608', $spec);
+        self::assertSame([140.0, 500.0], $shown(640, 360));
+        self::assertStringContainsString('1:1, a square | The whole height, and x from 140 to 500', $spec);
+        self::assertStringContainsString('x from 140 to 500, y from 30 to 330', $spec);
+    }
+
     public function testCanonicalDocumentationIsPresent(): void
     {
         $root = dirname(__DIR__, 2);

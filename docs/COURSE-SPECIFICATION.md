@@ -1,6 +1,8 @@
-# CattoLMS Course Specification 4.4
+# CattoLMS Course Specification 4.5
 
-**Version 4.4** · 1 November 2026, 20:41 SAST · Authored by Claude Opus 5.5 · Replaces version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+**Version 4.5** · 2 November 2026, 01:24 SAST · Authored by Claude Opus 5.5 · Replaces version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+
+**New in 4.5:** the cover drawing's exact size and the first line of its `<svg>` tag, the shapes CattoLMS shows it in and what each one trims (section 6.1). Version 4.4 gave the wrong size: a cover drawn to it does not reach the sides of the course page.
 
 **New in 4.4:** Module 0, for a course whose first module only sets the learner up (section 8). The review study aid a module may end with (section 8.6). The review's presentation and self assessment as panels of their own (section 10). CattoLMS writes every course on the site out in this form, and importing such a file gives the course back.
 
@@ -174,7 +176,7 @@ The masthead:
 
 ```html
 <header class="masthead" data-level="Beginner">
-  <div class="course-cover"><svg viewBox="0 0 1600 1000" ...>...</svg></div>
+  <div class="course-cover"><svg viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" ...>...</svg></div>
   <h1>Growing Vegetables in Small Spaces</h1>
   <p class="course-subtitle">Food from a balcony, a stoep or a small yard</p>
   <p class="course-summary">One paragraph saying what the course is and who it is for.</p>
@@ -187,7 +189,31 @@ The masthead:
 | `h1` | The title alone. Never add the subtitle to it with a dash, a colon or a `<br>`. |
 | `.course-subtitle` | One line. |
 | `.course-summary` | One paragraph, up to about 60 words: shown on the course's card and page. |
-| `.course-cover` | Optional and recommended: one SVG drawing in 16:10 proportions (`viewBox="0 0 1600 1000"`), with no visible text in it (the site shows the title over it, and an `aria-label` describing the drawing is welcome), no scripts, under 200 KB. It becomes the picture on the course's card and page. One that breaks these rules is left out, and the import review says why. |
+| `.course-cover` | Optional and recommended: one SVG drawing, drawn as section 6.1 says, with no visible text in it (the site shows the title over it, and an `aria-label` describing the drawing is welcome), no scripts, under 200 KB. It becomes the picture on the course's card and page. One that has text or scripts in it or is too large is left out, and the import review says why. |
+
+### 6.1 The cover drawing
+
+Draw the cover on a canvas of exactly 640 by 360, and start its `<svg>` tag exactly like this:
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="What the drawing shows">
+```
+
+1. **`viewBox="0 0 640 360"` is the canvas.** Use no other size, and put no `width` or `height` on the `<svg>` tag: the drawing takes its size from wherever it is shown.
+2. **`preserveAspectRatio="xMidYMid slice"` makes the drawing fill its frame,** trimming whatever does not fit. Never leave it out: without it the drawing shrinks to fit inside the frame, and the course page shows empty bars at its sides.
+3. **Cover the whole canvas.** Begin with a background that fills it, `<rect width="640" height="360" fill="#2F5D50"/>` or a gradient, and let shapes that touch an edge run past it.
+
+CattoLMS shows the one drawing in three shapes, trimming it to each:
+
+| Where | Shape | What shows of the 640 by 360 canvas |
+| --- | --- | --- |
+| The course page and landing page, on a computer or tablet | 32:15, about 1230 by 577 pixels on a wide screen | The whole width, and y from 30 to 330 |
+| The course's card in the catalogue | 16:10 | The whole height, and x from 32 to 608 |
+| The course page and landing page, in a window up to 700 pixels wide | 1:1, a square | The whole height, and x from 140 to 500 |
+
+So keep what matters inside the part that always shows: **x from 140 to 500, y from 30 to 330.** Outside it, draw only what can be lost, such as more background or the rest of a shape that still reads when trimmed.
+
+The site writes the course title over the bottom of the picture, on a shading that darkens the lower 40%. Put the drawing's main subject above y = 210, and nothing that has to be seen below it.
 
 ## 7. The introduction
 
@@ -630,6 +656,7 @@ Name the panels in these rules (`.panel`, `.sub`, `.block`), never every `summar
 - [ ] One file, opening in a browser with no errors, every module working.
 - [ ] `<meta name="cattolms:course-code">`, the masthead with `data-level`, the title alone in the `h1`.
 - [ ] One `<style>`: every kind of block in the content (a tip, a warning, a case, a definition) has a class with a rule, no rule styles content through the frame (section 5, rule 3), and no rule styles bare `button`, `input`, `label`, `fieldset`, `legend`, `select` or `form`.
+- [ ] A cover, if there is one, on the canvas section 6.1 gives: `viewBox="0 0 640 360"` and `preserveAspectRatio="xMidYMid slice"` on its `<svg>` tag, its background filling the whole canvas, and what matters inside x 140 to 500, y 30 to 330.
 - [ ] Modules `mod-m1`, `mod-m2` and so on in order, each a panel with `.m-name`, `.m-titles small`, `.module-body`, `.outcomes`, a summary in `.s-summary .sub-inner`, and `.practical` with `.answers` in `<div class="blocks">`.
 - [ ] Every part in its own panel, closed when the file opens, in the order section 8 shows: Presentation, (the video, outcomes and lesson), Summary, Flash cards, Practical work, Model answers, Self Assessment, Answer key. The readiness check, the review and the final assessment are panels too. Every panel is a `<details>` with its `<summary>`, without `open`, and nothing opens or closes any other way.
 - [ ] Every part under exactly the name section 4.1 gives it, and no other name for any part.
@@ -730,16 +757,16 @@ details[open]>summary .chev{transform:rotate(90deg)}
 <div class="wrap">
   <header class="masthead" data-level="Beginner">
     <div class="course-cover">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Three pots of vegetables on a balcony rail in the sun">
-        <rect width="1600" height="1000" fill="#2F5D50"/>
-        <circle cx="1270" cy="230" r="120" fill="#F2C14E"/>
-        <rect x="0" y="720" width="1600" height="280" fill="#7A4E2D"/>
-        <path d="M250 540 L450 540 L420 720 L280 720 Z" fill="#C8693A"/>
-        <path d="M330 520 C300 420 360 360 400 330 C420 400 400 470 360 520 Z" fill="#7BB661"/>
-        <path d="M680 500 L920 500 L890 720 L710 720 Z" fill="#B85C33"/>
-        <circle cx="800" cy="430" r="34" fill="#D7442E"/>
-        <path d="M1110 570 L1330 570 L1310 720 L1130 720 Z" fill="#C8693A"/>
-        <path d="M1200 560 C1230 500 1270 480 1310 470 C1300 520 1260 550 1210 570 Z" fill="#7BB661"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Three pots of vegetables on a balcony rail in the sun">
+        <rect width="640" height="360" fill="#2F5D50"/>
+        <circle cx="440" cy="84" r="46" fill="#F2C14E"/>
+        <rect x="0" y="258" width="640" height="102" fill="#7A4E2D"/>
+        <path d="M100 186 L180 186 L168 258 L112 258 Z" fill="#C8693A"/>
+        <path d="M132 178 C120 138 144 114 160 102 C168 130 160 158 144 178 Z" fill="#7BB661"/>
+        <path d="M272 170 L368 170 L356 258 L284 258 Z" fill="#B85C33"/>
+        <circle cx="320" cy="142" r="14" fill="#D7442E"/>
+        <path d="M444 198 L532 198 L524 258 L452 258 Z" fill="#C8693A"/>
+        <path d="M480 194 C492 170 508 162 524 158 C520 178 504 190 484 198 Z" fill="#7BB661"/>
       </svg>
     </div>
     <h1>Growing Vegetables in Small Spaces</h1>

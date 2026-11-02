@@ -20,6 +20,7 @@ use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -95,12 +96,41 @@ final class CoursePresentationController extends BaseController
     #[Route('/courses/{slug}/preview/{node_id}/complete', name: 'course_public_preview_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function markPart(): Response
     {
-        $this->requireCsrf();
-        $course = $this->withVisitorTicks($this->publicCourse()); $nodeId = (int) $this->param('node_id'); $node = null;
+        $nodeId = (int) $this->param('node_id');
+        // A plain form comes back to the buttons it was pressed at, not the top of the page.
+        $back = '/courses/' . rawurlencode($this->param('slug')) . '/preview/' . $nodeId . '/content' . ((string) ($_GET['preview'] ?? '') === '1' ? '?preview=1' : '') . '#cl-course-item-paging';
+        if (!$this->isHtmxRequest()) {
+            $this->requireCsrf();
+            $this->tickPart($nodeId);
+            $this->redirect($back);
+        }
+        // With JavaScript the page does not reload or move (owner, 2026-11-02). An expired form, or an author's preview
+        // signed out, reloads the page instead, which says why.
+        if ((string) ($_GET['preview'] ?? '') === '1' && $this->currentUser() === null) { return $this->htmxReloadPage(); }
+        try {
+            $this->requireCsrf();
+            $done = $this->tickPart($nodeId);
+        } catch (HttpExceptionInterface) {
+            return $this->htmxReloadPage();
+        }
+        $course = $this->withVisitorTicks($this->publicCourse());
+        $course['current_node_id'] = $nodeId;
+        return $this->renderFragment('partials/course-part-done', [
+            'course' => $course, 'public_preview' => true, 'presentation_query' => '', 'is_preview' => false,
+            'rows' => CourseNavigation::rowsUpTo((array) $course['structure'], $nodeId),
+            'paging_complete' => ['action' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview/' . $nodeId . '/complete' . $course['public_preview_query'], 'done' => $done],
+        ]);
+    }
+
+    /** Keeps the visitor's tick on a part in their session, and says whether it is now ticked. */
+    private function tickPart(int $nodeId): bool
+    {
+        $course = $this->withVisitorTicks($this->publicCourse()); $node = null;
         foreach ($course['structure'] as $candidate) { if ((int) $candidate['id'] === $nodeId) { $node = $candidate; break; } }
         if ($node === null || ($node['node_type'] ?? '') !== 'item' || in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) { throw $this->notFound('There is no part to mark complete here.'); }
-        $this->tick((int) $course['id'], $nodeId, $this->posted('completed') === '1');
-        $this->redirect('/courses/' . rawurlencode((string) $course['slug']) . '/preview/' . $nodeId . '/content' . $course['public_preview_query']);
+        $completed = $this->posted('completed') === '1';
+        $this->tick((int) $course['id'], $nodeId, $completed);
+        return $completed;
     }
 
     /** An assessment's start page, the learner's own: practice or graded, or the readiness check. */

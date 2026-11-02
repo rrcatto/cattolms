@@ -14,12 +14,15 @@ A Presentation is a Course Item of type `slide_deck` (shown as "Presentation"). 
 ]}
 ```
 
-- **kind**: `intro` (a module's opening, 5 to 9 slides), `review` (8 to 15), `overview` (4 to 7) or `trailer` (8 to 12,
-  ending with a call to action).
+- **kind**: `intro` (a module's opening, 5 to 9 slides), `review` (8 to 15), `overview` (4 to 7), `trailer` (8 to 12,
+  ending with a call to action) or `site` (8 to 15, the presentation that introduces the whole site, which may close on a
+  picture after its call to action).
 - **theme**: `light` (the default in modules) or `dark` (the default for a trailer).
 - **slides**: each a `layout` with that layout's fields, plain text only, a `title` of up to 40 characters, and an `id`
   that never changes, which its narration is filed under. Optional on every slide: `chapter`, `tone` (`base`, `alt`,
-  `accent`) and `narration` (the narrator's script, which is also the slide's transcript).
+  `accent`) and `narration` (the narrator's script, which is also the slide's transcript). On `accent` the deck's colours
+  swap, so every layout stays readable, and a box on it (a case's outcome, a question's options) keeps the deck's own page
+  and ink. Set a colour by token, never by element, so this keeps working.
 
 The twelve layouts and their fields are `Course\Catwalk\SlideLayouts`: title, statement, points, compare, picture,
 number, timeline, steps, case, check (a quick question, never marked), next (hands back to the course, last) and cta
@@ -111,5 +114,18 @@ page), otherwise the course's authors and learners who have reached it. A catalo
 - In Course Content, as a module's first part (`CourseItemRenderer`), or embedded in a lesson with `[course-item:key]`.
 - On a landing page, as a Presentation section that plays one of the course's presentations, usually its trailer.
 - In the editor: the presentation's preview at the top of its page, a slide's Preview window, and every slide's picture.
+- At `/presentation`, the presentation that introduces the whole site, which the front page links to while there is one
+  (`Course\Catwalk\SitePresentation`): a Course Item of the kind `site`, placed in no course, the most recently saved being
+  the site's. A catalogue package carries its slides (`site-presentation.json`, without narration audio): a site with none
+  gets it, and a site with its own keeps that.
+
+## Every slide can be read
+
+A slide fuller than its frame shrinks a little to fit, by `--cw-fit` (`Player.fit`), never below 72%. If it is still too
+full it scrolls, and what a step or an answer has just shown is brought into view. On the `accent` background the deck's
+colours swap by token, so a colour is set by token and never by element. Words in a drawing must be at least 10 pixels as
+a learner sees them at 1440: a drawing is given the slide's width but only about 311 pixels of height there, so a wide
+drawing draws larger than a tall one. `tests/Browser/presentation-readable.cjs` measures every word on every slide of every
+presentation against the real pixels behind it: run it after writing or changing a presentation, and before every release.
 
 The engine's two files depend on nothing in CattoLMS, so the same files play a deck on any page.

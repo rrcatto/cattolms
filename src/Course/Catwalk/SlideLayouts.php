@@ -127,11 +127,12 @@ final class SlideLayouts
         'review' => ['label' => 'Course review', 'slides' => [8, 15]],
         'overview' => ['label' => 'Overview', 'slides' => [4, 7]],
         'trailer' => ['label' => 'Course trailer', 'slides' => [8, 12]],
+        'site' => ['label' => 'Introducing the site', 'slides' => [8, 15]],
     ];
 
     public const TONES = ['base', 'alt', 'accent'];
     public const THEMES = ['light' => 'Light', 'dark' => 'Dark'];
-    public const ACTIONS = ['enrol' => 'Get this course', 'preview' => 'Preview the course'];
+    public const ACTIONS = ['enrol' => 'Get this course', 'preview' => 'Preview the course', 'register' => 'Register', 'courses' => 'Browse the courses'];
     public const MAX_SLIDES = 25;
 
     /** @return list<string> */

@@ -24,6 +24,7 @@
 				{label: 'Categories', value: report.catalogue.categories_created ~ ' made · ' ~ report.catalogue.categories_kept ~ ' already here'},
 				{label: 'Tags', value: report.catalogue.tags_created ~ ' made · ' ~ report.catalogue.tags_kept ~ ' already here'},
 				{label: 'Resource Library files', value: report.files_installed ~ ' installed'},
+				{label: 'Site presentation', value: report.site_presentation == 'new' ? 'Added: the front page now links to it' : (report.site_presentation == 'here' ? 'This site keeps its own' : 'None in the package')},
 			]}) }}
 {% endblock %}
 {% endembed %}

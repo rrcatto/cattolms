@@ -54,6 +54,11 @@ async function scenario(name, run) {
                     else assert.ok(at[second].y > at[first].y + 1, `${second} comes after ${first}`);
                 }
                 assert.equal(await page.locator('.cl-picture-head .cl-course-detail-headline h1').count(), 1, 'the title over the cover');
+                // The drawing covers its frame, with no bars at the sides (2026-11-02): where its 640 by 360 canvas lands on screen.
+                assert.ok(await page.locator('.cl-picture-head-art svg').evaluate((svg) => {
+                    const m = svg.getScreenCTM(), f = svg.parentElement.getBoundingClientRect();
+                    return m.e <= f.left + 0.5 && m.e + 640 * m.a >= f.right - 0.5 && m.f <= f.top + 0.5 && m.f + 360 * m.d >= f.bottom - 0.5;
+                }), 'the cover fills the head');
                 assert.deepEqual(await page.locator('.cl-course-modules .cl-course-module-title').allTextContents(), state.modules, 'the modules, in order');
                 assert.match(await page.locator('.cl-course-module-paragraph').textContent(), /^Every module opens with a presentation/, 'how a module is made');
                 assert.equal(await page.locator('.cl-course-modules a[href$="/preview"]').count(), 1, 'the first module is the free preview');

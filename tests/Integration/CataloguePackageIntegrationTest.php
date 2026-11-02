@@ -180,6 +180,8 @@ final class CataloguePackageIntegrationTest extends TestCase
         $catalogueFile = json_decode((string) $archive->getFromName('catalogue.json'), true);
         $exported = json_decode((string) $archive->getFromName('courses/' . $first . '.json'), true);
         $archive->close();
+        // The site's own presentation goes in whichever courses are ticked, when it has one.
+        $names = array_values(array_diff($names, [CataloguePackage::SITE_PRESENTATION]));
         sort($names);
         self::assertSame(['catalogue.json', 'courses/' . $first . '.json'], $names, 'Only the ticked course is in the package.');
         self::assertSame([$first], $catalogueFile['courses']);

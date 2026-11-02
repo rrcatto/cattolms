@@ -25,6 +25,7 @@
 						{% else %}
 							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/register', icon: 'action-register'}) }}
 						{% endif %}
+						{% if site_presentation %}{{ ui('action.link', {label: 'Watch presentation', variant: 'secondary', size: 'large', href: '/presentation#presentation', icon: 'action-play'}) }}{% endif %}
 
 {% endblock %}
 {% endembed %}

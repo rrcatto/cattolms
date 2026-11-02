@@ -75,6 +75,8 @@ final class CourseSpecificationIntegrationTest extends TestCase
         $course = $container->get(CourseRepository::class)->findById($courseId);
         self::assertSame(['GDN-101', 'Growing Vegetables in Small Spaces', 'Food from a balcony, a stoep or a small yard', 'Beginner'], [$course['code'], $course['title'], $course['subtitle'], $course['level']]);
         self::assertStringStartsWith('<svg', (string) $course['cover_svg'], 'The masthead\'s drawing is the cover.');
+        self::assertStringContainsString('viewBox="0 0 640 360"', (string) $course['cover_svg'], 'The example\'s cover is on the canvas section 6.1 gives.');
+        self::assertStringContainsString('preserveAspectRatio="xMidYMid slice"', (string) $course['cover_svg'], 'and keeps what makes it fill its frame.');
         self::assertStringContainsString('[grading-scale]', (string) $course['introduction_html'], 'The grading scale is shown from the course\'s bands.');
         self::assertSame([75.0, 70.0, 60.0, 50.0, 0.0], array_map(static fn(array $band): float => (float) $band['minimum_percentage'], $container->get(CourseRepository::class)->gradeBands($courseId)));
 

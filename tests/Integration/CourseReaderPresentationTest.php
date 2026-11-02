@@ -111,6 +111,93 @@ final class CourseReaderPresentationTest extends TestCase
         $this->fixture->cleanup();
     }
 
+    /** Only the section the reader is in starts open in the sidebar (owner, 2026-11-02), and the browser does the rest. */
+    public function testOnlyTheCurrentSectionStartsOpenInTheOutline(): void
+    {
+        $page = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        $week = $this->outlineEntry($page, $this->nodes['week']);
+        $group = $this->element($week->parentNode);
+        self::assertSame('summary', $week->nodeName, 'A section with parts is the heading of a panel.');
+        self::assertSame('details', $group->nodeName);
+        self::assertTrue($group->hasAttribute('open'), 'The section holding the current part is open.');
+        self::assertSame(1, $page->query('//nav[contains(@class, "cl-course-outline")]//details[@open]')->length, 'and no other.');
+        self::assertSame(1, $page->query('./*[contains(@class, "cl-course-outline-toggle")]', $week)->length, 'It has its arrow.');
+        self::assertSame(1, $page->query('.//*[contains(@class, "is-current")]', $group)->length, 'The current part is inside it.');
+        $introduction = $this->page('/learn/' . $this->slug);
+        self::assertSame(0, $introduction->query('//nav[contains(@class, "cl-course-outline")]//details[@open]')->length, 'The course introduction opens none.');
+    }
+
+    public function testMarkCompleteAnswersHtmxInPlaceAndAPlainFormComesBackToTheButtons(): void
+    {
+        $saved = [$_SERVER, $_SESSION['csrf'] ?? null];
+        $_SESSION['csrf'] = str_repeat('m', 64);
+        $form = ['csrf' => $_SESSION['csrf'], 'completed' => '1'];
+        $learner = '/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/complete';
+        $visitor = '/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/complete';
+        $done = fn(): int => (int) $this->db->fetchOne('SELECT count(*) FROM course_part_completions c JOIN course_enrolments e ON e.id = c.enrolment_id WHERE e.user_id = :user AND e.course_id = :course', ['user' => $this->learner, 'course' => $this->course]);
+        try {
+            // Without JavaScript the plain form comes back to the buttons.
+            unset($_SERVER['HTTP_HX_REQUEST']);
+            $plain = $this->post($learner, $form);
+            self::assertSame(303, $plain->getStatusCode());
+            self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content#cl-course-item-paging', $plain->headers->get('Location'));
+            self::assertSame(1, $done());
+            $this->post($learner, ['completed' => '0'] + $form);
+            self::assertSame(0, $done());
+
+            // With it, the answer is the form and only what the tick changed, with the lesson's row and its section's.
+            $_SERVER['HTTP_HX_REQUEST'] = 'true';
+            $answer = $this->post($learner, $form);
+            self::assertSame(200, $answer->getStatusCode());
+            $html = (string) $answer->getContent();
+            self::assertStringNotContainsString('<html', $html, 'Only the changed parts are sent.');
+            self::assertStringContainsString('class="cl-course-item-complete is-done"', $html);
+            self::assertStringContainsString('name="completed" value="0"', $html, 'Pressed again, it unticks.');
+            self::assertStringContainsString('Completed', $html);
+            foreach (['#cl-course-reader-progress', '#cl-outline-row-' . $this->nodes['lesson'], '#cl-outline-row-' . $this->nodes['week']] as $target) {
+                self::assertStringContainsString('<hx-partial hx-target="' . $target . '" hx-swap="outerHTML">', $html);
+            }
+            self::assertStringNotContainsString('#cl-outline-row-' . $this->nodes['pack'], $html, 'A row the tick did not change stays as it is.');
+            self::assertStringContainsString('<summary id="cl-outline-row-' . $this->nodes['week'] . '"', $html, 'A section stays the heading of its panel.');
+            self::assertStringContainsString('1 of', $html);
+            self::assertSame(1, $done());
+
+            // Whatever cannot be swapped in reloads the page: a refusal, an expired form, a signed-out reader.
+            $week = $this->post('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/complete', $form);
+            self::assertSame(['true', ''], [$week->headers->get('HX-Refresh'), (string) $week->getContent()], 'A section cannot be ticked by hand.');
+            $expired = $this->post($learner, ['csrf' => 'expired', 'completed' => '0']);
+            self::assertSame(['true', ''], [$expired->headers->get('HX-Refresh'), (string) $expired->getContent()]);
+            self::assertSame(1, $done(), 'An expired form changes nothing.');
+            $signedIn = $_COOKIE;
+            unset($_COOKIE[Env::string('AUTH_SESSION_COOKIE', 'catto_learning_session')]);
+            $away = $this->post($learner, ['completed' => '0'] + $form);
+            self::assertSame(['true', ''], [$away->headers->get('HX-Refresh'), (string) $away->getContent()]);
+            self::assertSame(1, $done());
+
+            // The public preview answers the same way, from the visitor's session.
+            $ticks = $_SESSION['public_preview_done'] ?? null;
+            unset($_SESSION['public_preview_done']);
+            $publicAnswer = $this->post($visitor, ['csrf' => (string) $_SESSION['csrf']] + $form);
+            $public = (string) $publicAnswer->getContent();
+            self::assertSame(200, $publicAnswer->getStatusCode());
+            self::assertNull($publicAnswer->headers->get('HX-Refresh'));
+            self::assertStringNotContainsString('<html', $public);
+            self::assertStringContainsString('class="cl-course-item-complete is-done"', $public);
+            self::assertStringContainsString('action="' . $visitor . '"', $public);
+            self::assertStringContainsString('<hx-partial hx-target="#cl-outline-row-' . $this->nodes['lesson'] . '" hx-swap="outerHTML">', $public);
+            self::assertStringContainsString('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content', $public, 'Its rows stay in the public preview.');
+            self::assertTrue($_SESSION['public_preview_done'][$this->course][$this->nodes['lesson']] ?? false);
+            self::assertSame(1, $done(), 'A visitor\'s tick is kept in their session, never on a record.');
+            self::assertSame(['true', ''], (function () use ($visitor): array { $r = $this->post($visitor, ['csrf' => 'expired', 'completed' => '0']); return [$r->headers->get('HX-Refresh'), (string) $r->getContent()]; })());
+            if ($ticks === null) { unset($_SESSION['public_preview_done']); } else { $_SESSION['public_preview_done'] = $ticks; }
+            $_COOKIE = $signedIn;
+        } finally {
+            $_SERVER = $saved[0];
+            $_SESSION['csrf'] = $saved[1];
+            $this->db->executeStatement('DELETE FROM course_part_completions WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id = :course)', ['course' => $this->course]);
+        }
+    }
+
     public function testSectionsAreLabelledAndStyledInTheCourseModulesOutline(): void
     {
         $page = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
@@ -278,6 +365,20 @@ final class CourseReaderPresentationTest extends TestCase
         }
     }
 
+    /** @param array<string,string> $fields */
+    private function post(string $url, array $fields): \Symfony\Component\HttpFoundation\Response
+    {
+        $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
+        $_POST = $fields;
+        $_GET = [];
+        try {
+            return $kernel->handle(Request::create($url, 'POST', $fields));
+        } finally {
+            $kernel->shutdown();
+            $_POST = [];
+        }
+    }
+
     private function page(string $url): DOMXPath
     {
         $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
@@ -298,7 +399,7 @@ final class CourseReaderPresentationTest extends TestCase
 
     private function outlineEntry(DOMXPath $page, int $node): \DOMElement
     {
-        $entries = $page->query('//nav[contains(@class, "cl-course-outline")]/div[contains(@class, "cl-course-outline-item")]');
+        $entries = $page->query('//nav[contains(@class, "cl-course-outline")]//*[contains(@class, "cl-course-outline-item")]');
         $structure = array_map(static fn(array $row): int => (int) $row['id'], $this->db->fetchAllAssociative(
             'WITH RECURSIVE tree AS (SELECT n.*, ARRAY[n.position, n.id::int] AS path FROM course_structure_nodes n WHERE n.course_id=:course AND n.parent_node_id IS NULL UNION ALL SELECT n.*, t.path || ARRAY[n.position, n.id::int] FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id) SELECT id FROM tree ORDER BY path',
             ['course' => $this->course]
