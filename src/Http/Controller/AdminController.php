@@ -989,6 +989,32 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=site#settings-site');
     }
 
+    /** Settings > Site mode (owner, 2026-11-03): what a demo site's pages, emails and checkouts say. */
+    #[Route('/admin/settings/demo-words', name: 'admin_save_demo_words', methods: ['POST'])]
+    public function saveDemoWords(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveDemoWords([
+                'heading' => (string) ($_POST['demo_heading'] ?? ''), 'notice' => (string) ($_POST['demo_notice'] ?? ''),
+                'email_notice' => (string) ($_POST['demo_email_notice'] ?? ''), 'simulation' => (string) ($_POST['demo_simulation'] ?? ''),
+            ], $user->id);
+            $this->flash('success', 'The demo messages are saved.');
+            $this->redirect('/admin/settings?section=site#settings-site');
+        }, '/admin/settings?section=site#settings-site');
+    }
+
+    #[Route('/admin/settings/demo-words/reset', name: 'admin_reset_demo_words', methods: ['POST'])]
+    public function resetDemoWords(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->platformAdministration->resetDemoWords($user->id);
+        $this->flash('success', 'The demo messages are back to the standard words.');
+        $this->redirect('/admin/settings?section=site#settings-site');
+    }
+
     /** Settings > Who can sign in (owner, 2026-10-21): everyone, or administrators and the listed addresses only. */
     #[Route('/admin/settings/sign-in', name: 'admin_save_sign_in', methods: ['POST'])]
     public function saveSignIn(): Response

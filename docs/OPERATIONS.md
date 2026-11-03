@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 1.0.6 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.0.7 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -141,6 +141,7 @@ Administration → Settings → Who can sign in: everyone, or administrators and
 
 One setting says whether a site is real: `APP_SITE_MODE=demo` or `live` in `.env`, which Administration → Settings → Site mode overrides (`app_options` `site_mode`; Reset returns to `.env`). Anything but `live`, or no value, is a demo site, so a site never takes real orders by accident. demo, test and development mean the same thing: a site for trying the platform stays a demo site, and a public site takes real orders only when set to live. `APP_ENV` keeps its technical job (how the program runs) and says nothing about this (`Configuration\SiteMode`).
 
+- **What a demo site says** is yours to word at Settings → Site mode, with a button back to the standard words: the heading and notice on every page and the legal PDFs, the first line of every email, and the message at checkout, on orders and on financial documents (`SiteMode::WORDS`, plain text). A document already issued keeps its words. An email's subject still starts with `[DEMO]`.
 - **A demo site** makes every account registered through the site wait for an administrator's approval before it can sign in (Administration → People → the person → Approve account; the administrator is emailed when one registers, the dashboard lists them, and the person is emailed when approved), so nobody can buy courses with the simulated card and read them without your say. Accounts an administrator adds under People are approved already. It also shows "This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation." at the top of every page (`partials/flash-messages.html.twig`, in every theme and the course reader); asks search engines not to list it (`<meta name="robots" content="noindex, nofollow">` on every page and `X-Robots-Tag: noindex, nofollow` on every response from PHP); says at both checkouts that the purchase is a simulation and nothing is being bought or sold; marks every order placed on it as a simulation in its snapshot, so its order pages, invoice, receipt and credit note say so for good, even if the site later goes live; starts every email's subject with `[DEMO]` and its text with a line saying it comes from a demo site; shows fake bank details labelled as fake in EFT instructions and documents (`SiteMode::FAKE_BANK_DETAILS`); offers the simulated card; and lets the seed tools run.
 - **A live site** does none of that: never the simulated card (only the ticked payment methods, Settings → Payment methods), the Site Owner's bank details, a sitemap named in robots.txt, and the seed tools refuse to run.
 - In development (`APP_ENV`, below), Symfony adds `X-Robots-Tag: noindex` to every response by itself, so a development site sends it even when set to live.
@@ -160,12 +161,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.6`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.7`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.0.6  # the tag being released
+   V=v1.0.7  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

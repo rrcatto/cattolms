@@ -39,6 +39,36 @@
 				{{ ui('action.button', {label: 'Reset site mode to .env', variant: 'danger', size: 'small', confirm: 'Remove the saved site mode and follow APP_SITE_MODE in .env?', icon: 'action-reset'}) }}
 			</form>
 			{% endif %}
+			<form action="/admin/settings/demo-words" method="post" class="cl-mt-3">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Heading of the demo notice', full_width: true, for: 'demo-heading', required: true, help: 'Above the notice at the top of every page. Up to ' ~ site_mode.limits.heading ~ ' characters.'})} %}
+{% block control %}<input class="cl-input" type="text" id="demo-heading" name="demo_heading" value="{{ site_mode.heading }}" maxlength="{{ site_mode.limits.heading }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Demo notice', full_width: true, for: 'demo-notice', required: true, help: 'At the top of every page and on the legal PDFs. Plain text, up to ' ~ site_mode.limits.notice ~ ' characters.'})} %}
+{% block control %}<textarea class="cl-input" id="demo-notice" name="demo_notice" rows="3" maxlength="{{ site_mode.limits.notice }}" required {{ ui_field_attrs(props) }}>{{ site_mode.notice }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email message', full_width: true, for: 'demo-email-notice', required: true, help: 'The first line of every email the site sends. Plain text, up to ' ~ site_mode.limits.email_notice ~ ' characters. The subject still starts with [DEMO].'})} %}
+{% block control %}<textarea class="cl-input" id="demo-email-notice" name="demo_email_notice" rows="3" maxlength="{{ site_mode.limits.email_notice }}" required {{ ui_field_attrs(props) }}>{{ site_mode.email_notice }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Checkout message', full_width: true, for: 'demo-simulation', required: true, help: 'At checkout, on the order and on invoices, receipts and credit notes issued from now on. One already issued keeps its words. Plain text, up to ' ~ site_mode.limits.simulation ~ ' characters.'})} %}
+{% block control %}<textarea class="cl-input" id="demo-simulation" name="demo_simulation" rows="3" maxlength="{{ site_mode.limits.simulation }}" required {{ ui_field_attrs(props) }}>{{ site_mode.simulation }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Save demo messages', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+			{% if site_mode.own_words %}
+			<form action="/admin/settings/demo-words/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Back to the standard words', variant: 'danger', size: 'small', confirm: 'Remove your words for all four demo messages?', icon: 'action-reset'}) }}
+			</form>
+			{% endif %}
 
 {% endblock %}
 {% endembed %}

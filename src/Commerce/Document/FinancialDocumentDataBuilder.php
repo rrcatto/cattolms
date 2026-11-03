@@ -65,6 +65,7 @@ final class FinancialDocumentDataBuilder
     public function __construct(
         private readonly DocumentBusinessData $business,
         private readonly RuntimeSettings $settings,
+        private readonly ?SiteMode $site = null,
     ) {}
 
     /**
@@ -77,7 +78,7 @@ final class FinancialDocumentDataBuilder
      */
     public function forIssue(DocumentType $type, array $order, array $snapshot, string $number, string $issuedAt, array $context = []): array
     {
-        return self::assemble($type, $order, $snapshot, $number, $issuedAt, $context, $this->business->values(), $this->bank());
+        return self::assemble($type, $order, $snapshot, $number, $issuedAt, $context, $this->business->values(), $this->bank(), $this->site?->simulation());
     }
 
     /**
@@ -104,7 +105,7 @@ final class FinancialDocumentDataBuilder
      * @param array<string,string> $bank the bank.* values, or none
      * @return array<string,mixed>
      */
-    public static function assemble(DocumentType $type, array $order, array $snapshot, string $number, string $issuedAt, array $context, array $business, array $bank): array
+    public static function assemble(DocumentType $type, array $order, array $snapshot, string $number, string $issuedAt, array $context, array $business, array $bank, ?string $simulation = null): array
     {
         $currency = (string) ($snapshot['currency'] ?? '');
         $money = static fn(int $minor): array => ['minor' => $minor, 'currency' => $currency];
@@ -112,7 +113,7 @@ final class FinancialDocumentDataBuilder
         $promotion = is_array($snapshot['promotion'] ?? null) ? $snapshot['promotion'] : null;
         $data = $business + self::customer($snapshot) + [
             // An order placed on a demo site says so on every document drawn from it, for good.
-            'document.simulation' => ($snapshot['simulation'] ?? false) === true ? SiteMode::SIMULATION : null,
+            'document.simulation' => ($snapshot['simulation'] ?? false) === true ? ($simulation ?? SiteMode::SIMULATION) : null,
             'order.number' => self::orderNumber((int) $order['id']),
             'order.date' => self::date((string) $order['placed_at']),
         ];

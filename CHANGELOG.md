@@ -2,6 +2,21 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-03 — v1.0.7 A demo site's words are yours to set
+
+### Installing and updating
+
+- **No clean installation is needed from v1.0.6:** the schema is unchanged, so a v1.0.6 site updates in place. A site on v1.0.5 or earlier needs v1.0.6's clean installation, or its one new table.
+- **No new `.env` settings, packages, scheduled jobs, permissions, third parties or legal text.** Nothing is removed. The new settings are kept with the site's other options, and two new addresses save and reset them: `POST /admin/settings/demo-words` and `POST /admin/settings/demo-words/reset`.
+
+### Demo sites
+
+- **What a demo site says is set at Administration > Settings > Site mode,** with a button back to the standard words, and each change is logged with its old and new words:
+  - the heading above the notice on every page, now **Demo mode** by default, where it said Demo site
+  - the notice on every page and on the legal PDFs, by default: "This site is not live. It is currently being tested and developed. Nothing on here represents an offer."
+  - the first line of every email (an email's subject still starts with `[DEMO]`)
+  - the message at checkout, on orders and on invoices, receipts and credit notes issued from then on. A document already issued keeps its words.
+
 ## 2026-11-03 — v1.0.6 Course files keep their styling and hold everything
 
 ### The fault this fixes

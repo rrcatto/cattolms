@@ -1565,7 +1565,7 @@ final class PlatformAdministrationService
                     'platform_name' => $this->settings->platformName(),
                     'platform_name_source' => $this->settings->platformNameSource(),
                     'mail_settings' => $this->settings->mailAdminView(),
-                    'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode()],
+                    'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode(), 'heading' => $this->site->heading(), 'notice' => $this->site->notice(), 'email_notice' => $this->site->emailNotice(), 'simulation' => $this->site->simulation(), 'own_words' => $this->site->ownWords(), 'limits' => array_map(static fn(array $word): int => $word['limit'], \CattoLearning\Configuration\SiteMode::WORDS)],
                     'site_owner' => $this->siteOwnerView(),
                 ];
             })(),
@@ -2772,6 +2772,31 @@ final class PlatformAdministrationService
             $site->save($mode, $actorUserId);
             $this->audit->record($actorUserId, 'platform.site_mode_changed', ['mode' => $site->mode()]);
         });
+    }
+
+    /**
+     * What a demo site says (owner, 2026-11-03): ADMIN's words, each change logged with both.
+     *
+     * @param array<string,string> $words
+     */
+    public function saveDemoWords(array $words, int $actorUserId): void
+    {
+        $site = $this->site ?? throw new InvalidArgumentException('The demo messages cannot be changed here.');
+        $this->transactions->run(function () use ($site, $words, $actorUserId): void {
+            $keys = array_keys(\CattoLearning\Configuration\SiteMode::WORDS);
+            $before = array_combine($keys, array_map($site->words(...), $keys));
+            $site->saveWords($words, $actorUserId);
+            foreach ($keys as $key) {
+                if ($before[$key] !== $site->words($key)) $this->audit->record($actorUserId, 'platform.site_notice_changed', ['words' => $key, 'old' => $before[$key], 'new' => $site->words($key)]);
+            }
+        });
+    }
+
+    /** All of them go back to the standard words. */
+    public function resetDemoWords(int $actorUserId): void
+    {
+        $this->site?->resetWords();
+        $this->audit->record($actorUserId, 'platform.setting_reset', ['setting' => 'demo_words', 'source' => 'standard words']);
     }
 
     /** Removes the override, so APP_SITE_MODE in .env decides again. */

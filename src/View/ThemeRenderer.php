@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/03 SAST (v1.0.7)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.7. The demo site's heading, notice and checkout message are ADMIN's words.
 2026/11/03 SAST (v1.0.6)
 - Advanced PLATFORM_ASSET_VERSION to 1.0.6.
 2026/11/02 SAST (v1.0.5)
@@ -141,7 +143,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.6';
+    private const PLATFORM_ASSET_VERSION = '1.0.7';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -1385,12 +1387,14 @@ final class ThemeRenderer
      * draws site_demo_notice (partials/flash-messages.html.twig), a checkout and an order
      * site_simulation, and the payment method offers the simulated card only on a demo site.
      *
-     * @return array{site_demo:bool,site_demo_notice:string,site_simulation:string}
+     * @return array{site_demo:bool,site_demo_heading:string,site_demo_notice:string,site_simulation:string}
      */
     private function siteModeScalars(): array
     {
-        return ['site_demo' => $this->site?->isDemo() ?? false, 'site_demo_notice' => \CattoLearning\Configuration\SiteMode::NOTICE,
-            'site_simulation' => \CattoLearning\Configuration\SiteMode::SIMULATION];
+        $demo = $this->site?->isDemo() ?? false;
+        return ['site_demo' => $demo, 'site_demo_heading' => $this->site !== null && $demo ? $this->site->heading() : '', 'site_demo_notice' => $this->site !== null && $demo ? $this->site->notice() : '',
+            // Also read on a live site: an order placed while it was a demo stays a simulation.
+            'site_simulation' => $this->site !== null ? $this->site->simulation() : \CattoLearning\Configuration\SiteMode::SIMULATION];
     }
 
     /** @param array<string,mixed> $data */

@@ -111,7 +111,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
         $settings = IntegrationContainer::get()->get(RuntimeSettings::class);
         $html = IntegrationContainer::get()->get(ThemeRenderer::class)->renderFragment('partials/admin/settings', [
             'platform_name' => 'Test LMS', 'platform_name_source' => 'environment', 'mail_settings' => $settings->mailAdminView(),
-            'site_mode' => ['mode' => 'demo', 'source' => 'environment', 'environment' => 'demo'],
+            'site_mode' => ['mode' => 'demo', 'source' => 'environment', 'environment' => 'demo', 'heading' => 'Demo mode', 'notice' => 'Notice', 'email_notice' => 'Email', 'simulation' => 'Simulation', 'own_words' => false, 'limits' => ['heading' => 60, 'notice' => 300, 'email_notice' => 400, 'simulation' => 300]],
             'site_owner' => IntegrationContainer::get()->get(PlatformAdministrationService::class)->siteOwnerView(),
             'commerce_fields' => \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView(IntegrationContainer::get()->get(\CattoLearning\Commerce\Settings\CommerceSettings::class)),
             'can_manage_settings' => true, 'settings_open_section' => 'site-owner',

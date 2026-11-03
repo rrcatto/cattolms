@@ -104,8 +104,8 @@ final class MailingTemplatesIntegrationTest extends TestCase
         self::assertStringContainsString('Hello Sipho', $copy['html'], '{content} holds the message.');
         self::assertStringContainsString('Unsubscribe: ' . $copy['unsubscribe_url'], $copy['text'], 'The own plain-text copy is used.');
         if (IntegrationContainer::get()->get(SiteMode::class)->isDemo()) {
-            self::assertStringContainsString(SiteMode::EMAIL_NOTICE, $copy['html'], 'A demo site says so even where the template has no place for it.');
-            self::assertStringStartsWith(SiteMode::EMAIL_NOTICE, $copy['text']);
+            self::assertStringContainsString(IntegrationContainer::get()->get(SiteMode::class)->emailNotice(), $copy['html'], 'A demo site says so even where the template has no place for it.');
+            self::assertStringStartsWith(IntegrationContainer::get()->get(SiteMode::class)->emailNotice(), $copy['text']);
         }
         try {
             $templates->save($id, ['mode' => 'html', 'html' => $page, 'text_mode' => 'own', 'text_part' => 'Only words'], $this->admin());

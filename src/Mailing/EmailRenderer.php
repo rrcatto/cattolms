@@ -169,7 +169,7 @@ class EmailRenderer
         $values = ['{content}' => $html, '{unsubscribe_link}' => self::e($forward !== null ? (string) $forward['never_url'] : $unsubscribe), '{site_owner_address}' => self::e($owner), '{subject}' => self::e($subject),
             '{preheader}' => self::e($preheader), '{first_name}' => self::e($first), '{list_name}' => self::e($listName), '{why}' => self::e($because),
             '{subscriptions_link}' => self::e($forward !== null ? (string) $forward['register_url'] : $subscriptions), '{site_name}' => self::e($this->runtime->platformName()), '{site_url}' => self::e($site),
-            '{demo_notice}' => $demo ? self::e(SiteMode::EMAIL_NOTICE) : '', '{year}' => date('Y'), '{web_link}' => self::e($webUrl !== '' ? $webUrl : $site), '{forward_link}' => self::e($forwardUrl !== '' ? $forwardUrl : $site)];
+            '{demo_notice}' => $demo ? self::e($this->demoNotice()) : '', '{year}' => date('Y'), '{web_link}' => self::e($webUrl !== '' ? $webUrl : $site), '{forward_link}' => self::e($forwardUrl !== '' ? $forwardUrl : $site)];
         $page = (string) ($template['mode'] ?? 'design') === 'html' && trim((string) ($template['html'] ?? '')) !== ''
             ? $this->htmlFrame((string) $template['html'], $values, $demo, $pixel)
             : $this->designFrame($s, $html, $subject, $preheader, $demo, $because, $links, $webUrl, $owner, $pixel);
@@ -180,11 +180,11 @@ class EmailRenderer
         if ((string) ($template['text_mode'] ?? 'made') === 'own' && trim((string) ($template['text_part'] ?? '')) !== '') {
             $plain = strtr((string) $template['text_part'], ['{content}' => $content, '{unsubscribe_link}' => $forward !== null ? (string) $forward['never_url'] : $unsubscribe, '{site_owner_address}' => $owner, '{subject}' => $subject,
                 '{preheader}' => $preheader, '{first_name}' => $first, '{list_name}' => $listName, '{why}' => $because, '{subscriptions_link}' => $forward !== null ? (string) $forward['register_url'] : $subscriptions,
-                '{site_name}' => $this->runtime->platformName(), '{site_url}' => $site, '{demo_notice}' => $demo ? SiteMode::EMAIL_NOTICE : '', '{year}' => date('Y'),
+                '{site_name}' => $this->runtime->platformName(), '{site_url}' => $site, '{demo_notice}' => $demo ? $this->demoNotice() : '', '{year}' => date('Y'),
                 '{web_link}' => $webUrl !== '' ? $webUrl : $site, '{forward_link}' => $forwardUrl !== '' ? $forwardUrl : $site]);
-            if ($demo && !str_contains((string) $template['text_part'], '{demo_notice}')) $plain = SiteMode::EMAIL_NOTICE . "\n\n" . $plain;
+            if ($demo && !str_contains((string) $template['text_part'], '{demo_notice}')) $plain = $this->demoNotice() . "\n\n" . $plain;
         } else {
-            $plain = ($demo ? SiteMode::EMAIL_NOTICE . "\n\n" : '') . ($webUrl !== '' ? 'View it in your browser: ' . $webUrl . "\n\n" : '') . $content
+            $plain = ($demo ? $this->demoNotice() . "\n\n" : '') . ($webUrl !== '' ? 'View it in your browser: ' . $webUrl . "\n\n" : '') . $content
                 . "\n\n-- \n" . $because . "\n" . implode("\n", array_map(static fn(array $l): string => $l[0] . ': ' . $l[1], $links)) . "\n" . $owner;
         }
 
@@ -312,7 +312,7 @@ class EmailRenderer
             . '<tr><td align="' . $align . '" style="background:' . $s['header'] . ';padding:20px ' . $pad . 'px;font-family:' . $s['heading_font'] . ';font-size:22px;line-height:1.3;font-weight:bold;color:' . $s['header_text'] . ';text-align:' . $align . ';">' . $header . '</td></tr>'
             . $pictureRow
             . ($webUrl !== '' ? '<tr><td align="right" style="padding:8px ' . $pad . 'px 0;font-family:' . $s['body_font'] . ';font-size:12px;line-height:1.4;"><a href="' . self::e($webUrl) . '" style="color:' . self::MUTED . ';">View it in your browser</a></td></tr>' : '')
-            . ($demo ? '<tr><td style="padding:12px ' . $pad . 'px;background:#fff4d6;font-family:' . $s['body_font'] . ';font-size:13px;line-height:1.5;color:#2b2420;"><strong>' . self::e(SiteMode::EMAIL_NOTICE) . '</strong></td></tr>' : '')
+            . ($demo ? '<tr><td style="padding:12px ' . $pad . 'px;background:#fff4d6;font-family:' . $s['body_font'] . ';font-size:13px;line-height:1.5;color:#2b2420;"><strong>' . self::e($this->demoNotice()) . '</strong></td></tr>' : '')
             . '<tr><td style="padding:' . $pad . 'px;font-family:' . $s['body_font'] . ';font-size:' . $s['size'] . 'px;line-height:1.55;color:' . $s['text'] . ';">' . $html . '</td></tr>'
             . '<tr><td style="padding:16px ' . $pad . 'px ' . $pad . 'px;border-top:1px solid ' . self::LINE . ';font-family:' . $s['body_font'] . ';font-size:12px;line-height:1.6;color:' . self::MUTED . ';">'
             . ((string) $design['footer_words'] !== '' ? '<p style="margin:0 0 8px;">' . nl2br(self::e((string) $design['footer_words']), false) . '</p>' : '')
@@ -501,5 +501,11 @@ class EmailRenderer
     private static function e(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+    }
+
+    /** What the first line of an email from a demo site says: ADMIN's words (SiteMode). */
+    private function demoNotice(): string
+    {
+        return $this->site !== null ? $this->site->emailNotice() : SiteMode::EMAIL_NOTICE;
     }
 }

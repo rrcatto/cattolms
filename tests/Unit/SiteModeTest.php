@@ -55,12 +55,13 @@ final class SiteModeTest extends TestCase
     /** The words follow the platform's page text rules (LegalDocumentsTest), and the fake details say they are fake. */
     public function testTheWordsAreEverydayEnglishAndTheBankDetailsSayTheyAreFake(): void
     {
-        foreach ([SiteMode::NOTICE, SiteMode::SIMULATION, SiteMode::EMAIL_NOTICE] as $text) {
+        foreach ([SiteMode::HEADING, SiteMode::NOTICE, SiteMode::SIMULATION, SiteMode::EMAIL_NOTICE] as $text) {
             self::assertStringNotContainsString(';', $text);
             self::assertStringNotContainsString('—', $text);
         }
-        self::assertStringContainsString('demo site', SiteMode::NOTICE);
-        self::assertStringContainsString('simulation', SiteMode::NOTICE);
+        self::assertStringContainsString('not live', SiteMode::NOTICE);
+        self::assertStringContainsString('Nothing on here represents an offer', SiteMode::NOTICE);
+        self::assertSame('Demo mode', SiteMode::HEADING);
         self::assertStringContainsString('nothing is being bought or sold', SiteMode::SIMULATION);
         foreach (SiteMode::FAKE_BANK_DETAILS as $field => $value) {
             self::assertMatchesRegularExpression('/fake/i', $value, $field . ' is labelled as fake');

@@ -79,7 +79,7 @@ if ($action === 'create') {
     foreach ($records->documents($id) as $document) if ($document['kind'] === 'invoice') $invoice = $document;
     $html = $invoice === null ? '' : $container->get(FinancialDocuments::class)->render($invoice)->html;
     echo json_encode(['id' => $id, 'simulation' => ($snapshot['simulation'] ?? false) === true,
-        'invoice_simulation' => str_contains($html, SiteMode::SIMULATION), 'invoice_fake_bank' => str_contains($html, 'FAKE BANK (demo site, do not pay)'),
+        'invoice_simulation' => str_contains($html, $container->get(SiteMode::class)->simulation()), 'invoice_fake_bank' => str_contains($html, 'FAKE BANK (demo site, do not pay)'),
         'invoice_reference' => str_contains($html, 'Use your account reference ' . AccountReference::format((string) ($snapshot['account_reference'] ?? '')) . ' as the payment reference.')], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'theme') {
     // Learners cannot preview a theme, so the matrix activates each in turn; `restore` puts back the one that was active.

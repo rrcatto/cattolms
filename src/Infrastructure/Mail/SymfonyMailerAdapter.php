@@ -377,10 +377,11 @@ class SymfonyMailerAdapter implements MailerInterface
         }
 
         // Every email from a demo site says so (SiteMode, owner 2026-10-18), in its subject and first line.
-        if ($this->site?->isDemo() ?? false) {
+        if ($this->site !== null && $this->site->isDemo()) {
+            $notice = $this->site->emailNotice();
             $subject = SiteMode::EMAIL_PREFIX . $subject;
-            $html = '<p><strong>' . $this->escape(SiteMode::EMAIL_NOTICE) . '</strong></p>' . $html;
-            $text = SiteMode::EMAIL_NOTICE . "\n\n" . $text;
+            $html = '<p><strong>' . $this->escape($notice) . '</strong></p>' . $html;
+            $text = $notice . "\n\n" . $text;
         }
         $configuration = $this->settings->mailConfiguration();
         $mailer = new Mailer(Transport::fromDsn($configuration['dsn']));

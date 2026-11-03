@@ -19,7 +19,14 @@ invoice, receipt and credit note say so for good), every email says so, the EFT 
 fake and labelled as fake, simulated card payments work and the seed tools may run. On a live site
 none of that happens. APP_ENV keeps its technical job (how the program runs) and is not read here.
 
+What a demo site says is ADMIN's to word at Settings > Site mode (owner, 2026-11-03: "allow the demo message to be set by Admin in
+settings rather than hardcode the message", and "I need to be able to set the message that is inserted into emails and checkout
+too"): the heading and notice on every page, the first line of every email, and what a checkout, an order and its documents say.
+HEADING, NOTICE, EMAIL_NOTICE and SIMULATION are what they say until then. An issued document keeps the words it was issued with.
+
 Changelog:
+2026/11/03 SAST
+- The demo site's words: new standard words for the notice, the heading Demo mode, and ADMIN's own for all four (WORDS).
 2026/10/18 SAST
 - Created.
 */
@@ -40,8 +47,11 @@ final class SiteMode
     /** The app_options key of the override. */
     public const OPTION = 'site_mode';
 
-    /** What every page of a demo site says. */
-    public const NOTICE = 'This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation.';
+    /** What every page of a demo site says until ADMIN words it differently. */
+    public const NOTICE = 'This site is not live. It is currently being tested and developed. Nothing on here represents an offer.';
+
+    /** The heading over that notice. */
+    public const HEADING = 'Demo mode';
 
     /** What a checkout, an order and its documents say on a demo site. */
     public const SIMULATION = 'Simulation on a demo site: this purchase is not real and nothing is being bought or sold.';
@@ -49,6 +59,14 @@ final class SiteMode
     /** What every email from a demo site starts with; its subject starts with EMAIL_PREFIX. */
     public const EMAIL_NOTICE = 'This email comes from a demo site for testing and development. Nothing on it is real: any order, payment, invoice or receipt is a simulation, and nothing was bought or sold.';
     public const EMAIL_PREFIX = '[DEMO] ';
+
+    /** What ADMIN words at Settings > Site mode: each one's app_options key, standard words, name and longest length. */
+    public const WORDS = [
+        'heading' => ['option' => 'site_demo_heading', 'standard' => self::HEADING, 'name' => 'The heading', 'limit' => 60],
+        'notice' => ['option' => 'site_demo_notice', 'standard' => self::NOTICE, 'name' => 'The notice', 'limit' => 300],
+        'email_notice' => ['option' => 'site_demo_email_notice', 'standard' => self::EMAIL_NOTICE, 'name' => 'The email message', 'limit' => 400],
+        'simulation' => ['option' => 'site_demo_simulation', 'standard' => self::SIMULATION, 'name' => 'The checkout message', 'limit' => 300],
+    ];
 
     /** The EFT details a demo site shows instead of real ones, each labelled as fake. */
     public const FAKE_BANK_DETAILS = [
@@ -105,6 +123,69 @@ final class SiteMode
     public function reset(): void
     {
         $this->options?->delete(self::OPTION);
+    }
+
+    /** ADMIN's words for one of WORDS, or its standard ones. */
+    public function words(string $key): string
+    {
+        $word = self::WORDS[$key] ?? throw new InvalidArgumentException('There are no such words.');
+        $own = trim((string) $this->options?->find($word['option']));
+        return $own === '' ? $word['standard'] : $own;
+    }
+
+    public function heading(): string
+    {
+        return $this->words('heading');
+    }
+
+    public function notice(): string
+    {
+        return $this->words('notice');
+    }
+
+    public function emailNotice(): string
+    {
+        return $this->words('email_notice');
+    }
+
+    public function simulation(): string
+    {
+        return $this->words('simulation');
+    }
+
+    /** Whether ADMIN has worded any of them. */
+    public function ownWords(): bool
+    {
+        foreach (self::WORDS as $word) {
+            if (trim((string) $this->options?->find($word['option'])) !== '') return true;
+        }
+        return false;
+    }
+
+    /**
+     * ADMIN's words, each on one line, checked together. The standard words themselves leave nothing saved.
+     *
+     * @param array<string,string> $words
+     */
+    public function saveWords(array $words, int $actorUserId): void
+    {
+        if ($this->options === null) throw new InvalidArgumentException('This site mode is fixed.');
+        $clean = [];
+        foreach (self::WORDS as $key => $word) {
+            $text = trim((string) preg_replace('/\s+/u', ' ', (string) ($words[$key] ?? '')));
+            if ($text === '') throw new InvalidArgumentException($word['name'] . ' cannot be empty: write it, or go back to the standard words.');
+            if (mb_strlen($text) > $word['limit']) throw new InvalidArgumentException($word['name'] . ' can be at most ' . $word['limit'] . ' characters.');
+            $clean[$key] = $text;
+        }
+        foreach (self::WORDS as $key => $word) {
+            if ($clean[$key] === $word['standard']) $this->options->delete($word['option']);
+            else $this->options->set($word['option'], $clean[$key], $actorUserId);
+        }
+    }
+
+    public function resetWords(): void
+    {
+        foreach (self::WORDS as $word) $this->options?->delete($word['option']);
     }
 
     /** live only when it says live; anything else, a typing mistake included, is the safe demo. */

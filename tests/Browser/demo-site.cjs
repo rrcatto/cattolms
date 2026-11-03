@@ -5,7 +5,7 @@
  * the purchase is a simulation; the order placed by EFT says it is a simulation and shows fake bank
  * details labelled as fake, and its invoice says so and quotes the account reference; a sign-in email
  * starts with [DEMO] and says it comes from a demo site (Mailpit). ADMIN switches the site to live at
- * Administration > Settings > Site mode: the notice, the robots rule and the simulated card are gone,
+ * Administration > Settings > Site mode, where ADMIN also words the notice and can go back to the standard words: the notice, the robots rule and the simulated card are gone,
  * and the earlier order still says it was a simulation; Reset returns to APP_SITE_MODE. In Firefox the
  * notice and the checkout statement show as well. In every bundled theme at 1440, 820 and 390px the
  * notice shows on the home page, the catalogue, a course and the order, with one h1 and no sideways
@@ -33,7 +33,10 @@ const state = () => JSON.parse(execFileSync('podman', ['exec', container, 'cat',
 const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
     .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme).map((t) => `${t.slug}-v${t.version}`);
 const widths = (process.env.CATTO_WIDTHS || '1440,820,390').split(',').map(Number);
-const NOTICE = 'This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation.';
+// The words ADMIN's Settings give, read when the run starts (owner, 2026-11-03: the notice is ADMIN's to word).
+let NOTICE = '';
+let HEADING = '';
+let EMAIL = '';
 const SIMULATION = 'Simulation on a demo site: this purchase is not real and nothing is being bought or sold.';
 const results = [], failures = [];
 const clean = (text) => text.replace(/\s+/g, ' ').trim();
@@ -82,11 +85,21 @@ async function toReview(page, fixture, course, method) {
     const firefox = await playwright.firefox.launch({headless: true});
     let order = 0;
     try {
+        {
+            const admin = await open(chromium, fixture.admin_token);
+            await admin.page.goto(`${base}/admin/settings?section=site#settings-site`);
+            NOTICE = clean(await admin.page.locator('#demo-notice').inputValue());
+            HEADING = clean(await admin.page.locator('#demo-heading').inputValue());
+            EMAIL = clean(await admin.page.locator('#demo-email-notice').inputValue());
+            await admin.ctx.close();
+            assert.ok(NOTICE !== '', 'Settings gives the notice');
+        }
+
         await check('chromium: every page says it is a demo site and asks search engines not to list it', async () => {
             const {ctx, page} = await open(chromium, null);
             for (const route of ['/', '/courses', `/courses/${fixture.courses.a.slug}`, '/login', '/terms']) {
                 const response = await page.goto(`${base}${route}`);
-                assert.equal(await notice(page), `Demo site ${NOTICE}`, `${route} says so`);
+                assert.equal(await notice(page), `${HEADING} ${NOTICE}`, `${route} says so`);
                 assert.equal(await robots(page), 'noindex, nofollow', `${route} robots meta`);
                 assert.equal(response.headers()['x-robots-tag'], 'noindex, nofollow', `${route} X-Robots-Tag`);
             }
@@ -96,7 +109,7 @@ async function toReview(page, fixture, course, method) {
         await check('chromium without JavaScript: the notice is plain HTML', async () => {
             const {ctx, page} = await open(chromium, fixture.learner.token, {js: false});
             await page.goto(`${base}/courses`);
-            assert.equal(await notice(page), `Demo site ${NOTICE}`);
+            assert.equal(await notice(page), `${HEADING} ${NOTICE}`);
             await ctx.close();
         });
 
@@ -141,14 +154,14 @@ async function toReview(page, fixture, course, method) {
             }
             assert.ok(message, 'Mailpit received the sign-in email');
             assert.match(message.Subject, /^\[DEMO\] /, 'its subject starts with [DEMO]');
-            assert.ok(clean(message.Text).startsWith('This email comes from a demo site for testing and development.'), 'its first line says so');
+            assert.ok(clean(message.Text).startsWith(EMAIL), 'its first line says so');
             await ctx.close();
         });
 
         await check('firefox: the notice and the checkout statement', async () => {
             const {ctx, page} = await open(firefox, fixture.learner.token);
             await page.goto(`${base}/courses/${fixture.courses.a.slug}`);
-            assert.equal(await notice(page), `Demo site ${NOTICE}`);
+            assert.equal(await notice(page), `${HEADING} ${NOTICE}`);
             await page.goto(`${base}/courses/${fixture.courses.a.slug}`);
             await submit(page, page.locator('form[action="/cart/add"] button[value="add"]'));
             await page.goto(`${base}/checkout/profile`);
@@ -158,6 +171,49 @@ async function toReview(page, fixture, course, method) {
             await page.goto(`${base}/cart`);
             await submit(page, page.locator('form[action="/cart/remove"] button').first());
             await ctx.close();
+        });
+
+        await check('chromium: ADMIN words the heading, notice and checkout and email messages, and they go back to the standard words', async () => {
+            const admin = await open(chromium, fixture.admin_token);
+            const settings = `${base}/admin/settings?section=site#settings-site`;
+            const fields = {'#demo-heading': 'Rehearsal mode', '#demo-notice': 'Opening soon, and <this> stays plain text.', '#demo-email-notice': 'A rehearsal email from the site.', '#demo-simulation': 'A rehearsal order, with nothing bought.'};
+            await admin.page.goto(settings);
+            const before = {};
+            for (const field of Object.keys(fields)) before[field] = await admin.page.locator(field).inputValue();
+            const own = await admin.page.getByRole('button', {name: 'Back to the standard words'}).count() > 0;
+            for (const [field, words] of Object.entries(fields)) await admin.page.locator(field).fill(words);
+            await submit(admin.page, admin.page.getByRole('button', {name: 'Save demo messages'}));
+            assert.equal(await flash(admin.page), 'The demo messages are saved.');
+            const visitor = await open(chromium, null);
+            await visitor.page.goto(`${base}/courses`);
+            assert.equal(await notice(visitor.page), `${fields['#demo-heading']} ${fields['#demo-notice']}`, 'a visitor reads them, as plain text');
+            await visitor.page.goto(`${base}/login`);
+            await visitor.page.locator('#email').fill(fixture.learner.email);
+            await submit(visitor.page, visitor.page.getByRole('button', {name: 'Email my secure link'}));
+            let message = null;
+            for (let attempt = 0; attempt < 20 && !message; attempt++) {
+                const found = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${fixture.learner.email}"`)}`)).json();
+                const newest = found.messages?.length ? await (await fetch(`${mailpit}/api/v1/message/${found.messages[0].ID}`)).json() : null;
+                if (newest && clean(newest.Text).startsWith(fields['#demo-email-notice'])) message = newest;
+                else await visitor.page.waitForTimeout(500);
+            }
+            assert.ok(message, 'the email opens with the email message');
+            await visitor.ctx.close();
+            const learner = await open(chromium, fixture.learner.token);
+            await learner.page.goto(`${base}/account/orders/${order}`);
+            assert.ok((await text(learner.page)).includes(fields['#demo-simulation']), 'the order says the checkout message');
+            await learner.ctx.close();
+            await admin.page.goto(settings);
+            for (const [field, words] of Object.entries(fields)) assert.equal(await admin.page.locator(field).inputValue(), words, `${field} shows what was saved`);
+            await submit(admin.page, admin.page.getByRole('button', {name: 'Back to the standard words'}));
+            assert.equal(await flash(admin.page), 'The demo messages are back to the standard words.');
+            assert.equal(await admin.page.getByRole('button', {name: 'Back to the standard words'}).count(), 0, 'nothing is left to go back from');
+            if (own) {
+                for (const field of Object.keys(fields)) await admin.page.locator(field).fill(before[field]);
+                await submit(admin.page, admin.page.getByRole('button', {name: 'Save demo messages'}));
+            }
+            assert.equal(await notice(admin.page), `${HEADING} ${NOTICE}`, 'this site says what it said before');
+            await admin.ctx.close();
         });
 
         await check('chromium: ADMIN makes the site live and the demo signs go, then Reset returns to APP_SITE_MODE', async () => {
@@ -183,7 +239,7 @@ async function toReview(page, fixture, course, method) {
             await admin.page.goto(`${base}/admin/settings?section=site#settings-site`);
             await submit(admin.page, admin.page.getByRole('button', {name: 'Reset site mode to .env'}));
             assert.equal(await flash(admin.page), 'The site mode now follows APP_SITE_MODE in .env.');
-            assert.equal(await notice(admin.page), `Demo site ${NOTICE}`, 'catto.test is a demo site again');
+            assert.equal(await notice(admin.page), `${HEADING} ${NOTICE}`, 'catto.test is a demo site again');
             await admin.ctx.close();
         });
 
@@ -198,7 +254,7 @@ async function toReview(page, fixture, course, method) {
                     await check(`${key} ${width} ${route}`, async () => {
                         const response = await page.goto(`${base}${route}`, {waitUntil: 'networkidle'});
                         assert.equal(response.status(), 200);
-                        assert.equal(await notice(page), `Demo site ${NOTICE}`, 'the notice');
+                        assert.equal(await notice(page), `${HEADING} ${NOTICE}`, 'the notice');
                         const facts = await page.evaluate((k) => ({
                             served: [...document.querySelectorAll('link[rel=stylesheet]')].some((l) => l.href.includes(`/${k}/`)),
                             h1: document.querySelectorAll('h1').length,

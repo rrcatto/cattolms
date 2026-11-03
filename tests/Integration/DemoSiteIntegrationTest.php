@@ -60,6 +60,31 @@ final class DemoSiteIntegrationTest extends TestCase
         self::assertSame('live', $site->mode());
     }
 
+    public function testAnAdministratorWordsWhatADemoSiteSaysAndCanGoBackToTheStandardWords(): void
+    {
+        $site = new SiteMode(new OptionRepository($this->db));
+        $admin = (new DevelopmentFixture($this->db))->createUser('Notice fixture');
+        $site->resetWords();
+        self::assertSame(['Demo mode', SiteMode::NOTICE, SiteMode::EMAIL_NOTICE, SiteMode::SIMULATION, false], [$site->heading(), $site->notice(), $site->emailNotice(), $site->simulation(), $site->ownWords()]);
+        $words = ['heading' => 'Rehearsal', 'notice' => "  Opening soon.\n\n   Nothing here is on sale yet.  ", 'email_notice' => 'A rehearsal email.', 'simulation' => 'A rehearsal order.'];
+        $site->saveWords($words, $admin);
+        self::assertSame(['Rehearsal', 'Opening soon. Nothing here is on sale yet.', 'A rehearsal email.', 'A rehearsal order.', true], [$site->heading(), $site->notice(), $site->emailNotice(), $site->simulation(), $site->ownWords()], 'One line, as typed.');
+        $site->saveWords(['heading' => SiteMode::HEADING, 'notice' => SiteMode::NOTICE, 'email_notice' => SiteMode::EMAIL_NOTICE, 'simulation' => SiteMode::SIMULATION], $admin);
+        self::assertFalse($site->ownWords(), 'The standard words leave nothing saved, so a later change to them reaches this site.');
+        $site->saveWords($words, $admin);
+        foreach ([['heading' => ''] + $words, ['notice' => "   \n "] + $words, ['email_notice' => str_repeat('x', SiteMode::WORDS['email_notice']['limit'] + 1)] + $words] as $refused) {
+            try {
+                $site->saveWords($refused, $admin);
+                self::fail('Refused.');
+            } catch (\InvalidArgumentException) {
+                self::assertSame('Rehearsal', $site->heading(), 'Refused words change nothing.');
+            }
+        }
+        $site->resetWords();
+        self::assertSame(SiteMode::NOTICE, $site->notice());
+        self::assertSame(SiteMode::NOTICE, SiteMode::fixed('demo')->notice(), 'Without settings, the standard words.');
+    }
+
     public function testCustomersSeeFakeBankDetailsOnADemoSiteAndTheSiteOwnersWhenLive(): void
     {
         $owner = SiteOwner::fixed(['trading_name' => 'Placeholder', 'legal_name' => 'Placeholder', 'bank_name' => 'Real Bank', 'bank_account_name' => 'Placeholder', 'bank_account_number' => '62000000001', 'bank_branch_code' => '250655']);
@@ -82,7 +107,7 @@ final class DemoSiteIntegrationTest extends TestCase
         $documents = IntegrationContainer::get()->get(FinancialDocuments::class);
         $invoice = (new CommerceRepository($this->db))->documents($order)[0];
         $html = $documents->render($invoice)->html;
-        self::assertStringContainsString(SiteMode::SIMULATION, $html);
+        self::assertStringContainsString((new SiteMode(new OptionRepository($this->db)))->simulation(), $html);
         self::assertStringContainsString('Use your account reference ' . AccountReference::format($reference) . ' as the payment reference.', $html);
         self::assertStringContainsString('FAKE BANK (demo site, do not pay)', $html);
 
@@ -114,16 +139,18 @@ final class DemoSiteIntegrationTest extends TestCase
         $this->db->rollBack();
         self::assertNull((new OptionRepository($this->db))->find(SiteMode::OPTION), 'the development database has no saved site mode');
         $_ENV['APP_SITE_MODE'] = 'demo';
+        // The words are ADMIN's to choose, so this reads what this site's say.
+        $notice = htmlspecialchars((new SiteMode(new OptionRepository($this->db)))->notice(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         foreach (['/', '/courses', '/terms'] as $path) {
             $response = $this->send($path);
             $html = (string) $response->getContent();
-            self::assertStringContainsString(SiteMode::NOTICE, $html, $path . ' says it is a demo site');
+            self::assertStringContainsString($notice, $html, $path . ' says it is a demo site');
             self::assertStringContainsString('<meta name="robots" content="noindex, nofollow">', $html, $path);
             self::assertSame('noindex, nofollow', $response->headers->get('X-Robots-Tag'), $path);
         }
         $_ENV['APP_SITE_MODE'] = 'live';
         $response = $this->send('/');
-        self::assertStringNotContainsString(SiteMode::NOTICE, (string) $response->getContent());
+        self::assertStringNotContainsString($notice, (string) $response->getContent());
         self::assertStringNotContainsString('noindex', (string) $response->getContent());
         self::assertNotSame('noindex, nofollow', $response->headers->get('X-Robots-Tag'));
     }
