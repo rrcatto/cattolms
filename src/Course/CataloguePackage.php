@@ -60,6 +60,8 @@ final class CataloguePackage
     public const RESOURCES = 'resources/';
     /** Each Presentation's recorded narration, one clip per slide (CatWalk, owner 2026-10-28). */
     public const NARRATIONS = 'narrations/';
+    /** What a course already here gains when the package holds its original file and the site does not. */
+    private const FILE_FRAME = 'The page layout of its HTML file';
     /** What an upload may be, and what a package may unpack to. */
     public const MAXIMUM_UPLOAD_BYTES = 64 * 1024 * 1024;
     private const MAXIMUM_UNPACKED_BYTES = 512 * 1024 * 1024;
@@ -314,6 +316,7 @@ final class CataloguePackage
                         if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     }
                     $details = array_merge($details, $this->settings->apply($courseId, $block, $userId, false));
+                    if ($this->portability->adoptFileFrame($courseId, $data[$row['file']])) $details[] = self::FILE_FRAME;
                     $kind = in_array($row['code'], $replace, true) ? 'replaced' : ($details === [] ? 'unchanged' : 'updated');
                     $outcome = array_replace($outcome, ['outcome' => $kind === 'replaced' ? 'content replaced' : $kind, 'details' => $details]);
                     $report['counts'][$kind]++;
@@ -402,6 +405,7 @@ final class CataloguePackage
             $row['course_id'] = (int) $existing['id'];
             $row['started'] = $this->portability->hasStartedLearners((int) $existing['id']);
             $row['changes'] = $this->settings->changes($existing, $block, false);
+            if ($this->portability->lacksFileFrame((int) $existing['id'], $data)) $row['changes'][] = self::FILE_FRAME;
             $row['action'] = $row['changes'] === [] ? 'unchanged' : 'update';
             $row['site_title'] = (string) $existing['title'];
             return $row;

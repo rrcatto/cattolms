@@ -1,6 +1,8 @@
-# CattoLMS Course Specification 4.5
+# CattoLMS Course Specification 4.6
 
-**Version 4.5** · 2 November 2026, 01:24 SAST · Authored by Claude Opus 5.5 · Replaces version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+**Version 4.6** · 3 November 2026, 02:32 SAST · Authored by Claude Opus 5.5 · Replaces version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+
+**New in 4.6:** an optional course preview, `PRESENTATIONS.trailer` (section 9.2). The complete example's script now shows every word a slide holds: a case's question, a slide's chapter and caption, and the button on a closing slide.
 
 **New in 4.5:** the cover drawing's exact size and the first line of its `<svg>` tag, the shapes CattoLMS shows it in and what each one trims (section 6.1). Version 4.4 gave the wrong size: a cover drawn to it does not reach the sides of the course page.
 
@@ -525,6 +527,17 @@ Every slide has a `layout` and a `title` of up to 40 characters (used in the pre
 
 A presentation that breaks a rule is left out, and the import review says which slide and why.
 
+**A course preview (optional).** A presentation that introduces the whole course goes under the key `trailer`, with 8 to 12 slides ending on the `cta` layout. Its panel comes after the introduction, before the readiness check and the modules:
+
+```html
+<div class="subs course-preview">
+  <details class="sub s-present">
+    <summary><span class="sub-label">Course preview<small>What this course offers</small></span><span class="chev">&#8250;</span></summary>
+    <div class="sub-inner"><div class="presentation" data-deck="trailer"></div></div>
+  </details>
+</div>
+```
+
 ### 9.3 `FLASHCARDS`: the cards
 
 ```json
@@ -1009,10 +1022,10 @@ const REVIEW = {};
       var slide = deck.slides[index];
       box.textContent = "";
       var face = make("div", "slide");
-      if (slide.kicker) { face.appendChild(make("p", "eyebrow", slide.kicker)); }
+      if (slide.kicker || slide.chapter) { face.appendChild(make("p", "eyebrow", slide.kicker || slide.chapter)); }
       var heading = slide.heading || slide.question || slide.figure || slide.text;
       if (heading) { face.appendChild(make("h3", "", heading)); }
-      ["sub", "label", "facts", "source"].forEach(function (field) { if (slide[field] && slide[field] !== heading) { face.appendChild(make("p", "", slide[field])); } });
+      ["sub", "label", "facts", "question", "caption", "source"].forEach(function (field) { if (slide[field] && slide[field] !== heading) { face.appendChild(make("p", "", slide[field])); } });
       if (slide.text && slide.text !== heading) { face.appendChild(make("p", "", slide.text)); }
       var list = slide.points || slide.steps;
       if (list) { var ul = make("ul"); list.forEach(function (item) { ul.appendChild(make("li", "", item)); }); face.appendChild(ul); }
@@ -1029,6 +1042,7 @@ const REVIEW = {};
           face.appendChild(choice);
         });
       }
+      if (slide.action_label) { var onward = make("button", "btn", slide.action_label); onward.type = "button"; onward.addEventListener("click", function () { var panel = box.closest("details"); if (panel) { panel.open = false; } }); face.appendChild(onward); }
       if (slide.outcome) { var reveal = make("button", "btn", "What happened"); reveal.type = "button"; reveal.addEventListener("click", function () { face.appendChild(make("p", "", slide.outcome)); }); face.appendChild(reveal); }
       box.appendChild(face);
       var controls = make("div", "slide-controls");

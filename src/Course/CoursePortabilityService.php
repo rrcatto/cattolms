@@ -253,6 +253,10 @@ final class CoursePortabilityService
             throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts']));
         }
         $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId, $code);
+        // The file's own build travels with it (2026-11-03), so its course file looks and works as the file did.
+        if (array_key_exists('file_frame', $analysis)) {
+            $this->portability->saveFileFrame($courseId, is_array($analysis['file_frame']) ? $analysis['file_frame'] : null);
+        }
         // The number of its first module travels with it (2026-10-29).
         if (array_key_exists('first_module_number', (array) ($analysis['course'] ?? []))) {
             $this->courses->setFirstModuleNumber($courseId, (int) $analysis['course']['first_module_number']);
@@ -390,9 +394,29 @@ final class CoursePortabilityService
             'course_items' => array_values($courseItems),
             'structure' => $structure,
             'grade_bands' => $this->courses->gradeBands($courseId),
+            'file_frame' => $this->portability->fileFrame($courseId),
             // Its place in the catalogue (owner, 2026-10-23): category, tags, cover, position, related courses, prices, status.
             'catalogue' => $this->catalogue->export($courseId),
         ];
+    }
+
+    /**
+     * Gives a course already here the original file a package carries, when it has none: nothing a learner sees changes,
+     * only what Download as one HTML file is made from.
+     *
+     * @param array<string,mixed> $package
+     */
+    public function adoptFileFrame(int $courseId, array $package): bool
+    {
+        if (!$this->lacksFileFrame($courseId, $package)) { return false; }
+        $this->portability->saveFileFrame($courseId, $package['file_frame']);
+        return true;
+    }
+
+    /** @param array<string,mixed> $package */
+    public function lacksFileFrame(int $courseId, array $package): bool
+    {
+        return is_array($package['file_frame'] ?? null) && $this->portability->fileFrame($courseId) === null;
     }
 
     public function exportCourseJson(int $courseId): string
@@ -699,6 +723,11 @@ final class CoursePortabilityService
             if (isset($keys[$candidate])) { throw new InvalidArgumentException('The imported course produces a duplicate Course Item key: ' . $candidate . '. Rename the source component and review the import again.'); }
             $keys[$candidate] = true; return $candidate;
         };
+        if (is_array($analysis['trailer'] ?? null)) {
+            $previewKey = $key('trailer');
+            $items[] = ['item_key' => $previewKey, 'item_type' => 'slide_deck', 'title' => (string) $analysis['trailer']['title'], 'description_html' => '', 'content_source' => '', 'type_config' => (array) $analysis['trailer']['type_config'], 'estimated_minutes' => $analysis['trailer']['minutes'] ?? null, 'resource_id' => null];
+            $structure[] = ['item_key' => $previewKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+        }
         foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $index => $assessment) {
             if (!is_array($assessment)) { continue; }
             $itemKey = $key((string) ($assessment['assessment_key'] ?? 'diagnostic-' . ($index + 1))); $items[] = $this->importAssessmentItem($assessment, $itemKey, 'diagnostic'); $structure[] = ['item_key' => $itemKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];

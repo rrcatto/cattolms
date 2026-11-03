@@ -42,10 +42,13 @@ const facts = () => {
   const tops = cards.slice(0, 12).map(c => Math.round(c.getBoundingClientRect().top));
   const grid = document.querySelector('.cl-ui-card-grid, .cl-course-cards');
   const wide = grid ? cards.filter(c => c.getBoundingClientRect().right > grid.getBoundingClientRect().right + 1).length : 0;
+  // A card's foot, with the line above it, sits at the bottom of the card (owner, 2026-11-03: "It looks ugly being displayed at different places on cards").
+  const footLoose = cards.filter(c => { const foot = c.querySelector(':scope > .cl-ui-card-actions, .cl-course-card-foot'); if (!foot) return false; const style = getComputedStyle(c); return c.getBoundingClientRect().bottom - foot.getBoundingClientRect().bottom - parseFloat(style.borderBottomWidth) > (c.classList.contains('cl-course-card') ? parseFloat(getComputedStyle(foot.parentElement).paddingBottom) + 1 : 1); }).length;
   const shown = [...document.querySelectorAll('.cl-view-switch a')].find(a => /shown now/.test(a.getAttribute('aria-label') || ''));
   const select = document.querySelector('.pagination-row select');
   return {
     cards: cards.length,
+    footLoose,
     rows: document.querySelectorAll('.cl-ui-table tbody tr').length,
     perRow: tops.filter(t => t === tops[0]).length,
     outOfGrid: wide,
@@ -139,6 +142,7 @@ async function cardMenus(page, label, failures) {
           if (expected !== null && f.perRow !== expected) failures.push(`${label} grid: ${f.perRow} cards to a row, not ${expected}`);
           if (most !== null && f.perRow > most) failures.push(`${label} grid: ${f.perRow} cards to a row on a phone`);
           if (f.outOfGrid) failures.push(`${label} grid: ${f.outOfGrid} cards stand out of the grid`);
+          if (f.footLoose) failures.push(`${label} grid: ${f.footLoose} cards with their foot above the bottom of the card`);
           if (f.sizes.length && f.sizes.join(',') !== list.sizes.join(',')) failures.push(`${label} grid: page sizes ${f.sizes.join(', ')}, not ${list.sizes.join(', ')}`);
           if (!f.sort) failures.push(`${label} grid: no Sort`);
           await pictures(page, `${label} grid`, failures);

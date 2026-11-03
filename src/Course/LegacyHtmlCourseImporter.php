@@ -141,7 +141,7 @@ final class LegacyHtmlCourseImporter
         $flashcards = $this->extractJsonAssignment($html, 'FLASHCARDS');
         $flashcards = is_array($flashcards) ? $flashcards : [];
 
-        $moduleNodes = $xpath->query('//section[contains(concat(" ", normalize-space(@class), " "), " module ") and starts-with(@id,"mod-") and @id!="mod-review"]');
+        $moduleNodes = $xpath->query('//*[(self::section or self::details) and contains(concat(" ", normalize-space(@class), " "), " module ") and starts-with(@id,"mod-") and @id!="mod-review"]');
         if ($moduleNodes->length === 0) {
             throw new InvalidArgumentException('The importer could not identify any course modules.');
         }
@@ -290,7 +290,7 @@ final class LegacyHtmlCourseImporter
             $position++;
         }
 
-        $reviewNode = $xpath->query('//section[@id="mod-review"]')->item(0);
+        $reviewNode = $xpath->query('//*[(self::section or self::details) and @id="mod-review"]')->item(0);
         if ($reviewNode instanceof DOMElement) {
             $reviewTitle = $this->relativeText($xpath, $reviewNode, './/*[contains(concat(" ", normalize-space(@class), " "), " m-name ")][1]') ?: 'Review Study Aid';
             $reviewSubtitle = $this->relativeText($xpath, $reviewNode, './/small[1]');
@@ -350,7 +350,7 @@ final class LegacyHtmlCourseImporter
         $knownQuestionBanks = array_fill_keys(array_map(static fn(array $module): string => (string) $module['module_key'], $modules), true);
         foreach (['PRESENTATIONS' => $presentations, 'FLASHCARDS' => $flashcards] as $name => $data) {
             foreach (array_keys($data) as $dataKey) {
-                if (!isset($knownQuestionBanks[(string) $dataKey])) $warnings[] = $name . '.' . $dataKey . ' is not one of the course\'s modules, so it was left out.';
+                if (!isset($knownQuestionBanks[(string) $dataKey]) && !($name === 'PRESENTATIONS' && $dataKey === 'trailer')) $warnings[] = $name . '.' . $dataKey . ' is not one of the course\'s modules, so it was left out.';
             }
         }
         $knownQuestionBanks['final'] = true;
@@ -439,8 +439,12 @@ final class LegacyHtmlCourseImporter
                 'source_filename' => $sourceFilename,
             ],
             'modules' => $modules,
+            // The course preview, a presentation of its own outside the modules (owner, 2026-11-03: everything is exported).
+            'trailer' => $this->presentation(is_array($presentations['trailer'] ?? null) ? ['kind' => 'trailer'] + $presentations['trailer'] : null, 'The course preview', false, $warnings),
             // The course's cover, an SVG drawing in the masthead's .course-cover (owner, 2026-11-01), set after import.
             'catalogue' => ($cover = $this->cover($xpath, $title, $warnings)) === null ? null : ['cover' => $cover],
+            // The file's own build, which the course file keeps (2026-11-03). A file written to the specification has none.
+            'file_frame' => CourseFileFrame::capture($html),
             'diagnostic_assessments' => $diagnosticAssessments,
             'final_assessment' => $finalQuestions === [] ? null : [
                 'assessment_type' => 'final',
@@ -555,7 +559,7 @@ final class LegacyHtmlCourseImporter
     private static function importedElsewhere(DOMElement $node): bool
     {
         $class = ' ' . (string) preg_replace('/\s+/', ' ', (string) $node->getAttribute('class')) . ' ';
-        foreach (['module', 'review', 'final', 'diag'] as $name) { if (str_contains($class, ' ' . $name . ' ')) return true; }
+        foreach (['module', 'review', 'final', 'diag', 'course-preview'] as $name) { if (str_contains($class, ' ' . $name . ' ')) return true; }
         $id = (string) $node->getAttribute('id');
         return in_array($id, ['diagnostic', 'final', 'mod-review'], true) || str_starts_with($id, 'mod-');
     }
@@ -807,7 +811,8 @@ final class LegacyHtmlCourseImporter
     public function presentationCss(string $html): string
     {
         $styleBlocks = [];
-        if (preg_match_all('~<style\\b[^>]*>(.*?)</style\\s*>~is', $html, $matches) !== false) {
+        // The rules a course file adds for its frame are the file's, not the course's.
+        if (preg_match_all('~<style\\b(?![^>]*\\bdata-course-file\\b)[^>]*>(.*?)</style\\s*>~is', $html, $matches) !== false) {
             foreach ($matches[1] as $block) {
                 $block = trim((string) $block);
                 if ($block !== '') {

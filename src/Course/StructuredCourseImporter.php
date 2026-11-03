@@ -99,7 +99,9 @@ final class StructuredCourseImporter
             $courseInput['code'] = CourseCode::normalise((string) ($courseInput['code'] ?? ''));
             $courseInput['source_filename'] = $sourceFilename;
             return ['format' => 'catto-learning-course', 'schema_version' => $schemaVersion, 'course' => $courseInput,
-                'catalogue' => is_array($data['catalogue'] ?? null) ? $data['catalogue'] : null, 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
+                'catalogue' => is_array($data['catalogue'] ?? null) ? $data['catalogue'] : null,
+                // Only a package that carries the course's original file: one made before there was any leaves a course's alone.
+                ...(is_array($data['file_frame'] ?? null) ? ['file_frame' => $data['file_frame']] : []), 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
         }
 
         $modules = [];

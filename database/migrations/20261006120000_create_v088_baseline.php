@@ -18,6 +18,8 @@ Changelog:
 - course_page_layouts: named layouts of course pages that ADMIN makes, edits and deletes, one of them the default
   (owner, 2026-11-01), the first named Default; courses.page_layout_choice (default, layout or custom) and
   courses.page_layout_id; courses.page_layout keeps the course's custom layout while another is chosen.
+2026/11/03 SAST (course files)
+- course_file_frames: the page skeleton and script of a course's original file, which its course file is drawn in. Its styling is the CSS tab.
 2026/10/31 SAST (landing page section widths)
 - course_landing_sections.width: half or full (owner, 2026-10-31); the hero is always full.
 2026/10/30 SAST (course page layouts)
@@ -1401,6 +1403,14 @@ CREATE TABLE course_part_completions (
     PRIMARY KEY (enrolment_id, structure_node_id)
 );
 CREATE INDEX course_part_completions_node_idx ON course_part_completions(structure_node_id);
+
+-- The page skeleton and script of a course's original HTML file (owner, 2026-11-03), without its content or its styling, which
+-- are the site's and the CSS tab's: what its course file is drawn in, because the CSS tab's rules are written for it (Course\CourseFileFrame).
+CREATE TABLE course_file_frames (
+    course_id BIGINT PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    frame JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE assessment_responses (
     attempt_id BIGINT NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,

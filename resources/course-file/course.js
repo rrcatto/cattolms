@@ -22,10 +22,10 @@
       var slide = deck.slides[index];
       box.textContent = "";
       var face = make("div", "slide");
-      if (slide.kicker) { face.appendChild(make("p", "eyebrow", slide.kicker)); }
+      if (slide.kicker || slide.chapter) { face.appendChild(make("p", "eyebrow", slide.kicker || slide.chapter)); }
       var heading = slide.heading || slide.question || slide.figure || slide.text;
       if (heading) { face.appendChild(make("h3", "", heading)); }
-      ["sub", "label", "facts", "source"].forEach(function (field) { if (slide[field] && slide[field] !== heading) { face.appendChild(make("p", "", slide[field])); } });
+      ["sub", "label", "facts", "question", "caption", "source"].forEach(function (field) { if (slide[field] && slide[field] !== heading) { face.appendChild(make("p", "", slide[field])); } });
       if (slide.text && slide.text !== heading) { face.appendChild(make("p", "", slide.text)); }
       var list = slide.points || slide.steps;
       if (list) { var ul = make("ul"); list.forEach(function (item) { ul.appendChild(make("li", "", item)); }); face.appendChild(ul); }
@@ -42,6 +42,7 @@
           face.appendChild(choice);
         });
       }
+      if (slide.action_label) { var onward = make("button", "btn", slide.action_label); onward.type = "button"; onward.addEventListener("click", function () { var panel = box.closest("details"); if (panel) { panel.open = false; } }); face.appendChild(onward); }
       if (slide.outcome) { var reveal = make("button", "btn", "What happened"); reveal.type = "button"; reveal.addEventListener("click", function () { face.appendChild(make("p", "", slide.outcome)); }); face.appendChild(reveal); }
       box.appendChild(face);
       var controls = make("div", "slide-controls");

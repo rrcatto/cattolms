@@ -1,0 +1,19 @@
+summary.acc-trigger,summary.block-head{list-style:none;cursor:pointer}
+summary.acc-trigger::-webkit-details-marker,summary.block-head::-webkit-details-marker{display:none}
+.course-cover{margin:0 0 1.1rem}
+.course-cover svg{display:block;width:100%;height:auto;border-radius:10px}
+.course-file-note{margin:0;padding:.6rem 1rem;background:#fff4e0;color:#5a3800;font-size:.9rem}
+.video{margin:0 0 1.2rem}
+.video-frame{position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000}
+.video-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.video-cap{font-size:.86rem;margin:.5rem 0 0}
+.subs,.blocks{margin:1.2rem 0}
+.subs+.subs{margin-top:.6rem}
+.blocks>.block+.block{margin-top:.6rem}
+.slide,.card{border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:1rem 1.2rem;min-height:9rem}
+.slide h3{margin:.2rem 0 .6rem}
+.slide-controls,.card-controls{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.7rem 0 .2rem}
+.btn{font:inherit;padding:.45rem 1rem;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+.btn[disabled]{opacity:.45;cursor:default}
+.slide .right{font-weight:600;color:#1b7a50}
+.slide .wrong{font-weight:600;color:#b23c32}

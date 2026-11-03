@@ -606,6 +606,14 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-section-pages-state.json'
 ```
 
+`course-file.cjs` opens a course file the site wrote beside its original, in Chromium and Firefox with the network off (owner, 2026-11-03), for its styling and how it works, never its words: the stylesheet rules a browser accepts from the course's CSS tab, the look of the same elements with panels closed and open, the build (progress strip, masthead, coloured word, pills, scale, reset button, results panel), its cover showing, every panel a `<details>`, the same learner through the whole course by the file's own script, every word of every slide and flash card on the screen, and every panel opening without JavaScript. Its fixture writes a made-up course and its file inside a transaction it rolls back, so there is nothing to clean up. A JSON list of `{name, original, file}` as its first argument checks other files, and a pair's `allow` names what an edit on the site has since taken away. `course-file-contents.php`, in `env_php_1`, looks for every word a course holds on the site in its file, for every course or those named, and changes nothing.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-file-fixture.php'
+podman cp env_php_1:/tmp/catto-course-file /tmp/
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-file.cjs
+```
+
 `presentation-readable.cjs` measures that every word on every slide of every presentation can be read (owner, 2026-11-02). Its fixture, `presentation-readable-fixture.php create|cleanup` in `env_php_1`, makes an ADMIN with a preview of every course that has a presentation, lists each one with the address it is read at, the presentation that introduces the site among them, and makes a course whose presentations draw every layout on every background in both looks. Each presentation is played in Chromium at 1440, every slide built to its last step and every quick question also answered wrongly. For each piece of text, the text in drawings included, it takes the colour against the real pixels behind it (WCAG AA, 4.5:1, or 3:1 for large text), and fails on low contrast, text that changes nothing on the screen, text under 10px as drawn, text past the side of the slide or the edge of its drawing, two pieces of text in a drawing on top of each other, text below the frame at this width, a step or an answer shown out of view, and text no pass reached. The fixture's course is also played in every bundled theme at 1440 and 390 and read without JavaScript. The front page's link to the presentation that introduces the site is followed in every bundled theme, on desktop and laptop screens, where the whole player must be in view, its buttons included. Copy the state file to the host first, as for the other checks:
 
 ```sh

@@ -91,6 +91,8 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $this->db->beginTransaction();
         $this->fixture = new IntegrationDataFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable('2026-11-02 10:00:00', new \DateTimeZone('UTC')));
+        // The site's own job records the digests it has made today, and this test's frozen clock may be today.
+        $this->db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'mailing.digest_made.%'");
         // The gentle first days depend on what this database has sent before: the tests pace by the hourly limit.
         // Around the clock, unless a test is about the sending hours.
         $this->rules = ['first_day_limit' => 0, 'send_from' => '00:00', 'send_until' => '00:00'] + MailingSettings::RULES;

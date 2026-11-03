@@ -2,6 +2,42 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-03 — v1.0.6 Course files keep their styling and hold everything
+
+### The fault this fixes
+
+- **Download as one HTML file damaged course files in v1.0.4 and v1.0.5.** A stylesheet holding a Google Fonts address was broken across lines at the address's semicolons, and the browser threw away most of it. Every file was rebuilt in a generic form its own stylesheet's rules did not match, without its progress strip, results panel, reset button or the course's own script. Throw away any file downloaded from those releases and download it again from this one.
+
+### Installing and updating
+
+- **A clean installation is needed:** the baseline gains `course_file_frames`, which keeps the page skeleton and script of the HTML file a course came from, with no course content and no styling. A v1.0.5 site can instead add that one table as the baseline defines it, then update in place.
+- **No new `.env` settings, packages, scheduled jobs, permissions, addresses, third parties or legal text.** Nothing is removed.
+- **A course imported before this release has no page skeleton,** so its file is in the course specification's form until the course's HTML file, or a catalogue package from a site that has it, is imported again. A course already on a site gains the skeleton from a package without anything else changing, and the import review says so.
+- **Course and catalogue packages carry it** as `file_frame`.
+
+### Course files
+
+- **A course file holds everything the course holds on the site now:** its lessons, summaries, slides, flash cards, practical work, model answers, questions and answers, as they stand after every edit.
+- **The styling is the course's CSS tab,** read when the file is written, so a change there is in the next file. A stylesheet's address stays whole and its `@import` comes first.
+- **The cover shows** at the top of the masthead.
+- **The course preview is in the file,** after the introduction, and comes back when the file is imported.
+- **The file keeps the page it came from:** its progress strip, masthead, cards, results panel, reset button and script, every panel a `<details>` with its own classes, so that its own rules style it and its panels open and close without JavaScript.
+- **A course keeps its styling after modules are added or removed:** the file adds or removes their panels, and the script counts them. A course's stated question counts follow its questions, and its answer key is called that.
+- **Presentation and Flash cards panels** look like the course's Summary panel. A presentation plays one slide at a time, and every word of a slide reaches the screen, a case's question, a chapter, a caption and a closing button included.
+- **Anything a file has no room for is named at its top.** Nothing was named anywhere before.
+
+### Catalogue
+
+- **View course and the line above it sit at the bottom of every course card,** so a row of cards lines up whatever the length of their text, in every theme.
+
+### Writing courses
+
+- **Course specification 4.6** adds an optional course preview, `PRESENTATIONS.trailer`, and its example's script shows every word a slide holds.
+
+### Checks
+
+- **`tests/Browser/course-file.cjs`** opens a file beside the one it came from in Chromium and Firefox, for its styling and how it works, and **`tests/Browser/course-file-contents.php`** looks for every word a course holds on the site in its file. The first fails on a file damaged by v1.0.4 or v1.0.5.
+
 ## 2026-11-02 — v1.0.5 Every slide readable, a presentation that introduces the site, and Mark complete without a reload
 
 ### Installing and updating

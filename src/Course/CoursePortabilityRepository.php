@@ -184,6 +184,32 @@ final class CoursePortabilityRepository
         $this->db->executeStatement('DELETE FROM courses WHERE id=:course_id', ['course_id' => $courseId]);
     }
 
+    /**
+     * The course's original file's frame (CourseFileFrame), which only its course file reads.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function fileFrame(int $courseId): ?array
+    {
+        $frame = $this->db->fetchOne('SELECT frame FROM course_file_frames WHERE course_id = :id', ['id' => $courseId]);
+        $decoded = is_string($frame) ? json_decode($frame, true) : null;
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /** @param array<string,mixed>|null $frame */
+    public function saveFileFrame(int $courseId, ?array $frame): void
+    {
+        if ($frame === null) {
+            $this->db->executeStatement('DELETE FROM course_file_frames WHERE course_id = :id', ['id' => $courseId]);
+            return;
+        }
+        $this->db->executeStatement(
+            'INSERT INTO course_file_frames (course_id, frame) VALUES (:id, CAST(:frame AS jsonb))
+             ON CONFLICT (course_id) DO UPDATE SET frame = EXCLUDED.frame, updated_at = NOW()',
+            ['id' => $courseId, 'frame' => json_encode($frame, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
+        );
+    }
+
     /** @return array<string,mixed> */
     public function ensurePreviewEnrolment(int $userId, int $courseId): array
     {

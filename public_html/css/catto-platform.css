@@ -1002,7 +1002,7 @@ a.cl-column-chart-bar:hover,a.cl-column-chart-bar:focus-visible{opacity:1}
    a grid row are the same height, and without this the action sits directly under the text and no
    two cards in a row agree where it is. */
 
-.cl-course-card-body{display:flex;flex-direction:column;gap:.6rem;padding:clamp(.85rem,1.2vw,1.1rem);min-width:0}
+.cl-course-card-body{display:flex;flex-direction:column;flex:1 1 auto;gap:.6rem;padding:clamp(.85rem,1.2vw,1.1rem);min-width:0}
 .cl-course-card-title{font-size:1rem;line-height:1.3;margin:0}
 .cl-course-card-title a{color:inherit;text-decoration:none}
 .cl-course-card-title a:hover{text-decoration:underline}/* Bound long descriptions so one card does not dominate the entire row. */
