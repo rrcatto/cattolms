@@ -1,0 +1,102 @@
+{#
+	Lockouts (owner, 2026-11-04, the approved mockup): everything kept off the site, one table chosen by feature cards, with
+	Lift; Add a lockout; the email addresses and domains refused; what a locked-out visitor sees; and, on a server whose
+	firewall tells the site (decision 2B), what the server refuses, which can be seen but not lifted from here.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Site Analytics' %}{% set ph_title = 'Lockouts' %}
+	{% set ph_lead = 'Everything kept off this site, for how long, and why.' %}
+	{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'Add a lockout', variant: 'danger', href: '#add-lockout', icon: 'action-lock-out'}) }}{% endset %}{% endif %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+	{% set sk_icons = {
+		force: '<svg ' ~ a ~ '><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+		auto: '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+		you: '<svg ' ~ a ~ '><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4-6.5 8-6.5s7 2 8 6.5"/></svg>',
+		ended: '<svg ' ~ a ~ '><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>',
+	} %}
+	{% set sk_cards = [] %}
+	{% for key, one in kinds %}{% set sk_cards = sk_cards|merge([{value: key, label: one.label, icon: sk_icons[key], note: counts[key]|number_format}]) %}{% endfor %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'lockouts'})} %}{% block surface_body %}
+		<form class="cl-library-lists" method="get" action="/admin/site-analytics/lockouts" data-choose-submits>
+			{{ ui('form.picture-choice', {name: 'show', legend: 'Kinds of lockout', id: 'site-lockout-kinds', size: 'small', columns: 4, selected: kind, items: sk_cards}) }}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'lockouts', pagination: lockouts_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th>What</th><th>Which</th><th>Why</th><th>By</th><th>Since</th><th>Until</th><th class="text-end">Refused</th><th><span class="visually-hidden">Lift</span></th></tr>{% endblock %}
+			{% block body %}{% for row in rows %}<tr data-site-lockout="{{ row.id }}">
+				<td class="cell-text">{% if row.href %}<a href="{{ row.href }}">{{ row.what }}</a>{% else %}{{ row.what }}{% endif %}<br><span class="small">{{ row.kind }}{{ row.firewall ? ', at the firewall' : '' }}</span></td>
+				<td>{{ ui('feedback.badge', {label: row.which, tone: row.tone, size: 'small'}) }}</td>
+				<td class="cell-text">{{ row.why }}</td>
+				<td class="cell-text">{{ row.by }}</td>
+				<td>{{ row.since }}</td>
+				<td>{{ row.until }}</td>
+				<td class="text-end">{{ row.refused }}</td>
+				<td class="cell-actions">{% if row.can_lift and can_manage %}<form action="/admin/site-analytics/lockouts/{{ row.id }}/lift" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="/admin/site-analytics/lockouts?show={{ kind }}">{{ ui('action.button', {label: 'Lift', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-lift', aria_label: 'Lift the lockout of ' ~ row.what}) }}</form>{% endif %}</td>
+			</tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: 'Nothing here.'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% if can_manage %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'add-lockout'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Add a lockout'}) }}
+		<form action="/admin/site-analytics/lockouts" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="/admin/site-analytics/lockouts">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What to lock out', for: 'add-target', required: true, help: 'An address, a range such as 198.51.100.0/24, or a network owner\'s number such as AS64500.'})} %}{% block control %}<input id="add-target" name="target" required maxlength="60" placeholder="198.51.100.23" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How long', for: 'add-length'})} %}{% block control %}<select id="add-length" name="length" {{ ui_field_attrs(props) }}>{% for value, label in lengths %}<option value="{{ value }}"{{ value == '30d' ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'add-why', required: true})} %}{% block control %}<input id="add-why" name="why" required maxlength="500" placeholder="What it was doing" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% if firewall_offered %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Also ban it at the server\'s firewall. It then cannot reach any website on this server.', help: 'For an address or a range. A firewall knows nothing of network owners.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="firewall" value="1">{% endblock %}{% endembed %}{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Lock out', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-lock-out'}) }}{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+	{% if server.available %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'server'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Refused by the server', summary: 'The server stops these before they reach this site. You can see them here, but not lift them. Last told ' ~ server.written_words|lower ~ '.'}) }}
+		{% if server.stale %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'This is out of date'})} %}{% block body %}<p>The server has not told the site anything for a while, so what is shown here may be old.</p>{% endblock %}{% endembed %}{% endif %}
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+			<div>
+				<h3 class="h5">Banned at its firewall ({{ server.bans|length }})</h3>
+				{% if server.bans_rows %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+				{% block header %}<tr><th>Address</th><th>Why</th></tr>{% endblock %}
+				{% block body %}{% for row in server.bans_rows %}<tr><td><a href="{{ row.href }}">{{ row.address }}</a></td><td class="cell-text">{{ row.why }}</td></tr>{% endfor %}{% endblock %}
+				{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'Nothing is banned.'}) }}{% endif %}
+			</div>
+			<div>
+				<h3 class="h5">Probes refused for this site ({{ server.probes_today|number_format }} today)</h3>
+				{% if server.probes_rows %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+				{% block header %}<tr><th>When</th><th>Address</th><th>Asked for</th></tr>{% endblock %}
+				{% block body %}{% for row in server.probes_rows %}<tr><td>{{ row.when }}</td><td><a href="{{ row.href }}">{{ row.address }}</a></td><td class="cell-text"><span class="cl-mono small">{{ row.path }}</span></td></tr>{% endfor %}{% endblock %}
+				{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'None lately.'}) }}{% endif %}
+			</div>
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+	<section class="cl-page-section">{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'emails'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Email addresses and domains refused', summary: 'Whatever address they come from, these cannot register, ask for a sign-in link or use the contact form. They see the usual page.'}) }}
+			{% if emails %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th>Address or domain</th><th>Why</th><th class="text-end">Refused</th><th><span class="visually-hidden">Remove</span></th></tr>{% endblock %}
+			{% block body %}{% for row in emails %}<tr data-refused-email="{{ row.id }}"><td class="cell-text">{{ row.value }}</td><td class="cell-text">{{ row.why }}</td><td class="text-end">{{ row.refused|number_format }}</td><td class="cell-actions">{% if can_manage %}<form action="/admin/site-analytics/refused-emails/{{ row.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove', aria_label: 'Stop refusing ' ~ row.value}) }}</form>{% endif %}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'None yet.'}) }}{% endif %}
+			{% if can_manage %}<form action="/admin/site-analytics/refused-emails" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address or domain', for: 'refuse-value', required: true})} %}{% block control %}<input id="refuse-value" name="value" required maxlength="254" placeholder="someone@example.com or example.com" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'refuse-why'})} %}{% block control %}<input id="refuse-why" name="why" maxlength="500" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+				{% endblock %}{% endembed %}
+			</form>{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'what-they-see'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'What a locked-out visitor sees', summary: 'This page and nothing else, on every address of the site. No reason, no theme, no way to tell it was singled out.'}) }}
+			<div class="cl-lock-sample">This site is not available.</div>
+			<p class="small mb-0 mt-5">You can never lock out the address you are using now, or an address on the Never lock out list in <a href="/admin/site-analytics/protection">Site protection settings</a>.</p>
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

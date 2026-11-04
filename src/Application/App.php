@@ -11,6 +11,8 @@ Description:
 Provides application-layer coordination for app, connecting Catto Learning domain services, persistence and HTTP workflows.
 
 Changelog:
+2026/11/04 SAST
+- The lockout check before the session starts (site analytics, owner 2026-11-04).
 2026/10/24 SAST
 - The kernel's environment and debugging come from Configuration\RunMode: APP_ENV alone, development unless it says
   production; APP_DEBUG is no longer read (owner, 2026-10-24).
@@ -113,7 +115,10 @@ final class App
         ini_set('error_log', $logRoot . '/application.log');
         self::logRequest();
 
-        self::startSession(new DbalDatabase(ConnectionFactory::create()));
+        $database = new DbalDatabase(ConnectionFactory::create());
+        // A locked-out visitor gets the bare refusal and nothing else, with no session started (owner, 2026-11-04).
+        \CattoLearning\SiteAnalytics\LockoutGate::checkCurrentRequest($database);
+        self::startSession($database);
 
         // Symfony owns every route, the container and the error page. Fat-Free is gone.
         self::handleWithSymfony($instanceRoot);

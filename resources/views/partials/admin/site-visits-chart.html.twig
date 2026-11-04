@@ -1,0 +1,18 @@
+{#
+	Visitors over a period as stacked columns (Site Analytics' overview): people below, automated visitors above, one column
+	for each slice of the period, the empty ones included. Each column says its slice and figures to a pointer and to a
+	screen reader, and about seven slices are named beneath. A wide period scrolls inside itself on a phone.
+#}
+<figure class="cl-site-chart" aria-label="{{ sv_label }}">
+	<div class="cl-site-chart-scale" aria-hidden="true"><span>{{ sv_top }}</span><span>0</span></div>
+	<ol class="cl-site-chart-columns">
+		{% for sv in sv_columns %}
+			<li class="cl-site-chart-column" title="{{ sv.title }}">
+				<span class="visually-hidden">{{ sv.title }}</span>
+				<span class="cl-site-chart-bar cl-site-chart-bar--automated" style="height:{{ sv.automated_share }}%"></span>
+				<span class="cl-site-chart-bar cl-site-chart-bar--people" style="height:{{ sv.people_share }}%"></span>
+				{% if sv.labelled %}<span class="cl-site-chart-label" aria-hidden="true">{{ sv.label }}</span>{% endif %}
+			</li>
+		{% endfor %}
+	</ol>
+</figure>

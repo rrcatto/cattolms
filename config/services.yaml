@@ -170,6 +170,11 @@ services:
     CattoLearning\Event\:
         resource: '../src/Event/'
 
+    # Site analytics and lockouts. The lockout check runs before the container is built, and the rest of what is excluded are values.
+    CattoLearning\SiteAnalytics\:
+        resource: '../src/SiteAnalytics/'
+        exclude: '../src/SiteAnalytics/{LockoutGate.php,LockoutGateRepository.php,VisitorAgent.php,RequestFacts.php,SitePeriod.php,SiteAnalyticsWords.php}'
+
     # ScheduledJob is the list of scheduled jobs, an enum, not a service.
     CattoLearning\Maintenance\:
         resource: '../src/Maintenance/'

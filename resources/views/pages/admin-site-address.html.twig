@@ -1,0 +1,100 @@
+{#
+	One address on one page (owner, 2026-11-04, the approved mockup; one-page overviews keep the identity band): why it was
+	flagged, what it did, its history, who used it, its network, and the Lock out form with what it would catch named before
+	the button. Choosing what to lock out shows only the warning that applies, by CSS, so no script is needed.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Address' %}{% set ph_title = subject %}
+	{% set ph_badges %}
+		{% if flag %}{{ ui('feedback.badge', {label: flag.fine ? 'Not a problem' : flag.level, tone: flag.fine ? 'neutral' : flag.tone}) }}{% endif %}
+		{% if force %}{{ ui('feedback.badge', {label: force.which ~ ' ' ~ force.until_short, tone: force.tone}) }}{% endif %}
+		{% if at_firewall %}{{ ui('feedback.badge', {label: 'Banned at the server\'s firewall', tone: 'danger'}) }}{% endif %}
+		{{ ui('feedback.badge', {label: country}) }}
+		{{ ui('feedback.badge', {label: network_words ~ (network_words == 'Unknown' ? ' network' : '')}) }}
+		{% if owner %}{{ ui('feedback.badge', {label: owner}) }}{% endif %}
+		{% if first_seen %}{{ ui('feedback.badge', {label: 'First seen ' ~ first_seen}) }}{% endif %}
+	{% endset %}
+	{% set ph_actions %}
+		{{ ui('action.link', {label: 'Everything it did', variant: 'secondary', href: log_href, icon: 'action-view-all'}) }}
+		{% if can_manage and flag and not flag.fine %}<form action="/admin/site-analytics/flagged/fine" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="a" value="{{ subject }}">{{ ui('action.button', {label: 'Not a problem', variant: 'secondary', type: 'submit', icon: 'action-done'}) }}</form>{% endif %}
+	{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if force %}
+	<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: force.what ~ ': ' ~ force.which|lower ~ ' ' ~ force.until_short})} %}{% block body %}<p>{{ force.why }} It sees a plain page saying the site is not available, and nothing more. {{ force.refused }} refused so far.</p>{% if can_manage %}<form action="/admin/site-analytics/lockouts/{{ force.id }}/lift" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ href }}">{{ ui('action.button', {label: 'Lift this lockout', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-lift'}) }}</form>{% endif %}{% endblock %}{% endembed %}</section>
+	{% endif %}
+	<section class="cl-page-section">{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 5})} %}{% block body %}
+		{{ ui('data.stat-card', {value: figures.requests|number_format, label: 'Requests', icon: 'figure-chart', href: log_href}) }}
+		{{ ui('data.stat-card', {value: figures.missing|number_format, label: 'Pages that do not exist', icon: 'figure-cancelled', href: log_href ~ '&kind=missing'}) }}
+		{{ ui('data.stat-card', {value: figures.refused|number_format, label: 'Refused while locked out', icon: 'figure-lock-out', href: log_href ~ '&kind=refused'}) }}
+		{{ ui('data.stat-card', {value: figures.forms|number_format, label: 'Forms refused', icon: 'figure-risk-medium', href: '/admin/site-analytics/flagged#forms-refused'}) }}
+		{{ ui('data.stat-card', {value: figures.people|number_format, label: 'People signed in from it', icon: 'figure-people'}) }}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side'})} %}{% block body %}
+		<div class="cl-side-stack">
+			{% if why %}{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'why'})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Why it was flagged'}) }}
+				<ul class="mb-0">{% for line in why %}<li>{{ line }}</li>{% endfor %}</ul>
+			{% endblock %}{% endembed %}{% endif %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'did'})} %}{% block surface_body %}
+				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'What it did'})} %}{% block section_actions %}{{ ui('action.link', {label: 'All ' ~ figures.requests|number_format ~ ' in the Site Log', variant: 'secondary', size: 'small', icon: 'action-view-all', href: log_href}) }}{% endblock %}{% endembed %}
+				{% if did %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+				{% block header %}<tr><th>When</th><th>Page</th><th>Answer</th></tr>{% endblock %}
+				{% block body %}{% for row in did %}<tr><td>{{ row.when }}</td><td class="cell-text"><span class="cl-mono small">{{ row.method }} {{ row.page }}</span></td><td>{{ ui('feedback.badge', {label: row.answer.label, tone: row.answer.tone, size: 'small'}) }}</td></tr>{% endfor %}{% endblock %}
+				{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'The Site Log holds nothing from this address.'}) }}{% endif %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'history'})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'History'}) }}
+				{% if history %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+				{% block body %}{% for row in history %}<tr><td>{{ row.when }}</td><td class="cell-text">{{ row.what }}</td></tr>{% endfor %}{% endblock %}
+				{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'Nothing yet.'}) }}{% endif %}
+			{% endblock %}{% endembed %}
+		</div>
+		<div class="cl-side-stack">
+			{% if can_manage and not force %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'lock-out'})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Lock out'}) }}
+				{% if own_address %}
+				<p class="mb-0">You are using this address now, so you cannot lock it out.</p>
+				{% else %}
+				<form class="cl-lock-form" action="/admin/site-analytics/lockouts" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ href }}">
+					<input type="hidden" name="address_value" value="{{ subject }}"><input type="hidden" name="range_value" value="{{ range }}">
+					<input type="hidden" name="owner_value" value="{{ asn }}"><input type="hidden" name="owner_name" value="{{ owner }}">
+					{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+					{% set sa_icons = {
+						address: '<svg ' ~ a ~ '><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/></svg>',
+						range: '<svg ' ~ a ~ '><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
+						owner: '<svg ' ~ a ~ '><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1"/></svg>',
+					} %}
+					{% set sa_cards = [] %}
+					{% for one in whats %}{% set sa_cards = sa_cards|merge([{value: one.value, label: one.label, icon: sa_icons[one.value], note: one.note}]) %}{% endfor %}
+					{{ ui('form.picture-choice', {name: 'what', legend: 'What to lock out', id: 'lock-what', size: 'small', selected: 'address', items: sa_cards}) }}
+					{% if range_people %}<div data-lock-warning="range">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>Signed-in people used addresses in this range in the past 30 days: {% for person in range_people %}{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.id}) }}{{ not loop.last ? ', ' }}{% endfor %}. Locking it out locks them out too.</p>{% endblock %}{% endembed %}</div>{% endif %}
+					{% if owner_people %}<div data-lock-warning="owner">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>Signed-in people used this network owner's addresses in the past 30 days: {% for person in owner_people %}{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.id}) }}{{ not loop.last ? ', ' }}{% endfor %}. Locking it out locks them out too.</p>{% endblock %}{% endembed %}</div>{% endif %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How long', for: 'lock-length'})} %}{% block control %}<select id="lock-length" name="length" {{ ui_field_attrs(props) }}>{% for value, label in lengths %}<option value="{{ value }}"{{ value == '30d' ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'lock-why', required: true})} %}{% block control %}<textarea id="lock-why" name="why" rows="3" maxlength="500" required {{ ui_field_attrs(props) }}>{{ draft_why }}</textarea>{% endblock %}{% endembed %}
+					{% if firewall_offered %}<div data-lock-firewall>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Also ban it at the server\'s firewall. It then cannot reach any website on this server.', help: 'For an address or a range. A firewall knows nothing of network owners.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="firewall" value="1">{% endblock %}{% endembed %}</div>{% endif %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Lock out', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-lock-out'}) }}{% endblock %}{% endembed %}
+				</form>
+				{% endif %}
+			{% endblock %}{% endembed %}
+			{% endif %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'people'})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'People who used it', summary: people ? 'In the past 90 days.' : 'Nobody has signed in from this address.'}) }}
+				{% if people %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for person in people %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.id}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}{% endif %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'network'})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Its network'}) }}
+				{{ ui('data.key-value-list', {items: [
+					{label: 'Owner', value: owner ?: 'Unknown'},
+					{label: 'Kind', value: network_words},
+					{label: 'Range', value: range ?: 'Unknown'},
+					{label: 'Tor', value: tor ? 'Yes' : 'No'},
+					{label: 'VPN', value: vpn ? 'Yes' : 'No'},
+					{label: 'Others flagged', value: others_flagged == 1 ? '1 address from this owner' : others_flagged ~ ' addresses from this owner'},
+				]}) }}
+			{% endblock %}{% endembed %}
+		</div>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

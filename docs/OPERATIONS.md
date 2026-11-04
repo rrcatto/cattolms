@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 1.0.7 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.0.8 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -80,6 +80,7 @@ One scheduler runs everything on an installation: `php bin/console schedule:run 
 | Orders and emails (`commerce`) | every minute | the commerce job, below |
 | Course popularity (`popularity`) | every hour | recalculates the popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read; pages never calculate it |
 | Clean-up (`cleanup`) | every day | deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
+| Site protection (`site_protection`) | every minute | checks what each address did against the rules in Site protection settings, flags it and times it out, and asks the server's firewall to release any lockout that has ended |
 | Sign-up check lists (`signup_lists`) | every day | fetches the Tor exit addresses daily and, weekly, the VPN and hosting networks and the throwaway email domains the sign-up check reads |
 | News emails (`mailing`) | every minute | records course changes as held updates, releases the updates whose time has come and delivers them (at once to people who want them as they happen, in each digest on its day), sends within the sending hours at the pace Mailing › Sending settings allows, pauses a sending whose bounces or complaints are too high, reads back what became of each email and asks sleeping addresses once a day |
 | Review requests (`review_requests`) | every hour | emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review (`Course\ReviewRequests`); never to an address on Addresses never emailed, never about a course completed more than 30 days ago |
@@ -161,12 +162,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.7`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.8`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.0.7  # the tag being released
+   V=v1.0.8  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
@@ -411,6 +412,32 @@ Every registration form sent is judged and recorded (owner, 2026-10-26; `src/Aut
 - **Lists:** the scheduler's "Sign-up check lists" job (`ScheduledJob::SignupLists`) fetches the Tor Project's exit addresses daily and, weekly, X4BNet's VPN and hosting networks (MIT) and the disposable-email-domains list (CC0) into `storage/signup-lists/`; Settings > Sign-up checks shows each list's size and date and fetches them at once. The server needs outbound HTTPS to `check.torproject.org` and `raw.githubusercontent.com`. Without a list, its signal is simply not found.
 - **The visitor's address** comes from `REMOTE_ADDR`: behind a proxy, the web server must pass the visitor's address through (nginx `real_ip`), or every address is the proxy's, private, and every registration's country is unknown. A country outside the allowed list is a warning sign, not a hold (owner, 2026-10-27): only a blocked country, or a high-risk registration on a live site, is held.
 - **Kept:** an attempt that became an account is deleted with it; one that never did is deleted by the daily clean-up after 5 years (the Privacy Policy).
+
+## Site analytics and lockouts
+
+Administration > Site Analytics (`src/SiteAnalytics/`, `SiteAnalyticsController`, `PLATFORM.SITEANALYTICS.VIEW` and `MANAGE`): the Overview, the Site Log, Flagged Activity, one address on one page, Lockouts and Site protection settings. Everything stays on the server: no outside service, no tracking script and no new cookie.
+
+- **The visitor's address** must be the true one, or a site log and lockouts are worthless. Behind a proxy, the web server must take the address the proxy itself appended, which is the last in `X-Forwarded-For` (nginx `real_ip_recursive off`), never the first, which the visitor can write. The Podman kit does this.
+- **Recording.** `RequestRecorder`, on kernel terminate, writes each request after its page has been sent (`site_requests`). The secret part of a sign-in link, unsubscribe link or private certificate address is written as ••••, and nothing after a question mark is kept (`RequestFacts::maskedPath`). The daily clean-up deletes what is older than Settings keep (`SITE_LOG_KEPT_FOR`, `SITE_FLAGS_KEPT_FOR`). An IPv6 machine counts as its whole /64.
+- **Refusal.** `LockoutGate`, in `App::run` before a session starts, answers a locked-out address with a bare 403, "This site is not available.", whatever it asks for, with no theme and no reason. `/webhooks/` is never refused: each carries its own signature. A refused request adds to its lockout's counter, and only the first 100 of a day go into the Site Log, so a flood cannot fill the disk.
+- **Rules.** The `site_protection` scheduled job (`SiteProtectionJob`) checks the log once a minute, so a time-out can start up to a minute late. `SITE_RULE_*`, `SITE_TIMEOUT_*`, `SITE_LOCKOUT_AFTER` and `SITE_SPARE_*` in `.env` give the starting values; Site protection settings overrides them, with a Reset. An address on Never lock out (`SITE_NEVER_LOCK_OUT`), a private address, an address an administrator used and a search engine that proves who it is (its address's host name belongs to the engine and leads back to the address) are never timed out; an address a signed-in person used in the past 30 days is flagged instead. An address marked Not a problem is left alone for 30 days.
+- **People and automated visitors** are told apart by what a browser says it is and how it behaves (`VisitorAgent`). A careful bot that behaves normally counts as a person.
+- **Forms.** `FormGuard` on Sign in and Contact: the hidden field filled in, no browser named, a browser years out of date (Chrome or Firefox before 80, Safari before 11, Internet Explorer), a script, or an email address or domain on the refused list. Such a form is shown the usual page and nothing is sent. Register keeps its own sign-up check and takes only the refused list from this. An address on Never lock out and a private address are never refused.
+
+### The server's firewall
+
+A site runs without root, so it can only ask. With `SITE_FIREWALL_LINK=on` (or the tick in Site protection settings), a lockout of an address or range may also ask for a ban at the server's firewall, by appending a line to `storage/server-firewall/requests.log`:
+
+    {"at":"2026-11-04T10:00:00+00:00","do":"ban","network":"198.51.100.23"}
+    {"at":"2026-11-04T11:00:00+00:00","do":"lift","network":"198.51.100.23"}
+
+Something on the server, run by its owner as root, reads those lines and keeps `storage/server-firewall/view.json` up to date, which the site shows as Refused by the server. It can be seen there but not lifted:
+
+    {"written_at":"2026-11-04T10:00:30+00:00","probes_today":47,
+     "bans":[{"address":"192.0.2.9","why":"Probing","since":""}],
+     "probes":[{"at":"2026-11-04T09:59:00+02:00","address":"192.0.2.9","path":"/.env"}]}
+
+Without that file the panel shows CattoLMS's own view only, and the tick on a lockout is not offered. What runs on the server, and how it decides what it will never ban, is that server's owner's choice; CattoLMS ships nothing that needs root for this.
 
 ## South African ID numbers
 

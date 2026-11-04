@@ -37,6 +37,9 @@ Changelog:
   mailing_course_notices (the new-course digest) removed.
 2026/10/28 SAST (landing pages)
 - The "Instructor" section type removed (owner, 2026-10-28: "Remove it"; there are no lecturers, the system presents the courses).
+2026/11/04 SAST (site analytics)
+- site_requests, site_flags, site_lockouts and site_refused_emails: the Site Log, flagged activity, lockouts and the
+  email addresses refused; the PLATFORM.SITEANALYTICS.VIEW and PLATFORM.SITEANALYTICS.MANAGE permissions (owner, 2026-11-04).
 2026/10/28 SAST (mailing templates)
 - mailing_templates (designed or HTML, the defaults for messages and the digest) and mailing_campaigns.template_id;
   mailing_campaigns.from_name, reply_to, exclude_list_ids, max_recipients and plain_text.
@@ -524,6 +527,8 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('PLATFORM.IDENTITY.MANAGE','ManageIdentityVerification','Platform','Revoke an identity verification with a reason, and allow another try after three declined checks.'),
     ('PLATFORM.MAILING.VIEW','ViewMailing','Platform','See the mailing lists, their followers, the campaigns and what became of each email.'),
     ('PLATFORM.MAILING.MANAGE','ManageMailing','Platform','Write, approve, send and stop campaigns, and change the mailing settings.'),
+    ('PLATFORM.SITEANALYTICS.VIEW','ViewSiteAnalytics','Platform','See who is on the site, the Site Log, flagged activity and lockouts.'),
+    ('PLATFORM.SITEANALYTICS.MANAGE','ManageSiteAnalytics','Platform','Lock out and lift, decide flagged addresses, and change the site protection settings.'),
     ('PLATFORM.DOCUMENT.VIEW','ViewFinancialDocumentDesign','Commerce · Platform','See the design of invoices, receipts and credit notes and preview it when Commerce is installed.'),
     ('PLATFORM.DOCUMENT.MANAGE','ManageFinancialDocumentDesign','Commerce · Platform','Change the design of invoices, receipts and credit notes when Commerce is installed.');
 
@@ -2164,6 +2169,96 @@ CREATE INDEX signup_attempts_created_idx ON signup_attempts (created_at DESC);
 CREATE INDEX signup_attempts_ip_idx ON signup_attempts (ip_address, created_at DESC);
 CREATE INDEX signup_attempts_user_idx ON signup_attempts (user_id) WHERE user_id IS NOT NULL;
 
+-- Site analytics (owner, 2026-11-04): one row for each page anyone asked for, deleted after the time Settings > Site
+-- protection keeps it. subject is the address the rules count: the address itself, or an IPv6 address's whole /64,
+-- because one machine can hold billions of addresses. Secrets in a path are never kept (SiteAnalytics\RequestFacts).
+CREATE TABLE site_requests (
+    id BIGSERIAL PRIMARY KEY,
+    at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    address INET NOT NULL,
+    subject INET NOT NULL,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    by_administrator BOOLEAN NOT NULL DEFAULT FALSE,
+    visitor VARCHAR(12) NOT NULL CHECK (visitor IN ('signed_in','person','automated')),
+    agent_kind VARCHAR(12) NOT NULL CHECK (agent_kind IN ('browser','outdated','script','search','crawler','none')),
+    agent_label VARCHAR(80) NOT NULL DEFAULT '',
+    agent_proved BOOLEAN NULL,
+    device VARCHAR(10) NOT NULL DEFAULT '' CHECK (device IN ('','phone','tablet','computer')),
+    user_agent VARCHAR(500) NOT NULL DEFAULT '',
+    country_code CHAR(2) NULL CHECK (country_code ~ '^[A-Z]{2}$'),
+    network_kind VARCHAR(10) NOT NULL DEFAULT '' CHECK (network_kind IN ('','home','hosting','vpn','tor','private')),
+    network_asn BIGINT NULL,
+    network_name VARCHAR(200) NOT NULL DEFAULT '',
+    method VARCHAR(10) NOT NULL,
+    path VARCHAR(500) NOT NULL,
+    status SMALLINT NOT NULL,
+    is_page BOOLEAN NOT NULL DEFAULT FALSE,
+    refused BOOLEAN NOT NULL DEFAULT FALSE,
+    came_from VARCHAR(200) NOT NULL DEFAULT '',
+    source VARCHAR(10) NOT NULL DEFAULT 'direct' CHECK (source IN ('inside','direct','search','social','email','site')),
+    form VARCHAR(10) NULL CHECK (form IN ('sign_in','register','contact')),
+    form_signal VARCHAR(12) NULL CHECK (form_signal IN ('trap','no_browser','outdated','script','email_list')),
+    form_refused BOOLEAN NOT NULL DEFAULT FALSE,
+    form_email VARCHAR(254) NULL,
+    form_email_hash CHAR(64) NULL
+);
+CREATE INDEX site_requests_at_idx ON site_requests (at DESC);
+CREATE INDEX site_requests_subject_idx ON site_requests (subject, at DESC);
+CREATE INDEX site_requests_user_idx ON site_requests (user_id, at DESC) WHERE user_id IS NOT NULL;
+CREATE INDEX site_requests_form_idx ON site_requests (at DESC) WHERE form_refused;
+
+-- Each suspicious address, why and what the owner decided. Where it stands otherwise follows from its lockouts.
+CREATE TABLE site_flags (
+    id BIGSERIAL PRIMARY KEY,
+    subject INET NOT NULL UNIQUE,
+    level VARCHAR(10) NOT NULL CHECK (level IN ('medium','high')),
+    fine BOOLEAN NOT NULL DEFAULT FALSE,
+    why JSONB NOT NULL DEFAULT '[]'::jsonb,
+    first_flagged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_flagged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    decided_at TIMESTAMPTZ NULL
+);
+CREATE INDEX site_flags_last_idx ON site_flags (last_flagged_at DESC);
+
+-- Everything kept off the site: an address or range (network) or a network owner (asn), automatic or by hand, a time-out
+-- or a lockout. refused counts every request it turned away; logged_on_day limits how many of them the Site Log keeps.
+CREATE TABLE site_lockouts (
+    id BIGSERIAL PRIMARY KEY,
+    kind VARCHAR(10) NOT NULL CHECK (kind IN ('address','range','owner')),
+    network CIDR NULL,
+    asn BIGINT NULL,
+    label VARCHAR(200) NOT NULL,
+    which VARCHAR(10) NOT NULL CHECK (which IN ('timeout','lockout')),
+    why VARCHAR(500) NOT NULL,
+    rule_key VARCHAR(20) NULL,
+    automatic BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    until_at TIMESTAMPTZ NULL,
+    lifted_at TIMESTAMPTZ NULL,
+    lifted_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    refused BIGINT NOT NULL DEFAULT 0,
+    last_refused_at TIMESTAMPTZ NULL,
+    logged_day DATE NULL,
+    logged_on_day INTEGER NOT NULL DEFAULT 0,
+    firewall VARCHAR(10) NOT NULL DEFAULT 'no' CHECK (firewall IN ('no','banned','released')),
+    CHECK ((kind = 'owner') = (asn IS NOT NULL)),
+    CHECK ((kind = 'owner') = (network IS NULL))
+);
+CREATE INDEX site_lockouts_force_idx ON site_lockouts (until_at) WHERE lifted_at IS NULL;
+CREATE INDEX site_lockouts_network_idx ON site_lockouts (network, started_at DESC);
+
+-- Email addresses and domains that cannot register, ask for a sign-in link or use the contact form, from any address.
+CREATE TABLE site_refused_emails (
+    id BIGSERIAL PRIMARY KEY,
+    value VARCHAR(254) NOT NULL UNIQUE CHECK (value = LOWER(value)),
+    why VARCHAR(500) NOT NULL DEFAULT '',
+    refused BIGINT NOT NULL DEFAULT 0,
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE commerce_order_preferences (
     order_id BIGINT PRIMARY KEY REFERENCES commerce_orders(id) ON DELETE RESTRICT,
     payment_method TEXT NOT NULL CHECK(payment_method IN ('dummy','eft','wallet'))
@@ -3225,6 +3320,7 @@ SQL);
     {
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS
+    site_requests, site_flags, site_lockouts, site_refused_emails,
     document_assets, document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
     audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,

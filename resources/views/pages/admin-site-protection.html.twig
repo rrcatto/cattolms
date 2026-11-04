@@ -1,0 +1,68 @@
+{#
+	Site protection settings (owner, 2026-11-04, the approved mockup, decision 3A): the automatic time-outs, what happens if
+	an address comes back, what is never timed out, Never lock out, how long records are kept and the server's firewall. Every
+	value starts in .env and what is saved here overrides it, with a Reset.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Settings' %}{% set ph_title = 'Site protection' %}
+	{% set ph_lead = 'What the site does by itself about bad actors, and how long it keeps its records.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section"><form action="/admin/site-analytics/protection" method="post" id="site-protection-form"><input type="hidden" name="csrf" value="{{ csrf }}">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'rules'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Automatic time-outs', summary: 'Checked once a minute. Write lengths like this: 90s, 10m, 1h30m, 1d, 4w2d.'}) }}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th>On</th><th>When one address does this</th><th>How many</th><th>Within</th><th>Then</th><th>For how long</th></tr>{% endblock %}
+		{% block body %}{% for rule in rules %}<tr data-site-rule="{{ rule.key }}">
+			<td><input class="cl-check" type="checkbox" name="rule[{{ rule.key }}][on]" value="1" aria-label="{{ rule.name }}: on or off"{{ rule.on ? ' checked' : '' }}></td>
+			<td class="cell-text">{{ rule.name }}</td>
+			<td>{% if rule.counted %}<input class="cl-input cl-site-short" name="rule[{{ rule.key }}][count]" value="{{ rule.count }}" inputmode="numeric" aria-label="{{ rule.name }}: how many">{% endif %}</td>
+			<td>{% if rule.counted %}<input class="cl-input cl-site-short" name="rule[{{ rule.key }}][within]" value="{{ rule.within }}" aria-label="{{ rule.name }}: within">{% endif %}</td>
+			<td><select class="cl-select" name="rule[{{ rule.key }}][then]" aria-label="{{ rule.name }}: then"><option value="flag"{{ rule.then == 'flag' ? ' selected' : '' }}>Flag it only</option><option value="timeout"{{ rule.then == 'timeout' ? ' selected' : '' }}>Time it out</option></select></td>
+			<td><input class="cl-input cl-site-short" name="rule[{{ rule.key }}][length]" value="{{ rule.length }}" aria-label="{{ rule.name }}: for how long"></td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'comes-back'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'If it comes back'}) }}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Each new time-out lasts twice as long as the one before'})} %}{% block control %}<input type="checkbox" class="cl-check" name="doubles" value="1"{{ values.doubles ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Longest time-out', for: 'site-longest'})} %}{% block control %}<input id="site-longest" name="longest" value="{{ values.longest }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Timed out this many times', for: 'site-lock-count'})} %}{% block control %}<input id="site-lock-count" name="lockout_count" value="{{ values.lockout_count }}" inputmode="numeric" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Within', for: 'site-lock-within'})} %}{% block control %}<input id="site-lock-within" name="lockout_within" value="{{ values.lockout_within }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Locks it out for', for: 'site-lock-length'})} %}{% block control %}<input id="site-lock-length" name="lockout_length" value="{{ values.lockout_length }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'never-timed-out'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Never timed out automatically'}) }}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'An address an administrator signed in from in the past 30 days'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_administrators" value="1"{{ values.spare_administrators ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'An address a signed-in person used in the past 30 days. It is flagged for you to decide, because mobile networks share addresses among many people.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_people" value="1"{{ values.spare_people ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Search engines that prove who they are'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_search_engines" value="1"{{ values.spare_search_engines ? ' checked' : '' }}>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'never-lock-out'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Never lock out', summary: 'Your own connections. Not even you can lock these out. You are using ' ~ (own_address ?: 'an unknown address') ~ ' now.'}) }}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'One address or range to a line', for: 'site-never'})} %}{% block control %}<textarea id="site-never" name="never_lock_out" rows="4" {{ ui_field_attrs(props) }}>{{ values.never_lock_out|join("\n") }}</textarea>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'records'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Records', summary: 'The daily clean-up deletes anything older. Today the Site Log holds ' ~ log_total ~ ' requests.'}) }}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep the Site Log for', for: 'site-log-keep'})} %}{% block control %}<input id="site-log-keep" name="log_kept_for" value="{{ values.log_kept_for }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep flagged activity and ended lockouts for', for: 'site-flags-keep'})} %}{% block control %}<input id="site-flags-keep" name="flags_kept_for" value="{{ values.flags_kept_for }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Leave administrators out of the Overview\'s figures'})} %}{% block control %}<input type="checkbox" class="cl-check" name="leave_out_administrators" value="1"{{ values.leave_out_administrators ? ' checked' : '' }}>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'firewall', section_spacing: true})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'The server\'s firewall', summary: server.available ? (server.stale ? 'The server last told this site what it refuses ' ~ server.written_words|lower ~ ', so it may have stopped.' : 'The server told this site what it refuses ' ~ server.written_words|lower ~ '.') : 'This server has not been set up for this yet, so the tick does nothing until it is.'}) }}
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Let a lockout also ban at the server\'s firewall. A lockout then offers this as a tick, and the address cannot reach any website on the server.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="firewall_link" value="1"{{ values.firewall_link ? ' checked' : '' }}>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	</form></section>
+	{% if can_manage %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes', form: 'site-protection-form'}) }}
+			<form action="/admin/site-analytics/protection/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset to the starting values', variant: 'secondary', type: 'submit', icon: 'action-back', confirm: 'Put every value on this page back to its starting value?'}) }}</form>
+		{% endblock %}{% endembed %}
+		<p class="small mb-0 mt-5">{{ source == 'database' ? 'These are the values you saved here. Reset returns to the starting values.' : 'These are the starting values, from the site\'s settings file. Saving here overrides them.' }}</p>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

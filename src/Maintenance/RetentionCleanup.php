@@ -43,7 +43,11 @@ final class RetentionCleanup
         private readonly ClockInterface $clock,
         private readonly ContactMessageRepository $contactMessages,
         private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signupAttempts = null,
-        private readonly ?\CattoLearning\Mailing\CampaignRepository $mailingCopies = null
+        private readonly ?\CattoLearning\Mailing\CampaignRepository $mailingCopies = null,
+        private readonly ?\CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection = null,
+        private readonly ?\CattoLearning\SiteAnalytics\SiteLogRepository $siteLog = null,
+        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
+        private readonly ?\CattoLearning\SiteAnalytics\LockoutRepository $siteLockouts = null
     ) {}
 
     /** The oldest moment kept: anything recorded before it is deleted. */
@@ -52,7 +56,7 @@ final class RetentionCleanup
         return DateTimeImmutable::createFromInterface($this->clock->now())->modify('-' . self::YEARS . ' years');
     }
 
-    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
+    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,site_requests:int,site_flags:int,site_lockouts:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
     public function run(): array
     {
         $before = $this->cutoff();
@@ -62,6 +66,19 @@ final class RetentionCleanup
             'signup_attempts' => $this->signupAttempts?->deleteUnclaimedBefore($before) ?? 0,
             // The record of each news email a person was sent, opened or clicked (mailing, step 2; owner, 2026-10-26).
             'mailing_copies' => $this->mailingCopies?->deleteBefore($before) ?? 0]
+            + $this->siteRecords()
             + $this->maintenance->prune();
+    }
+
+    /** @return array{site_requests:int,site_flags:int,site_lockouts:int} the Site Log, flags and ended lockouts past what Settings keep (owner, 2026-11-04) */
+    private function siteRecords(): array
+    {
+        if ($this->siteProtection === null || $this->siteLog === null || $this->siteFlags === null || $this->siteLockouts === null) return ['site_requests' => 0, 'site_flags' => 0, 'site_lockouts' => 0];
+        $values = $this->siteProtection->values();
+        $now = DateTimeImmutable::createFromInterface($this->clock->now());
+        $flags = \CattoLearning\Support\Duration::parse((string) $values['flags_kept_for'])->before($now);
+
+        return ['site_requests' => $this->siteLog->deleteBefore(\CattoLearning\Support\Duration::parse((string) $values['log_kept_for'])->before($now)),
+            'site_flags' => $this->siteFlags->deleteBefore($flags), 'site_lockouts' => $this->siteLockouts->deleteEndedBefore($flags)];
     }
 }

@@ -1,0 +1,86 @@
+{#
+	Site Analytics, the overview (owner, 2026-11-04, the approved mockup): what needs the owner's attention, one Period for
+	the figures and the chart, each figure opening what it counts, where visitors are from, what they are doing, how they
+	found the site and who is on it now.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Site Analytics' %}
+	{% set ph_lead = 'Who is on your site, where they are from and what they are doing.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if attention or new_countries %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'attention'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Needs your attention', summary: attention_more > 0 ? 'The latest 8 flagged addresses. ' ~ attention_more ~ ' more on Flagged Activity.' : 'Each address the site has flagged and you have not decided, and each sign-in from a new country.'}) }}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+			{% for row in attention %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+			{% block body %}<a href="{{ row.href }}"><strong>{{ row.subject }}</strong></a> {{ ui('feedback.badge', {label: row.level, tone: row.tone, size: 'small'}) }}<br>{{ row.why }}<br><span class="small">{{ row.from }}, {{ row.network }}. {{ row.stands }}. Last seen {{ row.seen|lower }}.</span>{% endblock %}
+			{% block actions %}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', icon: 'action-open', href: row.href, aria_label: 'Open ' ~ row.subject}) }}{% if can_manage %}{{ ui('action.link', {label: 'Lock out', variant: 'danger', size: 'small', icon: 'action-lock-out', href: row.href ~ '#lock-out', aria_label: 'Lock out ' ~ row.subject}) }}{% endif %}{% endblock %}
+			{% endembed %}
+			{% endfor %}
+			{% for row in new_countries %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+			{% block body %}{{ ui('data.person', {name: row.name, href: row.href}) }} {{ ui('feedback.badge', {label: 'Medium', tone: 'warning', size: 'small'}) }}<br>Signed in from a country not used before: {{ row.country }}.{% if row.earlier %} Usually signs in from {{ row.earlier }}.{% endif %}<br><span class="small">{{ row.at }} from {{ row.ip }}.</span>{% endblock %}
+			{% block actions %}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', icon: 'action-open', href: row.href, aria_label: 'Open ' ~ row.name}) }}{% endblock %}
+			{% endembed %}
+			{% endfor %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		<form class="cl-money-period" action="/admin/site-analytics" method="get">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'site-period'})} %}{% block control %}<select id="site-period" name="period" onchange="if (this.value !== 'dates') this.form.requestSubmit()" {{ ui_field_attrs(props) }}>{% for key, label in period_choices %}<option value="{{ key }}"{{ period.key == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'site-from'})} %}{% block control %}<input type="date" id="site-from" name="from" value="{{ period.fromDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'site-to'})} %}{% block control %}<input type="date" id="site-to" name="to" value="{{ period.toDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}
+		</form>
+		<p class="small mt-3 mb-5">Compared with the same length of time before it. Each figure opens what it counts.</p>
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: server.available ? 3 : 5})} %}{% block body %}
+			{{ ui('data.stat-card', {value: figures.visitors.value, label: 'Visitors', note: figures.visitors.note, icon: 'figure-people', href: '/admin/site-analytics/log?' ~ period_query}) }}
+			{{ ui('data.stat-card', {value: figures.signed_in.value, label: 'People signed in', note: figures.signed_in.note, icon: 'figure-enrolments', href: '/admin/site-analytics/log?kind=signed&' ~ period_query}) }}
+			{{ ui('data.stat-card', {value: figures.page_views.value, label: 'Page views', note: figures.page_views.note, icon: 'figure-chart', href: '/admin/site-analytics/log?' ~ period_query}) }}
+			{{ ui('data.stat-card', {value: figures.flagged.value, label: 'Flagged addresses', note: figures.flagged.note, icon: 'figure-risk-medium', href: '/admin/site-analytics/flagged'}) }}
+			{{ ui('data.stat-card', {value: figures.locked.value, label: 'Locked out now', note: figures.locked.note, icon: 'figure-lock-out', href: '/admin/site-analytics/lockouts'}) }}
+			{% if server.available %}{{ ui('data.stat-card', {value: server.probes_today|number_format, label: 'Refused by the server', note: server.bans|length ~ ' banned at its firewall. Today.', icon: 'figure-risk-high', href: '/admin/site-analytics/lockouts#server'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Visits each day', summary: 'Most automated traffic is search engines and scanners, so people and automated visitors are counted apart.'}) }}
+		<p class="cl-site-chart-legend"><span class="cl-site-chart-key cl-site-chart-key--people"></span>People: {{ people_total }}<span class="cl-site-chart-key cl-site-chart-key--automated"></span>Automated: {{ automated_total }}</p>
+		{% include '@platform/partials/admin/site-visits-chart.html.twig' with {sv_label: 'Visitors in each part of the period, people and automated apart', sv_top: visits.top, sv_columns: visits.columns} %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Where they are from'}) }}
+			{% if countries %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th>Country</th><th><span class="visually-hidden">Share</span></th><th class="text-end">Visitors</th><th class="text-end">Flagged</th></tr>{% endblock %}
+			{% block body %}{% for row in countries %}<tr><td class="cell-text">{% if row.href %}<a href="{{ row.href }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</td><td class="cl-site-share">{{ ui('feedback.progress', {value: row.share, label: row.name ~ ': share of visitors'}) }}</td><td class="text-end">{{ row.visitors }}</td><td class="text-end">{{ row.flagged }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'Nobody has visited in this period.'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'What they are doing'}) }}
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 2, density: 'compact'})} %}{% block body %}
+				{{ ui('data.stat-card', {value: doing.registrations, label: 'Registrations'}) }}
+				{{ ui('data.stat-card', {value: doing.sign_ins, label: 'Sign-ins'}) }}
+				{{ ui('data.stat-card', {value: doing.checkouts, label: 'Checkouts started'}) }}
+				{{ ui('data.stat-card', {value: doing.orders, label: 'Orders placed'}) }}
+			{% endblock %}{% endembed %}
+			{% if pages %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th>Most viewed</th><th class="text-end">Views</th><th class="text-end">Visitors</th></tr>{% endblock %}
+			{% block body %}{% for row in pages %}<tr><td class="cell-text"><a href="{{ row.href }}">{{ row.name }}</a></td><td class="text-end">{{ row.views|number_format }}</td><td class="text-end">{{ row.visitors|number_format }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'How they found you'}) }}
+			{% if sources %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th>Came from</th><th><span class="visually-hidden">Share</span></th><th class="text-end">Visitors</th></tr>{% endblock %}
+			{% block body %}{% for row in sources %}<tr><td class="cell-text">{{ row.name }}</td><td class="cl-site-share">{{ ui('feedback.progress', {value: row.share, label: row.name ~ ': share of visitors'}) }}</td><td class="text-end">{{ row.visitors }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'Nobody has visited in this period.'}) }}{% endif %}
+			{% if devices %}<p class="small mb-0 mt-5">{{ devices }}</p>{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'on-site-now'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'On the site now', summary: 'Past 5 minutes. Refreshes by itself.'}) }}
+			<div id="site-on-now" hx-get="/admin/site-analytics/now" hx-trigger="every 30s" hx-swap="innerHTML">{% include '@platform/partials/admin/site-on-now.html.twig' %}</div>
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

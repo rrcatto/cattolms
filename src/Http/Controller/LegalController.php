@@ -40,7 +40,8 @@ final class LegalController extends BaseController
         RequestStack $requests,
         private readonly LegalDocuments $legal,
         private readonly CommerceSettings $settings,
-        private readonly \CattoLearning\Document\DocumentPdfRenderer $pdfs
+        private readonly \CattoLearning\Document\DocumentPdfRenderer $pdfs,
+        private readonly \CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -116,6 +117,9 @@ final class LegalController extends BaseController
             'legal_documents' => $this->legal->all(),
             'supplier' => $this->legal->supplier(),
             // The periods and fees the documents state, from the commerce settings in force now.
+            // How long the Site Log and flagged addresses are kept, from Site protection settings (owner, 2026-11-04).
+            'site_log_kept_for' => \CattoLearning\Support\Duration::parse((string) $this->siteProtection->values()['log_kept_for'])->words(),
+            'site_flags_kept_for' => \CattoLearning\Support\Duration::parse((string) $this->siteProtection->values()['flags_kept_for'])->words(),
             'refund_window' => $this->settings->refundWindow()->words(),
             'payment_due' => $this->settings->paymentDue()->words(),
             'wallet_expiry' => $this->settings->walletExpiry()->words(),

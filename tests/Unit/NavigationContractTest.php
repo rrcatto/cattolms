@@ -174,15 +174,17 @@ final class NavigationContractTest extends TestCase
         }
 
         self::assertSame(
-            ['admin-group-catalogue', 'admin-group-directory', 'admin-group-commerce', 'admin-group-insights', 'admin-group-system'],
+            ['admin-group-catalogue', 'admin-group-directory', 'admin-group-commerce', 'admin-group-site_analytics', 'admin-group-insights', 'admin-group-system'],
             array_keys($groups),
-            'Administration must be gathered into its five groups, in order.'
+            'Administration must be gathered into its six groups, in order.'
         );
         self::assertSame(
             ['admin-courses', 'admin-course-page-layouts', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-course-catalogue', 'admin-course-reviews', 'admin-bundles', 'admin-certificate-designs', 'admin-issued-certificates', 'admin-requests', 'admin-enrolments'],
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );
+        // Who is on the site and what they are doing, and the lockouts (owner, 2026-11-04).
+        self::assertSame(['admin-site-analytics', 'admin-site-log', 'admin-site-flagged', 'admin-site-lockouts', 'admin-site-protection'], $groups['admin-group-site_analytics']);
         // People, then Companies: Find a Person is gone, because the People search finds the same people (owner, 2026-10-21).
         self::assertSame(['admin-people', 'admin-companies'], array_slice($groups['admin-group-directory'], 0, 2));
     }

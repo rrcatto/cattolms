@@ -39,7 +39,8 @@ final class ContactController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly ContactService $contact
+        private readonly ContactService $contact,
+        private readonly \CattoLearning\SiteAnalytics\FormGuard $forms
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -62,9 +63,10 @@ final class ContactController extends BaseController
     {
         $this->requireCsrf();
 
-        // Bots that populate the hidden website field are treated as successful
-        // without sending mail so the form does not become an obvious oracle.
-        if (trim((string) ($_POST['website'] ?? '')) !== '') {
+        // Bots (the hidden website field, a script or a browser years out of date) and addresses on the refused list are
+        // treated as successful without sending mail, so the form does not become an obvious oracle.
+        $sender = $this->currentUser();
+        if ($this->forms->refuses(\CattoLearning\SiteAnalytics\FormGuard::CONTACT, $_POST, (string) ($_POST['email'] ?? ($sender !== null ? $sender->primaryEmail : '')))) {
             $this->flash('success', 'Thank you. Your message has been received.');
             $this->redirect('/contact');
         }

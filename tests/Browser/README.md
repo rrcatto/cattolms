@@ -118,6 +118,19 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 `CATTO_BROWSERS` narrows the browsers; results and failure screenshots go to
 `/tmp/catto-bootstrap-safety-net` (`CATTO_BROWSER_OUTPUT`).
 
+## Site analytics
+
+`site-analytics.cjs` checks Administration > Site Analytics in every bundled theme at 1440 and 390px, with the shared page checks, then its cards, filters, Lock out, Lift, Not a problem, the refused email list and Site protection, without JavaScript too, what the server's firewall tells the site and what the tick asks of it (through the two files, not a real firewall), and the bare refusal itself by locking out for a moment the address the check comes from. Fixtures: `section-pages-fixture.php create` and `site-analytics-fixture.php create`, and both `cleanup` afterwards:
+
+```sh
+podman exec -u cattotest env_php_1 php tests/Browser/section-pages-fixture.php create
+podman exec -u cattotest env_php_1 php tests/Browser/site-analytics-fixture.php create
+podman cp env_php_1:/tmp/catto-section-pages-state.json /tmp/catto-section-pages-state.json
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/site-analytics.cjs
+podman exec -u cattotest env_php_1 php tests/Browser/site-analytics-fixture.php cleanup
+podman exec -u cattotest env_php_1 php tests/Browser/section-pages-fixture.php cleanup
+```
+
 ## Sign-up checks
 
 `signup-checks.cjs` follows the sign-up check from the outside on the demo site (owner, 2026-10-26; UX rule 2.6h):

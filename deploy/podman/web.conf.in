@@ -17,10 +17,11 @@ server {
     client_max_body_size 64M;
     server_tokens off;
 
-    # Only the server's own web server can reach this port, so the visitor's address is the one it forwards.
+    # Only the server's own web server can reach this port. It adds the address it saw to the end of the list, and a
+    # visitor can write anything before that, so the visitor's address is the last one in the list and never the first.
     set_real_ip_from 0.0.0.0/0;
     real_ip_header X-Forwarded-For;
-    real_ip_recursive on;
+    real_ip_recursive off;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;

@@ -18,6 +18,7 @@ Changelog:
 2026/10/08 SAST
 
 - PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (Commerce · Platform): the design of invoices, receipts and credit notes (Phase K). 92 permissions.
+- PLATFORM.SITEANALYTICS.VIEW and PLATFORM.SITEANALYTICS.MANAGE (Platform): the Site Log, flagged activity and lockouts (owner, 2026-11-04).
 - PLATFORM.MAILING.VIEW and PLATFORM.MAILING.MANAGE (Platform): mailing lists and campaigns (mailing, step 2; owner, 2026-10-26).
 
 2026/10/07 SAST
@@ -102,6 +103,8 @@ final class PermissionCatalog
             $this->p('PLATFORM.IDENTITY.MANAGE', 'ManageIdentityVerification', 'Platform', 'Revoke an identity verification with a reason, and allow another try after three declined checks.'),
             $this->p('PLATFORM.MAILING.VIEW', 'ViewMailing', 'Platform', 'See the mailing lists, their followers, the campaigns and what became of each email.'),
             $this->p('PLATFORM.MAILING.MANAGE', 'ManageMailing', 'Platform', 'Write, approve, send and stop campaigns, and change the mailing settings.'),
+            $this->p('PLATFORM.SITEANALYTICS.VIEW', 'ViewSiteAnalytics', 'Platform', 'See who is on the site, the Site Log, flagged activity and lockouts.'),
+            $this->p('PLATFORM.SITEANALYTICS.MANAGE', 'ManageSiteAnalytics', 'Platform', 'Lock out and lift, decide flagged addresses, and change the site protection settings.'),
             $this->p('PLATFORM.ACTIVITY.VIEW', 'ViewPlatformActivity', 'Platform', 'View audit activity platform-wide.'),
             $this->p('PLATFORM.REPORT.VIEW', 'ViewPlatformReports', 'Platform', 'View operational and learning reports platform-wide.'),
             $this->p('COURSE.MANAGEMENT.VIEW', 'ViewCourseManagement', 'Courses', 'Open course-authoring surfaces for courses within resource scope.'),

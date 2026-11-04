@@ -2,6 +2,37 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-04 — v1.0.8 Site analytics and lockouts
+
+### The fault this fixes
+
+- **A visitor could fake their address on a site installed with `deploy/podman/`, from v0.9.7 to v1.0.7.** The kit's web server took the first address in `X-Forwarded-For`, which a visitor can write. It now takes the last, which the server's own web server added (`real_ip_recursive off` in `deploy/podman/web.conf.in`). The fake address reached the limit on sign-in links per address, the sign-up check's country and network, Recent sign-ins and the Activity log. Updating a site by the kit writes the new setting. Addresses recorded before the update may be false.
+
+### Installing and updating
+
+- **A clean installation is needed:** the baseline gains four tables, `site_requests`, `site_flags`, `site_lockouts` and `site_refused_emails`, and two permissions, `PLATFORM.SITEANALYTICS.VIEW` and `PLATFORM.SITEANALYTICS.MANAGE` (105 permissions). A v1.0.7 site can instead add the four tables and the two permissions as the baseline defines them, give both permissions to the Platform Administrator role, then update in place, keeping everything on it.
+- **New `.env` settings, all optional:** `SITE_RULE_MISSING`, `SITE_RULE_FLOOD`, `SITE_RULE_LINKS`, `SITE_RULE_REGISTER`, `SITE_RULE_TOKENS`, `SITE_RULE_TRAP`, `SITE_RULE_SCRIPT`, `SITE_RULE_OLD`, `SITE_TIMEOUT_DOUBLES`, `SITE_TIMEOUT_LONGEST`, `SITE_LOCKOUT_AFTER`, `SITE_SPARE_ADMINISTRATORS`, `SITE_SPARE_SIGNED_IN`, `SITE_SPARE_SEARCH_ENGINES`, `SITE_NEVER_LOCK_OUT`, `SITE_LOG_KEPT_FOR`, `SITE_FLAGS_KEPT_FOR`, `SITE_FIGURES_LEAVE_OUT_ADMINISTRATORS` and `SITE_FIREWALL_LINK`. A missing one takes the starting value in `.env.example`, and Site protection settings overrides each, with a Reset. **Automatic time-outs are on by default.**
+- **A new scheduled job,** `site_protection`, every minute. The daily clean-up also deletes Site Log records after 120 days and flags and ended lockouts after a year.
+- **The Privacy Policy changes** (dated 2026-11-04): it says what the Site Log keeps and for how long. No third party is added: everything stays on the site's own server, with no tracking script and no new cookie.
+- **New addresses:** `/admin/site-analytics` with `/now`, `/log`, `/flagged`, `/flagged/fine`, `/address/{address}`, `/lockouts`, `/lockouts/{id}/lift`, `/refused-emails`, `/refused-emails/{id}/remove`, `/protection` and `/protection/reset`.
+- **No new packages, and nothing is removed.** Updated: Symfony 8.1.11, Symfony Stimulus bundle 3.7.0, PHPUnit 13.4.6, PHPStan 2.3.5 and CakePHP's database packages 5.4.4 (through Phinx); CKEditor 49.1.0 (GPL, as before); Lucide 1.68.0 (ISC, as before): 21 more icons to choose from for categories and tags, 3 redrawn, none removed.
+- **`public_html` changes:** `css/catto-platform.css`, `css/ckeditor5.css`, `js/ckeditor5.umd.js` and `img/nav-icons.svg`.
+
+### Site Analytics
+
+Administration has a new menu group, Site Analytics, for Platform Administrators.
+
+- **Overview:** what needs your attention, a Period drop-down, figures that open what they count, visits each day with people and automated visitors apart, where they are from, what they are doing, how they found the site and who is on it now.
+- **Site Log:** every page anyone asked for, with when, who, country, kind of network, page, the site's answer and browser, searched, filtered and paged. A request is written after its page has been sent. The secret part of a sign-in link, unsubscribe link or private certificate address is written as ••••, and anything after a question mark is left out.
+- **Flagged Activity:** each suspicious address with why in plain words and where it stands, with Lock out and Not a problem, and the forms refused. Not a problem also ends an automatic time-out and leaves the address alone for 30 days.
+- **One address:** why it was flagged, what it did, who used it, its network, its history and Lock out, on one page.
+- **Lockouts:** everything kept off the site, by whom, why, until when and how many requests were refused, with Lift, and the email addresses and domains refused. What can be locked out is one address, its range or everything from a network owner, and an IPv6 machine counts as its whole /64.
+- **A locked-out visitor** gets a bare "This site is not available." with no reason and no theme, before any session starts. Every refused request adds to a counter, and the first 100 a day per lockout go in the Site Log. Webhooks are never refused, because each carries its own signature.
+- **Site protection settings:** the automatic rules, how long a time-out lasts and how it grows, what locks an address out, what is never timed out, Never lock out and how long records are kept.
+- **Protecting real people:** nobody can lock out the address they are using or anything on Never lock out, a range or network owner names the signed-in people it would catch before the button is pressed, an address a signed-in person used in the past 30 days is flagged and never timed out automatically, and administrators' addresses, private addresses and search engines that prove who they are are never timed out.
+- **Also:** one row per flagged address on the dashboard's Needs your attention, Recent visits on a person's page, and the hidden field and browser check on the sign-in form. A form sent by a script or from a browser older than about 2020 is refused silently on Sign in and Contact, and shows under Forms refused.
+- **The server's firewall, optional:** on a server set up for it, a lockout of an address or range can also ask for a ban at the firewall, and the panel can show what the server refuses (a figure on the Overview and a list on Lockouts, visible but not liftable). The site never needs root: it appends to a file and reads another (`docs/OPERATIONS.md`, "The server's firewall"). A firewall knows nothing of network owners, so the tick does nothing for one.
+
 ## 2026-11-03 — v1.0.7 A demo site's words are yours to set
 
 ### Installing and updating

@@ -149,10 +149,10 @@ The current menus provide Account (All sections, Dashboard, a Profile group hold
 Particulars, Billing Address, Email Addresses, My Subscriptions and Social Media, a COURSES group holding My Orders and My Courses,
 Sessions, Activity), Company (All sections, Dashboard, a People group holding People,
 Course Requests, Enrolments and Performance, a Courses group holding Courses Created, Favourites, Courses
-Bought and Credits, then Billing details), and Administration in five groups: Courses (courses, the Course Item and Resource
+Bought and Credits, then Billing details), and Administration in six groups: Courses (courses, the Course Item and Resource
 Libraries, categories, tags, Course Reviews, Bundles, Certificate Designs, requests, enrolments), People & Companies,
 Credits & Orders (credits, Orders & Payments, Record EFT Payment, Unmatched Money, Money Ledger, Refund Requests, Wallets,
-Promotions, Financial Documents), Insights (activity and reports) and
+Promotions, Financial Documents), Site Analytics (Overview, Site Log, Flagged Activity, Lockouts, Site protection settings), Insights (activity and reports) and
 System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-level entries
 are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
 these examples do not authorise hard-coded destinations in themes.

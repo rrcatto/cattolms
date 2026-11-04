@@ -59,6 +59,23 @@ class NetworkLookup
         return $this->geo->locate($ip);
     }
 
+    /** The block of addresses an address belongs to, from the ASN database, else its /24 (a /48 for IPv6); '' for a private one. */
+    public function rangeOf(string $ip): string
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false || \CattoLearning\SiteAnalytics\RequestFacts::isPrivate($ip)) return '';
+        $reader = $this->asnReader();
+        if ($reader !== null) {
+            try {
+                $network = (string) $reader->asn($ip)->network;
+                if ($network !== '') return $network;
+            } catch (Throwable) {
+            }
+        }
+        $packed = (string) inet_pton($ip);
+
+        return strlen($packed) === 4 ? inet_ntop(substr($packed, 0, 3) . "\0") . '/24' : inet_ntop(substr($packed, 0, 6) . str_repeat("\0", 10)) . '/48';
+    }
+
     /** The GeoLite2 ASN database beside GEOIP_DATABASE, opened once, or null when it is not there. */
     private function asnReader(): ?Reader
     {

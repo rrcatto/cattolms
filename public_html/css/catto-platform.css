@@ -513,6 +513,25 @@ a.cl-column-chart-bar{min-height:3px}
 a.cl-column-chart-bar:hover,a.cl-column-chart-bar:focus-visible{opacity:1}
 .cl-column-chart-label{position:absolute;top:calc(100% + .35rem);left:0;font-size:.72rem;line-height:1;white-space:nowrap;opacity:.75}
 .cl-column-chart-column:last-child .cl-column-chart-label{left:auto;right:0}
+.cl-site-chart{--cl-chart-people:#2f5d7c;--cl-chart-automated:#d9833f;display:grid;grid-template-columns:auto minmax(0,1fr);gap:.5rem;margin:1rem 0 0}
+.cl-site-chart-scale{display:flex;flex-direction:column;justify-content:space-between;height:13rem;font-size:.72rem;line-height:1;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.75}
+.cl-site-chart-columns{display:flex;align-items:flex-end;gap:3px;height:13rem;margin:0 0 1.6rem;padding:0;list-style:none;border-top:1px dashed color-mix(in srgb,currentColor 25%,transparent);border-bottom:1px solid color-mix(in srgb,currentColor 55%,transparent)}
+.cl-site-chart-column{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;flex:1 1 0;min-width:2px;height:100%;margin:0;padding:0}
+.cl-site-chart-bar{display:block;width:100%}
+.cl-site-chart-bar--people{background:var(--cl-chart-people)}
+.cl-site-chart-bar--automated{background:var(--cl-chart-automated)}
+.cl-site-chart-label{position:absolute;top:calc(100% + .35rem);left:0;font-size:.72rem;line-height:1;white-space:nowrap;opacity:.75}
+.cl-site-chart-legend{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0;font-size:.85rem}
+.cl-site-chart-key{display:inline-block;width:.75rem;height:.75rem;margin-left:.75rem}
+.cl-site-chart-key:first-child{margin-left:0}
+.cl-site-chart-key--people{background:#2f5d7c}
+.cl-site-chart-key--automated{background:#d9833f}
+.cl-site-short{width:5.5rem}
+.cl-site-share{min-width:9rem}
+.cl-site-share>*{min-width:8rem}
+.cl-side-stack{display:flex;flex-direction:column;gap:var(--cl-section-space,1.5rem);min-width:0}
+.cl-lock-sample{margin-top:.75rem;padding:2.75rem 1.25rem;border:1px solid #c9b8a3;background:#fff;color:#222;font-family:Arial,Helvetica,sans-serif;text-align:center}
+.cl-lock-form:has(input[name="what"][value="address"]:checked) [data-lock-warning],.cl-lock-form:has(input[name="what"][value="range"]:checked) [data-lock-warning="owner"],.cl-lock-form:has(input[name="what"][value="owner"]:checked) [data-lock-warning="range"],.cl-lock-form:has(input[name="what"][value="owner"]:checked) [data-lock-firewall]{display:none}
 .cl-chart-note{display:block;font-size:.72rem;font-weight:400;white-space:nowrap;opacity:.75}
 .cl-chart-label a{color:inherit}
 .cl-chart{display:grid;gap:.4rem}

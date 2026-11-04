@@ -293,6 +293,17 @@
 {% endblock %}
 {% endembed %}
 
+		{% if recent_visits|default([]) %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'recent-visits'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Recent visits', summary: 'The last ' ~ recent_visits|length ~ ' pages they asked for, from the Site Log.'}) }}
+			{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+				{% for visit in recent_visits %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ visit.when }}</strong><br><span class="cl-mono small">{{ visit.page }}</span><br><span class="small">{{ visit.from }} · <a href="{{ visit.href }}">{{ visit.address }}</a></span>{% endblock %}{% endembed %}{% endfor %}
+			{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
+		{% endif %}
+
 		{# The South African ID number, the date of birth it gives and where they say they live (owner, 2026-10-27), and
 		   identity verification (owner, 2026-10-19; adults only, 2026-10-20). #}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'identity'})} %}

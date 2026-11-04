@@ -15,6 +15,8 @@ dashboard warns when the commerce job is, because without it no buyer is emailed
 is cancelled.
 
 Changelog:
+2026/11/04 SAST
+- Site protection (owner, 2026-11-04, decision 3A): the rules applied every minute.
 2026/10/28 SAST
 - Review requests and the course video check (owner, 2026-10-28, decision 8A): the one email asking a learner for a
   review, every hour, and whether every course video still plays, every day.
@@ -41,6 +43,7 @@ enum ScheduledJob: string
     case LogArchive = 'log_archive';
     case ReviewRequests = 'review_requests';
     case VideoCheck = 'video_check';
+    case SiteProtection = 'site_protection';
 
     /** How often the job runs, in seconds. */
     public function interval(): int
@@ -54,6 +57,7 @@ enum ScheduledJob: string
             self::LogArchive => 86400,
             self::ReviewRequests => 3600,
             self::VideoCheck => 86400,
+            self::SiteProtection => 60,
         };
     }
 
@@ -93,6 +97,7 @@ enum ScheduledJob: string
             self::LogArchive => 2 * 86400,
             self::ReviewRequests => 3 * 3600,
             self::VideoCheck => 3 * 86400,
+            self::SiteProtection => 300,
         };
     }
 
@@ -107,6 +112,7 @@ enum ScheduledJob: string
             self::LogArchive => 'Log archive',
             self::ReviewRequests => 'Review requests',
             self::VideoCheck => 'Course videos',
+            self::SiteProtection => 'Site protection',
         };
     }
 
@@ -116,12 +122,13 @@ enum ScheduledJob: string
         return match ($this) {
             self::Commerce => 'Every minute: sends order and payment emails, cancels unpaid orders at their deadline, ends expired access and expires wallet credit.',
             self::Popularity => 'Every hour: recalculates the course popularity ranking that the home page and the popularity report show.',
-            self::Cleanup => 'Every day: deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, and expired sign-in links and sessions.',
+            self::Cleanup => 'Every day: deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, expired sign-in links and sessions, and Site Log records, flags and ended lockouts older than Settings keep them.',
             self::SignupLists => 'Every day: fetches the Tor exit addresses, and every week the VPN and hosting networks and the throwaway email domains, for the sign-up check.',
             self::Mailing => 'Every minute: sends the news campaigns at the pace Settings allow, pauses one whose bounces or complaints are too high, reads back what became of each email, makes the new-course digest on its day, and once a day asks the sleeping addresses whether they still want news.',
             self::LogArchive => 'Every day just after midnight: moves the application log, and any other log beside it, into a compressed archive, starts each afresh and deletes the archives older than Settings keep them.',
             self::ReviewRequests => 'Every hour: emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review.',
             self::VideoCheck => 'Every day: asks YouTube whether each course video can still be played, and lists any that cannot under Needs your attention.',
+            self::SiteProtection => 'Every minute: checks what each address did against the rules in Site protection settings, flags it and times it out, and takes off the server\'s firewall any lockout that has ended.',
         };
     }
 }

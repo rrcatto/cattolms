@@ -40,7 +40,7 @@ final class AuthController extends BaseController
     /** What a refused registration keeps to fill the form in again: never the ID number. */
     private const DRAFT = ['account_type', 'first_name', 'middle_names', 'last_name', 'company_name', 'country', 'news'];
 
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly GeoIpLocator $geoIp, private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly GeoIpLocator $geoIp, private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null, private readonly ?\CattoLearning\SiteAnalytics\FormGuard $forms = null)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -78,6 +78,8 @@ final class AuthController extends BaseController
     public function register(): Response
     {
         $this->requireCsrf();
+        // On the refused list: the usual page, and nothing sent or kept (site analytics, owner 2026-11-04).
+        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::REGISTER, $_POST, (string) ($_POST['email'] ?? '')) === true) $this->redirect('/login/sent?registered=1');
         try {
             $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses')));
         } catch (\Throwable $e) {
@@ -101,6 +103,8 @@ final class AuthController extends BaseController
         $email = (string) ($_POST['email'] ?? '');
         $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses'));
         $follow = \CattoLearning\Mailing\FollowIntent::fromText($_POST['follow'] ?? '');
+        // A bot's form, or an address on the refused list: the usual page, and nothing sent (site analytics, owner 2026-11-04).
+        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::SIGN_IN, $_POST, $email) === true) $this->redirect('/login/sent');
         try {
             $this->auth->requestLogin($email, $returnPath, $follow?->text() ?? '');
         } catch (UnknownLoginEmailException $e) {

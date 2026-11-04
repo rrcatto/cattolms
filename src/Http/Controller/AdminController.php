@@ -154,7 +154,8 @@ final class AdminController extends BaseController
         private readonly SeedDatabaseService $seedDatabase,
         private readonly \CattoLearning\Maintenance\LogArchive $logArchive,
         private readonly \CattoLearning\Course\CataloguePositions $cataloguePositions,
-        private readonly \CattoLearning\Course\CourseQuickEdit $courseQuickEdit
+        private readonly \CattoLearning\Course\CourseQuickEdit $courseQuickEdit,
+        private readonly \CattoLearning\SiteAnalytics\SiteLogRepository $siteLog
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -320,6 +321,14 @@ final class AdminController extends BaseController
     }
 
     /** Renders the standalone Settings Administration section. */
+    /** @return list<array<string,string>> a person's latest requests, for their page */
+    private function recentVisits(int $userId): array
+    {
+        return array_map(static fn(array $visit): array => ['when' => \CattoLearning\SiteAnalytics\SiteAnalyticsWords::when((string) $visit['at'], true), 'page' => $visit['method'] . ' ' . $visit['path'],
+            'address' => (string) $visit['address'], 'href' => \CattoLearning\SiteAnalytics\SiteAnalyticsWords::addressHref((string) $visit['subject']), 'from' => \CattoLearning\SiteAnalytics\SiteAnalyticsWords::country($visit['country_code'])],
+            $this->siteLog->visitsBy($userId));
+    }
+
     #[Route('/admin/settings', name: 'admin_settings', methods: ['GET'])]
     public function settings(): Response
     {
@@ -500,6 +509,8 @@ final class AdminController extends BaseController
             // How they registered and where they sign in from (owner, 2026-10-26).
             'signup_check' => self::signupCheckView($this->signupAttempts->forUser($target)),
             'recent_signins' => $this->signInHistory->recent($target),
+            // What they asked for lately (site analytics, owner 2026-11-04).
+            'recent_visits' => $this->requireUser()->hasPermission('PLATFORM.SITEANALYTICS.VIEW') ? $this->recentVisits($target) : [],
             'site_is_demo' => $this->auth->demoHoldsRegistrations(),
             'can_manage_people' => $this->requireUser()->hasPermission('PLATFORM.PERSON.MANAGE'),
             'target_company_id' => (int) (($data['company']['id'] ?? 0)),

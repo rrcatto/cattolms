@@ -1,0 +1,11 @@
+{# The visitors of the past five minutes (Site Analytics' overview), drawn again by itself every 30 seconds. #}
+{% if on_site %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}<tr><th>Who</th><th>From</th><th>Doing</th></tr>{% endblock %}
+{% block body %}{% for row in on_site %}<tr>
+	<td class="cell-text">{% if row.signed_in %}{{ ui('data.person', {name: row.who, href: row.who_href}) }}{% else %}<a href="{{ row.who_href }}">{{ row.who }}</a>{% endif %}</td>
+	<td>{{ row.from }}</td>
+	<td class="cell-text">{{ row.doing }}</td>
+</tr>{% endfor %}{% endblock %}
+{% endembed %}
+{% else %}{{ ui('feedback.empty', {summary: 'Nobody in the past 5 minutes.'}) }}{% endif %}

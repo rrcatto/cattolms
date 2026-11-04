@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/04 SAST (v1.0.8)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.8. The Site Analytics menu group.
 2026/11/03 SAST (v1.0.7)
 - Advanced PLATFORM_ASSET_VERSION to 1.0.7. The demo site's heading, notice and checkout message are ADMIN's words.
 2026/11/03 SAST (v1.0.6)
@@ -143,7 +145,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.7';
+    private const PLATFORM_ASSET_VERSION = '1.0.8';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -169,7 +171,8 @@ final class ThemeRenderer
         private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null,
         private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
-        private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null
+        private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null,
+        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null
     ) {
     }
 
@@ -607,7 +610,7 @@ final class ThemeRenderer
         }
 
         // Administration is grouped rather than flat. Twelve sections in one list is a list to
-        // read; five groups is a structure to navigate, and the grouping is what makes it obvious
+        // read; six groups is a structure to navigate, and the grouping is what makes it obvious
         // where a new section belongs when one is added.
         //
         // A group is a child that has children of its own, so themes render three levels. Sections
@@ -637,6 +640,7 @@ final class ThemeRenderer
             'catalogue' => ['label' => 'Courses', 'icon' => 'courses', 'sections' => ['courses', 'requests', 'enrolments']],
             'directory' => ['label' => 'People & Companies', 'icon' => 'people', 'sections' => ['people', 'companies']],
             'commerce' => ['label' => 'Credits & Orders', 'icon' => 'credits', 'sections' => ['credits']],
+            'site_analytics' => ['label' => 'Site Analytics', 'icon' => 'reports', 'sections' => []],
             'insights' => ['label' => 'Insights', 'icon' => 'reports', 'sections' => ['activity', 'reports', 'company_report']],
             'system' => ['label' => 'System', 'icon' => 'settings', 'sections' => ['themes', 'roles', 'seed', 'settings', 'ui_components']],
         ];
@@ -724,6 +728,15 @@ final class ThemeRenderer
                     // Every registration attempt with its risk (owner, 2026-10-26).
                     $grandchildren[] = $child('admin-signup-attempts', 'Sign-up Attempts', '/admin/people/signup-attempts', 'people');
                 }
+            }
+            // Who is on the site and what they are doing, and the lockouts (owner, 2026-11-04). What waits for a decision is counted in the label.
+            if ($groupKey === 'site_analytics' && $this->can($data, 'PLATFORM.SITEANALYTICS.VIEW')) {
+                $grandchildren[] = $child('admin-site-analytics', 'Overview', '/admin/site-analytics', 'reports');
+                $grandchildren[] = $child('admin-site-log', 'Site Log', '/admin/site-analytics/log', 'reports');
+                $waitingFlags = isset($this->siteFlags) ? count($this->siteFlags->waiting()) : 0;
+                $grandchildren[] = $child('admin-site-flagged', 'Flagged Activity' . ($waitingFlags > 0 ? ' (' . $waitingFlags . ' waiting)' : ''), '/admin/site-analytics/flagged', 'reports');
+                $grandchildren[] = $child('admin-site-lockouts', 'Lockouts', '/admin/site-analytics/lockouts', 'reports');
+                $grandchildren[] = $child('admin-site-protection', 'Site protection settings', '/admin/site-analytics/protection', 'settings');
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
                 $grandchildren[] = $child('admin-commerce-orders', 'Orders & Payments', '/admin/commerce/orders', 'credits');

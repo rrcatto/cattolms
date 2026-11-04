@@ -1,0 +1,49 @@
+{#
+	Flagged Activity (owner, 2026-11-04, the approved mockup): the addresses behaving like bad actors, one table chosen by
+	feature cards by where each stands, with Lock out and Not a problem, and the forms refused.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Site Analytics' %}{% set ph_title = 'Flagged Activity' %}
+	{% set ph_lead = 'Addresses behaving like bad actors, why each was flagged, and what has been done about it.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+	{% set sf_icons = {
+		waiting: '<svg ' ~ a ~ '><path d="M5 21V4M5 4h13l-3 4 3 4H5"/></svg>',
+		timed: '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+		locked: '<svg ' ~ a ~ '><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+		fine: '<svg ' ~ a ~ '><path d="m5 12 5 5 9-10"/></svg>',
+	} %}
+	{% set sf_cards = [] %}
+	{% for key, label in states %}{% set sf_cards = sf_cards|merge([{value: key, label: label, icon: sf_icons[key], note: counts[key]|number_format}]) %}{% endfor %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'addresses'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Addresses'}) }}
+		<form class="cl-library-lists" method="get" action="/admin/site-analytics/flagged" data-choose-submits>
+			{{ ui('form.picture-choice', {name: 'show', legend: 'Where they stand', id: 'site-flag-kinds', size: 'small', columns: 4, selected: state, items: sf_cards}) }}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% if rows %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th>Address</th><th>From</th><th>Why it was flagged</th><th class="text-end">Requests</th><th>Last seen</th><th>Where it stands</th><th><span class="visually-hidden">Actions</span></th></tr>{% endblock %}
+		{% block body %}{% for row in rows %}<tr data-site-flag="{{ row.id }}">
+			<td><a href="{{ row.href }}">{{ row.subject }}</a><br>{{ ui('feedback.badge', {label: row.level, tone: row.tone, size: 'small'}) }}</td>
+			<td class="cell-text">{{ row.from }}<br><span class="small">{{ row.network }}</span></td>
+			<td class="cell-text">{{ row.why }}</td>
+			<td class="text-end">{{ row.count }}</td>
+			<td>{{ row.seen }}</td>
+			<td class="cell-text">{{ row.stands }}</td>
+			<td class="cell-actions">{% if can_manage and (row.can_lock or row.can_clear) %}{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Actions', aria_label: 'Actions for ' ~ row.subject, icon: 'action-more'})} %}{% block body %}{% if row.can_lock %}{{ ui('action.link', {label: 'Lock out', variant: 'danger', size: 'small', icon: 'action-lock-out', href: row.href ~ '#lock-out', aria_label: 'Lock out ' ~ row.subject}) }}{% endif %}{% if row.can_clear %}<form action="/admin/site-analytics/flagged/fine" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="a" value="{{ row.subject }}">{{ ui('action.button', {label: 'Not a problem', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-done', aria_label: row.subject ~ ' is not a problem'}) }}</form>{% endif %}{% endblock %}{% endembed %}{% endif %}</td>
+		</tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}{{ ui('feedback.empty', {summary: 'Nothing here.'}) }}{% endif %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'forms-refused'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Forms refused', summary: 'Each of these was shown the usual page and told nothing. Nothing was sent or saved.'}) }}
+		{% if forms %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th>When</th><th>Form</th><th>Why</th><th>Address</th><th>Email address typed</th></tr>{% endblock %}
+		{% block body %}{% for form in forms %}<tr><td>{{ form.when }}</td><td>{{ form.form }}</td><td class="cell-text">{{ form.why }}</td><td><a href="{{ form.href }}">{{ form.who }}</a></td><td class="cell-text">{{ form.email }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}{{ ui('feedback.empty', {summary: 'No form has been refused.'}) }}{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

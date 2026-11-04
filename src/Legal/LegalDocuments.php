@@ -76,7 +76,7 @@ final class LegalDocuments
             'intro' => 'These terms apply to everyone who uses this site and to every purchase made on it.'],
         self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-19',
             'intro' => 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.'],
-        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-10-28',
+        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-11-04',
             'intro' => 'This policy explains how personal information is handled on this site, as the Protection of Personal Information Act 4 of 2013 (POPIA) requires.'],
     ];
 

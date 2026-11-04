@@ -25,6 +25,7 @@ Kinds, in this order, oldest first within each:
 - money: TransactionAttention's items (an order paid in part or overpaid, a cancelled order's payment, a refund to
   decide or to pay out, money that paid no order), each on its own page;
 - identity: an identity check Didit's reviewers are deciding (the person's page);
+- site_flag: an address the site flagged, waiting for a decision (site analytics, owner 2026-11-04);
 - video: a course video YouTube says no longer plays (CourseVideoCheck, decision 8A; the video's item: replace it or
   take it out of the course);
 - draft: a course not yet published (the course's page: publish it or delete it).
@@ -81,7 +82,8 @@ final class AdminAttention
         private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signups = null,
         private readonly ?\CattoLearning\Auth\Signup\SignInHistory $signIns = null,
         private readonly ?\CattoLearning\Mailing\CampaignRepository $campaigns = null,
-        private readonly ?\CattoLearning\Course\CourseVideoCheckRepository $videos = null
+        private readonly ?\CattoLearning\Course\CourseVideoCheckRepository $videos = null,
+        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null
     ) {
     }
 
@@ -171,6 +173,14 @@ final class AdminAttention
                     '/admin/courses/' . $course['id'], 'Open the course', (string) $course['updated_at']);
             }
         }
+        // An address the site flagged and the owner has not decided (site analytics, owner 2026-11-04).
+        if ($admin->hasPermission('PLATFORM.SITEANALYTICS.VIEW')) {
+            foreach ($this->siteFlags?->waiting() ?? [] as $flag) {
+                $why = \CattoLearning\SiteAnalytics\FlagRepository::why($flag)[0]['words'] ?? '';
+                $items[] = self::item('site_flag', 'Flagged address', null, false, $flag['subject'] . ' behaves like a bad actor',
+                    $why . ' Lock it out, or mark it not a problem.', \CattoLearning\SiteAnalytics\SiteAnalyticsWords::addressHref((string) $flag['subject']), 'Open the address', (string) $flag['last_flagged_at']);
+            }
+        }
         // A campaign waiting for approval, or one that paused itself (mailing, step 2; owner, 2026-10-26).
         if ($admin->hasPermission('PLATFORM.MAILING.MANAGE')) {
             foreach ($this->campaigns?->waiting() ?? [] as $campaign) {
@@ -181,7 +191,7 @@ final class AdminAttention
                     '/mailing/messages/' . $campaign['id'] . '#send', $approval ? 'Approve or cancel' : 'Resume or cancel', (string) $campaign['updated_at']);
             }
         }
-        $order = array_flip(['account', 'signin_country', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'video', 'draft']);
+        $order = array_flip(['account', 'signin_country', 'site_flag', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'video', 'draft']);
         usort($items, static fn(array $a, array $b): int => [$order[$a['kind']], $a['at']] <=> [$order[$b['kind']], $b['at']]);
         return $items;
     }
