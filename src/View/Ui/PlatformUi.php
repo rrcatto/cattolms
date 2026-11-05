@@ -11,6 +11,9 @@ use Twig\Markup;
 /** Canonical presentation registry: bounded semantic properties and Twig-owned structure/slots. */
 final class PlatformUi
 {
+    /** A form field's name, as a tick's card or a list of ticks is named: such as news, or slide[build]. */
+    private const FIELD_NAME = '/^[a-z][a-z0-9_]*(\[[a-z0-9_]+\])*$/';
+
     private ?string $iconSprite = null;
 
     /** @param string|null $publicRoot The served web root, for the icon sprite's fingerprint. */
@@ -40,7 +43,11 @@ final class PlatformUi
         // columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row, further rows beneath, left-aligned.
         // multiple (owner, 2026-11-01, "Feature Card Checkbox Selectors"): each card a checkbox named by its value, the
         // ticked ones listed in selected (a section's Show outline, Numbered module and Public preview).
-        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => '', 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => '', 'multiple' => false], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 4]]],
+        // list (owner, 2026-11-05: every radio and checkbox a feature card): the cards share one field, list[], each sent as its
+        // value. tick_value is what a named card sends when ticked, for a field that reads something other than 1. required
+        // makes every control required, an item's disabled greys out that one, legend_hidden keeps the legend for screen
+        // readers when the card's own title says it all, and columns 1 stacks the cards in a narrow place.
+        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => '', 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '', 'size' => 'normal', 'columns' => 'auto', 'form' => '', 'multiple' => false, 'list' => '', 'tick_value' => '1', 'required' => false, 'legend_hidden' => false], 'props' => ['size' => ['normal', 'small'], 'columns' => ['auto', 1, 4]]],
         // form (field mode, owner 2026-11-01): the choice belongs to a form elsewhere on the page (a course's row edited in place).
         'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit', 'form' => '']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
@@ -58,12 +65,12 @@ final class PlatformUi
         'data.key-value-list' => ['template' => 'data/key-value-list', 'defaults' => ['items' => null]],
         'data.person' => ['template' => 'data/person', 'defaults' => ['name' => null, 'reference' => '', 'href' => '', 'email' => '', 'full' => false]],
         'feedback.badge' => ['template' => 'feedback/badge', 'defaults' => ['label' => null, 'tone' => 'neutral', 'size' => 'normal']],
-        'feedback.notice' => ['template' => 'feedback/notice', 'defaults' => ['tone' => 'info', 'heading' => '', 'section_spacing' => false, 'flash' => false]],
+        'feedback.notice' => ['template' => 'feedback/notice', 'defaults' => ['tone' => 'info', 'heading' => '', 'section_spacing' => false, 'flash' => false, 'solid' => false, 'icon' => '']],
         'feedback.empty' => ['template' => 'feedback/empty-state', 'defaults' => ['heading' => '', 'summary' => '']],
         'feedback.progress' => ['template' => 'feedback/progress', 'defaults' => ['value' => null, 'min' => 0, 'max' => 100, 'label' => null, 'show_value' => false, 'size' => 'normal']],
         'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post', 'upload' => false]],
         // eyebrow and icon (owner, 2026-10-20, the FAQ): a category line above the heading and an SVG icon before both.
-        'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '', 'eyebrow' => '', 'icon' => '']],
+        'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'summary_tone' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '', 'eyebrow' => '', 'icon' => '']],
         'icon' => ['template' => 'helpers/icon', 'defaults' => ['name' => null, 'label' => '', 'decorative' => true, 'size' => 'normal']],
         'catalogue.course-grid' => ['template' => 'catalogue/course-grid', 'defaults' => ['courses' => []]],
         'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'courses' => [], 'catalogue_pagination' => []]],
@@ -121,19 +128,20 @@ final class PlatformUi
             }
         }
         $enums = [
-            'tone' => $component === 'feedback.notice' ? ['info', 'success', 'warning', 'danger'] : ['neutral', 'info', 'success', 'warning', 'danger', 'permanent'],
+            'tone' => $component === 'feedback.notice' ? ['info', 'success', 'warning', 'danger', 'neutral'] : ['neutral', 'info', 'success', 'warning', 'danger', 'permanent'],
             'variant' => $component === 'layout.surface' ? ['standard', 'compact'] : ['primary', 'secondary', 'quiet', 'danger'],
             'size' => $component === 'overlay.modal' ? ['normal', 'wide', 'page'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
             // What a button or link's htmx GET replaces: its target's inside, or the target itself (a course's row edited
             // in place, owner 2026-11-01).
             'swap' => ['innerHTML', 'outerHTML'],
-            'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
+            'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 1, 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
             'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
         ];
         if ($component === 'overlay.accordion-section') {
             $enums['workspace'] = ['', 'admin', 'account', 'company', 'library'];
+            $enums['summary_tone'] = ['', 'success', 'danger', 'neutral'];
         }
         if ($component === 'data.card') {
             $enums['picture'] = ['round', 'square', 'wide'];
@@ -166,9 +174,14 @@ final class PlatformUi
         }
         if ($component === 'form.picture-choice') {
             $multiple = $values['multiple'];
-            if (!is_bool($multiple)
+            $list = $values['list'];
+            if ($multiple === true && is_array($values['selected'])) $values['selected'] = array_values($values['selected']);
+            if (!is_bool($multiple) || !is_string($list) || !is_bool($values['required']) || !is_bool($values['legend_hidden'])
+                || !is_string($values['tick_value']) || preg_match('/^[a-z0-9]+$/', $values['tick_value']) !== 1
+                // list: one field's values, so a field name, for feature card checkboxes, and each sends its own value.
+                || ($list !== '' && (!$multiple || preg_match(self::FIELD_NAME, $list) !== 1 || $values['tick_value'] !== '1'))
                 || (!$multiple && (!is_string($values['name']) || $values['name'] === '' || !is_scalar($values['selected'])))
-                || ($multiple && ($values['name'] !== '' || !is_array($values['selected']) || !array_is_list($values['selected']) || array_filter($values['selected'], static fn(mixed $value): bool => !is_string($value)) !== []))
+                || ($multiple && ($values['name'] !== '' || !is_array($values['selected']) || !array_is_list($values['selected']) || array_filter($values['selected'], static fn(mixed $value): bool => !is_string($value) && ($list === '' || !is_int($value))) !== []))
                 || !is_string($values['legend']) || $values['legend'] === ''
                 || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)
                 || !is_string($values['form']) || ($values['form'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form']) !== 1)) {
@@ -178,15 +191,15 @@ final class PlatformUi
             // An option shows a picture on this site (a certificate look) or, as a feature card (owner,
             // 2026-10-20, the Register page's account type), an SVG icon above its bold label and its note.
             foreach ($values['items'] as $item) {
-                $keys = is_array($item) ? array_keys($item) : [];
+                $keys = is_array($item) ? array_values(array_diff(array_keys($item), ['disabled'])) : [];
                 $picture = in_array($keys, [['value', 'label', 'image'], ['value', 'label', 'image', 'note']], true);
                 $icon = in_array($keys, [['value', 'label', 'icon'], ['value', 'label', 'icon', 'note']], true);
                 // A slide as the presentation player draws it (owner, 2026-10-30: a layout or a look chosen by what it
                 // looks like): only DeckRenderer::thumbnail's markup, nothing that runs.
                 $drawing = in_array($keys, [['value', 'label', 'drawing'], ['value', 'label', 'drawing', 'note']], true);
-                if ((!$picture && !$icon && !$drawing) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '')
+                if ((!$picture && !$icon && !$drawing) || !(is_string($item['value']) || is_int($item['value'])) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['note'] ?? '') || !is_bool($item['disabled'] ?? false)
                     // A checkbox is named by its value: a field name.
-                    || ($multiple && (!is_string($item['value']) || preg_match('/^[a-z][a-z0-9_]*$/', $item['value']) !== 1))
+                    || ($multiple && $list === '' && (!is_string($item['value']) || preg_match(self::FIELD_NAME, $item['value']) !== 1))
                     || ($picture && (!is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1))
                     || ($icon && !self::pictureOnly($item['icon']))
                     || ($drawing && !self::slideDrawing($item['drawing']))) {

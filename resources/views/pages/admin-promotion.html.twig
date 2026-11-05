@@ -42,27 +42,21 @@
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Applies to ' ~ plural, for: 'promotion-' ~ kind ~ '-scope', required: true})} %}{% block control %}<select id="promotion-{{ kind }}-scope" name="{{ kind }}_scope" required {{ ui_field_attrs(props) }}>{% for value, text in {all: 'All ' ~ plural, selected: 'Selected ' ~ plural, none: 'No ' ~ plural} %}<option value="{{ value }}"{% if scope == value %} selected{% endif %}>{{ text }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 		{% endfor %}
 	{% endblock %}{% endembed %}
-	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active: the code can be used within its dates and limits'})} %}{% block control %}<input type="checkbox" name="active" value="1" {{ form.active ? 'checked' : '' }}>{% endblock %}{% endembed %}
-	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Apply it automatically: purchasers need not type the code', help: 'The cart applies the promotion by itself to the courses and bundles it covers and says so, for example "' ~ (form.code ?: 'SPRING25') ~ ', applied automatically". Their pages announce it while it is active. One promotion applies to an order: when a typed code or another automatic promotion would save more, that one applies instead.'})} %}{% block control %}<input type="checkbox" name="applies_automatically" value="1" {{ form.applies_automatically ? 'checked' : '' }}>{% endblock %}{% endembed %}
+	{{ ui('form.picture-choice', {multiple: true, legend: 'How it is used', size: 'small', columns: 1, selected: ['active', 'applies_automatically']|filter(name => form[name]), items: [
+		{value: 'active', label: 'Active', icon: lucide('circle-check'), note: 'The code can be used within its dates and limits. Untick it and nobody can use it.'},
+		{value: 'applies_automatically', label: 'Apply it automatically', icon: lucide('wand-sparkles'), note: 'Purchasers need not type the code. ' ~ 'The cart applies the promotion by itself to the courses and bundles it covers and says so, for example "' ~ (form.code ?: 'SPRING25') ~ ', applied automatically". Their pages announce it while it is active. One promotion applies to an order: when a typed code or another automatic promotion would save more, that one applies instead.' ~ ' Untick it and they must type the code.'},
+	]}) }}
 	<fieldset class="cl-promotion-courses mt-5">
 		<legend class="h6">Selected courses</legend>
 		<p class="help">Used when the promotion applies to selected courses: only those courses in a cart are discounted, and the others keep their full price. A bundle is never discounted because it contains a selected course.</p>
-		{% for course in form.courses %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: course.label ~ ' (' ~ course.detail ~ ')'})} %}{% block control %}<input type="checkbox" name="course_ids[]" value="{{ course.id }}" checked>{% endblock %}{% endembed %}
-		{% else %}
-			<p class="muted">No courses selected.</p>
-		{% endfor %}
+		{% if form.courses %}{{ ui('form.picture-choice', {multiple: true, list: 'course_ids', legend: 'Courses selected now', legend_hidden: true, size: 'small', selected: form.courses|map(course => course.id), items: form.courses|map(course => {value: course.id, label: course.label, icon: lucide('book-open'), note: course.detail})}) }}{% else %}<p class="muted">No courses selected.</p>{% endif %}
 		{% if form.courses %}<p class="help">Clear a course’s box to remove it when you save.</p>{% endif %}
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_course_id', lk_type: 'courses', lk_label: 'Add a course', lk_empty: 'Search for a course to add', lk_selected: 0, lk_required: 0} %}
 	</fieldset>
 	<fieldset class="cl-promotion-courses mt-5">
 		<legend class="h6">Selected bundles</legend>
 		<p class="help">Used when the promotion applies to selected bundles: only those bundles in a cart are discounted.</p>
-		{% for bundle in form.bundles %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: bundle.label ~ ' (' ~ bundle.detail ~ ')'})} %}{% block control %}<input type="checkbox" name="bundle_ids[]" value="{{ bundle.id }}" checked>{% endblock %}{% endembed %}
-		{% else %}
-			<p class="muted">No bundles selected.</p>
-		{% endfor %}
+		{% if form.bundles %}{{ ui('form.picture-choice', {multiple: true, list: 'bundle_ids', legend: 'Bundles selected now', legend_hidden: true, size: 'small', selected: form.bundles|map(bundle => bundle.id), items: form.bundles|map(bundle => {value: bundle.id, label: bundle.label, icon: lucide('package'), note: bundle.detail})}) }}{% else %}<p class="muted">No bundles selected.</p>{% endif %}
 		{% if form.bundles %}<p class="help">Clear a bundle’s box to remove it when you save.</p>{% endif %}
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_bundle_id', lk_type: 'bundles', lk_label: 'Add a bundle', lk_empty: 'Search for a bundle to add', lk_selected: 0, lk_required: 0} %}
 	</fieldset>

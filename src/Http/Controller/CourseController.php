@@ -71,7 +71,9 @@ final class CourseController extends BaseController
             }
             $this->redirect($target);
         }
-        $category = $this->courses->browsableCategory(trim((string) $this->param('slug')));
+        $slug = trim((string) $this->param('slug'));
+        $category = $this->courses->browsableCategory($slug);
+        if ($slug !== '' && $category === null) throw $this->notFound('The course category was not found.');
         $search = trim((string) ($this->request()->query->get(PlatformAdministrationService::searchParam(self::DATASET), '')));
         // Every published course, a page at a time; a category shows every course in it and in all its
         // subcategories, and a keyword searches the same scope (owner, 2026-10-19).

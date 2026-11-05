@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/05 SAST (v1.0.9)
+- Advanced PLATFORM_ASSET_VERSION to 1.0.9.
 2026/11/04 SAST (v1.0.8)
 - Advanced PLATFORM_ASSET_VERSION to 1.0.8. The Site Analytics menu group.
 2026/11/03 SAST (v1.0.7)
@@ -145,7 +147,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.8';
+    private const PLATFORM_ASSET_VERSION = '1.0.9';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -172,7 +174,8 @@ final class ThemeRenderer
         private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
         private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null,
-        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null
+        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
+        private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null
     ) {
     }
 
@@ -340,6 +343,8 @@ final class ThemeRenderer
         $model['csrf'] = $csrf;
         $model['current_uri'] = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $model = $this->siteModeScalars() + $model;
+        // The site notification stays off the pages where a course is taken, unless ADMIN ticked them (owner, 2026-11-05).
+        if (in_array($family, ['course-player', 'assessment'], true) && !($model['site_notification']['on_course_pages'] ?? false)) $model['site_notification'] = null;
 
         $navigation = $this->navigation($data, $csrf);
         // Bootstrap 6 underneath (6.0.0-alpha.1): only its reboot, grid and utilities files, the reboot first
@@ -733,6 +738,7 @@ final class ThemeRenderer
             if ($groupKey === 'site_analytics' && $this->can($data, 'PLATFORM.SITEANALYTICS.VIEW')) {
                 $grandchildren[] = $child('admin-site-analytics', 'Overview', '/admin/site-analytics', 'reports');
                 $grandchildren[] = $child('admin-site-log', 'Site Log', '/admin/site-analytics/log', 'reports');
+                $grandchildren[] = $child('admin-telegram-log', 'Telegram log', '/admin/site-analytics/telegram-log', 'reports');
                 $waitingFlags = isset($this->siteFlags) ? count($this->siteFlags->waiting()) : 0;
                 $grandchildren[] = $child('admin-site-flagged', 'Flagged Activity' . ($waitingFlags > 0 ? ' (' . $waitingFlags . ' waiting)' : ''), '/admin/site-analytics/flagged', 'reports');
                 $grandchildren[] = $child('admin-site-lockouts', 'Lockouts', '/admin/site-analytics/lockouts', 'reports');
@@ -1400,12 +1406,15 @@ final class ThemeRenderer
      * draws site_demo_notice (partials/flash-messages.html.twig), a checkout and an order
      * site_simulation, and the payment method offers the simulated card only on a demo site.
      *
-     * @return array{site_demo:bool,site_demo_heading:string,site_demo_notice:string,site_simulation:string}
+     * The site notification (SiteNotification) is drawn under the demo notice on every page, demo or live.
+     *
+     * @return array{site_demo:bool,site_demo_heading:string,site_demo_notice:string,site_simulation:string,site_notification:array<string,mixed>|null}
      */
     private function siteModeScalars(): array
     {
         $demo = $this->site?->isDemo() ?? false;
         return ['site_demo' => $demo, 'site_demo_heading' => $this->site !== null && $demo ? $this->site->heading() : '', 'site_demo_notice' => $this->site !== null && $demo ? $this->site->notice() : '',
+            'site_notification' => $this->siteNotification?->forPage(),
             // Also read on a live site: an order placed while it was a demo stays a simulation.
             'site_simulation' => $this->site !== null ? $this->site->simulation() : \CattoLearning\Configuration\SiteMode::SIMULATION];
     }

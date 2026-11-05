@@ -49,6 +49,7 @@ final class Scheduler
         private readonly ?\CattoLearning\Course\ReviewRequests $reviewRequests = null,
         private readonly ?\CattoLearning\Course\CourseVideoCheck $videos = null,
         private readonly ?\CattoLearning\SiteAnalytics\SiteProtectionJob $siteProtection = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageJob $ownerMessages = null,
     ) {}
 
     /**
@@ -92,6 +93,7 @@ final class Scheduler
                 ScheduledJob::ReviewRequests => $this->reviewRequests === null ? 'Not available here.' : self::reviewsAsked($this->reviewRequests->send()),
                 ScheduledJob::VideoCheck => $this->videos?->run() ?? 'Not available here.',
                 ScheduledJob::SiteProtection => $this->siteProtection?->run() ?? 'Not available here.',
+                ScheduledJob::OwnerMessages => $this->ownerMessages?->run() ?? 'Not available here.',
             };
         } catch (Throwable $failed) {
             $this->runs->failed($job, $this->now(), $failed->getMessage());
@@ -116,8 +118,8 @@ final class Scheduler
     private function cleanup(): string
     {
         $deleted = $this->cleanup->run();
-        return sprintf('Deleted %d activity log entries, %d analytics events, %d contact messages, %d sign-up attempts and %d news email records older than %d years, %d expired sign-in links, %d expired sign-in sessions and %d expired browser sessions; %d Site Log records, %d flags and %d ended lockouts past what Settings keep.',
-            $deleted['activity_log'], $deleted['analytics_events'], $deleted['contact_messages'], $deleted['signup_attempts'], $deleted['mailing_copies'], RetentionCleanup::YEARS, $deleted['login_tokens'], $deleted['auth_sessions'], $deleted['web_sessions'], $deleted['site_requests'], $deleted['site_flags'], $deleted['site_lockouts']);
+        return sprintf('Deleted %d activity log entries, %d analytics events, %d contact messages, %d sign-up attempts and %d news email records older than %d years, %d expired sign-in links, %d expired sign-in sessions and %d expired browser sessions; %d Site Log records, %d flags and %d ended lockouts past what Settings keep; %d sent messages to you older than 30 days.',
+            $deleted['activity_log'], $deleted['analytics_events'], $deleted['contact_messages'], $deleted['signup_attempts'], $deleted['mailing_copies'], RetentionCleanup::YEARS, $deleted['login_tokens'], $deleted['auth_sessions'], $deleted['web_sessions'], $deleted['site_requests'], $deleted['site_flags'], $deleted['site_lockouts'], $deleted['owner_messages']);
     }
 
     private static function reviewsAsked(int $sent): string

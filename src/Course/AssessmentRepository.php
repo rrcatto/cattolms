@@ -152,7 +152,7 @@ final class AssessmentRepository
         $rows = $this->db->fetchAllAssociative(
             "SELECT s.*,ci.title AS assessment_title,ci.item_type AS assessment_type,
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
-                    a.time_limit_seconds,a.practice_enabled,ce.course_id,ci.item_key AS assessment_key,
+                    a.time_limit_seconds,a.practice_enabled,a.practice AS practice_only,ce.course_id,ci.item_key AS assessment_key,
                     a.result_pass_html,a.result_fail_html,p.assessment_role,
                     ce.user_id, ce.is_preview, c.slug, c.title AS course_title
              FROM assessment_sessions s

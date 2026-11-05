@@ -149,6 +149,90 @@ final class PictureChoiceContractTest extends TestCase
         }
     }
 
+    /**
+     * Every radio and checkbox a feature card (owner, 2026-11-05: "That is the default I already established for the radio
+     * and checkbox controls!"): cards can share one field, a card can send what its field reads, be required or be greyed
+     * out, and a card's title can stand for a hidden legend.
+     */
+    public function testCardsCanShareAFieldSendTheirOwnValueAndBeRequiredOrDisabled(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>';
+        $xpath = self::xpath(ComponentHarness::render('form.picture-choice', ['multiple' => true, 'list' => 'tag_ids', 'legend' => 'Tags', 'selected' => [2], 'items' => [
+            ['value' => 1, 'label' => 'One', 'icon' => $icon], ['value' => 2, 'label' => 'Two', 'icon' => $icon], ['value' => 3, 'label' => 'Three', 'icon' => $icon, 'disabled' => true],
+        ]]));
+        self::assertSame([['tag_ids[]', '1'], ['tag_ids[]', '2'], ['tag_ids[]', '3']], array_map(static fn(\DOMElement $input): array => [$input->getAttribute('name'), $input->getAttribute('value')], iterator_to_array($xpath->query('//label/input[@type="checkbox"]'))));
+        self::assertSame(['2'], array_map(static fn(\DOMElement $input): string => $input->getAttribute('value'), iterator_to_array($xpath->query('//input[@checked]'))));
+        self::assertSame(['3'], array_map(static fn(\DOMElement $input): string => $input->getAttribute('value'), iterator_to_array($xpath->query('//input[@disabled]'))));
+        self::assertSame(0, $xpath->query('//input[@required]')->length);
+        self::assertSame(0, $xpath->query('//legend[contains(@class,"visually-hidden")]')->length);
+
+        $html = ComponentHarness::render('form.picture-choice', ['multiple' => true, 'legend' => 'Terms', 'legend_hidden' => true, 'tick_value' => 'yes', 'required' => true, 'selected' => [], 'items' => [['value' => 'accept_terms', 'label' => 'I accept', 'icon' => $icon]]]);
+        self::assertStringContainsString('<input type="checkbox" name="accept_terms" value="yes" required>', $html);
+        $xpath = self::xpath($html);
+        self::assertSame('Terms', trim((string) $xpath->query('//legend[contains(@class,"visually-hidden")]')->item(0)?->textContent), 'A hidden legend still names the choice for a screen reader.');
+        self::assertSame(1, $xpath->query('//fieldset[contains(@class,"cl-ui-picture-choice--single")]')->length, 'A lone card takes the whole row.');
+        self::assertSame(1, self::xpath(ComponentHarness::render('form.picture-choice', ['multiple' => true, 'legend' => 'Lots', 'columns' => 1, 'selected' => [], 'items' => [['value' => 'a', 'label' => 'A', 'icon' => $icon], ['value' => 'b', 'label' => 'B', 'icon' => $icon]]]))->query('//fieldset[contains(@class,"cl-ui-picture-choice--one") and not(contains(@class,"--single"))]')->length);
+
+        $radios = self::xpath(ComponentHarness::render('form.picture-choice', ['name' => 'type', 'legend' => 'Type', 'required' => true, 'items' => [['value' => 'a', 'label' => 'A', 'icon' => $icon, 'disabled' => true], ['value' => 'b', 'label' => 'B', 'icon' => $icon]]]));
+        self::assertSame(2, $radios->query('//input[@type="radio" and @required]')->length);
+        self::assertSame(['a'], array_map(static fn(\DOMElement $input): string => $input->getAttribute('value'), iterator_to_array($radios->query('//input[@disabled]'))));
+        self::assertSame(1, self::xpath(ComponentHarness::render('form.picture-choice', ['multiple' => true, 'legend' => 'Flag', 'selected' => ['slide[build]'], 'items' => [['value' => 'slide[build]', 'label' => 'Build', 'icon' => $icon]]]))->query('//input[@name="slide[build]" and @checked]')->length);
+
+        $ui = new PlatformUi();
+        $card = ['value' => 'a', 'label' => 'A', 'icon' => $icon];
+        foreach ([
+            'A list without checkboxes' => ['name' => 'type', 'list' => 'tag_ids', 'items' => [$card]],
+            'A list named badly' => ['multiple' => true, 'list' => 'Bad name', 'selected' => [], 'items' => [$card]],
+            'A list sending a fixed value' => ['multiple' => true, 'list' => 'tag_ids', 'tick_value' => 'yes', 'selected' => [], 'items' => [$card]],
+            'A value that is not a word' => ['multiple' => true, 'tick_value' => '"><script>', 'selected' => [], 'items' => [$card]],
+            'Required that is not true or false' => ['multiple' => true, 'required' => 'yes', 'selected' => [], 'items' => [$card]],
+            'A hidden legend that is not true or false' => ['multiple' => true, 'legend_hidden' => 1, 'selected' => [], 'items' => [$card]],
+            'Disabled that is not true or false' => ['multiple' => true, 'selected' => [], 'items' => [$card + ['disabled' => 'yes']]],
+            'A number as a named card' => ['multiple' => true, 'selected' => [], 'items' => [['value' => 1, 'label' => 'A', 'icon' => $icon]]],
+        ] as $what => $broken) {
+            try {
+                $ui->properties('form.picture-choice', $broken + ['legend' => 'Choice']);
+                self::fail('Accepted: ' . $what);
+            } catch (\InvalidArgumentException $refused) {
+                self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage(), $what);
+            }
+        }
+    }
+
+    /** Words that need markup go in a block when the component is embedded: a card's links, a price with its was price. */
+    public function testACardsTitleAndNoteCanHoldMarkupWhenEmbedded(): void
+    {
+        $source = '{% embed ui_template(\'form.picture-choice\') with {props: ui_props(\'form.picture-choice\', {multiple: true, legend: \'Terms\', selected: [], items: [{value: \'accept\', label: \'Plain\', icon: icon, note: \'Plain note\'}]})} %}{% block item_label %}I accept <a href="/terms">the terms</a> of {{ item.value }}{% endblock %}{% block item_note %}<em>Marked</em>{% endblock %}{% endembed %}';
+        $xpath = self::xpath(\CattoLearning\Tests\Support\RenderHarness::renderSource($source, ['icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>']));
+        self::assertSame(1, $xpath->query('//label//*[@class="cl-ui-picture-choice-label"]/a[@href="/terms"]')->length);
+        self::assertStringContainsString('of accept', (string) $xpath->query('//*[@class="cl-ui-picture-choice-label"]')->item(0)?->textContent, 'A block sees the card it is drawing.');
+        self::assertSame(1, $xpath->query('//label//em')->length);
+    }
+
+    /** Every icon a template asks the library for exists: a missing one stops the page, and many pages are drawn only for ADMIN. */
+    public function testEveryIconATemplateNamesIsInTheLibrary(): void
+    {
+        $library = new \CattoLearning\View\Artwork\IconLibrary();
+        $checked = 0;
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(dirname(__DIR__, 2) . '/resources/views', \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if (!str_ends_with((string) $file, '.twig')) continue;
+            $source = (string) file_get_contents((string) $file);
+            preg_match_all("/lucide\\('([a-z0-9-]+)'\\)/", $source, $named);
+            // A map of icons beside the choice: {key: 'icon-name', ...} assigned to a variable ending in _icons.
+            preg_match_all('/_icons = \{([^}]*)\}/', $source, $maps);
+            $names = $named[1];
+            foreach ($maps[1] as $map) {
+                preg_match_all("/: '([a-z0-9-]+)'/", $map, $inMap);
+                $names = array_merge($names, $inMap[1]);
+            }
+            foreach ($names as $name) {
+                self::assertTrue($library->has($name), basename((string) $file) . ' names the icon ' . $name . ', which the library does not have.');
+                $checked++;
+            }
+        }
+        self::assertGreaterThan(100, $checked, 'The templates were read.');
+    }
+
     /** columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row. */
     public function testFourColumnsIsAVariantAndNothingElseIs(): void
     {

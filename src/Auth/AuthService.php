@@ -84,7 +84,8 @@ final class AuthService
         private readonly ?SignInRestriction $signIn = null,
         private readonly ?Signup\SignupChecks $signups = null,
         private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null,
-        private readonly ?IdNumbers $idNumbers = null
+        private readonly ?IdNumbers $idNumbers = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null
     ) {
     }
 
@@ -662,6 +663,8 @@ final class AuthService
                 if ($this->companies === null) throw new RuntimeException('Company registration is unavailable.');
                 $this->companies->register((int)$user['id'], $email, (string)$reg['company_name'], EmailAddress::domain($email));
             }
+            // A message to the owner's Telegram (owner, 2026-11-05), the same whether the account is held or not.
+            $this->ownerMessages?->registered((int)$user['id'], $email, trim(((string)($reg['first_name'] ?? '')) . ' ' . ((string)($reg['last_name'] ?? ''))), is_string($reg['residence_country'] ?? null) ? $reg['residence_country'] : null);
             $signup = is_array($context['signup'] ?? null) ? $context['signup'] : [];
             $held = $this->needsApproval($email, $signup);
             if (isset($signup['attempt_id'])) $this->signups?->complete((int) $signup['attempt_id'], (int) $user['id'], $held);

@@ -15,6 +15,9 @@
    - in Course Modules only the section the reader is in starts open: none on the course introduction or a part in no
      section, the next one as the reader moves into it, and any section opened or closed by hand with its arrow, without
      a new page (owner, 2026-11-02), on a phone and without JavaScript too;
+   - practice says how the last answer went too, with one button to the result; a result has nothing beside its report
+     and ends with its way on: Assessment options alone after practice, with Next after a graded attempt, with Course
+     overview after the last stop, and the final's page says the course's result (owner, 2026-11-05);
    - nothing scrolls sideways and no script errors.
    Fixture: php tests/Browser/reader-preview-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -128,7 +131,86 @@ async function visitorSections(page, at) {
     check(`${at}: nothing scrolls sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 }
 
+/* The end of an assessment (owner, 2026-11-05): practice says how the last answer went too, before the result, and a
+   result's way on is at the bottom of the page, after the question report, with nothing beside the report. */
+const rowLabels = (page) => page.locator('.cl-course-item-paging a').evaluateAll((links) => links.map((a) => a.textContent.trim()));
+
+async function resultPage(page, at, what) {
+    check(`${at}: ${what} has nothing beside the report`, await page.locator('.cl-course-item aside').count() === 0);
+    check(`${at}: ${what} ends with its way on, after the question report`, await page.locator('.cl-course-item').evaluate((article) => {
+        const row = article.querySelector('#cl-course-item-paging'); const report = [...article.querySelectorAll('h2')].find((h) => h.textContent.includes('Question report'));
+        return row !== null && report !== undefined && Boolean(report.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) && !row.nextElementSibling;
+    }));
+    const apart = await page.locator('.cl-result-score').first().evaluate((score) => score.children[1].getBoundingClientRect().left - score.children[0].getBoundingClientRect().right);
+    check(`${at}: ${what} keeps the score and the grade apart`, apart >= 8, String(apart));
+    const words = await page.locator('.cl-course-item').innerText();
+    check(`${at}: ${what} says its times in words`, !/\d\d:\d\d:\d\d/.test(words) && !/\b1 seconds\b/.test(words), words.match(/Total time.*/)?.[0] ?? '');
+}
+
+async function practice(page, at) {
+    await press(page, page.locator('button:has-text("Start practice assessment")'));
+    const told = [];
+    for (let turn = 0; turn < 8 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Wrong\s*$/}).locator('input').check();
+        await press(page, page.locator('button:has-text("Submit answer")'));
+        told.push(await page.getByText('Not correct.').count());
+    }
+    check(`${at}: practice says after every answer, the last too, that it was not correct`, told.length >= 1 && told.every((count) => count === 1), told.join(','));
+    const notCorrect = await page.locator('.cl-ui-notice', {hasText: 'Not correct.'}).first().evaluate((note) => getComputedStyle(note).backgroundColor);
+    check(`${at}: "Not correct." shows in its own colour, not plain white (owner, 2026-11-05)`, notCorrect === 'rgb(251, 223, 148)', notCorrect);
+    check(`${at}: the last answer's feedback comes before the result, with no question, timer or Finish left`, !/\/result(\?|$)/.test(page.url()) && await page.getByText('Question report').count() === 0
+        && await page.locator('button:has-text("Submit answer")').count() === 0 && await page.locator('.cl-countdown').count() === 0 && await page.locator('button:has-text("Finish assessment now")').count() === 0, page.url());
+    const onward = await rowLabels(page);
+    check(`${at}: and its one button goes on to the result`, onward.length === 1 && onward[0].includes('View my result'), onward.join(' | '));
+    await press(page, page.locator('.cl-course-item-paging-next a'));
+    check(`${at}: View my result opens the result`, /\/result(\?|$)/.test(page.url()) && await page.getByText('Question report').count() === 1, page.url());
+    await resultPage(page, at, 'a practice result');
+    const row = await rowLabels(page);
+    check(`${at}: a practice result has one button, Assessment options`, row.length === 1 && row[0].includes('Assessment options') && await page.locator('.cl-course-item a:has-text("Course overview")').count() === 0, row.join(' | '));
+    await press(page, page.locator('.cl-course-item-paging-next a'));
+    check(`${at}: it leads to the start page, to take the graded assessment`, await page.locator('button:has-text("Start graded assessment")').count() === 1, page.url());
+    await press(page, page.locator('button:has-text("Start practice assessment")'));
+    for (let turn = 0; turn < 8 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Wrong\s*$/}).locator('input').check();
+        const last = (await badge(page)).replace(/^Question (\d+) of (\d+)$/, '$1') === (await badge(page)).replace(/^Question (\d+) of (\d+)$/, '$2');
+        await press(page, last ? page.locator('button:has-text("Skip for now")') : page.locator('button:has-text("Submit answer")'));
+        if (last) break;
+    }
+    for (let turn = 0; turn < 8 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Wrong\s*$/}).locator('input').check();
+        await press(page, page.locator('button:has-text("Submit answer")'));
+    }
+    check(`${at}: a skipped question comes back, and answering it still says how it went`, !/\/result(\?|$)/.test(page.url()) && await page.getByText('Not correct.').count() === 1, page.url());
+}
+
+/* In a course with a stop after the assessment (the author's preview walks the whole course): Next goes on; the final,
+   the last stop, goes back to the course. */
+async function gradedWayOn(page, at) {
+    await page.goto(learn(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
+    await press(page, page.locator('button:has-text("Start graded assessment")'));
+    for (let turn = 0; turn < 6 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Correct\s*$/}).locator('input').check();
+        await press(page, page.locator('button:has-text("Submit answer")'));
+    }
+    await resultPage(page, at, 'a graded module result');
+    check(`${at}: a graded module result has Assessment options and Next`, (await rowLabels(page)).join(' | ').replace(/\s+/g, ' ').match(/Assessment options.*\|.*Next/) !== null, (await rowLabels(page)).join(' | '));
+    await press(page, page.locator('.cl-course-item-paging-next a'));
+    check(`${at}: Next goes to the next part`, page.url().includes(`/item/${state.second_module}/`), page.url());
+    await page.goto(learn(`${state.final_node}/assessment/${state.final_key}`), {waitUntil: 'load'});
+    await press(page, page.locator('button:has-text("Start graded assessment"), button:has-text("Start assessment")').first());
+    for (let turn = 0; turn < 6 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Correct\s*$/}).locator('input').check();
+        await press(page, page.locator('button:has-text("Submit answer")'));
+    }
+    await resultPage(page, at, "the final assessment's result");
+    const result = await page.locator('[data-course-result]').innerText();
+    check(`${at}: the final's page says the course's result beside this assessment's`, await page.getByText('This assessment', {exact: true}).count() === 1 && /Your course result/.test(result) && /Half comes from your module assessments \(100%\) and half from your final assessment \(100%\)/.test(result), result);
+    check(`${at}: the final, the last stop, has Assessment options and Course overview`, (await rowLabels(page)).join(' | ').replace(/\s+/g, ' ').match(/Assessment options.*\|.*Course overview/) !== null, (await rowLabels(page)).join(' | '));
+}
+
 async function visitorAssessment(page, at) {
+    await page.goto(`${base}/courses/${state.slug}/preview`, {waitUntil: 'load'});
+    check(`${at}: a visitor reads the course's introduction, as a learner does`, await page.getByText('How this course relates to its exam').count() === 1);
     await page.goto(pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
     check(`${at}: the start page offers practice and graded`, await page.locator('button:has-text("Start practice assessment")').count() === 1 && await page.locator('button:has-text("Start graded assessment")').count() === 1);
     const before = await progress(page);
@@ -149,11 +231,9 @@ async function visitorAssessment(page, at) {
     check(`${at}: it ends on the result page with its question report`, /\/result(\?|$)/.test(page.url()) && await page.getByText('Question report').count() === 1 && (await page.locator('.cl-result-score strong').innerText()).trim() === '100%');
     const after = await progress(page);
     check(`${at}: the finished assessment ticks its part`, await ticked(page, state.assessment_node) === 1 && before && after && after.done === before.done + 1, JSON.stringify({before, after}));
+    await resultPage(page, at, 'a graded result');
     await page.goto(pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
-    await press(page, page.locator('button:has-text("Start practice assessment")'));
-    await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Wrong\s*$/}).locator('input').check();
-    await press(page, page.locator('button:has-text("Submit answer")'));
-    check(`${at}: practice says at once that an answer was not correct`, await page.getByText('Not correct.').count() === 1);
+    await practice(page, at);
     await page.goto(pub(`${state.readiness_node}/assessment/${state.readiness_key}`), {waitUntil: 'load'});
     await press(page, page.locator('button:has-text("Start diagnostic")'));
     for (let turn = 0; turn < 4 && /\/preview\/assessment\/[0-9a-f-]+(\?|$)/.test(page.url()); turn++) {
@@ -198,6 +278,7 @@ async function run(browserType, name) {
     await row(student, `${name} student preview, an assessment`, learn(`${state.assessment_node}/assessment/${state.assessment_key}`), {previous: true, next: true, complete: false});
     await row(student, `${name} student preview, the course page`, `${base}/learn/${state.slug}?preview=1`, {next: true});
     await studentSections(student, name);
+    await gradedWayOn(student, `${name} student preview`);
 
     // The public preview, as a visitor who is not signed in.
     const visitor = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'})).newPage());
@@ -225,6 +306,8 @@ async function run(browserType, name) {
         await press(plain, plain.locator('button:has-text("Submit answer")'));
     }
     check(`${name} without JavaScript: the assessment runs to its result`, await plain.getByText('Question report').count() === 1);
+    await plain.goto(pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {waitUntil: 'load'});
+    await practice(plain, `${name} without JavaScript`);
 
     check(`${name}: no script errors`, errors.length === 0, errors.join(' | '));
     await browser.close();

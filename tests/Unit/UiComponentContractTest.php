@@ -221,7 +221,7 @@ final class UiComponentContractTest extends TestCase
     public function testEveryCourseItemPageComposesTheSameCoreArticleLayout(): void
     {
         $templates = self::templates();
-        foreach (['learn-item', 'course-public-preview-item', 'assessment-overview', 'assessment-question', 'assessment-session-result'] as $page) {
+        foreach (['learn-item', 'course-public-preview-item', 'assessment-overview', 'assessment-question', 'assessment-last-answer', 'assessment-session-result'] as $page) {
             $source = $templates['resources/views/pages/' . $page . '.html.twig'];
             self::assertStringContainsString("extends '@platform/layout/course-item.html.twig'", $source, $page . ' must use the standard Course Item page construction.');
             self::assertStringContainsString('block course_item_body', $source, $page . ' must render inside the standard Course Item article.');

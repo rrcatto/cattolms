@@ -24,6 +24,7 @@ final class ComponentGalleryContractTest extends TestCase
         self::assertStringContainsString('aria-valuenow="0"', $html);
         self::assertStringContainsString('aria-valuenow="45"', $html);
         self::assertStringContainsString('aria-valuenow="100"', $html);
+        self::assertStringNotContainsString('/courses/tag/sample', $html, 'The sample tag must not open a tag that does not exist.');
     }
     public function testGalleryIsARegisteredSystemSectionWithSystemPermission(): void
     {

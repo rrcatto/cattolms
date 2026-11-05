@@ -29,7 +29,9 @@
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true})} %}{% block control %}<input class="cl-input" id="list-name" name="name" maxlength="120" required value="{{ own.name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}>{{ own.description }}</textarea>{% endblock %}{% endembed %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show it on everyone\'s My Subscriptions page', help: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'})} %}{% block control %}<input type="checkbox" name="shown" value="1"{{ own.shown ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'My Subscriptions', legend_hidden: true, size: 'small', selected: own.shown ? ['shown'] : [], items: [
+					{value: 'shown', label: 'Show it on everyone\'s My Subscriptions page', icon: lucide('eye'), note: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'},
+				]}) }}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 			</form>
 		{% endblock %}{% endembed %}
@@ -54,8 +56,10 @@
 			{{ ui('layout.section-head', {heading: 'Welcome email', summary: 'Sent once to each person the moment they join, never again if they leave and come back.'}) }}
 			<form action="/mailing/lists/{{ list.id }}/welcome" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Off: nothing is sent when someone joins'})} %}{% block control %}<input type="radio" name="on" value="0"{{ not welcome or welcome.status != 'sending' ? ' checked' : '' }}>{% endblock %}{% endembed %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'On: send a welcome email the moment someone joins'})} %}{% block control %}<input type="radio" name="on" value="1"{{ welcome and welcome.status == 'sending' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{{ ui('form.picture-choice', {name: 'on', legend: 'Welcome email', legend_hidden: true, size: 'small', selected: (welcome and welcome.status == 'sending') ? 1 : 0, items: [
+					{value: 0, label: 'Off', icon: lucide('mail'), note: 'Nothing is sent when someone joins.'},
+					{value: 1, label: 'On', icon: lucide('mail-check'), note: 'Send a welcome email the moment someone joins.'},
+				]}) }}
 				<div class="cl-mailing-choices">
 					{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}
 					{% if not welcome %}{{ ui('action.button', {label: 'Switch it on and write it', variant: 'secondary', size: 'small', type: 'submit', name: 'write', value: '1', icon: 'action-edit'}) }}{% endif %}

@@ -28,7 +28,9 @@ use CattoLearning\Course\CourseFile;
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CoursePortabilityService;
 use CattoLearning\Course\CourseRepository;
+use CattoLearning\Course\ResourceLibraryService;
 use CattoLearning\Infrastructure\Persistence\Database;
+use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\SpecificationExample;
 use PHPUnit\Framework\TestCase;
@@ -78,6 +80,28 @@ final class CourseFileIntegrationTest extends TestCase
         );
     }
 
+    public function testWhatTheCoursePageSaysComesBackFromTheFile(): void
+    {
+        $courseId = $this->import(SpecificationExample::html(), 'example.html');
+        $course = $this->container->get(\CattoLearning\Course\CourseRepository::class);
+        $service = $this->container->get(\CattoLearning\Course\CourseService::class);
+        $words = '<p>Why you would buy it.</p><h3>The exam it prepares you for</h3><table><thead><tr><th>Domain</th></tr></thead><tbody><tr><td>Planning</td></tr></tbody></table>';
+        $service->updateCourse($courseId, ['description_html' => $words], (int) $course->findById($courseId)['created_by_user_id']);
+        $html = $this->container->get(CourseFile::class)->fromCourse($courseId)['html'];
+        self::assertStringContainsString('<details class="course-description">', $html, 'The file holds it, closed.');
+        $again = $this->import(str_replace(['content="GDN-101"', '<h1>Growing Vegetables in Small Spaces</h1>'], ['content="GDN-103"', '<h1>Growing Vegetables Three</h1>'], $html), 'again.html');
+        $back = $course->findById($again);
+        self::assertStringContainsString('The exam it prepares you for', (string) $back['description_html'], 'Importing the file gives it back.');
+        self::assertStringContainsString('<td>Planning</td>', (string) $back['description_html']);
+        self::assertStringNotContainsString('course-description', (string) $back['introduction_html'], 'and it is not in the introduction as well.');
+    }
+
+    public function testACourseWhosePageSaysOnlyItsSummaryHasNoSuchPanel(): void
+    {
+        $courseId = $this->import(SpecificationExample::html(), 'example.html');
+        self::assertStringNotContainsString('course-description', $this->container->get(CourseFile::class)->fromCourse($courseId)['html']);
+    }
+
     public function testACourseThatStartsAtModuleZeroKeepsItsNumbering(): void
     {
         $html = str_replace(['id="mod-m1"', 'data-deck="m1"', 'data-cards="m1"', 'data-quiz="m1"', 'data-key="m1"', '"m1": [', '"m1": {'], ['id="mod-m0"', 'data-deck="m0"', 'data-cards="m0"', 'data-quiz="m0"', 'data-key="m0"', '"m0": [', '"m0": {'], SpecificationExample::html());
@@ -86,6 +110,90 @@ final class CourseFileIntegrationTest extends TestCase
         $file = $this->container->get(CourseFile::class)->fromCourse($courseId)['html'];
         self::assertStringContainsString('<section class="module" id="mod-m0"', $file);
         self::assertStringContainsString('<span class="num">00</span>', $file);
+    }
+
+    public function testAFileNamesItsFilesAndItsFinalsTimeLimitAndTheyComeBack(): void
+    {
+        // Owner, 2026-11-05: "it's not about stuffing them all into html files", and yes to a course file carrying them.
+        $courseId = $this->import(SpecificationExample::html(), 'example.html');
+        $items = $this->container->get(CourseItemService::class);
+        $resources = $this->container->get(ResourceLibraryService::class);
+        $suffix = bin2hex(random_bytes(4));
+        $names = ['evidence-' . $suffix . '.pdf', 'records-' . $suffix . '.xlsx'];
+        $pdf = $resources->install(Uuid::v4(), $names[0], "%PDF-1.4\n", ['title' => 'Evidence ' . $suffix, 'resource_type' => 'pdf'], $this->admin);
+        $sheet = $resources->install(Uuid::v4(), $names[1], 'PK', ['title' => 'Records ' . $suffix, 'resource_type' => 'document'], $this->admin);
+        try {
+            $section = $items->addSection($courseId, ['title' => 'Case files', 'introduction_html' => '<p>Use these.</p>'], $this->admin);
+            $items->createAndPlace($courseId, ['item_key' => 'evidence-' . $suffix, 'item_type' => 'pdf', 'title' => 'Evidence pack', 'description_html' => '<p>Specimens to read.</p>', 'resource_id' => (string) $pdf, 'parent_node_id' => (string) $section], $this->admin);
+            $items->createAndPlace($courseId, ['item_key' => 'records-' . $suffix, 'item_type' => 'downloadable_file', 'title' => 'Records', 'description_html' => '<p>Work in your own copy.</p>', 'resource_id' => (string) $sheet, 'parent_node_id' => (string) $section], $this->admin);
+            $this->db->executeStatement("UPDATE course_item_assessments a SET time_limit_seconds = 5400 FROM course_item_placements p WHERE p.course_item_id = a.course_item_id AND p.course_id = :course AND p.assessment_role = 'final'", ['course' => $courseId]);
+
+            $file = $this->container->get(CourseFile::class)->fromCourse($courseId);
+            self::assertSame([], $file['left_out'], 'The file has room for the section of files.');
+            $html = $file['html'];
+            self::assertStringContainsString('<meta name="cattolms:final-time-limit" content="90">', $html);
+            self::assertSame(1, substr_count($html, 'class="course-files"'));
+            self::assertStringContainsString('<li><a href="' . $names[0] . '">Evidence pack</a> Specimens to read.</li>', $html);
+            self::assertStringNotContainsString('%PDF', $html, 'It names the file and does not hold it.');
+
+            $again = $this->import(str_replace(['content="GDN-101"', '<h1>Growing Vegetables in Small Spaces</h1>'], ['content="GDN-102"', '<h1>Growing Vegetables Again</h1>'], $html), 'again.html');
+            $top = $this->db->fetchAllAssociative('SELECT n.node_type, s.title, s.numbered FROM course_structure_nodes n LEFT JOIN course_sections s ON s.node_id = n.id WHERE n.course_id = :course AND n.parent_node_id IS NULL ORDER BY n.position', ['course' => $again]);
+            $titles = array_column(array_filter($top, static fn(array $row): bool => $row['node_type'] === 'section'), 'title');
+            self::assertSame('Case files', $titles[0] ?? null, 'The section comes back before the first module.');
+            self::assertSame([['pdf', $pdf, 'Evidence pack'], ['downloadable_file', $sheet, 'Records']], array_map(static fn(array $row): array => [$row['item_type'], (int) $row['resource_id'], $row['title']], $this->db->fetchAllAssociative(
+                'SELECT i.item_type, i.resource_id, i.title FROM course_item_placements p JOIN course_items i ON i.id = p.course_item_id JOIN course_structure_nodes n ON n.id = p.node_id WHERE p.course_id = :course AND i.resource_id IS NOT NULL ORDER BY n.position', ['course' => $again])), 'Each part is back, on the same stored file.');
+            self::assertSame(5400, (int) $this->db->fetchOne("SELECT a.time_limit_seconds FROM course_item_assessments a JOIN course_item_placements p ON p.course_item_id = a.course_item_id WHERE p.course_id = :course AND p.assessment_role = 'final'", ['course' => $again]));
+
+            $lost = (string) tempnam(sys_get_temp_dir(), 'course-file');
+            file_put_contents($lost, str_replace([$names[0], 'content="GDN-101"', '<h1>Growing Vegetables in Small Spaces</h1>'], ['nothing-here-' . $suffix . '.pdf', 'content="GDN-103"', '<h1>Growing Vegetables Three</h1>'], $html));
+            $analysis = $this->portability->stageImport(['error' => UPLOAD_ERR_OK, 'size' => filesize($lost), 'name' => 'lost.html', 'tmp_name' => $lost], $this->admin);
+            @unlink($lost);
+            self::assertNotSame([], array_filter((array) $analysis['warnings'], static fn(string $words): bool => str_contains($words, 'nothing-here-' . $suffix . '.pdf is not in the Resource Library')), 'A file the site lacks is named in the review.');
+            self::assertSame(['downloadable_file'], array_values(array_map(static fn(array $item): string => (string) $item['item_type'], array_filter((array) $analysis['course_items'], static fn(array $item): bool => !empty($item['resource_id'])))), 'And only that part is left out.');
+        } finally {
+            foreach ($names as $name) @unlink($resources->path(['filename' => $name]));
+        }
+    }
+
+    public function testACoursesStudyTimeIsWhatItsPageSaysAndTravelsInItsFile(): void
+    {
+        // Owner, 2026-11-05: the page said about 20 hours of a course that says 150.
+        $courseId = $this->import(SpecificationExample::html(), 'example.html');
+        $records = $this->container->get(CourseRepository::class);
+        $this->db->executeStatement('UPDATE courses SET estimated_minutes = 9000 WHERE id = :id', ['id' => $courseId]);
+        $structure = $this->container->get(CourseItemService::class)->availability($courseId, null, false);
+        $modules = array_values(array_filter($structure, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered'])));
+        self::assertNotSame([], $modules);
+        self::assertSame((int) (round(9000 / count($modules) / 5) * 5), (int) $modules[0]['total_minutes'], 'A learner sees each module\'s share of it too.');
+        $page = $this->container->get(\CattoLearning\Course\CoursePageView::class)->view(['estimated_minutes' => 9000, 'structure' => $structure, 'slug' => 'x'], false);
+        self::assertSame('about 150 hours', $page['total']);
+
+        $html = $this->container->get(CourseFile::class)->fromCourse($courseId)['html'];
+        self::assertStringContainsString('<meta name="cattolms:study-hours" content="150">', $html);
+        $again = $this->import(str_replace(['content="GDN-101"', '<h1>Growing Vegetables in Small Spaces</h1>'], ['content="GDN-102"', '<h1>Growing Vegetables Again</h1>'], $html), 'again.html');
+        self::assertSame(9000, (int) ($records->findById($again)['estimated_minutes'] ?? 0), 'It comes back with the course.');
+
+        // Replacing from a file that says nothing leaves what the course states.
+        $this->db->executeStatement('UPDATE courses SET estimated_minutes = 600 WHERE id = :id', ['id' => $again]);
+        $silent = (string) tempnam(sys_get_temp_dir(), 'course-file');
+        file_put_contents($silent, str_replace('<meta name="cattolms:study-hours" content="150">', '', str_replace(['content="GDN-101"', '<h1>Growing Vegetables in Small Spaces</h1>'], ['content="GDN-102"', '<h1>Growing Vegetables Again</h1>'], $html)));
+        $analysis = $this->portability->stageImport(['error' => UPLOAD_ERR_OK, 'size' => filesize($silent), 'name' => 'silent.html', 'tmp_name' => $silent], $this->admin);
+        @unlink($silent);
+        $this->portability->commitImport((string) $analysis['import_key'], 0, $this->admin, $again);
+        self::assertSame(600, (int) ($records->findById($again)['estimated_minutes'] ?? 0));
+    }
+
+    public function testACategoryThatDoesNotExistIsNotFoundAndTheCatalogueOpens(): void
+    {
+        // Owner, 2026-11-05: yes to "not found", where the whole catalogue used to show.
+        $missing = 'no-such-' . bin2hex(random_bytes(4));
+        try {
+            \CattoLearning\Tests\Support\InProcessPage::run(null, \CattoLearning\Http\Controller\CourseController::class, 'catalogue', ['slug' => $missing]);
+            self::fail('A category that does not exist is not found.');
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $notFound) {
+            self::assertStringContainsString('category', $notFound->getMessage());
+        }
+        self::assertSame(200, \CattoLearning\Tests\Support\InProcessPage::run(null, \CattoLearning\Http\Controller\CourseController::class, 'catalogue')['status'], 'The catalogue itself opens.');
     }
 
     public function testTheFilesScriptIsTheSpecificationsExampleScript(): void

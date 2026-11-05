@@ -76,6 +76,7 @@ final class PageHeadContractTest extends TestCase
         'course-public-preview-item.html.twig' => 'The public Course Presentation preview carries its own compact course header.',
         'assessment-session-result.html.twig' => 'The core-owned assessment presentation carries its own compact assessment heading.',
         'assessment-question.html.twig' => 'One question, full width, nothing else on screen.',
+        'assessment-last-answer.html.twig' => 'The core-owned assessment presentation carries its own compact assessment heading.',
     ];
 
     /**

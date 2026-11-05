@@ -51,19 +51,15 @@
             <form action="/checkout/payment" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 {% if wallet_balance_minor > 0 %}
-                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Use my wallet credit (' ~ wallet_balance_label ~ ' available)'})} %}
-{% block control %}
-<input type="checkbox" name="use_wallet" value="yes" {{ checkout.use_wallet|default(true) ? 'checked' : '' }}>
-{% endblock %}
-{% endembed %}
+                {{ ui('form.picture-choice', {multiple: true, legend: 'Wallet credit', legend_hidden: true, size: 'small', tick_value: 'yes', selected: checkout.use_wallet|default(true) ? ['use_wallet'] : [], items: [
+                    {value: 'use_wallet', label: 'Use my wallet credit (' ~ wallet_balance_label ~ ' available)', icon: lucide('wallet'), note: 'Untick it to keep your credit and pay the whole order another way.'},
+                ]}) }}
                 <p>Your wallet pays as much of the order as it holds, oldest credit first. Choose how to pay anything left.</p>
                 {% endif %}
                 {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: checkout.payment_method|default('')} %}
-                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email my invoice to ' ~ (user_email)})} %}
-{% block control %}
-<input type="checkbox" name="invoice_email" value="yes" {{ checkout.invoice_email|default(false) ? 'checked' : '' }}>
-{% endblock %}
-{% endembed %}
+                {{ ui('form.picture-choice', {multiple: true, legend: 'Invoice', legend_hidden: true, size: 'small', tick_value: 'yes', selected: checkout.invoice_email|default(false) ? ['invoice_email'] : [], items: [
+                    {value: 'invoice_email', label: 'Email my invoice to ' ~ user_email, icon: lucide('receipt'), note: 'As a PDF. An EFT order gets it with the payment details anyway.'},
+                ]}) }}
                 <p class="mt-5">Your PDF invoice will also be available in Account → COURSES → My Orders.</p>
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
@@ -99,12 +95,13 @@
                 {% for item in cart.items %}{% if item.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: item.course_id, title: item.title}]) %}{% endif %}{% endfor %}
                 {% for bundle in cart.bundles %}{% for course in bundle.courses %}{% if course.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: course.course_id, title: course.title}]) %}{% endif %}{% endfor %}{% endfor %}
                 {% if not news_subscribed|default(false) or ki_courses %}
-                <fieldset class="cl-keep-informed">
-                    <legend class="h6">Keep me informed by email</legend>
-                    {% if not news_subscribed|default(false) %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me News and Updates: new courses, offers and news about the site'})} %}{% block control %}<input type="checkbox" name="news" value="1">{% endblock %}{% endembed %}{% endif %}
-                    {% for course in ki_courses %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me the updates written about ' ~ course.title})} %}{% block control %}<input type="checkbox" name="follow_course[]" value="{{ course.id }}">{% endblock %}{% endembed %}{% endfor %}
+                <div class="cl-keep-informed">
+                    {% if not news_subscribed|default(false) %}{{ ui('form.picture-choice', {multiple: true, legend: 'Keep me informed by email', size: 'small', selected: [], items: [
+                        {value: 'news', label: 'Send me News and Updates', icon: lucide('newspaper'), note: 'New courses, offers and news about the site.'},
+                    ]}) }}{% endif %}
+                    {% if ki_courses %}{{ ui('form.picture-choice', {multiple: true, list: 'follow_course', legend: 'Updates about what I am buying', size: 'small', selected: [], items: ki_courses|map(course => {value: course.id, label: course.title, icon: lucide('bell'), note: 'Send me the updates written about this course.'})}) }}{% endif %}
                     <p class="help">You can stop at any time under Account › My Subscriptions.</p>
-                </fieldset>
+                </div>
                 {% endif %}
                 {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
                 {% include '@platform/partials/commerce-start-acceptance.html.twig' %}

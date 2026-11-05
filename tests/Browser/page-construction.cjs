@@ -104,6 +104,8 @@ const inspect = () => {
     overflowX: document.documentElement.scrollWidth > innerWidth + 1,
     // A pagination row that does not fit its line (owner, 2026-10-21: it must not scroll on a desktop screen, 1440px).
     pagerScrolls: [...main.querySelectorAll('nav.pagination-row')].some((row) => row.getClientRects().length && row.scrollWidth > row.clientWidth + 1),
+    // A column holding words that the table's fitting left no width (a phone, with two columns whose text wraps).
+    noWidthColumns: [...main.querySelectorAll('.cl-ui-table > table > thead > tr > th')].filter((th) => th.getClientRects().length && th.textContent.trim() !== '' && !th.querySelector('.visually-hidden') && th.getBoundingClientRect().width < 16).map((th) => th.textContent.trim()),
     // A list longer than the smallest page size keeps its rows drop-down on every page size (owner, 2026-10-21: after
     // choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way to change the rows per page back down").
     pagerWithoutSizes: [...main.querySelectorAll('nav.pagination-row')].filter((row) => row.getClientRects().length)
@@ -125,6 +127,7 @@ function judge(r, label) {
     if (Math.abs(box.edges[0] - r.cardRow[0]) > 2 || Math.abs(box.edges[1] - r.cardRow[1]) > 2) failures.push(`${label}: the ${box.name} spans ${box.edges[0]}-${box.edges[1]}px, the cards ${r.cardRow[0]}-${r.cardRow[1]}px`);
   }
   if (r.overflowX) failures.push(`${label}: scrolls sideways`);
+  if (r.noWidthColumns.length) failures.push(`${label}: a table column has no width: ${r.noWidthColumns.join(', ')}`);
   if (r.pagerScrolls && r.width >= 1440) failures.push(`${label}: its pagination row scrolls sideways`);
   if (r.pagerWithoutSizes.length) failures.push(`${label}: a list of more than 25 rows without its rows drop-down: ${r.pagerWithoutSizes.join(', ')}`);
   if (r.tableSpill.length) failures.push(`${label}: stands out of its table: ${r.tableSpill.join(', ')}`);

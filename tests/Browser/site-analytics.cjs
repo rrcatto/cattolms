@@ -11,7 +11,12 @@
    - the address in use now can never be locked out from a page;
    - a lockout on the address this check comes from answers every page with the bare refusal, no cookie and no theme, and
      a webhook still gets through; when it is lifted the site answers again;
-   - Site protection saves, refuses a wrong length and resets.
+   - Site protection saves, refuses a wrong length and resets;
+   - the cards, filters and Period change the page in place, the address following, Back working, and without JavaScript the
+     same forms load a page (owner, 2026-11-05: "just change the data displayed without reloading the whole page");
+   - the pages refresh by themselves: a new request reaches the Site Log with nothing pressed, what is typed survives, it waits
+     while the reader is reading or typing, Pause holds it, a refresh is never recorded as a visit, and a visitor cannot hide
+     from the Site Log by claiming to be one; signed out meanwhile, the reader goes to sign in.
    Fixtures: section-pages-fixture.php create (an ADMIN to look with) and site-analytics-fixture.php create, then both cleanup
    (in env_php_1). */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -31,6 +36,23 @@ const check = (ok, what) => { checks++; if (!ok) failures.push(what); };
 const text = async (page) => (await page.locator('main').evaluate((main) => main.textContent)).replace(/\s+/g, ' ');
 // A form sent or a choice made, and the page it leads to.
 const go = async (page, action) => { await Promise.all([page.waitForNavigation({waitUntil: 'load'}), action()]); };
+// A choice that must change the page without loading it: the mark on the window survives only if the page did not reload.
+const inPlace = async (page, action, inAddress, what) => {
+  await page.evaluate(() => { window.__stillThisPage = true; });
+  await action();
+  await page.waitForFunction((part) => location.search.includes(part), inAddress, {timeout: 8000}).catch(() => {});
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => window.__stillThisPage === true), `${what} changes the page without reloading it`);
+  check(page.url().includes(inAddress), `${what} shows in the address`);
+};
+const refresh = async (page) => {
+  const asked = page.waitForResponse((response) => response.request().headers()['x-live-refresh'] === '1', {timeout: 8000}).catch(() => null);
+  await page.evaluate(() => document.getElementById('catto-live').dispatchEvent(new Event('catto-live-refresh')));
+  const answer = await asked;
+  await page.waitForTimeout(300);
+  return answer;
+};
 const pages = {
   overview: '/admin/site-analytics', log: '/admin/site-analytics/log', flagged: '/admin/site-analytics/flagged',
   address: '/admin/site-analytics/address/198.51.100.23', lockouts: '/admin/site-analytics/lockouts', protection: '/admin/site-analytics/protection',
@@ -79,15 +101,22 @@ async function signedIn(browser, options = {}) {
   check(await page.locator('.cl-site-chart-column').count() >= 7, 'the Overview draws a column for each day');
   const stats = await page.locator('a.cl-ui-stat-link').evaluateAll((links) => links.map((a) => a.getAttribute('href')));
   check(stats.length >= 5 && stats.some((href) => href.includes('/flagged')) && stats.some((href) => href.includes('/lockouts')) && stats.some((href) => href.includes('/log')), 'each figure opens what it counts');
-  await go(page, () => page.selectOption('#site-period', 'today'));
-  check(page.url().includes('period=today'), 'choosing a period shows it at once');
+  await inPlace(page, () => page.selectOption('#site-period', 'today'), 'period=today', 'choosing a period');
+  check(await page.inputValue('#site-period') === 'today', 'the period chosen stays chosen');
 
   await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
   main = await text(page);
   for (const words of ['All requests', 'People signed in', 'Other people', 'Automated', 'Not found', 'Refused', 'Flagged']) check(main.includes(words), `the Site Log has a card for ${words}`);
   check(main.includes('GET /m/u/••••') && !main.includes('0123456789abcdef'), 'a secret in an address is written as ••••');
-  await go(page, () => page.locator('#site-log-kinds input[value="missing"]').check({force: true}));
+  await page.evaluate(() => window.scrollTo(0, 120));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await inPlace(page, () => page.locator('#site-log-kinds input[value="missing"]').check({force: true}), 'kind=missing', 'a kind of request card');
   check(page.url().includes('kind=missing'), 'a card chooses its list');
+  check(await page.evaluate(() => window.scrollY) === scrolled, 'choosing a card does not move the page');
+  check(await page.locator('.cl-main').count() === 1 && await page.locator('#site-log-kinds input[value="missing"]').isChecked(), 'the page holds one main area, with the card chosen');
+  await page.waitForTimeout(1200);
+  check(sql(`SELECT is_page FROM site_requests WHERE path LIKE '/admin/site-analytics/log%' ORDER BY id DESC LIMIT 1`).trim() === 't', 'a page changed in place still counts as a page');
+  check(await page.locator('form:has(#site-log-period) input[name="kind"]').inputValue() === 'missing', 'the filters follow the card');
   check(await page.locator('tr[data-site-request]').count() > 0 && (await text(page)).includes('404 Not found') && !(await text(page)).includes('200 Shown'), 'Not found lists only what was not found');
   await page.goto(`${base}/admin/site-analytics/log?kind=missing&sitelog_q=198.51.100.23`, {waitUntil: 'load'});
   check(await page.inputValue('#sitelog-search-input') === '198.51.100.23', 'the search box holds what is searched for');
@@ -97,7 +126,110 @@ async function signedIn(browser, options = {}) {
   await page.fill('#sitelog-search-input', '203.0.113.57');
   await page.waitForFunction(() => { const rows = [...document.querySelectorAll('tr[data-site-request]')]; return rows.length > 0 && rows.every((row) => row.textContent.includes('203.0.113.57')); }, null, {timeout: 8000}).then(() => check(true, ''), () => check(false, 'typing in the search box narrows the list in place'));
 
+  // Back returns to the list before, and the filters change the list in place too.
+  await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  await inPlace(page, () => page.locator('#site-log-kinds input[value="bot"]').check({force: true}), 'kind=bot', 'a second card');
+  await inPlace(page, () => page.locator('#site-log-kinds input[value="missing"]').check({force: true}), 'kind=missing', 'a third card');
+  await page.goBack();
+  await page.waitForFunction(() => location.search.includes('kind=bot'), null, {timeout: 8000}).catch(() => {});
+  await page.waitForTimeout(400);
+  check(page.url().includes('kind=bot') && await page.locator('#site-log-kinds input[value="bot"]').isChecked(), 'Back returns to the list before');
+  await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  await page.selectOption('#site-log-country', 'NL');
+  await inPlace(page, () => page.locator('form:has(#site-log-period) button[type=submit]').click(), 'country=NL', 'Filter');
+  check(await page.inputValue('#site-log-country') === 'NL', 'the filter chosen stays chosen');
+
+  // By itself: a new request reaches the Site Log with nothing pressed (the real timer), and the cards count it.
+  await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  check(await page.locator('#catto-live').isVisible(), 'the page says it updates by itself');
+  const watched = `/live-check-${Date.now()}`;
+  const allBefore = await page.locator('#site-log-kinds label').first().innerText();
+  await page.evaluate(() => { window.__stillThisPage = true; });
+  const stranger = await browser.newContext({ignoreHTTPSErrors: true});
+  await stranger.request.get(`${base}${watched}`);
+  await page.waitForFunction((path) => document.querySelector('.cl-main').textContent.includes(path), watched, {timeout: 24000}).catch(() => {});
+  check((await text(page)).includes(watched), 'a new request appears in the Site Log with nothing pressed');
+  check(await page.evaluate(() => window.__stillThisPage === true), 'it appears without the page reloading');
+  check(await page.locator('#site-log-kinds label').first().innerText() !== allBefore, 'the card counts it');
+
+  // A refresh is not a visit, and claiming to be one hides nobody.
+  const logged = (path) => Number(sql(`SELECT count(*) FROM site_requests WHERE path LIKE '${path}%'`).trim());
+  await page.waitForTimeout(1500);
+  const refreshesBefore = logged('/admin/site-analytics/log');
+  await refresh(page); await refresh(page); await refresh(page);
+  await page.waitForTimeout(1500);
+  check(logged('/admin/site-analytics/log') === refreshesBefore, 'a page refreshing itself adds nothing to the Site Log');
+  const forged = `/live-forged-${Date.now()}`;
+  await stranger.request.get(`${base}${forged}`, {headers: {'X-Live-Refresh': '1', 'HX-Request': 'true'}});
+  await page.waitForTimeout(800);
+  check(logged(forged) === 1, 'a visitor claiming to be a refresh is still in the Site Log');
+  await stranger.close();
+  const forgedPage = `/help?live-forged=${Date.now()}`;
+  await context.request.get(`${base}${forgedPage}`, {headers: {'X-Live-Refresh': '1', 'HX-Request': 'true'}});
+  await page.waitForTimeout(800);
+  check(logged('/help') > 0, 'a signed-in reader claiming one on an ordinary page is still in the Site Log');
+  sql(`DELETE FROM site_requests WHERE path LIKE '/live-check-%' OR path LIKE '/live-forged-%'`);
+
+  // What is typed survives a refresh, and it waits while the reader is busy.
+  await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  await page.selectOption('#site-log-period', 'dates');
+  await page.fill('#site-log-from', '2026-01-02');
+  await page.locator('#site-log-kinds legend, h1').first().click();
+  check(await page.evaluate(() => window.cattoLive.mayRefresh()), 'it refreshes when the reader is doing nothing');
+  await refresh(page);
+  check(await page.inputValue('#site-log-period') === 'dates' && await page.inputValue('#site-log-from') === '2026-01-02', 'filters chosen but not yet sent survive a refresh');
+  // A drop-down keeps the focus after a choice, and must not stop the page refreshing until the reader clicks elsewhere.
+  await page.selectOption('#site-log-country', {index: 1});
+  const countryChosen = await page.inputValue('#site-log-country');
+  await page.focus('#site-log-country');
+  check(await page.evaluate(() => window.cattoLive.mayRefresh()), 'a drop-down left in focus does not stop it refreshing');
+  await refresh(page);
+  check(await page.inputValue('#site-log-country') === countryChosen, 'a choice in a drop-down, not yet sent, survives a refresh while it has the focus');
+  await page.focus('#sitelog-search-input');
+  check(!await page.evaluate(() => window.cattoLive.mayRefresh()), 'it waits while the reader is typing');
+  await page.locator('h1').first().click();
+  await page.evaluate(() => { const range = document.createRange(); range.selectNodeContents(document.querySelector('h1')); getSelection().removeAllRanges(); getSelection().addRange(range); });
+  check(!await page.evaluate(() => window.cattoLive.mayRefresh()), 'it waits while text is selected');
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await page.goto(`${base}/admin/site-analytics/log?sitelog_page=2`, {waitUntil: 'load'});
+  check(!await page.evaluate(() => window.cattoLive.mayRefresh()), 'it waits on a later page, whose rows would otherwise move');
+  await page.goto(`${base}/admin/site-analytics/lockouts`, {waitUntil: 'load'});
+  await page.fill('#add-target', '198.51.100.99');
+  await page.fill('#add-why', 'typed and not yet sent');
+  await page.locator('h1').first().click();
+  await refresh(page);
+  check(await page.inputValue('#add-target') === '198.51.100.99' && await page.inputValue('#add-why') === 'typed and not yet sent', 'a lockout typed and not yet sent survives a refresh');
+
+  // Pause holds it, across a change of list.
+  await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  await page.click('#live-pause');
+  check(!await page.evaluate(() => window.cattoLive.mayRefresh()) && await page.locator('#live-resume').isVisible() && !await page.locator('#live-pause').isVisible(), 'Pause holds the page and offers Resume');
+  await inPlace(page, () => page.locator('#site-log-kinds input[value="bot"]').check({force: true}), 'kind=bot', 'a card while paused');
+  check(!await page.evaluate(() => window.cattoLive.mayRefresh()) && await page.locator('#live-resume').isVisible(), 'it stays paused after a change of list');
+  await page.click('#live-resume');
+  check(await page.evaluate(() => window.cattoLive.mayRefresh()) && await page.locator('#live-pause').isVisible(), 'Resume starts it again');
+
+  // Signed out meanwhile: to sign in, not an empty page.
+  const leaving = await signedIn(browser);
+  const leavingPage = await leaving.newPage();
+  await leavingPage.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
+  await leaving.clearCookies();
+  const toSignIn = leavingPage.waitForURL(/\/login/, {timeout: 8000}).then(() => true).catch(() => false);
+  await leavingPage.evaluate(() => document.getElementById('catto-live').dispatchEvent(new Event('catto-live-refresh')));
+  check(await toSignIn, 'signed out meanwhile, a refresh goes to sign in');
+  await leaving.close();
+
+  // The other pages change in place and refresh themselves.
+  await page.goto(`${base}/admin/site-analytics/lockouts`, {waitUntil: 'load'});
+  await inPlace(page, () => page.locator('#site-lockout-kinds input[value="ended"]').check({force: true}), 'show=ended', 'a Lockouts card');
+  check(await refresh(page) !== null, 'Lockouts refreshes itself');
+  await page.goto(`${base}/admin/site-analytics`, {waitUntil: 'load'});
+  check(await refresh(page) !== null && await page.locator('#site-on-now').count() === 1, 'the Overview refreshes itself, the people on the site with it');
+  await page.goto(`${base}/admin/site-analytics/address/198.51.100.23`, {waitUntil: 'load'});
+  check(await refresh(page) !== null, 'an address page refreshes itself');
+
   await page.goto(`${base}/admin/site-analytics/flagged`, {waitUntil: 'load'});
+  check(await refresh(page) !== null, 'Flagged Activity refreshes itself');
   main = await text(page);
   check(main.includes('Asked for 22 pages that do not exist in 10 minutes.'), 'Flagged Activity says why in plain words');
   check(main.includes('Forms refused') && main.includes('seo-offers@example.com'), 'Forms refused lists them with the address typed');
@@ -198,6 +330,7 @@ async function signedIn(browser, options = {}) {
   await plainPage.locator('#site-log-kinds input[value="bot"]').check({force: true});
   await go(plainPage, () => plainPage.locator('form.cl-library-lists button[type=submit]').click());
   check(plainPage.url().includes('kind=bot'), 'without JavaScript a card still chooses its list');
+  check(await plainPage.locator('#catto-live').count() === 1 && !await plainPage.locator('#catto-live').isVisible(), 'without JavaScript the page does not claim to update by itself');
   await plainPage.goto(`${base}/admin/site-analytics/address/198.51.100.23`, {waitUntil: 'load'});
   check((await text(plainPage)).includes('Lift this lockout'), 'without JavaScript the address page still works');
   await plain.close();
@@ -249,4 +382,4 @@ async function signedIn(browser, options = {}) {
   await browser.close();
   console.log(JSON.stringify({checks, failures}, null, 2));
   process.exit(failures.length ? 1 : 0);
-})().catch((error) => { console.error(error); process.exit(1); });
+})().catch((error) => { console.error(error); console.log(JSON.stringify({checks, failures}, null, 2)); process.exit(1); });

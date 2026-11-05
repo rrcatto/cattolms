@@ -24,6 +24,16 @@ final class FeedbackComponentContractTest extends TestCase
             self::assertStringContainsString('&lt;strong&gt;', $html);
         }
     }
+    public function testASolidNoticeHasItsIconAndAnOrdinaryOneHasNeither(): void
+    {
+        $html = ComponentHarness::render('feedback.notice', ['tone' => 'warning', 'solid' => true, 'icon' => 'notice-warning']);
+        self::assertStringContainsString('cl-ui-notice--solid', $html);
+        self::assertStringContainsString('#notice-warning', $html);
+        $plain = ComponentHarness::render('feedback.notice', ['tone' => 'warning']);
+        self::assertStringNotContainsString('cl-ui-notice--solid', $plain);
+        self::assertStringNotContainsString('cl-ui-notice-icon', $plain);
+    }
+
     public function testEmptyFeedbackOmitsEmptyHeadings(): void
     {
         self::assertStringNotContainsString('<h3', ComponentHarness::render('feedback.empty', ['summary' => 'Nothing yet']));

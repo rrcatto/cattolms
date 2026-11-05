@@ -16,7 +16,8 @@
 			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate', icon: 'action-edit'}) }}{% endif %}
 			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status), icon: 'action-edit'}) }}
 			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
-			{{ ui('action.link', {label: 'Download as one HTML file', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-file', icon: 'action-download', title: 'One HTML file of the whole course: it works on its own in a browser, and importing it gives the course back'}) }}
+			{{ ui('action.link', {label: 'Download as one HTML file', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-file', icon: 'action-download', title: 'One HTML file of the whole course, without its PDFs and downloads: it works on its own in a browser, and importing it gives the course back'}) }}
+			{{ ui('action.link', {label: 'Download with its files (.zip)', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-package', icon: 'action-download', title: 'The whole course with its PDFs and downloads, which imports back at Import and Export Catalogue'}) }}
 			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import', icon: 'action-import'}) }}
 {% endblock %}
 {% endembed %}</nav>
@@ -45,14 +46,7 @@
 					{# Its tags and its cover picture (owner, 2026-10-20). #}
 					<fieldset class="cl-course-tags-choice mt-5">
 						<legend class="h6">Tags</legend>
-						{% for tag in tag_options %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: tag.name})} %}
-{% block control %}<input type="checkbox" name="tag_ids[]" value="{{ tag.id }}" {{ tag.checked ? 'checked' : '' }}>{% endblock %}
-{% block label_content %}{% if tag.icon_svg %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|raw }}</span> {% endif %}{{ tag.name }}{% endblock %}
-{% endembed %}
-						{% else %}
-							<p class="help">No tags exist yet. Create them at <a href="/admin/courses/tags">Course Tags</a>.</p>
-						{% endfor %}
+						{% if tag_options %}{{ ui('form.picture-choice', {multiple: true, list: 'tag_ids', legend: 'Tags', legend_hidden: true, size: 'small', columns: 4, selected: tag_options|filter(tag => tag.checked)|map(tag => tag.id), items: tag_options|map(tag => {value: tag.id, label: tag.name, icon: tag.icon_svg ?: lucide('tag')})}) }}{% else %}<p class="help">No tags exist yet. Create them at <a href="/admin/courses/tags">Course Tags</a>.</p>{% endif %}
 						{% if tag_options %}<p class="help">One to three tags that say what the course is about help learners find it. Tags are managed at <a href="/admin/courses/tags">Course Tags</a>.</p>{% endif %}
 						{# Says the form showed the tags, so none ticked removes them all; after the choices, never between the legend and the first. #}
 						<input type="hidden" name="tags_shown" value="1">
@@ -60,16 +54,7 @@
 					{# The courses related to it (owner, 2026-10-20): a relation is both courses', so ticking one here ticks this course on the other's form too. #}
 					<fieldset class="cl-course-related-choice mt-5">
 						<legend class="h6">Related courses</legend>
-						<div class="cl-course-related-list">
-						{% for other in related_options %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: other.title})} %}
-{% block control %}<input type="checkbox" name="related_ids[]" value="{{ other.id }}" {{ other.checked ? 'checked' : '' }}>{% endblock %}
-{% block label_content %}{{ other.title }}{% if other.status != 'published' %} <small class="cl-text-muted">({{ other.status }})</small>{% endif %}{% endblock %}
-{% endembed %}
-						{% else %}
-							<p class="help">There is no other course yet.</p>
-						{% endfor %}
-						</div>
+						{% if related_options %}{{ ui('form.picture-choice', {multiple: true, list: 'related_ids', legend: 'Related courses', legend_hidden: true, size: 'small', selected: related_options|filter(other => other.checked)|map(other => other.id), items: related_options|map(other => {value: other.id, label: other.title, icon: lucide('book-open'), note: other.status != 'published' ? other.status|capitalize : ''})}) }}{% else %}<p class="help">There is no other course yet.</p>{% endif %}
 						{% if related_options %}<p class="help">Related courses are shown on this course's page, and this course on theirs: relating a course here relates it both ways.</p>{% endif %}
 						{# Says the form showed the related courses, so none ticked removes them all; after the choices, never between the legend and the first. #}
 						<input type="hidden" name="related_shown" value="1">
@@ -144,17 +129,7 @@
 						   the first 50 people was handed to someone else on save, and editors not shown were dropped). #}
 						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'owner_company_id', lk_type: 'companies', lk_label: 'Owning company', lk_selected: owner_company_selected, lk_required: 0, lk_empty: 'No company: the Site Owner'} %}
 						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'owner_user_id', lk_type: 'people', lk_label: 'Owning person', lk_selected: owner_person_selected, lk_required: 1, lk_empty: 'Nobody selected'} %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Editors', full_width: true, help: course.editors ? 'Untick someone to take them off this course.' : 'Nobody edits this course yet.'})} %}
-{% block control %}
-							<div class="editor-choice-grid">
-								{% for editorPerson in course.editors %}
-									{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: ((editorPerson.first_name ~ ' ' ~ editorPerson.last_name)|trim ?: editorPerson.display_name) ~ ' · ' ~ editorPerson.email ~ (editorPerson.company_name ? ' · ' ~ editorPerson.company_name : '')})} %}
-{% block control %}<input type="checkbox" name="editor_user_ids[]" value="{{ editorPerson.id }}" checked>{% endblock %}
-{% endembed %}
-								{% endfor %}
-							</div>
-{% endblock %}
-{% endembed %}
+						<div class="cl-ui-field--full">{% if course.editors %}{{ ui('form.picture-choice', {multiple: true, list: 'editor_user_ids', legend: 'Course Editors', size: 'small', help: 'Untick someone to take them off this course.', selected: course.editors|map(editorPerson => editorPerson.id), items: course.editors|map(editorPerson => {value: editorPerson.id, label: (editorPerson.first_name ~ ' ' ~ editorPerson.last_name)|trim ?: editorPerson.display_name, icon: lucide('user-round'), note: editorPerson.email ~ (editorPerson.company_name ? ' · ' ~ editorPerson.company_name : '')})}) }}{% else %}<p class="help">Course Editors: nobody edits this course yet.</p>{% endif %}</div>
 						{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'editor_add_id', lk_type: 'people', lk_label: 'Add a Course Editor', lk_selected: 0, lk_required: 0, lk_empty: 'Nobody to add'} %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save owner & editors', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
@@ -261,8 +236,10 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label'})} %}
 {% block control %}<input class="cl-input" id="new-price-label" name="label" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" checked>{% endblock %}{% endembed %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Make this the default catalogue price', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_default" value="1">{% endblock %}{% endembed %}
+						<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'This price option', size: 'small', selected: ['is_active'], items: [
+							{value: 'is_active', label: 'Active', icon: lucide('circle-check'), note: 'Buyers can choose it. Untick it to keep it off sale.'},
+							{value: 'is_default', label: 'Make this the default catalogue price', icon: lucide('star'), note: 'The price on the course\'s card. Leave it unticked and the current default stays.'},
+						]}) }}</div>
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Add price option', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
@@ -414,7 +391,9 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'course-status', span: 'third'})} %}
 {% block control %}<select class="cl-select" id="course-status" name="status" {{ ui_field_attrs(props) }}>{% for state in course_states %}<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|capitalize }}</option>{% endfor %}</select>{% endblock %}
 {% endembed %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
+							<div class="cl-ui-field--two-thirds">{{ ui('form.picture-choice', {multiple: true, legend: 'Publication warnings', legend_hidden: true, size: 'small', selected: [], items: [
+								{value: 'override_publication_warnings', label: 'Override publication warnings', icon: lucide('triangle-alert'), note: 'Go ahead although warnings remain. Leave it unticked and a warning stops it.'},
+							]}) }}</div>
 							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Change status', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
@@ -426,7 +405,9 @@
 					<form action="/admin/courses/{{ course.id }}/submit-for-approval" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						{{ ui('data.key-value-list', {items: [{label: 'Current approval', value: course.publication_approval_status|capitalize}]}) }}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
+						{{ ui('form.picture-choice', {multiple: true, legend: 'Publication warnings', legend_hidden: true, size: 'small', selected: [], items: [
+								{value: 'override_publication_warnings', label: 'Override publication warnings', icon: lucide('triangle-alert'), note: 'Go ahead although warnings remain. Leave it unticked and a warning stops it.'},
+							]}) }}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Submit for approval', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}
 {% endembed %}

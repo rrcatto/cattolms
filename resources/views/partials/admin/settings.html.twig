@@ -73,6 +73,129 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {# The site notification (owner, 2026-11-05: a promotion, or a warning that the site is going offline, with a countdown if wanted). #}
+    {% if site_notification|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site notification', summary: site_notification.showing ? (site_notification.on_course_pages ? 'Showing, also while taking a course.' : 'Showing, except while taking a course.') : (site_notification.ended ? 'Its countdown has ended, so it is not showing.' : 'Not showing.'), id: 'settings-site-notification', open: settings_open_section|default('') == 'site-notification'})} %}
+{% block body %}
+
+			<p>A message at the top of the site's pages, under the demo notice, for everyone who visits: a promotion, or a warning that the site is going offline. It shows on a demo site and a live one.</p>
+			{% if can_manage_settings|default(false) %}
+			{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+			<form action="/admin/settings/site-notification" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% set notification_ticks = (site_notification.show ? ['show'] : [])|merge(site_notification.on_course_pages ? ['on_course_pages'] : []) %}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'Show it', id: 'site-notification-show', size: 'small', selected: notification_ticks, items: [
+					{value: 'show', label: 'Show this notification', icon: '<svg ' ~ icon_attributes ~ '><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>', note: 'At the top of the site\'s pages, for everyone. Untick it to hide the notification and keep its words.'},
+					{value: 'on_course_pages', label: 'Also while taking a course', icon: '<svg ' ~ icon_attributes ~ '><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>', note: 'On the lessons and assessments too. Leave it off for a promotion, and tick it for a warning learners need to see, such as the site going offline.'},
+				]}) }}
+				{# Each card is drawn in the colour of what it chooses, with its icon, and the real thing is shown under them. #}
+				{{ ui('form.picture-choice', {name: 'kind', legend: 'Kind of message', id: 'site-notification-kind', size: 'small', selected: site_notification.kind, items: [
+					{value: 'promotion', label: 'Promotion', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#166534"/><g transform="translate(4.8 4.8) scale(.6)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></g></svg>', note: 'Green, with a megaphone. For an offer or good news.'},
+					{value: 'information', label: 'Information', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#1e4e8c"/><g transform="translate(4.8 4.8) scale(.6)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></g></svg>', note: 'Blue, with an information sign. For something people should know.'},
+					{value: 'warning', label: 'Warning', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="4" fill="#f5b301"/><g transform="translate(4.8 4.8) scale(.6)" fill="none" stroke="#231700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></g></svg>', note: 'Amber, with a warning triangle. For the site going offline, or anything urgent.'},
+				]}) }}
+				<div class="cl-site-notification-samples" data-site-notification-samples>
+					<p class="cl-site-notification-samples-label">How each one looks at the top of a page</p>
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'Promotion', solid: true, icon: 'notice-promotion'})} %}{% block body %}An offer or good news looks like this.{% endblock %}{% endembed %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Information', solid: true, icon: 'notice-information'})} %}{% block body %}Something people should know looks like this.{% endblock %}{% endembed %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Warning', solid: true, icon: 'notice-warning'})} %}{% block body %}Anything urgent looks like this.{% endblock %}{% endembed %}
+				</div>
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Heading (optional)', full_width: true, for: 'site-notification-heading', help: 'Above the message. Up to ' ~ site_notification.limits.heading ~ ' characters.'})} %}
+{% block control %}<input class="cl-input" type="text" id="site-notification-heading" name="heading" value="{{ site_notification.heading }}" maxlength="{{ site_notification.limits.heading }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Message', full_width: true, for: 'site-notification-message', help: 'Plain text, up to ' ~ site_notification.limits.message ~ ' characters.'})} %}
+{% block control %}<textarea class="cl-input" id="site-notification-message" name="message" rows="3" maxlength="{{ site_notification.limits.message }}" {{ ui_field_attrs(props) }}>{{ site_notification.message }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Count down to (optional)', for: 'site-notification-ends', help: 'In the site\'s time (' ~ site_notification.zone ~ '). The count shows weeks, days, hours, minutes and seconds, and the notification goes away by itself when it reaches zero. Leave it empty for no countdown.'})} %}
+{% block control %}<input class="cl-input" type="datetime-local" id="site-notification-ends" name="ends_at" value="{{ site_notification.ends_at_local }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Words before the countdown (optional)', for: 'site-notification-words', help: 'For example, Offer ends in, or The site goes offline in. Left empty, it says ' ~ site_notification.standard_words ~ ' Up to ' ~ site_notification.limits.countdown_words ~ ' characters.'})} %}
+{% block control %}<input class="cl-input" type="text" id="site-notification-words" name="countdown_words" value="{{ site_notification.countdown_words }}" maxlength="{{ site_notification.limits.countdown_words }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save site notification', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% if site_notification.exists %}
+			<form action="/admin/settings/site-notification/remove" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Remove the notification', variant: 'danger', size: 'small', confirm: 'Remove the site notification and its words?', icon: 'action-remove'}) }}
+			</form>
+			{% endif %}
+			{% endif %}
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {# Messages to you (owner, 2026-11-05: "yes telegram, paid orders only"): a message to the owner's phone by Telegram. The key is never shown back. #}
+    {% if owner_messages|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Messages to you', summary: owner_messages.title, summary_tone: owner_messages.title_tone, id: 'settings-owner-messages', open: settings_open_section|default('') == 'owner-messages'})} %}
+{% block body %}
+
+			{% set om = owner_messages %}
+			<div class="cl-owner-messages" data-owner-messages="{{ om.state }}">
+			{% if om.state == 'connected' %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'Connected'})} %}{% block body %}<p class="mb-0" data-owner-messages-status>@{{ om.bot_name }} sends your messages to @{{ om.username }}.</p>{% endblock %}{% endembed %}
+			{% elseif om.state == 'failing' %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'Messages are not getting through'})} %}{% block body %}<p class="mb-0" data-owner-messages-status>{{ om.last_error }}{% if om.waiting %} Waiting to go: {{ om.waiting }}.{% endif %}</p>{% endblock %}{% endembed %}
+			{% elseif om.state == 'waiting' %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Not connected yet'})} %}{% block body %}<p class="mb-0" data-owner-messages-status>Telegram has not seen @{{ om.username }} yet. Open your bot, send it hello, then press Connect to Telegram again.</p>{% endblock %}{% endembed %}
+			{% else %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'neutral', heading: om.disconnected ? 'Disconnected' : 'Not connected'})} %}{% block body %}{% endblock %}{% endembed %}
+			{% endif %}
+			{% if can_manage_settings|default(false) %}
+			{% if om.state == 'none' or om.state == 'waiting' %}
+			<form action="/admin/settings/owner-messages/connect" method="post" autocomplete="off" class="cl-owner-messages">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bot key from @BotFather', for: 'owner-messages-key'})} %}
+{% block control %}<input class="cl-input" type="password" id="owner-messages-key" name="bot_key" value="" placeholder="{{ om.has_key ? 'Saved' : '123456789:AAF...' }}" autocomplete="new-password" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your personal Telegram username', for: 'owner-messages-username'})} %}
+{% block control %}<input class="cl-input" type="text" id="owner-messages-username" name="telegram_username" value="{{ om.username }}" placeholder="@your_username" maxlength="33" autocomplete="off" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				{% if owner_messages_note|default(null) %}<p class="cl-owner-messages-note cl-owner-messages-note--{{ owner_messages_note.tone }}" role="status" data-owner-messages-note>{{ owner_messages_note.words }}</p>{% endif %}
+				<div class="cl-owner-messages-actions">
+					{% if om.state == 'waiting' %}{{ ui('action.link', {label: 'Open @' ~ om.bot_name, variant: 'secondary', size: 'normal', href: 'https://t.me/' ~ om.bot_name|url_encode, new_window: true, icon: 'action-external'}) }}{% endif %}
+					{{ ui('action.button', {label: 'Connect to Telegram', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-connect'}) }}
+				</div>
+			</form>
+			{% else %}
+			<div class="cl-owner-messages-actions">
+				<form action="/admin/settings/owner-messages/test" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('action.button', {label: 'Send test message', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}
+				</form>
+				<form action="/admin/settings/owner-messages/disconnect" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('action.button', {label: 'Disconnect', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disconnect Telegram and forget the key?', icon: 'action-disconnect'}) }}
+				</form>
+				{% if owner_messages_note|default(null) %}<p class="cl-owner-messages-note cl-owner-messages-note--{{ owner_messages_note.tone }}" role="status" data-owner-messages-note>{{ owner_messages_note.words }}</p>{% endif %}
+			</div>
+			{% endif %}
+			{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+			<form action="/admin/settings/owner-messages/choices" method="post" hx-post="/admin/settings/owner-messages/choices" hx-trigger="change" hx-swap="none" data-owner-messages-choices>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {multiple: true, legend: 'Send me a message', id: 'owner-messages-events', size: 'small', selected: (om.on_register ? ['on_register'] : [])|merge(om.on_sale ? ['on_sale'] : []), items: [
+					{value: 'on_register', label: 'When someone registers', icon: '<svg ' ~ icon_attributes ~ '><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M18 8v6"/><path d="M15 11h6"/></svg>'},
+					{value: 'on_sale', label: 'When an order is paid', icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>'},
+				]}) }}
+				<noscript>{{ ui('action.button', {label: 'Save', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-save'}) }}</noscript>
+			</form>
+			{% endif %}
+			{% if can_view_telegram_log|default(false) %}<div class="cl-owner-messages-actions">{{ ui('action.link', {label: 'Telegram log', variant: 'secondary', size: 'small', href: '/admin/site-analytics/telegram-log', icon: 'action-view'}) }}</div>{% endif %}
+			</div>
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
     {# Who can sign in (owner, 2026-10-21: "disallow all non-admin logins ... a whitelist of allowed emails"). #}
     {% if sign_in|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Who can sign in', summary: sign_in.restricted ? 'Administrators and the listed addresses only.' : 'Everyone.', id: 'settings-sign-in', open: settings_open_section|default('') == 'sign-in'})} %}
@@ -339,9 +462,8 @@
 			<p>Checkout offers only the ticked methods, each named with its provider. No method collects card details on this site: a card is paid on the provider's own page. Wallet credit is not a payment method here: it can always be spent. Every change is recorded in the Activity log.</p>
 			<form action="/admin/settings/payment-methods" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% for method in payment_methods %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: method.label ~ (method.problem ? ' (cannot be ticked: ' ~ method.problem ~ ')' : '')})} %}{% block control %}<input type="checkbox" name="methods[]" value="{{ method.key }}" {{ method.ticked ? 'checked' : '' }} {{ method.problem ? 'disabled' : '' }} data-payment-method="{{ method.key }}">{% endblock %}{% endembed %}
-				{% endfor %}
+				{% set method_icons = {eft: 'landmark', card: 'credit-card', dummy: 'flask-conical'} %}
+				{{ ui('form.picture-choice', {multiple: true, list: 'methods', legend: 'Methods offered', legend_hidden: true, size: 'small', selected: payment_methods|filter(method => method.ticked)|map(method => method.key), items: payment_methods|map(method => {value: method.key, label: method.label, icon: lucide(method_icons[method.key]|default('wallet')), note: method.problem ? 'Cannot be ticked: ' ~ method.problem : '', disabled: method.problem ? true : false})}) }}
 				{% if can_manage_settings|default(false) %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save payment methods', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 				{% endif %}

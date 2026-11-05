@@ -4,15 +4,11 @@
 	frequency they choose: daily, weekly or monthly"), for My Subscriptions and the first Follow. Weekly is chosen when
 	nothing was. mh: {delivery, frequency, deliveries, frequencies, days, id}.
 #}
-<fieldset class="cl-mailing-lists">
-	<legend class="h6">Send me updates</legend>
-	{% for value, label in mh.deliveries %}
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label, help: value == 'instant' ? 'An email whenever there is news, within our sending hours.' : (value == 'per_list' ? 'A separate digest for each course, category, tag or list you follow.' : 'Everything you follow together, in one email.')})} %}{% block control %}<input type="radio" name="delivery" value="{{ value }}"{{ value == mh.delivery ? ' checked' : '' }}>{% endblock %}{% endembed %}
-	{% endfor %}
-</fieldset>
-<fieldset class="cl-mailing-lists">
-	<legend class="h6">How often a digest comes</legend>
-	{% for value, label in mh.frequencies %}
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label, help: mh.days[value] is defined ? 'It comes ' ~ mh.days[value] ~ '.' : ''})} %}{% block control %}<input type="radio" name="frequency" value="{{ value }}"{{ value == mh.frequency ? ' checked' : '' }}>{% endblock %}{% endembed %}
-	{% endfor %}
-</fieldset>
+{% set mh_notes = {instant: 'An email whenever there is news, within our sending hours.', per_list: 'A separate digest for each course, category, tag or list you follow.', combined: 'Everything you follow together, in one email.'} %}
+{% set mh_icons = {instant: 'zap', per_list: 'layers', combined: 'mails', daily: 'calendar-days', weekly: 'calendar-range', monthly: 'calendar'} %}
+<div class="cl-mailing-lists">
+	{{ ui('form.picture-choice', {name: 'delivery', legend: 'Send me updates', size: 'small', selected: mh.delivery, items: mh.deliveries|keys|map(value => {value: value, label: mh.deliveries[value], icon: lucide(mh_icons[value]|default('mail')), note: mh_notes[value]|default('')})}) }}
+</div>
+<div class="cl-mailing-lists">
+	{{ ui('form.picture-choice', {name: 'frequency', legend: 'How often a digest comes', size: 'small', selected: mh.frequency, items: mh.frequencies|keys|map(value => {value: value, label: mh.frequencies[value], icon: lucide(mh_icons[value]|default('calendar')), note: mh.days[value] is defined ? 'It comes ' ~ mh.days[value] ~ '.' : ''})}) }}
+</div>

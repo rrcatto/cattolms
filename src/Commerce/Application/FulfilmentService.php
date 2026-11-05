@@ -20,13 +20,16 @@ use RuntimeException;
  */
 final class FulfilmentService
 {
-    public function __construct(private readonly CommerceRepository $records, private readonly TransitionService $transitions, private readonly AccessService $access, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly ClockInterface $clock, private readonly CompanyCreditFulfilment $companyCredits, private readonly AnalyticsEventRecorder $analytics, private readonly PromotionService $promotions) {}
+    public function __construct(private readonly CommerceRepository $records, private readonly TransitionService $transitions, private readonly AccessService $access, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly ClockInterface $clock, private readonly CompanyCreditFulfilment $companyCredits, private readonly AnalyticsEventRecorder $analytics, private readonly PromotionService $promotions, private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null) {}
 
     /** @param array<string,mixed> $order */
     public function fulfil(array $order): bool
     {
         if ($order['state']!=='paid') throw new RuntimeException('Only a fully paid order can be fulfilled.');
         $items=$this->records->items((int)$order['id']);
+        // Paid in full, however it was paid and whatever it bought: a message to the owner's Telegram (owner, 2026-11-05: "paid
+        // orders only"). Every way an order becomes paid comes through here, and it is kept once per order, however often.
+        $this->ownerMessages?->orderPaid($order,$items);
         $this->recordPurchases($order,$items);
         // The order is paid: its promotion use is redeemed now, once, before anything can hold it for review.
         $this->promotions->redeem($order);

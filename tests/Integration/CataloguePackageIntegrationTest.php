@@ -130,6 +130,65 @@ final class CataloguePackageIntegrationTest extends TestCase
         self::assertSame("A guide.\n", $file, 'The files the courses use go in the package.');
     }
 
+    public function testReplacingACoursesContentLeavesItPublished(): void
+    {
+        $code = 'PKG-' . strtoupper(substr($this->suffix, 0, 6));
+        $zip = $this->zip($this->catalogue([$code]), [$code => $this->course($code, 'pkg-course-' . $this->suffix)], []);
+        $this->package->apply($this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin))['key'], ['prices' => true, 'publish' => true], $this->admin);
+        $before = $this->courses->findByCode($code);
+        self::assertSame('published', $before['status'] ?? null);
+
+        $zip = $this->zip($this->catalogue([$code]), [$code => $this->course($code, 'pkg-course-' . $this->suffix)], []);
+        $report = $this->package->apply($this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin))['key'], ['replace' => [$code]], $this->admin);
+        self::assertSame(1, $report['counts']['replaced'], json_encode($report['courses']) ?: '');
+        $after = $this->courses->findByCode($code);
+        self::assertSame([$before['status'], $before['publication_approval_status']], [$after['status'] ?? null, $after['publication_approval_status'] ?? null], 'Its new content does not take it out of the catalogue.');
+    }
+
+    public function testACoursesPdfAndDownloadGoOutInItsPackageAndComeBackWhole(): void
+    {
+        // Owner, 2026-11-05: "export the courses using the appropriate method and make sure the import process works with whatever you export".
+        $code = 'PKG-' . strtoupper(substr($this->suffix, 0, 6));
+        $sheet = self::uuid();
+        $pdf = self::uuid();
+        $course = $this->course($code, 'pkg-course-' . $this->suffix, $sheet);
+        $pdfKey = 'pkg-' . $this->suffix . '-evidence';
+        $course['course_items'][] = ['item_key' => $pdfKey, 'item_type' => 'pdf', 'title' => 'Evidence pack', 'description_html' => '', 'content_source' => '', 'type_config' => [], 'resource_public_id' => $pdf];
+        $course['structure'][] = ['node_key' => $pdfKey, 'parent_node_key' => null, 'position' => 3, 'node_type' => 'item', 'relative_delay_minutes' => 0, 'item_key' => $pdfKey, 'public_preview' => false, 'assessment_role' => 'content'];
+        $course['resources'][] = ['public_id' => $pdf, 'filename' => 'evidence-' . $this->suffix . '.pdf', 'original_filename' => 'evidence.pdf', 'title' => 'Evidence ' . $this->suffix, 'resource_type' => 'pdf'] + $course['resources'][0];
+        $bytes = ['guide-' . $this->suffix . '.txt' => "A workbook.\n", 'evidence-' . $this->suffix . '.pdf' => "%PDF-1.4 evidence\n"];
+        $zip = $this->zip($this->catalogue([$code]), [$code => $course], [$sheet => ['guide-' . $this->suffix . '.txt', $bytes['guide-' . $this->suffix . '.txt']], $pdf => ['evidence-' . $this->suffix . '.pdf', $bytes['evidence-' . $this->suffix . '.pdf']]]);
+        $this->package->apply($this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin))['key'], ['prices' => true, 'publish' => true], $this->admin);
+        $id = (int) ($this->courses->findByCode($code)['id'] ?? 0);
+        $resources = IntegrationContainer::get()->get(\CattoLearning\Course\ResourceLibraryService::class);
+        foreach (array_keys($bytes) as $name) $this->files[] = $resources->path(['filename' => $name]);
+
+        $out = $this->package->export($this->admin, [$id]);
+        $this->files[] = $out;
+        $archive = new ZipArchive();
+        self::assertTrue($archive->open($out) === true);
+        self::assertSame($bytes['evidence-' . $this->suffix . '.pdf'], $archive->getFromName('resources/' . $pdf . '/evidence-' . $this->suffix . '.pdf'), 'The package holds the PDF itself.');
+        self::assertSame($bytes['guide-' . $this->suffix . '.txt'], $archive->getFromName('resources/' . $sheet . '/guide-' . $this->suffix . '.txt'), 'And the file to download.');
+        $archive->close();
+
+        // A site without the course or its files, as another server is.
+        IntegrationContainer::get()->get(\CattoLearning\Course\CoursePortabilityService::class)->deleteCourse($id, $this->admin);
+        $this->db->executeStatement('DELETE FROM course_items WHERE item_key LIKE :key', ['key' => 'pkg-' . $this->suffix . '%']);
+        foreach ($this->db->fetchFirstColumn('SELECT id FROM resources WHERE public_id IN (:a, :b)', ['a' => $sheet, 'b' => $pdf]) as $resource) $resources->delete((int) $resource);
+        foreach (array_keys($bytes) as $name) self::assertFileDoesNotExist($resources->path(['filename' => $name]));
+
+        $plan = $this->package->plan($this->package->stageFile($out, 'course.zip', $this->admin));
+        self::assertSame([1, 2], [$plan['counts']['new'], $plan['files_new']], 'It is a new course here, bringing both files.');
+        $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => true], $this->admin);
+        self::assertSame([1, 0, 2], [$report['counts']['imported'], $report['counts']['failed'], $report['files_installed']], json_encode($report['courses']) ?: '');
+        $parts = array_column($this->db->fetchAllAssociative(
+            'SELECT i.item_type, r.public_id FROM course_item_placements p JOIN course_items i ON i.id = p.course_item_id JOIN resources r ON r.id = i.resource_id WHERE p.course_id = :c',
+            ['c' => (int) ($this->courses->findByCode($code)['id'] ?? 0)]
+        ), 'public_id', 'item_type');
+        self::assertSame(['downloadable_file' => $sheet, 'pdf' => $pdf], ['downloadable_file' => $parts['downloadable_file'] ?? null, 'pdf' => $parts['pdf'] ?? null], 'Each part is back, on the same file.');
+        foreach ($bytes as $name => $content) self::assertSame($content, file_get_contents($resources->path(['filename' => $name])), $name . ' is back unchanged.');
+    }
+
     public function testACourseThePackageCannotMatchIsLeftOutWithTheReason(): void
     {
         $owner = $this->fixture->createUser('Package course owner');

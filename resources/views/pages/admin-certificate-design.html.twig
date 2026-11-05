@@ -43,7 +43,9 @@
 	{{ ui('layout.section-head', {heading: 'Logo', heading_level: 2, summary: 'Optional. It is printed above the title. A Canva background usually has its logo drawn in already.'}) }}
 	{% if pictures.logo %}
 		<div class="cl-certificate-pictures"><img class="cl-certificate-picture" src="{{ pictures.logo }}" alt="The current logo">
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the logo'})} %}{% block control %}<input type="checkbox" name="remove_logo" value="1">{% endblock %}{% endembed %}</div>
+		{{ ui('form.picture-choice', {multiple: true, legend: 'The current logo', legend_hidden: true, size: 'small', selected: [], items: [
+			{value: 'remove_logo', label: 'Remove the logo', icon: lucide('trash-2'), note: 'It goes when you save. Leave it unticked to keep it.'},
+		]}) }}</div>
 	{% endif %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.logo ? 'Replace the logo' : 'Add a logo', for: 'design-logo', help: 'PNG or JPEG.'})} %}{% block control %}<input id="design-logo" type="file" name="logo" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% endblock %}{% endembed %}
@@ -65,7 +67,9 @@
 	{% endblock %}{% endembed %}
 	{% if pictures.signature %}
 		<div class="cl-certificate-pictures"><img class="cl-certificate-picture" src="{{ pictures.signature }}" alt="The current signature">
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the signature picture'})} %}{% block control %}<input type="checkbox" name="remove_signature_image" value="1">{% endblock %}{% endembed %}</div>
+		{{ ui('form.picture-choice', {multiple: true, legend: 'The current signature', legend_hidden: true, size: 'small', selected: [], items: [
+			{value: 'remove_signature_image', label: 'Remove the signature picture', icon: lucide('trash-2'), note: 'It goes when you save. Leave it unticked to keep it.'},
+		]}) }}</div>
 	{% endif %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.signature ? 'Replace the signature picture' : 'Add a signature picture', for: 'signature-image', help: 'Optional. A PNG or JPEG of the signature, any size: its paper and empty margins are removed, and it is sized to fit and centred on the signature line.'})} %}{% block control %}<input id="signature-image" type="file" name="signature_image" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% endblock %}{% endembed %}

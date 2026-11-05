@@ -28,7 +28,8 @@
 	{% endblock %}{% endembed %}</section>
 	{% endif %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		<form class="cl-money-period" action="/admin/site-analytics" method="get">
+		{% include '@platform/partials/live-status.html.twig' with {live_seconds: 30} %}
+		<form class="cl-money-period" action="/admin/site-analytics" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics'} only %}>
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'site-period'})} %}{% block control %}<select id="site-period" name="period" onchange="if (this.value !== 'dates') this.form.requestSubmit()" {{ ui_field_attrs(props) }}>{% for key, label in period_choices %}<option value="{{ key }}"{{ period.key == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'site-from'})} %}{% block control %}<input type="date" id="site-from" name="from" value="{{ period.fromDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'site-to'})} %}{% block control %}<input type="date" id="site-to" name="to" value="{{ period.toDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
@@ -80,7 +81,7 @@
 		{% endblock %}{% endembed %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'on-site-now'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'On the site now', summary: 'Past 5 minutes. Refreshes by itself.'}) }}
-			<div id="site-on-now" hx-get="/admin/site-analytics/now" hx-trigger="every 30s" hx-swap="innerHTML">{% include '@platform/partials/admin/site-on-now.html.twig' %}</div>
+			<div id="site-on-now">{% include '@platform/partials/admin/site-on-now.html.twig' %}</div>
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

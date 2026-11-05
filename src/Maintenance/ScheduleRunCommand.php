@@ -39,7 +39,7 @@ final class ScheduleRunCommand extends Command
     protected function configure(): void
     {
         $this->addOption('watch', null, InputOption::VALUE_NONE, 'Run once a minute until stopped.');
-        $this->addOption('job', null, InputOption::VALUE_REQUIRED, 'Run one job now, due or not: commerce, popularity, cleanup, signup_lists, mailing, log_archive, review_requests or video_check.');
+        $this->addOption('job', null, InputOption::VALUE_REQUIRED, 'Run one job now, due or not: commerce, popularity, cleanup, signup_lists, mailing, log_archive, review_requests, video_check, site_protection or owner_messages.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

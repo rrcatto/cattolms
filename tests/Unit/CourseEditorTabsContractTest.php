@@ -65,7 +65,7 @@ final class CourseEditorTabsContractTest extends TestCase
     public function testCourseFieldsCategoryPickerIsWiredForInlineCreate(): void
     {
         $course = ['title' => 'T', 'slug' => 't', 'subtitle' => '', 'category_id' => 2, 'level' => '', 'estimated_minutes' => 0,
-            'summary' => '', 'introduction_html' => '', 'description_html' => '', 'access_days' => 365, 'show_outline_on_intro' => false];
+            'summary' => '', 'introduction_html' => '', 'description_html' => '', 'access_days' => 365];
         $picker = ['items' => [['value' => '0', 'label' => 'Uncategorised', 'depth' => 0, 'path' => 'Uncategorised'], ['value' => '2', 'label' => 'Health', 'depth' => 1, 'path' => 'Health']], 'selected' => '2'];
         $places = ['items' => [['value' => '0', 'label' => 'Top level', 'depth' => 0, 'path' => 'Top level'], ['value' => '2', 'label' => 'Health', 'depth' => 1, 'path' => 'Health']], 'selected' => '0'];
         $html = RenderHarness::render('partials/admin-course-fields.html.twig', RenderHarness::hiveWith([

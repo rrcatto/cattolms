@@ -59,7 +59,9 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', for: 'bundle-period', required: true})} %}{% block control %}<input id="bundle-period" name="access_period_value" type="number" min="1" max="3650" value="{{ form.access_period_value }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'bundle-unit', required: true})} %}{% block control %}<select id="bundle-unit" name="access_period_unit" required {{ ui_field_attrs(props) }}>{% for unit in units %}<option value="{{ unit }}"{% if form.access_period_unit == unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'On sale: a published bundle can be bought'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" {{ form.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}
+		{{ ui('form.picture-choice', {multiple: true, legend: 'On sale', legend_hidden: true, size: 'small', selected: form.is_active ? ['is_active'] : [], items: [
+			{value: 'is_active', label: 'On sale', icon: lucide('store'), note: 'A published bundle can be bought. Untick it and nobody can buy it.'},
+		]}) }}
 		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save price', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 	</form>
 	{% else %}

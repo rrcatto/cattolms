@@ -1906,11 +1906,11 @@ final class CourseService
             'summary' => trim((string) ($input['summary'] ?? $existing['summary'] ?? '')),
             'description_html' => $this->courseHtml->preserve((string) ($input['description_html'] ?? $existing['description_html'] ?? '')),
             'level' => trim((string) ($input['level'] ?? $existing['level'] ?? '')),
-            'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? $existing['estimated_minutes'] ?? 0)),
+            // Typed in hours on the course's form (owner, 2026-11-05), kept in minutes.
+            'estimated_minutes' => array_key_exists('study_hours', $input) ? max(0, (int) $input['study_hours']) * 60 : max(0, (int) ($input['estimated_minutes'] ?? $existing['estimated_minutes'] ?? 0)),
             'status' => (string) ($input['status'] ?? $existing['status'] ?? 'draft'),
             'default_access_period_seconds' => $period,
             'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $existing['introduction_html'] ?? '')),
-            'show_outline_on_intro' => $this->boolValue($input['show_outline_on_intro'] ?? $existing['show_outline_on_intro'] ?? true),
             'certificate_enabled' => $this->boolValue($input['certificate_enabled'] ?? $existing['certificate_enabled'] ?? true),
             'certificate_accreditation' => mb_substr(trim((string) ($input['certificate_accreditation'] ?? $existing['certificate_accreditation'] ?? '')), 0, 240),
             'course_style_key' => trim((string) ($input['course_style_key'] ?? $existing['course_style_key'] ?? 'standard')) ?: 'standard',

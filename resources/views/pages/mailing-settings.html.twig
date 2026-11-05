@@ -36,8 +36,10 @@
 			{% set r = ms.rules %}
 			<form action="/mailing/settings/rules" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Record who opens each email'})} %}{% block control %}<input type="checkbox" name="track_opens" value="1"{{ r.track_opens ? ' checked' : '' }}>{% endblock %}{% endembed %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Record the links each person clicks'})} %}{% block control %}<input type="checkbox" name="track_clicks" value="1"{{ r.track_clicks ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'What is recorded about each email', size: 'small', selected: ['track_opens', 'track_clicks']|filter(name => r[name]), items: [
+					{value: 'track_opens', label: 'Record who opens each email', icon: lucide('mail-open'), note: 'Untick it and opening an email is not recorded.'},
+					{value: 'track_clicks', label: 'Record the links each person clicks', icon: lucide('mouse-pointer-click'), note: 'Untick it and clicks are not recorded.'},
+				]}) }}
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Emails an hour, at most', for: 'mr-hourly'})} %}{% block control %}<input class="cl-input" id="mr-hourly" name="hourly_limit" inputmode="numeric" value="{{ r.hourly_limit }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Emails on the first day of sending', for: 'mr-first', help: 'Doubling each day after, a gentle start for a new sending address. 0 starts at the hourly limit.'})} %}{% block control %}<input class="cl-input" id="mr-first" name="first_day_limit" inputmode="numeric" value="{{ r.first_day_limit }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
@@ -59,13 +61,10 @@
 					{% endblock %}{% endembed %}
 					<p class="help">Each digest goes at the start of the sending hours on its day: {{ ms.digest_days.daily }} for the daily one, {{ ms.digest_days.weekly }} for the weekly one and {{ ms.digest_days.monthly }} for the monthly one. Each person chooses which, or updates as they happen, on My Subscriptions.</p>
 				</fieldset>
-				<fieldset class="cl-mailing-lists" id="recorded">
-					<legend class="h6">What becomes an update</legend>
-					<p class="help">The site records these course changes as updates and holds them on the Digest page until you release them.</p>
-					{% for key, label in ms.recorded %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label})} %}{% block control %}<input type="checkbox" name="{{ key }}" value="1"{{ r[key] ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% endfor %}
-				</fieldset>
+				{% set recorded_icons = {record_first_published: 'rocket', record_content_added: 'file-plus', record_price_lowered: 'badge-percent', record_promotion: 'tag', record_landing_published: 'layout-template', record_retired: 'archive'} %}
+				<div class="cl-mailing-lists" id="recorded">
+					{{ ui('form.picture-choice', {multiple: true, legend: 'What becomes an update', size: 'small', help: 'The site records these course changes as updates and holds them on the Digest page until you release them. A change left unticked makes no update.', selected: ms.recorded|keys|filter(key => r[key]), items: ms.recorded|keys|map(key => {value: key, label: ms.recorded[key], icon: lucide(recorded_icons[key])})}) }}
+				</div>
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the sending discipline', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 			</form>
 			{% if ms.rules_source == 'database' %}

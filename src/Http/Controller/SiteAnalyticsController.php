@@ -65,6 +65,7 @@ final class SiteAnalyticsController extends BaseController
         private readonly NetworkLookup $network,
         private readonly AuditRepository $audit,
         private readonly \CattoLearning\Auth\Signup\SignInHistory $signIns,
+        private readonly \CattoLearning\OwnerMessages\OwnerMessageRepository $ownerMessages,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -73,6 +74,7 @@ final class SiteAnalyticsController extends BaseController
     public function overview(): Response
     {
         $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
         $query = $this->request()->query;
         $period = SitePeriod::of((string) $query->get('period', 'week'), (string) $query->get('from', ''), (string) $query->get('to', ''), new DateTimeImmutable());
         $leaveOut = $this->settings->values()['leave_out_administrators'] === true;
@@ -117,19 +119,11 @@ final class SiteAnalyticsController extends BaseController
         ]);
     }
 
-    /** The On the site now card, which refreshes by itself. */
-    #[Route('/admin/site-analytics/now', name: 'admin_site_analytics_now', methods: ['GET'])]
-    public function now(): Response
-    {
-        $this->requirePermission(self::VIEW);
-
-        return $this->renderFragment('partials/admin/site-on-now.html.twig', ['on_site' => $this->onSite($this->log->courseTitles(), $this->settings->values()['leave_out_administrators'] === true)]);
-    }
-
     #[Route('/admin/site-analytics/log', name: 'admin_site_log', methods: ['GET'])]
     public function siteLog(): Response
     {
         $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
         $query = $this->request()->query;
         $kind = (string) $query->get('kind', 'all');
         if (!isset(SiteLogRepository::KINDS[$kind])) $kind = 'all';
@@ -169,10 +163,41 @@ final class SiteAnalyticsController extends BaseController
         ]);
     }
 
+    /** What went to the owner's Telegram (owner, 2026-11-05: "so I can see what messages you sent and I can check if I got them"). */
+    #[Route('/admin/site-analytics/telegram-log', name: 'admin_telegram_log', methods: ['GET'])]
+    public function telegramLog(): Response
+    {
+        $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
+        $query = $this->request()->query;
+        $counts = $this->ownerMessages->logCounts();
+        $list = (string) $query->get('list', 'all');
+        if (!isset($counts[$list])) $list = 'all';
+        $pagination = Pagination::create($query->get('telegramlog_page'), $query->get('telegramlog_page_size'), $counts[$list], 25);
+        $zone = new \DateTimeZone(date_default_timezone_get());
+        $when = static fn(mixed $at): string => is_string($at) ? (new DateTimeImmutable($at))->setTimezone($zone)->format('j M Y, H:i:s') : '';
+
+        return $this->render('admin-telegram-log', [
+            'title' => 'Telegram log',
+            'active_nav' => 'admin',
+            'list' => $list,
+            'counts' => $counts,
+            'rows' => array_map(static fn(array $row): array => [
+                'id' => (int) $row['id'], 'body' => (string) $row['body'], 'when' => $when($row['created_at']), 'sent' => $when($row['sent_at']), 'tries' => (int) $row['tries'],
+                'kind' => ['registration' => 'Registration', 'sale' => 'Sale', 'test' => 'Test message'][(string) $row['kind']] ?? (string) $row['kind'],
+                'status' => $row['sent_at'] !== null ? ['label' => 'Sent', 'tone' => 'success'] : ((string) $row['kind'] === 'test' ? ['label' => 'Failed', 'tone' => 'danger'] : ['label' => 'Waiting', 'tone' => 'warning']),
+                'error' => (string) ($row['last_error'] ?? ''),
+            ], $this->ownerMessages->logPage($list, $pagination->pageSize, $pagination->offset)),
+            'telegramlog_pagination' => PlatformAdministrationService::paginationPayload('telegramlog', $pagination, self::BASE . '/telegram-log', 'Telegram log', $list === 'all' ? [] : ['list' => $list]),
+            'can_manage_settings' => $this->requireUser()->hasPermission('SYSTEM.SETTING.MANAGE'),
+        ]);
+    }
+
     #[Route('/admin/site-analytics/flagged', name: 'admin_site_flagged', methods: ['GET'])]
     public function flagged(): Response
     {
         $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
         $state = (string) $this->request()->query->get('show', 'waiting');
         if (!isset(FlagRepository::STATES[$state])) $state = 'waiting';
         $all = $this->flags->all();
@@ -212,6 +237,7 @@ final class SiteAnalyticsController extends BaseController
     public function address(): Response
     {
         $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
         $subject = self::subjectFrom($this->param('address'));
         if ($subject === '') throw $this->notFound('That is not an address.');
         $plain = (string) strtok($subject, '/');
@@ -272,6 +298,7 @@ final class SiteAnalyticsController extends BaseController
     public function lockoutsPage(): Response
     {
         $this->requirePermission(self::VIEW);
+        $this->liveRefreshIsNotAVisit();
         $query = $this->request()->query;
         $kind = (string) $query->get('show', 'force');
         if (!isset(LockoutRepository::KINDS[$kind])) $kind = 'force';

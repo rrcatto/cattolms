@@ -63,6 +63,14 @@ final class CoursePageView
         }
         $count = count($modules);
         $total = array_sum(array_column($modules, 'minutes'));
+        // The study time the course states (owner, 2026-11-05): the parts add up to reading time, and leave out the work a
+        // learner does. Each module takes its share of it.
+        $stated = (int) ($course['estimated_minutes'] ?? 0);
+        if ($stated > 0) {
+            $courseMinutes = $stated;
+            $total = $stated;
+            foreach (array_keys($modules) as $index) { $modules[$index]['minutes'] = CourseItemService::moduleShare($stated, $count); }
+        }
         $common = [];
         $some = [];
         foreach (array_keys(CourseItemService::PART_LABELS) as $part) {

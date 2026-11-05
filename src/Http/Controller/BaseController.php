@@ -179,6 +179,18 @@ abstract class BaseController
         return new Response('', 200, ['HX-Refresh' => 'true']);
     }
 
+    /**
+     * Says that a page's refresh of itself (partials/live-status.html.twig) is not a visit, so the Site Log does not fill with
+     * its own refreshes. Only a page that refreshes itself calls this, so sending the header elsewhere hides nobody.
+     */
+    protected function liveRefreshIsNotAVisit(): void
+    {
+        $request = $this->request();
+        if ($request->isMethod('GET') && $request->headers->has('X-Live-Refresh') && $request->headers->has('HX-Request')) {
+            $request->attributes->set(\CattoLearning\SiteAnalytics\RequestRecorder::LIVE_REFRESH, true);
+        }
+    }
+
     protected function isHtmxRequest(): bool
     {
         return strtolower((string) ($_SERVER['HTTP_HX_REQUEST'] ?? '')) === 'true';

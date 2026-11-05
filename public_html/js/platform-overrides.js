@@ -510,8 +510,10 @@
       const total = needs.reduce((sum, need) => sum + need, 0);
       if (total <= available) return needs.map(need => need + (available - total) * need / total);
       const widths = needs.slice();
-      const floor = parseFloat(getComputedStyle(document.documentElement).fontSize) * 10;
       const wrapping = needs.map((_, index) => index).filter(index => wraps[index]);
+      // On a phone two floors of 10rem are wider than the table, and would leave the one-line columns no width at all.
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) * 10;
+      const floor = wrapping.length * rem > available / 2 ? Math.min(rem, available / needs.length) : rem;
       const lines = needs.map((_, index) => index).filter(index => !wraps[index]);
       const floors = wrapping.map(index => Math.min(needs[index], floor));
       const reserved = floors.reduce((sum, value) => sum + value, 0);
@@ -823,4 +825,92 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
         var list = choice.closest('[role="region"]');
         if (list) list.innerHTML = '';
     });
+})();
+
+/* A page that shows live data refreshes itself in place (owner, 2026-11-05; UX rule 8.6b; partials/live-status.html.twig).
+   It holds back while the reader is busy, so a refresh never takes what they are looking at: typing, text selected, a menu
+   open, a later page whose rows would otherwise move, or a tab out of sight. Pause holds it for this tab. */
+(function () {
+    var KEY = 'catto-learning:live-paused';
+    var paused = false;
+    try { paused = sessionStorage.getItem(KEY) === '1'; } catch (_) {}
+    function onALaterPage() {
+        var later = false;
+        new URLSearchParams(location.search).forEach(function (value, key) { if (key.slice(-5) === '_page' && Number(value) > 1) later = true; });
+        return later;
+    }
+    function typing() {
+        var focused = document.activeElement;
+        // A drop-down keeps the focus after a choice, so it does not count, or the page would stop refreshing until the next click.
+        return !!focused && focused.matches('textarea, input:not([type=radio]):not([type=checkbox]):not([type=hidden]):not([type=submit]):not([type=button])');
+    }
+    function selecting() {
+        var selection = window.getSelection ? window.getSelection() : null;
+        return !!selection && !selection.isCollapsed && selection.toString().trim() !== '';
+    }
+    window.cattoLive = {
+        mayRefresh: function () {
+            return !paused && document.visibilityState === 'visible' && !typing() && !selecting() && !onALaterPage()
+                && !document.querySelector('.cl-main details[open], dialog[open], [aria-modal="true"]:not([hidden])');
+        }
+    };
+    function show(selector, shown) { document.querySelectorAll(selector).forEach(function (element) { element.hidden = !shown; }); }
+    function draw() {
+        show('[data-live-status]', true);
+        show('[data-live-running]', !paused);
+        show('[data-live-paused]', paused);
+        show('#live-pause', !paused);
+        show('#live-resume', paused);
+    }
+    function stamp() {
+        var words = 'Last updated ' + new Date().toLocaleTimeString('en-ZA', {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}) + '.';
+        document.querySelectorAll('[data-live-when]').forEach(function (element) { element.textContent = words; });
+    }
+    function hold(value) {
+        paused = value;
+        try { if (paused) sessionStorage.setItem(KEY, '1'); else sessionStorage.removeItem(KEY); } catch (_) {}
+        draw();
+    }
+    document.addEventListener('click', function (event) {
+        if (!(event.target instanceof Element)) return;
+        if (event.target.closest('#live-pause')) { hold(true); var resume = document.getElementById('live-resume'); if (resume) resume.focus(); }
+        else if (event.target.closest('#live-resume')) { hold(false); var pause = document.getElementById('live-pause'); if (pause) pause.focus(); }
+    });
+    document.addEventListener('htmx:after:swap', function () { draw(); stamp(); });
+    function start() { draw(); stamp(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true}); else start();
+})();
+
+/* The site notification's countdown (Settings > Site notification, owner 2026-11-05). The server draws the five units and
+   says its own time, so a visitor's wrong clock cannot change the count; this only keeps the numbers ticking, finds the
+   timer afresh each second because a page changing in place may replace it, and takes the notification away at zero. */
+(function () {
+    var LENGTHS = {week: 604800, day: 86400, hour: 3600, minute: 60, second: 1};
+    function draw(timer) {
+        var now = Date.now() / 1000;
+        if (timer.cattoSeen !== timer.dataset.siteNow) {
+            timer.cattoSeen = timer.dataset.siteNow;
+            timer.cattoAhead = Number(timer.dataset.siteNow) - now;
+        }
+        var left = Math.floor(Number(timer.dataset.siteCountdown) - now - timer.cattoAhead);
+        if (left <= 0) {
+            var stack = timer.closest('[data-site-notification]');
+            if (stack) stack.hidden = true;
+            return;
+        }
+        var shown = false;
+        timer.querySelectorAll('[data-unit]').forEach(function (unit) {
+            var length = LENGTHS[unit.dataset.unit];
+            var count = Math.floor(left / length);
+            left -= count * length;
+            shown = shown || count > 0 || length === 1;
+            unit.hidden = !shown;
+            unit.querySelector('strong').textContent = count;
+            var name = unit.querySelector('[data-one]');
+            name.textContent = count === 1 ? name.dataset.one : name.dataset.many;
+        });
+    }
+    function tick() { document.querySelectorAll('[data-site-countdown]').forEach(draw); }
+    setInterval(tick, 1000);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tick); else tick();
 })();

@@ -1,4 +1,4 @@
-{# The visitors of the past five minutes (Site Analytics' overview), drawn again by itself every 30 seconds. #}
+{# The visitors of the past five minutes, on Site Analytics' overview, which refreshes itself. #}
 {% if on_site %}
 {% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}<tr><th>Who</th><th>From</th><th>Doing</th></tr>{% endblock %}

@@ -6,9 +6,8 @@
   what the purchaser has entered. On a demo site (SiteMode) it first says the purchase is a simulation.
 #}
 {% if site_demo|default(false) %}{{ ui('feedback.notice', {tone: 'warning', heading: site_simulation}) }}{% endif %}
-{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have read and accept the Terms and Conditions and the Refund Policy.'})} %}
-{% block control %}
-<input type="checkbox" name="accept_terms" value="yes" required>
-{% endblock %}
-{% block label_content %}I have read and accept the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/refunds" target="_blank" rel="noopener">Refund Policy</a>.{% endblock %}
+{% embed ui_template('form.picture-choice') with {props: ui_props('form.picture-choice', {multiple: true, legend: 'Terms and Conditions and Refund Policy', legend_hidden: true, size: 'small', tick_value: 'yes', required: true, selected: [], items: [
+{value: 'accept_terms', label: 'I have read and accept the Terms and Conditions and the Refund Policy.', icon: lucide('file-check')},
+]})} %}
+{% block item_label %}I have read and accept the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/refunds" target="_blank" rel="noopener">Refund Policy</a>.{% endblock %}
 {% endembed %}

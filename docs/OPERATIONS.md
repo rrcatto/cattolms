@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 1.0.8 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.0.9 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -147,7 +147,17 @@ One setting says whether a site is real: `APP_SITE_MODE=demo` or `live` in `.env
 - **A live site** does none of that: never the simulated card (only the ticked payment methods, Settings → Payment methods), the Site Owner's bank details, a sitemap named in robots.txt, and the seed tools refuse to run.
 - In development (`APP_ENV`, below), Symfony adds `X-Robots-Tag: noindex` to every response by itself, so a development site sends it even when set to live.
 
+### The site notification
+
+Administration > Settings > Site notification, straight after Site mode (owner, 2026-11-05; `Configuration\SiteNotification`, `partials/flash-messages.html.twig`): a message at the top of the site's pages, under the demo notice, for everyone, on a demo site and a live one. The pages where a course is taken (the reader and its assessments, the public preview's too) show it only with Also while taking a course ticked (owner, 2026-11-05). It has a kind, each with its own look in every theme and on the pages where a course is taken (Promotion green with a megaphone, Information blue with an information sign, Warning amber with a warning triangle; `feedback.notice` with `solid` and `icon`), an optional heading, plain text and an optional date and time, typed in the site's time, to count down to in weeks, days, hours, minutes and seconds. The server draws the five units and says its own time, so a visitor's wrong clock does not change the count, `platform-overrides.js` keeps it ticking, and it goes away by itself at zero. Unticked it keeps its words; Remove clears them. It has no `.env` value: nothing starts it but this setting. Every change is in the activity log (`platform.site_notification_changed`).
+
 Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Settings → Site Owner) before providing EFT instructions to customers on a live site; a demo site shows fake details instead (below). The Dummy gateway simulates card outcomes only on a demo site. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No live payment-processor credentials are included in the current code.
+
+### Messages to you
+
+Administration > Settings > Messages to you, straight after Site notification (owner, 2026-11-05; `src/OwnerMessages/`): a message to the owner's phone by Telegram when someone registers and when an order is paid in full, each ending with the site's `APP_DOMAIN`, because one bot may serve several sites. The bot's key is saved encrypted (`SecretCipher`) in one saved option with the Telegram username of the account to message, that account's chat and the two ticks, and there is no `.env` value. A bot cannot write to a username or a phone number, so Connect to Telegram keeps a key Telegram accepts and the username, reads `getUpdates` and connects only the private chat whose `from.username` matches, in any case: a stranger who presses Start on the bot gets nothing, and changing the username clears the chat. The section's title and a status say what is connected to what, the fields go once it is connected and come back after Disconnect, and the two ticks save as they change. The Telegram log, under Site Analytics after Site Log and linked from the section, lists every message, test messages too, with when it went or why it did not; sent ones are kept for 30 days and unsent ones for 7. Telegram holds those updates for about a day. No phone number is kept. Neither hook can fail what it is about: `AuthService::consumeRegistration` and `FulfilmentService::fulfil` keep the message in their own transaction, behind a savepoint, in `owner_messages`, once per person or order by its unique reference, and only when connected and ticked. Nobody invented sends one: an address at `.invalid` (Seed Database, `GeneratedDomainRouter`), `.test`, `.example`, `.localhost` or `example.com`, `.net` or `.org` keeps nothing (`OwnerMessages::invented`), so the checks stay quiet with Telegram connected.
+
+The `owner_messages` scheduled job sends the waiting ones every minute, oldest first, 30 at a time, and stops at the first failure. A failed message stays with its error, which Settings shows, and is tried next minute. One still unsent after 7 days is dropped, and the daily clean-up clears sent ones after 30 days. Anything Telegram or the network says is scrubbed of the key before it is stored or shown (`TelegramClient`), because the key is part of Telegram's address. The scheduler must be restarted after an update, or it will not know the job. `owner_messages.telegram_address` is a saved option no page sets, so that `tests/Browser/owner-messages.cjs` can use its stand-in. It must not exist on a real site.
 
 ## A site on rootless Podman
 
@@ -162,12 +172,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.8`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.0.9`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.0.8  # the tag being released
+   V=v1.0.9  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

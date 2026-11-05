@@ -38,6 +38,7 @@ Changelog:
 2026/10/28 SAST (landing pages)
 - The "Instructor" section type removed (owner, 2026-10-28: "Remove it"; there are no lecturers, the system presents the courses).
 2026/11/04 SAST (site analytics)
+- owner_messages: the messages to the owner's Telegram, waiting or sent (owner, 2026-11-05).
 - site_requests, site_flags, site_lockouts and site_refused_emails: the Site Log, flagged activity, lockouts and the
   email addresses refused; the PLATFORM.SITEANALYTICS.VIEW and PLATFORM.SITEANALYTICS.MANAGE permissions (owner, 2026-11-04).
 2026/10/28 SAST (mailing templates)
@@ -1030,7 +1031,6 @@ CREATE TABLE courses (
     summary TEXT NOT NULL DEFAULT '',
     description_html TEXT NOT NULL DEFAULT '',
     introduction_html TEXT NOT NULL DEFAULT '',
-    show_outline_on_intro BOOLEAN NOT NULL DEFAULT FALSE,
     level VARCHAR(80) NULL,
     estimated_minutes INTEGER NULL CHECK (estimated_minutes IS NULL OR estimated_minutes >= 0),
     status VARCHAR(24) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired','archived')),
@@ -2250,6 +2250,22 @@ CREATE INDEX site_lockouts_force_idx ON site_lockouts (until_at) WHERE lifted_at
 CREATE INDEX site_lockouts_network_idx ON site_lockouts (network, started_at DESC);
 
 -- Email addresses and domains that cannot register, ask for a sign-in link or use the contact form, from any address.
+-- The messages to the owner's Telegram (owner, 2026-11-05: "yes telegram, paid orders only"): kept in the transaction of what
+-- they are about and sent every minute by the owner_messages job, so Telegram being down holds nothing up. One per person
+-- registering or order paid, by its reference.
+CREATE TABLE owner_messages (
+    id BIGSERIAL PRIMARY KEY,
+    reference TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL CHECK (kind IN ('registration','sale','test')),
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at TIMESTAMPTZ NULL,
+    tries INTEGER NOT NULL DEFAULT 0 CHECK (tries >= 0),
+    last_tried_at TIMESTAMPTZ NULL,
+    last_error TEXT NULL
+);
+CREATE INDEX owner_messages_waiting_idx ON owner_messages (created_at) WHERE sent_at IS NULL;
+
 CREATE TABLE site_refused_emails (
     id BIGSERIAL PRIMARY KEY,
     value VARCHAR(254) NOT NULL UNIQUE CHECK (value = LOWER(value)),
@@ -3320,7 +3336,7 @@ SQL);
     {
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS
-    site_requests, site_flags, site_lockouts, site_refused_emails,
+    site_requests, site_flags, site_lockouts, site_refused_emails, owner_messages,
     document_assets, document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
     audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,

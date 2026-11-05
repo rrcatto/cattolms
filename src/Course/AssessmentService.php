@@ -94,7 +94,8 @@ final class AssessmentService
         $current = $this->assessments->nextQuestion((int) $session['id']);
         if ($current === null || (int) $current['question_id'] !== $questionId) { throw new InvalidArgumentException('This is not the current assessment question.'); }
         $feedback = $this->transactions->run(fn(): array => $this->assessments->recordResponse((int) $session['id'], $questionId, $optionId, $skip, (bool) $session['negative_marking']));
-        if (!$this->assessments->hasRemainingQuestions((int) $session['id'])) { return $this->finalise($session, false); }
+        // Practice says how the last answer went too, before the result (owner, 2026-11-05).
+        if (!$this->assessments->hasRemainingQuestions((int) $session['id'])) { $finished = $this->finalise($session, false); if ($session['attempt_mode'] === 'practice' && !$skip) { $finished['feedback'] = $feedback; } return $finished; }
         $next = $this->session($userId, $publicId); if ($session['attempt_mode'] === 'practice' && !$skip) { $next['feedback'] = $feedback; } return $next;
     }
 
@@ -110,8 +111,10 @@ final class AssessmentService
     public function result(int $userId, string $publicId): array
     {
         $session = $this->requireSession($userId, $publicId); $responses = $this->assessments->sessionResponses((int) $session['id']);
-        foreach ($responses as &$response) { $response['has_response_seconds'] = $response['response_seconds'] !== null && $response['response_seconds'] !== ''; } unset($response);
-        $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = self::timerLabel($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
+        foreach ($responses as &$response) { $response['has_response_seconds'] = $response['response_seconds'] !== null && $response['response_seconds'] !== ''; $response['response_time'] = self::timeTaken((int) $response['response_seconds']); } unset($response);
+        $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = self::timeTaken($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
+        // The final assessment's page says the course's result too (owner-approved mockup, 2026-11-05).
+        $session['course_result'] = ($session['assessment_role'] ?? '') === 'final' && $session['attempt_mode'] === 'graded' ? $this->courses->courseResult((int) $session['enrolment_id']) : null;
         if ($session['is_diagnostic']) { $passed = (float) ($session['percentage'] ?? 0) + .0001 >= (float) ($session['pass_mark'] ?? 50); $session['diagnostic_passed'] = $passed; $session['diagnostic_message_html'] = $passed ? (string) ($session['result_pass_html'] ?? '') : (string) ($session['result_fail_html'] ?? ''); $session['diagnostic_remediation_items'] = $this->remediationItems($responses, (int) $session['course_id']); }
         return $session;
     }
@@ -178,8 +181,7 @@ final class AssessmentService
             if ($context['assessment_role'] === 'final') { $final = $value; } else { $graded[] = $value; }
         }
         if ($final === null) { return; }
-        $module = $graded === [] ? 0.0 : array_sum($graded) / count($graded);
-        $overall = round($module * .5 + $final * .5, 2);
+        ['module' => $module, 'overall' => $overall] = self::courseFigures($graded, $final);
         $band = $this->band($overall, $this->courses->gradeBands((int) $session['course_id']));
         $before = $this->courses->enrolmentByIdForUser((int) $session['enrolment_id'], (int) $session['user_id']); $this->courses->saveCourseResult((int) $session['enrolment_id'], $module, $final, $overall, (string) $band['grade_code'], (bool) $band['is_passing']);
         if (($before['status'] ?? '') !== 'completed') { $this->audit->record((int) $session['user_id'], 'course.completed', ['course_id' => (int) $session['course_id'], 'enrolment_id' => (int) $session['enrolment_id'], 'completion_method' => 'final_assessment', 'percentage' => $overall, 'grade_code' => $band['grade_code'], 'passed' => $band['is_passing']]); }
@@ -255,6 +257,20 @@ final class AssessmentService
     private function remainingSeconds(array $session): int { return max(0, (strtotime((string) $session['deadline_at']) ?: time()) - time()); }
     /** @param array<string,mixed> $session */
     private function elapsedSeconds(array $session): int { $start = strtotime((string) $session['started_at']) ?: time(); $end = strtotime((string) ($session['completed_at'] ?? '')) ?: time(); return max(0, $end - $start); }
+    /**
+     * A course's result: half the average of its module assessments, half its final assessment.
+     *
+     * @param list<float> $graded
+     * @return array{module:float,overall:float}
+     */
+    public static function courseFigures(array $graded, float $final): array
+    {
+        $module = $graded === [] ? 0.0 : array_sum($graded) / count($graded);
+        return ['module' => $module, 'overall' => round($module * .5 + $final * .5, 2)];
+    }
+
+    /** A length of time a learner took, in words (UX rule 4.7): "42 minutes 10 seconds", "1 second". */
+    public static function timeTaken(int $seconds): string { return $seconds > 0 ? Duration::ofSeconds($seconds)->words() : '0 seconds'; }
     public static function timerLabel(int $seconds): string { return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60); }
     /** A time limit in the words every length of time is stated in (Support\Duration, owner 2026-10-26): "1 hour 30 minutes". */
     public static function durationLabel(int $seconds): string { return Duration::ofSeconds(max(1, $seconds))->words(); }

@@ -216,8 +216,7 @@ final class LegalDocumentsTest extends TestCase
 
     public function testBothCheckoutsIncludeTheOneAcceptanceControl(): void
     {
-        $partial = self::source('partials/commerce-terms-acceptance');
-        self::assertStringContainsString('<input type="checkbox" name="accept_terms" value="yes" required>', $partial);
+        self::assertStringContainsString('<input type="checkbox" name="accept_terms" value="yes" required>', RenderHarness::renderSource("{% include '@platform/partials/commerce-terms-acceptance.html.twig' %}", []));
         foreach (['pages/commerce-checkout', 'pages/company-credit-checkout'] as $checkout) {
             $source = self::source($checkout);
             self::assertStringContainsString("{% include '@platform/partials/commerce-terms-acceptance.html.twig' %}", $source, $checkout . ' uses the shared acceptance.');
@@ -225,9 +224,9 @@ final class LegalDocumentsTest extends TestCase
             self::assertStringNotContainsString('identification_number', $source, 'Checkout does not ask for an identity number.');
         }
         self::assertStringContainsString("{% include '@platform/partials/commerce-start-acceptance.html.twig' %}", self::source('pages/commerce-checkout'), 'A course purchase also agrees to start on payment.');
-        self::assertStringContainsString('<input type="checkbox" name="accept_start" value="yes" required>', self::source('partials/commerce-start-acceptance'));
+        self::assertStringContainsString('<input type="checkbox" name="accept_start" value="yes" required>', RenderHarness::renderSource("{% include '@platform/partials/commerce-start-acceptance.html.twig' %}", ['immediate_start' => 'The course starts on payment.']));
         $html = RenderHarness::renderSource("{% include '@platform/partials/commerce-terms-acceptance.html.twig' %}", []);
-        self::assertStringContainsString('<label><input type="checkbox" name="accept_terms" value="yes" required>', (string) preg_replace('/>\s+</', '><', $html));
+        self::assertMatchesRegularExpression('/<label[^>]*><input type="checkbox" name="accept_terms" value="yes" required>/', (string) preg_replace('/>\s+</', '><', $html));
         self::assertStringContainsString('I have read and accept the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/refunds" target="_blank" rel="noopener">Refund Policy</a>.', $html);
         // The account profile shows the South African ID number masked, given at registration or at sign-in, never a field to
         // type one (owner, 2026-10-27); a checkout never asks for it.

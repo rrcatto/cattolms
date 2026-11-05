@@ -176,8 +176,35 @@ final class PublicAssessmentAttempts
             if ($attempt['attempt_mode'] === 'practice') { $feedback = ['status' => 'answered', 'is_correct' => $correct, 'points_awarded' => $row['points_awarded'], 'correct_option_html' => (string) ($correctOption['option_html'] ?? ''), 'explanation_html' => (string) ($question['explanation_html'] ?? '')]; }
         }
         unset($row);
-        if ($this->nextIndex($attempt) === null) { return ['attempt' => $this->finalise($attempt, false), 'feedback' => null]; }
+        if ($this->nextIndex($attempt) === null) { return ['attempt' => $this->finalise($attempt, false), 'feedback' => $feedback]; }
         return ['attempt' => $this->session($attempt), 'feedback' => $feedback];
+    }
+
+    /**
+     * A visitor's course result after the final, by the learner's rule (AssessmentService::completeCourse): from their own
+     * finished graded attempts on this course, kept in their session.
+     *
+     * @param array<string,mixed> $attempt
+     * @param list<array<string,mixed>> $attempts
+     * @return array<string,mixed>|null
+     */
+    public function courseResult(array $attempt, array $attempts): ?array
+    {
+        if (($attempt['assessment_role'] ?? '') !== 'final' || $attempt['attempt_mode'] !== 'graded' || $attempt['status'] === 'in_progress') { return null; }
+        $graded = []; $final = null;
+        foreach ($this->itemRecords->assessmentContexts((int) $attempt['course_id']) as $context) {
+            $scores = [];
+            foreach ($attempts as $other) {
+                if ((int) $other['course_id'] === (int) $attempt['course_id'] && (int) $other['node_id'] === (int) $context['node_id'] && $other['attempt_mode'] === 'graded' && $other['status'] !== 'in_progress') { $scores[] = (float) $other['percentage']; }
+            }
+            if ($scores === []) { continue; }
+            $value = ScorePolicy::aggregate($scores, (string) $context['score_policy']);
+            if ($context['assessment_role'] === 'final') { $final = $value; } else { $graded[] = $value; }
+        }
+        if ($final === null) { return null; }
+        ['module' => $module, 'overall' => $overall] = AssessmentService::courseFigures($graded, $final);
+        $band = AssessmentService::gradeBand($overall, $this->courses->gradeBands((int) $attempt['course_id']));
+        return ['module_percentage' => round($module, 2), 'final_percentage' => $final, 'overall_percentage' => $overall, 'grade_code' => (string) $band['grade_code']];
     }
 
     /**
@@ -215,14 +242,14 @@ final class PublicAssessmentAttempts
                 if ((int) $option['id'] === (int) ($row['selected_option_id'] ?? 0)) { $selected = (string) $option['option_html']; }
                 if ((bool) $option['is_correct']) { $correct = (string) $option['option_html']; }
             }
-            $responses[] = ['question_id' => (int) $row['question_id'], 'question_html' => (string) $question['question_html'], 'explanation_html' => (string) ($question['explanation_html'] ?? ''), 'points' => $question['points'], 'response_status' => $row['response_status'], 'is_correct' => $row['is_correct'], 'points_awarded' => $row['points_awarded'], 'selected_option_html' => $selected, 'correct_option_html' => $correct, 'response_seconds' => $row['response_seconds'], 'has_response_seconds' => $row['response_seconds'] !== null && $row['response_status'] !== 'unanswered'];
+            $responses[] = ['question_id' => (int) $row['question_id'], 'question_html' => (string) $question['question_html'], 'explanation_html' => (string) ($question['explanation_html'] ?? ''), 'points' => $question['points'], 'response_status' => $row['response_status'], 'is_correct' => $row['is_correct'], 'points_awarded' => $row['points_awarded'], 'selected_option_html' => $selected, 'correct_option_html' => $correct, 'response_seconds' => $row['response_seconds'], 'has_response_seconds' => $row['response_seconds'] !== null && $row['response_status'] !== 'unanswered', 'response_time' => AssessmentService::timeTaken((int) $row['response_seconds'])];
             if ($row['is_correct'] !== true) { foreach ((array) ($question['remediation_item_keys'] ?? []) as $key) { $review[(string) $key] = true; } }
         }
         $view = $attempt;
         $view['responses'] = $responses;
         $view['counts'] = self::counts($attempt);
         $view['elapsed_seconds'] = max(0, (int) ($attempt['completed_at'] ?? time()) - (int) $attempt['started_at']);
-        $view['elapsed_label'] = AssessmentService::timerLabel($view['elapsed_seconds']);
+        $view['elapsed_label'] = AssessmentService::timeTaken($view['elapsed_seconds']);
         $view['structure_node_id'] = (int) $attempt['node_id'];
         $view['is_diagnostic'] = $attempt['assessment_type'] === 'diagnostic';
         if ($view['is_diagnostic']) {

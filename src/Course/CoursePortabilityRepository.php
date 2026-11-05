@@ -110,6 +110,29 @@ final class CoursePortabilityRepository
         );
     }
 
+    /** Puts back the status and approval a replaced course had before its content was reset. */
+    public function restorePublication(int $courseId, string $status, string $approval): void
+    {
+        $this->db->executeStatement(
+            'UPDATE courses SET status=:status, publication_approval_status=:approval, updated_at=NOW() WHERE id=:course_id',
+            ['status' => $status, 'approval' => $approval, 'course_id' => $courseId]
+        );
+    }
+
+    /**
+     * The course's parts that are Resource Library files, which a course file cannot hold, in course order.
+     *
+     * @return list<string>
+     */
+    public function fileParts(int $courseId): array
+    {
+        return array_map('strval', $this->db->fetchFirstColumn(
+            'SELECT i.title FROM course_item_placements p JOIN course_items i ON i.id = p.course_item_id JOIN course_structure_nodes n ON n.id = p.node_id
+              WHERE p.course_id = :course_id AND i.resource_id IS NOT NULL ORDER BY n.parent_node_id NULLS FIRST, n.position',
+            ['course_id' => $courseId]
+        ));
+    }
+
     /** @return list<int> The courses that place the Course Item with this key, lowest id first. */
     public function coursesPlacingItemKey(string $key): array
     {

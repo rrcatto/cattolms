@@ -609,7 +609,11 @@ final class CourseItemService
             if ($row['minutes'] === null) { continue; }
             for ($up = $parents[(int) $row['id']]; $up !== null; $up = $parents[$up] ?? null) { $totals[$up] = ($totals[$up] ?? 0) + (int) $row['minutes']; }
         }
+        // A module's time is its share of the study time the course states, where it states one, as the course's page says.
+        $stated = $this->items->courseStudyMinutes($courseId);
+        $share = self::moduleShare($stated, count(array_filter($rows, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered']))));
         foreach ($rows as &$row) {
+            if ($stated > 0 && (string) $row['node_type'] === 'section' && !empty($row['numbered'])) { $totals[(int) $row['id']] = $share; }
             $row['total_minutes'] = (string) $row['node_type'] === 'section' && isset($totals[(int) $row['id']]) ? $totals[(int) $row['id']] : null;
             $row['total_minutes_label'] = $row['total_minutes'] === null ? '' : self::duration((int) $row['total_minutes']);
         }
@@ -661,6 +665,12 @@ final class CourseItemService
             'html_lesson', 'practical' => self::readingMinutes((string) ($row['content_source'] ?? '') . ' ' . (string) ($row['type_config']['answer_html'] ?? '')),
             default => null,
         };
+    }
+
+    /** A module's share of the study time a course states, to the nearest five minutes. */
+    public static function moduleShare(int $statedMinutes, int $modules): int
+    {
+        return $modules > 0 ? (int) (round($statedMinutes / $modules / 5) * 5) : 0;
     }
 
     /** At 120 words a minute, to the next five minutes. */

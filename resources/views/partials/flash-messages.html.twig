@@ -4,4 +4,11 @@
 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: site_demo_heading|default('Demo mode')})} %}{% block body %} {{ site_demo_notice }}{% endblock %}{% endembed %}
 </div>
 {% endif %}
+{# The site notification (Settings > Site notification, owner 2026-11-05), on a demo site and a live one alike. The count is written here for a reader without JavaScript, and platform-overrides.js keeps it ticking. #}
+{% if site_notification|default(null) %}
+<div class="cl-flash-stack" data-site-notification>
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: site_notification.tone, heading: site_notification.heading, solid: true, icon: 'notice-' ~ site_notification.kind})} %}{% block body %}<span class="visually-hidden">{{ site_notification.kind|capitalize }}: </span>{{ site_notification.message }}{% if site_notification.countdown %}
+<div class="cl-site-countdown" role="timer" aria-live="off" data-site-countdown="{{ site_notification.countdown.ends_at }}" data-site-now="{{ site_notification.countdown.now }}"><span class="cl-site-countdown-words">{{ site_notification.countdown.words }}</span>{% for unit in site_notification.countdown.units %}<span class="cl-site-countdown-unit" data-unit="{{ unit.name }}"{{ unit.shown ? '' : ' hidden' }}><strong>{{ unit.count }}</strong> <span data-one="{{ unit.name }}" data-many="{{ unit.name }}s">{{ unit.count == 1 ? unit.name : unit.name ~ 's' }}</span></span>{% endfor %}<small class="cl-site-countdown-until">Until {{ site_notification.countdown.until }}</small></div>{% endif %}{% endblock %}{% endembed %}
+</div>
+{% endif %}
 {% if flash_messages|default([]) %}<div class="cl-flash-stack" aria-live="polite">{% for message in flash_messages %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: message.type == 'error' ? 'danger' : message.type, flash: true})} %}{% block body %}{{ message.message }}{% endblock %}{% endembed %}{% endfor %}</div>{% endif %}

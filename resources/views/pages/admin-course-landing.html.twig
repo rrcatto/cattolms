@@ -115,14 +115,8 @@
 	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'landing-add', title: 'Add a section', action: '/admin/courses/' ~ course.id ~ '/landing/sections'})} %}
 {% block modal_body %}
 		<input type="hidden" name="csrf" value="{{ csrf }}">
-		<fieldset class="cl-landing-add">
-			<legend class="cl-visually-hidden">Kind of section</legend>
-			{% for option in landing_page.add_options %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: option.label ~ (option.taken ? ' (already on the page)' : (option.on_page ? ' (on the page, you can add another)' : '')), help: option.description, full_width: true})} %}
-{% block control %}<input class="cl-check mt-1" type="radio" name="type" value="{{ option.value }}" required{% if option.taken %} disabled{% endif %}>{% endblock %}
-{% endembed %}
-			{% endfor %}
-		</fieldset>
+		{% set la_icons = {hero: 'panels-top-left', audience: 'users', outcomes: 'target', contents: 'list-tree', benefits: 'gem', reviews: 'star', pricing: 'badge-percent', faq: 'circle-help', cta: 'megaphone', presentation: 'presentation'} %}
+		{{ ui('form.picture-choice', {name: 'type', legend: 'Kind of section', legend_hidden: true, size: 'small', columns: 1, required: true, items: landing_page.add_options|map(option => {value: option.value, label: option.label ~ (option.taken ? ' (already on the page)' : (option.on_page ? ' (on the page, you can add another)' : '')), icon: lucide(la_icons[option.value]|default('square')), note: option.description, disabled: option.taken ? true : false})}) }}
 {% endblock %}
 {% block modal_actions %}{{ ui('action.button', {label: 'Add section', variant: 'primary', type: 'submit', icon: 'action-add'}) }}{% endblock %}
 	{% endembed %}

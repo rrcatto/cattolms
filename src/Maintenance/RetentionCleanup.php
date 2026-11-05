@@ -47,7 +47,8 @@ final class RetentionCleanup
         private readonly ?\CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection = null,
         private readonly ?\CattoLearning\SiteAnalytics\SiteLogRepository $siteLog = null,
         private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
-        private readonly ?\CattoLearning\SiteAnalytics\LockoutRepository $siteLockouts = null
+        private readonly ?\CattoLearning\SiteAnalytics\LockoutRepository $siteLockouts = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageRepository $ownerMessages = null
     ) {}
 
     /** The oldest moment kept: anything recorded before it is deleted. */
@@ -56,7 +57,7 @@ final class RetentionCleanup
         return DateTimeImmutable::createFromInterface($this->clock->now())->modify('-' . self::YEARS . ' years');
     }
 
-    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,site_requests:int,site_flags:int,site_lockouts:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
+    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,owner_messages:int,site_requests:int,site_flags:int,site_lockouts:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
     public function run(): array
     {
         $before = $this->cutoff();
@@ -65,7 +66,9 @@ final class RetentionCleanup
             // Sign-up attempts that never became an account (owner, 2026-10-26); an account's goes with the account.
             'signup_attempts' => $this->signupAttempts?->deleteUnclaimedBefore($before) ?? 0,
             // The record of each news email a person was sent, opened or clicked (mailing, step 2; owner, 2026-10-26).
-            'mailing_copies' => $this->mailingCopies?->deleteBefore($before) ?? 0]
+            'mailing_copies' => $this->mailingCopies?->deleteBefore($before) ?? 0,
+            // The messages sent to the owner's Telegram (owner, 2026-11-05).
+            'owner_messages' => $this->ownerMessages?->deleteSentBefore(DateTimeImmutable::createFromInterface($this->clock->now())->modify('-30 days')) ?? 0]
             + $this->siteRecords()
             + $this->maintenance->prune();
     }

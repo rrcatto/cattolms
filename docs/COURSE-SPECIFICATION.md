@@ -1,6 +1,12 @@
-# CattoLMS Course Specification 4.6
+# CattoLMS Course Specification 4.9
 
-**Version 4.6** · 3 November 2026, 02:32 SAST · Authored by Claude Opus 5.5 · Replaces version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+**Version 4.9** · 5 November 2026, 07:37 SAST · Authored by Claude Opus 5.5 · Replaces version 4.8 (5 November 2026, 07:16 SAST), version 4.7 (5 November 2026, 03:45 SAST), version 4.6 (3 November 2026, 02:32 SAST), version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+
+**New in 4.9:** the whole course's study time, `cattolms:study-hours` (section 6.5), which the course's page shows.
+
+**New in 4.8:** the files a course uses, named and not held, `.course-files` (section 6.3), and the final assessment's time limit, `cattolms:final-time-limit` (section 6.4).
+
+**New in 4.7:** an optional course description, `.course-description` (section 6.2): what the course's page says to someone deciding whether to buy it. Put a course's strongest selling point there, and first in `.course-summary` too, because nothing else before the modules reaches a buyer's page.
 
 **New in 4.6:** an optional course preview, `PRESENTATIONS.trailer` (section 9.2). The complete example's script now shows every word a slide holds: a case's question, a slide's chapter and caption, and the button on a closing slide.
 
@@ -131,7 +137,7 @@ There are three kinds, each built exactly as shown in the sections named:
 
 Section 8 shows a whole module and section 14 a whole course built this way. Never leave a part outside its panel, and never put a panel's content anywhere but where these sections show it.
 
-**Reserved class names.** These names tell CattoLMS what something is. Use each only as this document describes, and never for anything else: `masthead`, `course-cover`, `course-subtitle`, `course-summary`, `modules`, `module`, `m-titles`, `m-name`, `module-body`, `outcomes`, `video`, `video-cap`, `subs`, `s-summary`, `sub-inner`, `practical`, `answers`, `block-inner`, `review`, `review-inner`, `review-aid`, `final`, `diag`, `scale-list`. The panels' classes (`panel`, `panel-head`, `sub`, `s-present`, `s-cards`, `s-assess`, `s-answers`, `block`, `blocks`) are used exactly as sections 4 and 8 to 11 show. Every other class name is yours to choose.
+**Reserved class names.** These names tell CattoLMS what something is. Use each only as this document describes, and never for anything else: `masthead`, `course-cover`, `course-subtitle`, `course-summary`, `course-description`, `course-files`, `modules`, `module`, `m-titles`, `m-name`, `module-body`, `outcomes`, `video`, `video-cap`, `subs`, `s-summary`, `sub-inner`, `practical`, `answers`, `block-inner`, `review`, `review-inner`, `review-aid`, `final`, `diag`, `scale-list`. The panels' classes (`panel`, `panel-head`, `sub`, `s-present`, `s-cards`, `s-assess`, `s-answers`, `block`, `blocks`) are used exactly as sections 4 and 8 to 11 show. Every other class name is yours to choose.
 
 ### 4.1 The names are fixed
 
@@ -190,7 +196,7 @@ The masthead:
 | `data-level` | `Beginner`, `Intermediate` or `Advanced`. |
 | `h1` | The title alone. Never add the subtitle to it with a dash, a colon or a `<br>`. |
 | `.course-subtitle` | One line. |
-| `.course-summary` | One paragraph, up to about 60 words: shown on the course's card and page. |
+| `.course-summary` | One paragraph, up to about 60 words: shown on the course's card and page. A card shows only about its first 100 characters, so put what sells the course first. |
 | `.course-cover` | Optional and recommended: one SVG drawing, drawn as section 6.1 says, with no visible text in it (the site shows the title over it, and an `aria-label` describing the drawing is welcome), no scripts, under 200 KB. It becomes the picture on the course's card and page. One that has text or scripts in it or is too large is left out, and the import review says why. |
 
 ### 6.1 The cover drawing
@@ -216,6 +222,61 @@ CattoLMS shows the one drawing in three shapes, trimming it to each:
 So keep what matters inside the part that always shows: **x from 140 to 500, y from 30 to 330.** Outside it, draw only what can be lost, such as more background or the rest of a shape that still reads when trimmed.
 
 The site writes the course title over the bottom of the picture, on a shading that darkens the lower 40%. Put the drawing's main subject above y = 210, and nothing that has to be seen below it.
+
+### 6.2 The course description (optional)
+
+What the course's page shows under About this course, for someone deciding whether to buy it. Without it the page shows `.course-summary`. Write it when a course has more to say than one paragraph, above all an exam it prepares for, an accreditation, or a series it belongs to. Say only what the course really does.
+
+It is one closed panel straight after the masthead, before the introduction:
+
+```html
+<details class="course-description"><summary>About this course</summary>
+<p>What the course is and who it is for.</p>
+<h3>The exam this course prepares you for</h3>
+<p>What the exam is and how this course relates to it.</p>
+<table><thead><tr><th>Exam domain</th><th>Weight</th><th>Covered by</th></tr></thead><tbody><tr><td>Planning</td><td>40%</td><td>Modules 1 and 2</td></tr></tbody></table>
+</details>
+```
+
+Use `<p>`, `<h3>`, `<ul>`, `<ol>`, `<table>` and `<a>`. The panel is not part of the introduction, which only someone who has started the course or its public preview reads, so write in it whatever a buyer must see. A course's page draws it in the site's own styling, so it uses no classes of the course's own.
+
+### 6.3 The course's files (optional)
+
+A PDF, a spreadsheet or any other file a learner opens or downloads is never inside the course file. The file only names them, in one closed panel straight after the course description, before the introduction:
+
+```html
+<details class="course-files"><summary>Case files</summary>
+<p>What these files are and how to use them.</p>
+<ul>
+<li><a href="Garden-Planting-Plan.pdf">Planting plan</a> A one-page plan to print and fill in.</li>
+<li><a href="Garden-Budget.xlsx">Budget workbook</a> The working spreadsheet. Download it and save your own copy.</li>
+</ul>
+</details>
+```
+
+Each `<li>` is one file: the link's `href` is the file's exact name, the link's text is its title, and the words after the link describe it. Importing makes one section with the panel's title, before the first module. A PDF shows in the page with a Download button, and any other file is a Download button. Upload each file to the Resource Library first: one that is not there is left out, and the import review says so. To move a course together with its files, use its zip, not this file.
+
+Tell the learner where the files are by that section's title, and never send them to a "Resources area".
+
+### 6.4 The final assessment's time limit (optional)
+
+The final assessment allows two hours unless the file's head says otherwise, in minutes:
+
+```html
+<meta name="cattolms:final-time-limit" content="90">
+```
+
+Use it when the final is written as a mock of a real exam, so that it allows what the exam allows.
+
+### 6.5 The course's study time (optional)
+
+Say in the file's head how many hours the whole course takes, including the practical work, so that the course's page tells a buyer what the course itself says:
+
+```html
+<meta name="cattolms:study-hours" content="150">
+```
+
+A course of ten modules at about 15 hours a module is 150. Each module is shown its equal share. Without it the page adds up the parts, which counts only reading and watching and so reads far lower. Make it agree with what the introduction and the course preview say.
 
 ## 7. The introduction
 

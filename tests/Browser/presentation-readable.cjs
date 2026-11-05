@@ -20,13 +20,15 @@
    The front page's link to the presentation that introduces the site is followed in every bundled theme, on ordinary desktop
    and laptop screens: the whole player must be in view, its buttons included, with nothing scrolling sideways.
    CATTO_READABLE_REPORT names a file for the findings as JSON; CATTO_READABLE_ONLY=own runs only the fixture's course,
-   CATTO_READABLE_ONLY=site only the site's own, CATTO_READABLE_ONLY=front only the front page's link. */
+   CATTO_READABLE_ONLY=site only the site's own, CATTO_READABLE_ONLY=front only the front page's link, and
+   CATTO_READABLE_CODES=A-101,B-202 only the presentations of the courses with those codes, after changing them. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs');
 const zlib = require('node:zlib');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-presentation-readable-state.json'));
 const only = process.env.CATTO_READABLE_ONLY || '';
+const codes = (process.env.CATTO_READABLE_CODES || '').split(',').filter(Boolean);
 const MIN_PX = 10;
 const findings = [];
 const scrolling = [];
@@ -267,7 +269,7 @@ async function openDeck(page, url) {
         return page;
     };
     const failedToOpen = [];
-    if (state.decks.some((d) => d.kind === 'site') && (only === '' || only === 'front')) {
+    if (codes.length === 0 && state.decks.some((d) => d.kind === 'site') && (only === '' || only === 'front')) {
         for (const theme of state.themes) {
             for (const [width, height] of [[1440, 900], [1366, 768], [1920, 1080], [390, 844]]) {
                 const page = await session({viewport: {width, height}});
@@ -289,7 +291,7 @@ async function openDeck(page, url) {
     }
     if (only !== 'own' && only !== 'front') {
         const page = await session();
-        for (const deck of state.decks.filter((d) => !d.own)) {
+        for (const deck of state.decks.filter((d) => !d.own && (codes.length === 0 || codes.includes(d.code)))) {
             try {
                 await openDeck(page, deck.url);
                 await chrome(page, deck, 'the reader');
@@ -299,7 +301,7 @@ async function openDeck(page, url) {
         }
         await page.context().close();
     }
-    if (only !== 'site' && only !== 'front') {
+    if (codes.length === 0 && only !== 'site' && only !== 'front') {
         for (const deck of state.decks.filter((d) => d.own)) {
             for (const theme of state.themes) {
                 for (const width of [1440, 390]) {

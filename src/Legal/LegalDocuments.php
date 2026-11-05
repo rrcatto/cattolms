@@ -22,6 +22,9 @@ print comes from there. No name, address or legal form of a real business is wri
 Changing a document's text means changing its date here in the same change.
 
 Changelog:
+2026/11/05 SAST
+- The Privacy Policy gains a messaging service in Who receives your information: the site's owner is told of each
+  registration and paid order (owner, 2026-11-05); its date moves to 2026-11-05.
 2026/10/26 SAST
 - Privacy: the sign-up check's registration records, a sign-in's country in the activity log, and unfinished
   registrations kept 5 years (owner, 2026-10-26); its date moves to 2026-10-26.
@@ -76,7 +79,7 @@ final class LegalDocuments
             'intro' => 'These terms apply to everyone who uses this site and to every purchase made on it.'],
         self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-19',
             'intro' => 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.'],
-        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-11-04',
+        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-11-05',
             'intro' => 'This policy explains how personal information is handled on this site, as the Protection of Personal Information Act 4 of 2013 (POPIA) requires.'],
     ];
 

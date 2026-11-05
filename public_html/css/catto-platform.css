@@ -498,6 +498,10 @@ summary{display:list-item;cursor:pointer}
 
 /* The dashboard's money (owner, 2026-10-21): the period in one row above everything it governs, then each labelled group
    of figures and the two charts with room between them. */
+/* A page that refreshes itself says so (UX rule 8.6b, partials/live-status.html.twig). Words and a dot in the text's own colour, so every theme keeps its look. */
+.cl-live-status{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:0 0 1rem}
+.cl-live-status[hidden]{display:none}
+.cl-live-dot{width:.55rem;height:.55rem;border-radius:50%;background:currentColor;flex:0 0 auto}
 .cl-money-period{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem 1rem;margin:0}
 .cl-money-period>.cl-ui-field{flex:0 1 12rem;margin:0}
 .cl-money-group{margin-top:1.75rem}
@@ -1596,7 +1600,62 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
    with section spacing) does not add its margin to it. Between blocks the margins stay. */
 :is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section>.cl-ui-spaced:first-child{margin-top:0}
 :is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section>.cl-ui-spaced:last-child{margin-bottom:0}
+/* A course page's About this course may hold a table and a path of courses (owner-approved mockup, 2026-11-05). */
+.cl-prose h3{margin:1.25rem 0 .5rem;font-size:1.2rem!important;line-height:1.3}
+.cl-prose table{width:100%;border-collapse:collapse;margin:.5rem 0 1rem;font-size:.95em}
+.cl-prose th{text-align:left;font-weight:600;padding:.4rem .9rem .4rem 0;border-bottom:1px solid var(--cl-border,var(--cl-line,#dfe4ea))}
+.cl-prose td{padding:.45rem .9rem .45rem 0;border-bottom:1px solid var(--cl-border,var(--cl-line,#dfe4ea));vertical-align:top}
+@media (max-width:640px){.cl-prose table{display:block;overflow-x:auto}}
+.cl-course-path{list-style:none;margin:.5rem 0 1rem;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.75rem}
+.cl-course-path li{border:1px solid var(--cl-border,var(--cl-line,#dfe4ea));padding:.7rem .9rem}
+.cl-course-path li.is-this-course{border-color:currentColor}
+.cl-course-path li>strong{display:block;font-size:.78em;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
 .cl-flash-stack{display:grid;gap:.5rem;margin-bottom:1rem}
+/* A solid notice looks the same in every theme and on the pages where a course is taken, so its kind is a real choice (owner,
+   2026-11-05: "I need each different type of notification to show a real difference"). Themes and the reader style notices
+   after this file, so its colours are !important. */
+.cl-ui-notice.cl-ui-notice--solid{justify-content:flex-start;align-items:flex-start;gap:.9rem;padding:1rem 1.25rem!important;border:0!important;background:var(--cl-solid-background)!important;color:var(--cl-solid-text)!important}
+.cl-ui-notice--solid.cl-ui-notice--success{--cl-solid-background:#166534;--cl-solid-text:#fff}
+.cl-ui-notice--solid.cl-ui-notice--info{--cl-solid-background:#1e4e8c;--cl-solid-text:#fff}
+.cl-ui-notice--solid.cl-ui-notice--warning{--cl-solid-background:#f5b301;--cl-solid-text:#231700}
+.cl-ui-notice--solid.cl-ui-notice--danger{--cl-solid-background:#9f1d1d;--cl-solid-text:#fff}
+.cl-ui-notice--solid .cl-ui-notice-heading{color:inherit!important}
+.cl-ui-notice--solid strong,.cl-ui-notice--solid small{color:inherit!important}
+.cl-ui-notice-icon{flex:none;display:inline-flex;margin-top:.1rem}
+.cl-ui-notice-icon .cl-ui-icon{width:1.75rem;height:1.75rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Every other notice says what kind of message it is by its colours, the same in every theme and on the pages where a
+   course is taken (owner, 2026-11-05: "Yes, fix the ordinary notices"). A theme keeps its shape and type. Same hues as the
+   site notification's kinds, paler, because these are many and it is one. Buttons and badges inside keep their own colours. */
+.cl-ui-notice:not(.cl-ui-notice--solid){background:var(--cl-notice-background)!important;color:var(--cl-notice-text)!important;border-color:var(--cl-notice-edge)!important;border-left-width:4px!important;border-left-style:solid!important}
+.cl-ui-notice--success{--cl-notice-background:#bfe8cc;--cl-notice-text:#0f3f21;--cl-notice-edge:#166534}
+.cl-ui-notice--info{--cl-notice-background:#c6dcf9;--cl-notice-text:#12325c;--cl-notice-edge:#1e4e8c}
+.cl-ui-notice--warning{--cl-notice-background:#fbdf94;--cl-notice-text:#3d2b00;--cl-notice-edge:#b77f00}
+.cl-ui-notice--danger{--cl-notice-background:#f7c9c4;--cl-notice-text:#5c1010;--cl-notice-edge:#9f1d1d}
+.cl-ui-notice--neutral{--cl-notice-background:#ece3d6;--cl-notice-text:#3b3027;--cl-notice-edge:#8a7a68}
+/* A section's state, in its title (owner, 2026-11-05: "In the Title of the accordion, show a status message"). */
+.cl-ui-accordion-summary .cl-ui-accordion-status{display:inline-flex;flex:0 1 auto;align-items:center;gap:.5rem;margin-right:auto;padding:.2rem .75rem;font-size:.95rem;font-weight:500;opacity:1!important;text-align:left}
+.cl-ui-accordion-status .cl-ui-icon{flex:none;width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round}
+.cl-ui-accordion-status--success{background:#bfe8cc!important;color:#0f3f21!important}
+.cl-ui-accordion-status--danger{background:#f7c9c4!important;color:#5c1010!important}
+.cl-ui-accordion-status--neutral{background:#ece3d6!important;color:#3b3027!important}
+.cl-owner-messages{display:grid;gap:1.25rem}
+.cl-owner-messages-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+.cl-owner-messages-actions form{margin:0}
+.cl-owner-messages-note{margin:0;font-weight:500}
+.cl-owner-messages-note--danger{color:#8f1d1d}
+.cl-owner-messages-note--success{color:#0f3f21}
+.cl-ui-notice:not(.cl-ui-notice--solid) :is(p,li,strong,small,em,b,span,h2,h3,h4,h5,.cl-ui-notice-heading):not(.cl-ui-action,.cl-ui-action *,.cl-ui-badge,.cl-ui-badge *){color:inherit!important}
+.cl-ui-notice:not(.cl-ui-notice--solid) a:not(.cl-ui-action){color:inherit!important;text-decoration:underline}
+.cl-site-notification-samples{display:grid;gap:.5rem;margin:.75rem 0 1.25rem}
+.cl-site-notification-samples-label{margin:0;font-weight:600}
+/* The site notification's countdown (Settings > Site notification, owner 2026-11-05). */
+.cl-flash-stack[hidden]{display:none}
+.cl-site-countdown{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem;margin-top:.5rem}
+.cl-site-countdown-words{font-weight:600}
+.cl-site-countdown-unit{white-space:nowrap}
+.cl-site-countdown-unit[hidden]{display:none}
+.cl-site-countdown-unit strong{font-size:1.15em;font-variant-numeric:tabular-nums}
+.cl-site-countdown-until{flex-basis:100%;opacity:.85}
 .cl-identity{min-width:0}
 .cl-identity-meta{min-width:0}
 .cl-identity-avatar{width:72px;height:72px;object-fit:cover;border-radius:12px;flex:0 0 auto}
@@ -1718,7 +1777,7 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
    icon beside a smaller title, less padding, a smaller line. */
 .cl-ui-picture-choice--small.cl-ui-picture-choice--cards{margin-bottom:1rem}
 .cl-ui-picture-choice--small .cl-ui-picture-choice-legend{font-size:.95rem}
-.cl-ui-picture-choice--small.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:.6rem}
+.cl-ui-picture-choice--small.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:.6rem}
 /* Feature card checkboxes (owner, 2026-11-01): three to a row on a wider screen however many there are, so a lone card
    (a placement's Public preview) is the size of each of a section's three, not the whole width. */
 @media (min-width:768px){.cl-ui-picture-choice--multiple.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -1734,6 +1793,13 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:991.98px){.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:575.98px){.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:minmax(0,1fr)}}
+/* A lone card takes the whole row, and columns 1 stacks the cards where a row of three would be too narrow for their words
+   (owner, 2026-11-05: every radio and checkbox a feature card). A card that cannot be chosen says so by looking it. */
+.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--single .cl-ui-picture-choice-grid,.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--one .cl-ui-picture-choice-grid{grid-template-columns:minmax(0,1fr)}
+.cl-ui-picture-choice-item:has(input:disabled){opacity:.6;cursor:not-allowed}
+.cl-ui-notice+.cl-ui-picture-choice--cards,.cl-ui-field+.cl-ui-picture-choice--cards{margin-top:1rem}
+.cl-ui-picture-choice-item--icon .cl-ui-picture-choice-text{min-width:0;overflow-wrap:anywhere}
+@media (max-width:575.98px){.cl-ui-picture-choice.cl-ui-picture-choice--small.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Certificates: the design editor's preview above its form, and the preview itself - the PDF the
  * renderer draws, shown by the browser's own PDF viewer. A design's text styles and fields look in
@@ -2103,13 +2169,18 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 /* Every reader page has the one paging row (partials/course-item-paging): each slot keeps its own column, so a page
    without Mark complete (a section, an assessment) or without Previous or Next leaves the others in place. */
 .cl-course-item-paging{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+/* A result's score and its grade (owner, 2026-11-05). */
+.cl-result-score{display:flex;flex-wrap:wrap;align-items:baseline;gap:.75rem;margin-bottom:.75rem}
+.cl-result-score strong{font-size:clamp(2.25rem,5vw,3rem);font-weight:600;line-height:1.1}
+.cl-result-score span{font-size:1.25rem;font-weight:600}
 #cl-course-item-paging{scroll-margin-top:11rem}
 .cl-course-item-paging-previous{grid-column:1;grid-row:1;justify-self:start}
 .cl-course-item-complete{grid-column:2;grid-row:1;justify-self:center;margin:0}
+.cl-course-item-paging-centre{grid-column:2;grid-row:1;justify-self:center}
 .cl-course-item-paging-next{grid-column:3;grid-row:1;justify-self:end}
 .cl-course-item-complete.is-done .cl-ui-action{background:#1b8a4b;border-color:#1b8a4b;color:#fff}
 .cl-course-item-complete.is-done .cl-ui-action:hover{background:#156e3b;border-color:#156e3b}
-@media (max-width:520px){.cl-course-item-paging{grid-template-columns:1fr 1fr}.cl-course-item-complete{grid-column:1/-1;grid-row:1;margin-bottom:.5rem}.cl-course-item-paging-previous{grid-column:1;grid-row:2}.cl-course-item-paging-next{grid-column:2;grid-row:2}}
+@media (max-width:520px){.cl-course-item-paging{grid-template-columns:1fr 1fr}.cl-course-item-complete{grid-column:1/-1;grid-row:1;margin-bottom:.5rem}.cl-course-item-paging-centre{grid-column:1/-1;grid-row:1;justify-self:center;margin-bottom:.5rem}.cl-course-item-paging-previous{grid-column:1;grid-row:2}.cl-course-item-paging-next{grid-column:2;grid-row:2}}
 .cl-section-outline{list-style:none;margin:1.5rem 0 0;padding:0;border:1px solid #e0e6ed;border-radius:.75rem;overflow:hidden}
 .cl-section-outline li{display:grid;grid-template-columns:minmax(7rem,9rem) minmax(0,1fr) auto;gap:.75rem;align-items:baseline;padding:.7rem 1rem;border-top:1px solid #e0e6ed}
 .cl-section-outline li:first-child{border-top:0}

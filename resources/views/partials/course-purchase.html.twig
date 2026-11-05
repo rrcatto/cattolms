@@ -27,16 +27,9 @@
 			<input type="hidden" name="course_id" value="{{ purchase.course_id }}">
 			{% if landing_page_id|default(0) %}<input type="hidden" name="landing_page_id" value="{{ landing_page_id }}">{% endif %}
 			{% if purchase_style == 'full' %}
-				<div class="vstack gap-3 mb-5">
-					{% for price in purchase.variants %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: price.price_label ~ ' · ' ~ price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})} %}
-{% block control %}
-<input class="cl-check mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.id == purchase.default_variant.id ? 'checked' : '' }} required>
-{% endblock %}
-{% block label_content %}{% include '@platform/partials/price.html.twig' with {price: price, price_saving: true} %} · {{ price.access_period_label }} access{{ price.label ? ' · ' ~ price.label : '' }}{% endblock %}
-{% endembed %}
-					{% endfor %}
-				</div>
+				{% embed ui_template('form.picture-choice') with {props: ui_props('form.picture-choice', {name: 'variant_id', legend: 'Choose how long', legend_hidden: true, size: 'small', columns: 1, required: true, selected: purchase.default_variant.id, items: purchase.variants|map(price => {value: price.id, label: price.price_label, icon: lucide('calendar-days'), note: price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})})} %}
+				{% block item_label %}{% for price in purchase.variants|filter(one => one.id == item.value) %}{% include '@platform/partials/price.html.twig' with {price: price, price_saving: true} %}{% endfor %}{% endblock %}
+				{% endembed %}
 			{% else %}
 				<input type="hidden" name="variant_id" value="{{ purchase.default_variant.id }}">
 				<p class="cl-course-purchase-price"><strong>{% include '@platform/partials/price.html.twig' with {price: purchase.default_variant} %}</strong> · {{ purchase.default_variant.access_period_label }} access{% if purchase.variants|length > 1 %} · other periods available{% endif %}</p>

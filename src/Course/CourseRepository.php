@@ -1968,13 +1968,13 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO courses
                  (public_id,code,category_id,slug,title,subtitle,summary,description_html,level,
-                  estimated_minutes,status,default_access_period_seconds,introduction_html,show_outline_on_intro,
+                  estimated_minutes,status,default_access_period_seconds,introduction_html,
                   certificate_enabled,certificate_accreditation,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
                   publication_approval_status,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
              VALUES (:public_id,:code,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
-                     :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,:show_outline_on_intro,
+                     :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,
                      :certificate_enabled,:certificate_accreditation,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
                      :publication_approval_status,:interchange_schema_version,:created_by,:updated_by,
@@ -1995,7 +1995,6 @@ final class CourseRepository
                 'status' => (string) ($data['status'] ?? 'draft'),
                 'default_access_period_seconds' => $data['default_access_period_seconds'],
                 'introduction_html' => (string) ($data['introduction_html'] ?? ''),
-                'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
                 'certificate_enabled' => (bool) $data['certificate_enabled'],
                 'certificate_accreditation' => trim((string) ($data['certificate_accreditation'] ?? '')) ?: null,
                 'course_style_key' => $data['course_style_key'] ?: 'standard',
@@ -2037,7 +2036,6 @@ final class CourseRepository
             'estimated_minutes' => $data['estimated_minutes'] ?: null,
             'default_access_period_seconds' => $data['default_access_period_seconds'],
             'introduction_html' => (string) ($data['introduction_html'] ?? ''),
-            'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) $data['certificate_enabled'],
             'certificate_accreditation' => trim((string) ($data['certificate_accreditation'] ?? '')) ?: null,
             'course_style_key' => $data['course_style_key'] ?: 'standard',
@@ -2047,7 +2045,7 @@ final class CourseRepository
         $set = 'category_id=:category_id,slug=:slug,title=:title,subtitle=:subtitle,summary=:summary,'
             . 'description_html=:description_html,level=:level,estimated_minutes=:estimated_minutes,'
             . 'default_access_period_seconds=:default_access_period_seconds,introduction_html=:introduction_html,'
-            . 'show_outline_on_intro=:show_outline_on_intro,certificate_enabled=:certificate_enabled,'
+            . 'certificate_enabled=:certificate_enabled,'
             . 'certificate_accreditation=:certificate_accreditation,course_style_key=:course_style_key,'
             . 'updated_by_user_id=:updated_by,updated_at=:updated_at';
 
@@ -2431,6 +2429,17 @@ final class CourseRepository
                 ['enrolment_id' => $enrolmentId]
             );
         }
+    }
+
+    /**
+     * The course result saved when the final assessment was finished.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function courseResult(int $enrolmentId): ?array
+    {
+        $row = $this->db->fetchAssociative('SELECT module_percentage,final_percentage,overall_percentage,grade_code FROM course_results WHERE enrolment_id=:enrolment_id', ['enrolment_id' => $enrolmentId]);
+        return $row === false ? null : $row;
     }
 
     public function saveCourseResult(

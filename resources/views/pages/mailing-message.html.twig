@@ -70,22 +70,16 @@
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Preview line', for: 'mc-preheader', full_width: true, help: 'The grey line many inboxes show after the subject.'})} %}{% block control %}<input class="cl-input" id="mc-preheader" name="preheader" maxlength="200" value="{{ campaign.preheader }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% if campaign.kind == 'message' and campaign.status == 'draft' %}
 				<input type="hidden" name="lists_shown" value="1">
-				<fieldset class="cl-mailing-lists">
-					<legend class="h6">Who it goes to</legend>
-					{% for list in lists %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name ~ ' (' ~ (list.followers == 1 ? '1 person' : list.followers ~ ' people') ~ ')'})} %}{% block control %}<input type="checkbox" name="list_ids[]" value="{{ list.id }}"{{ list.id in campaign.list_ids ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% else %}
-						<p class="help">Nobody follows anything yet.</p>
-					{% endfor %}
-				</fieldset>
+				{% set list_icons = {news: 'newspaper', course: 'book-open', category: 'folder', tag: 'tag', own: 'list'} %}
 				{% if lists %}
-				<fieldset class="cl-mailing-lists">
-					<legend class="h6">Leave out the people on</legend>
-					<p class="help">Someone on a list ticked here does not get it, even when they are on a list it goes to.</p>
-					{% for list in lists %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name})} %}{% block control %}<input type="checkbox" name="exclude_list_ids[]" value="{{ list.id }}"{{ list.id in campaign.exclude_list_ids|default([]) ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% endfor %}
-				</fieldset>
+				<div class="cl-mailing-lists">
+					{{ ui('form.picture-choice', {multiple: true, list: 'list_ids', legend: 'Who it goes to', size: 'small', selected: lists|filter(list => list.id in campaign.list_ids)|map(list => list.id), items: lists|map(list => {value: list.id, label: list.name, icon: lucide(list_icons[list.kind]|default('list')), note: list.followers == 1 ? '1 person' : list.followers ~ ' people'})}) }}
+				</div>
+				<div class="cl-mailing-lists">
+					{{ ui('form.picture-choice', {multiple: true, list: 'exclude_list_ids', legend: 'Leave out the people on', size: 'small', help: 'Someone on a list ticked here does not get it, even when they are on a list it goes to.', selected: lists|filter(list => list.id in campaign.exclude_list_ids|default([]))|map(list => list.id), items: lists|map(list => {value: list.id, label: list.name, icon: lucide(list_icons[list.kind]|default('list'))})}) }}
+				</div>
+				{% else %}
+				<p class="help">Nobody follows anything yet.</p>
 				{% endif %}
 				{% endif %}
 				{# Its template, sender, most to send and own plain-text copy (owner, 2026-10-28: decisions 5B and 9A). #}
@@ -96,12 +90,13 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sender\'s name', for: 'mc-from-name', help: 'Empty uses Sending settings\' (' ~ sender_name ~ ').'})} %}{% block control %}<input class="cl-input" id="mc-from-name" name="from_name" maxlength="120" value="{{ campaign.from_name|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replies go to', for: 'mc-reply-to', help: 'Empty sends replies to the address it comes from.'})} %}{% block control %}<input class="cl-input" type="email" id="mc-reply-to" name="reply_to" value="{{ campaign.reply_to|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% endblock %}{% endembed %}
-				<fieldset class="cl-mailing-lists">
-					<legend class="h6">The plain-text copy</legend>
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Made from the message'})} %}{% block control %}<input type="radio" name="plain_mode" value="made"{{ not campaign.plain_text ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Written by me'})} %}{% block control %}<input type="radio" name="plain_mode" value="own"{{ campaign.plain_text ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				<div class="cl-mailing-lists">
+					{{ ui('form.picture-choice', {name: 'plain_mode', legend: 'The plain-text copy', size: 'small', selected: campaign.plain_text ? 'own' : 'made', items: [
+						{value: 'made', label: 'Made from the message', icon: lucide('wand-sparkles'), note: 'The site writes it from what the email says.'},
+						{value: 'own', label: 'Written by me', icon: lucide('pen-line'), note: 'Your own words, in the box below.'},
+					]}) }}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'My plain-text copy', for: 'mc-plain', full_width: true, help: 'Used when written by you, for email apps that show no pictures or colours. ' ~ placeholder ~ ' is the reader\'s first name.'})} %}{% block control %}<textarea class="cl-input" id="mc-plain" name="plain_text" rows="5" maxlength="20000" {{ ui_field_attrs(props) }}>{{ campaign.plain_text|default('') }}</textarea>{% endblock %}{% endembed %}
-				</fieldset>
+				</div>
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 			</form>
 			{% else %}
@@ -189,8 +184,10 @@
 				<form class="cl-mailing-send" action="/mailing/messages/{{ campaign.id }}/schedule" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<p>{{ audience == 1 ? 'It reaches 1 person now.' : 'It reaches ' ~ audience ~ ' people now.' }} Copies go out at the pace Settings allow.</p>
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send it now'})} %}{% block control %}<input type="radio" name="when" value="now" checked>{% endblock %}{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send it at a time'})} %}{% block control %}<input type="radio" name="when" value="later">{% endblock %}{% endembed %}
+					{{ ui('form.picture-choice', {name: 'when', legend: 'When it goes', legend_hidden: true, size: 'small', selected: 'now', items: [
+						{value: 'now', label: 'Send it now', icon: lucide('send'), note: 'Copies start going straight away.'},
+						{value: 'later', label: 'Send it at a time', icon: lucide('calendar-clock'), note: 'It waits until the date and time below.'},
+					]}) }}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date and time', for: 'mc-send-at', help: 'In the site\'s time (' ~ site_zone ~ ').'})} %}{% block control %}<input class="cl-input" type="datetime-local" id="mc-send-at" name="send_at" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send', confirm: 'Send ' ~ campaign.name ~ ' to the people on its lists?'}) }}{% endblock %}{% endembed %}
 				</form>

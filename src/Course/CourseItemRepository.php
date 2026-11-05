@@ -643,6 +643,19 @@ final class CourseItemRepository
         return $row === false ? null : $row;
     }
 
+    /** The whole course's study time as it states it, or 0: the page adds up its parts. */
+    public function courseStudyMinutes(int $courseId): int
+    {
+        return (int) $this->db->fetchOne('SELECT COALESCE(estimated_minutes, 0) FROM courses WHERE id = :id', ['id' => $courseId]);
+    }
+
+    /** @return array<string,mixed>|null The Resource with this file's name, the name it was uploaded under first. */
+    public function resourceByFilename(string $filename): ?array
+    {
+        $row = $this->db->fetchAssociative('SELECT * FROM resources WHERE original_filename=:name OR filename=:name ORDER BY (original_filename=:name) DESC, id LIMIT 1', ['name' => $filename]);
+        return $row === false ? null : $row;
+    }
+
     /** @param array<string,mixed> $data */
     public function createResource(array $data, int $userId): int
     {

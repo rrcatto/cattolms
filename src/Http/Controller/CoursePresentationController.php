@@ -51,6 +51,7 @@ final class CoursePresentationController extends BaseController
         $course = $this->publicCourse();
         $course = $this->withVisitorTicks($course);
         $this->publicView($course, 'course_page');
+        $course['introduction_html'] = GradeScale::resolve((string) ($course['introduction_html'] ?? ''), $this->courses->gradeBands((int) $course['id']));
         return $this->render('course-public-preview', ['title' => (string) $course['title'] . ' preview', 'course' => $course, 'course_content_mode' => true, 'is_public_preview' => true]);
     }
 
@@ -164,10 +165,13 @@ final class CoursePresentationController extends BaseController
     {
         $course = $this->withVisitorTicks($this->publicCourse());
         $attempt = $this->keepAttempt($this->attempts->session($this->storedAttempt($course)));
-        if ($attempt['status'] !== 'in_progress') { $this->redirect($this->attemptPath($course, (string) $attempt['public_id'], '/result')); }
-        $feedback = is_array($_SESSION[self::FEEDBACK] ?? null) ? $_SESSION[self::FEEDBACK] : null; unset($_SESSION[self::FEEDBACK]);
-        $session = $this->attempts->view($attempt);
+        $feedback = is_array($_SESSION[self::FEEDBACK] ?? null) && ($_SESSION[self::FEEDBACK]['session'] ?? '') === (string) $attempt['public_id'] ? $_SESSION[self::FEEDBACK] : null; unset($_SESSION[self::FEEDBACK]);
         $course['current_node_id'] = (int) $attempt['node_id'];
+        if ($attempt['status'] !== 'in_progress') {
+            if ($feedback === null) { $this->redirect($this->attemptPath($course, (string) $attempt['public_id'], '/result')); }
+            return $this->render('assessment-last-answer', ['course' => $course, 'title' => (string) $attempt['assessment_title'], 'session' => $this->attempts->result($attempt, (array) $course['structure']), 'feedback' => $feedback, 'result_url' => $this->attemptPath($course, (string) $attempt['public_id'], '/result'), 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '']);
+        }
+        $session = $this->attempts->view($attempt);
         return $this->render('assessment-question', ['course' => $course, 'title' => (string) $session['assessment_title'], 'session' => $session, 'question' => $session['question'], 'feedback' => $feedback, 'respond_action' => $this->attemptPath($course, (string) $attempt['public_id'], '/respond'), 'finish_action' => $this->attemptPath($course, (string) $attempt['public_id'], '/finish'), 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '', 'load_assessment_timer' => true]);
     }
 
@@ -179,8 +183,8 @@ final class CoursePresentationController extends BaseController
         return $this->handle(function () use ($course, $attempt): void {
             $answer = $this->attempts->respond($attempt, (int) ($_POST['question_id'] ?? 0), isset($_POST['option_id']) ? (int) $_POST['option_id'] : null, isset($_POST['skip']));
             $attempt = $this->keepAttempt($answer['attempt']);
-            if ($answer['feedback'] !== null) { $_SESSION[self::FEEDBACK] = $answer['feedback']; }
-            $this->redirect($this->attemptPath($course, (string) $attempt['public_id'], $attempt['status'] === 'in_progress' ? '' : '/result'));
+            if ($answer['feedback'] !== null) { $_SESSION[self::FEEDBACK] = ['session' => (string) $attempt['public_id']] + $answer['feedback']; }
+            $this->redirect($this->attemptPath($course, (string) $attempt['public_id'], $attempt['status'] === 'in_progress' || $answer['feedback'] !== null ? '' : '/result'));
         }, $this->attemptPath($course, (string) $attempt['public_id']));
     }
 
@@ -202,7 +206,10 @@ final class CoursePresentationController extends BaseController
         $course = $this->withVisitorTicks($publicCourse);
         $course['current_node_id'] = (int) $attempt['node_id'];
         $query = $course['public_preview_query'];
-        return $this->render('assessment-session-result', ['course' => $course, 'title' => 'Assessment result', 'session' => $this->attempts->result($attempt, (array) $course['structure']), 'review_prompt' => null, 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '', 'item_base' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview/', 'item_query' => $query, 'course_url' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview' . $query, 'retake_url' => $this->assessmentPath($course, (int) $attempt['node_id'], (string) $attempt['assessment_key']) . $query]);
+        $session = $this->attempts->result($attempt, (array) $course['structure']);
+        $session['next_node'] = CourseNavigation::neighbours((array) $course['structure'], (int) $attempt['node_id'])['next'];
+        $session['course_result'] = $this->attempts->courseResult($attempt, array_values($this->storedAttempts()));
+        return $this->render('assessment-session-result', ['course' => $course, 'title' => 'Assessment result', 'session' => $session, 'review_prompt' => null, 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '', 'item_base' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview/', 'item_query' => $query, 'course_url' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview' . $query, 'retake_url' => $this->assessmentPath($course, (int) $attempt['node_id'], (string) $attempt['assessment_key']) . $query]);
     }
 
     #[Route('/course-resources/{public_id}', name: 'course_resource_file', requirements: ['public_id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]

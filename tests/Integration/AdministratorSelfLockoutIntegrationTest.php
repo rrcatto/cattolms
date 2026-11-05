@@ -92,7 +92,8 @@ final class AdministratorSelfLockoutIntegrationTest extends TestCase
     {
         $page = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-person-profile.html.twig');
         self::assertStringContainsString("{% elseif is_own_account and profile.status == 'active' %}", $page);
-        self::assertStringContainsString('<input type="hidden" name="roles[]" value="ADMIN"><input type="checkbox" checked disabled', $page, 'The own ADMIN box is fixed, and the role still sent.');
+        self::assertStringContainsString('{% if pp_keeps_admin %}<input type="hidden" name="roles[]" value="ADMIN">{% endif %}', $page, 'The own ADMIN role is still sent.');
+        self::assertMatchesRegularExpression("/disabled: pp_keeps_admin and option\\.role_key == 'ADMIN'/", $page, 'And its feature card is fixed.');
     }
 
     private function accountStatus(int $userId): string

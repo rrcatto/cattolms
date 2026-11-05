@@ -174,6 +174,36 @@ final class PublicPreviewAssessmentIntegrationTest extends TestCase
         self::assertFalse(PublicAssessmentAttempts::ticksItsPart($finished), 'Practice on a graded assessment does not tick it.');
     }
 
+    public function testPracticeSaysHowTheLastAnswerWentAndAGradedAttemptDoesNot(): void
+    {
+        ['node' => $node, 'key' => $key] = $this->nodes['module'];
+        foreach (['practice' => true, 'graded' => false] as $mode => $says) {
+            $attempt = $this->attempts->session($this->attempts->start($this->course, $node, $key, $mode));
+            do {
+                $question = (int) $this->attempts->view($attempt)['question']['question_id'];
+                $answer = $this->attempts->respond($attempt, $question, $this->right($question), false);
+                $attempt = $answer['attempt'];
+            } while ($attempt['status'] === 'in_progress');
+            self::assertSame($says, $answer['feedback'] !== null, $mode);
+        }
+    }
+
+    public function testAVisitorsCourseResultIsWorkedOutAsALearnersIs(): void
+    {
+        if (!isset($this->nodes['final'])) self::markTestSkipped('The example has no final assessment.');
+        $course = (int) $this->course['id'];
+        $attempt = static fn(int $node, string $role, float $percentage, string $mode = 'graded'): array => ['course_id' => $course, 'node_id' => $node, 'assessment_role' => $role, 'attempt_mode' => $mode, 'status' => 'submitted', 'percentage' => $percentage];
+        $final = $attempt($this->nodes['final']['node'], 'final', 80.0);
+        $module = $attempt($this->nodes['module']['node'], 'content', 60.0);
+        $practice = $attempt($this->nodes['module']['node'], 'content', 100.0, 'practice');
+        $result = $this->attempts->courseResult($final, [$module, $practice, $final]);
+        self::assertNotNull($result);
+        self::assertSame(80.0, (float) $result['final_percentage']);
+        self::assertGreaterThan(0.0, (float) $result['module_percentage']);
+        self::assertSame(round(((float) $result['module_percentage'] + 80.0) / 2, 2), (float) $result['overall_percentage'], 'Half and half, practice left out.');
+        self::assertNull($this->attempts->courseResult($module, [$module, $final]), 'Only the final says it.');
+    }
+
     public function testFinishNowScoresTheRestAsUnanswered(): void
     {
         ['node' => $node, 'key' => $key] = $this->nodes['module'];

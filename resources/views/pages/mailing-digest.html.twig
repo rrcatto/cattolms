@@ -38,15 +38,16 @@
 		{% if can_manage and dg.held %}
 		<form id="release-form" class="cl-mailing-release" action="/mailing/digest/release" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<fieldset class="cl-mailing-lists">
-				<legend class="h6">When the ticked updates go</legend>
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Now'})} %}{% block control %}<input type="radio" name="when" value="now" checked>{% endblock %}{% endembed %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'At a day and time I choose'})} %}{% block control %}<input type="radio" name="when" value="later">{% endblock %}{% endembed %}
+			<div class="cl-mailing-lists">
+				{{ ui('form.picture-choice', {name: 'when', legend: 'When the ticked updates go', size: 'small', selected: 'now', items: [
+					{value: 'now', label: 'Now', icon: lucide('send'), note: 'They go as soon as you release them.'},
+					{value: 'later', label: 'At a day and time I choose', icon: lucide('calendar-clock'), note: 'They wait until the day and time below.'},
+				]}) }}
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Day', for: 'release-date'})} %}{% block control %}<input class="cl-input" type="date" id="release-date" name="date" min="{{ dg.now_date }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time', for: 'release-time', help: 'The site\'s time, such as 09:00.'})} %}{% block control %}<input class="cl-input" type="time" id="release-time" name="time" value="09:00" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% endblock %}{% endembed %}
-			</fieldset>
+			</div>
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release the ticked updates', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
 		</form>
 		{% elseif not dg.held %}

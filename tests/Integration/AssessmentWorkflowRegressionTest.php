@@ -83,6 +83,7 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             self::assertSame('submitted', (string) $practiceResult['status']);
             self::assertSame('practice', (string) $practiceResult['attempt_mode']);
             self::assertSame(100.0, (float) $practiceResult['percentage']);
+            self::assertTrue((bool) $practiceResult['feedback']['is_correct'], 'Practice says how the last answer went, before the result.');
 
             $attemptCount = $db->fetchAllAssociative(
                 'SELECT COUNT(*)::int AS total FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id',
@@ -103,6 +104,8 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             );
             self::assertSame('submitted', (string) $gradedResult['status']);
             self::assertSame(100.0, (float) $gradedResult['percentage']);
+            self::assertArrayNotHasKey('feedback', $gradedResult, 'A graded attempt says nothing until its result.');
+            self::assertNull($gradedResult['course_result'], 'Only the final says the course result.');
 
             $attempt = $db->fetchAllAssociative(
                 'SELECT percentage,passed FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id',
@@ -132,6 +135,7 @@ final class AssessmentWorkflowRegressionTest extends TestCase
                 false
             );
             self::assertSame(100.0, (float) $finalResult['percentage']);
+            self::assertSame(100.0, (float) $finalResult['course_result']['overall_percentage'], 'The final says the course result.');
 
             $result = $db->fetchAllAssociative(
                 'SELECT module_percentage,final_percentage,overall_percentage,grade_code,passed FROM course_results WHERE enrolment_id=:id',

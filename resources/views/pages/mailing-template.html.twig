@@ -27,11 +27,12 @@
 				<input type="hidden" name="sample" value="{{ sample }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', help: 'For you only. Readers never see it.'})} %}{% block control %}<input class="cl-input" id="template-name" name="name" value="{{ template.name }}" maxlength="120" required data-certificate-preview-ignore {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 
-				<fieldset class="cl-template-group">
-					<legend class="h6">How this template is made</legend>
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Design it here, with the choices below'})} %}{% block control %}<input type="radio" name="mode" value="design"{{ template.mode == 'design' ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Write it in HTML, for full control'})} %}{% block control %}<input type="radio" name="mode" value="html"{{ template.mode == 'html' ? ' checked' : '' }}>{% endblock %}{% endembed %}
-				</fieldset>
+				<div class="cl-template-group">
+					{{ ui('form.picture-choice', {name: 'mode', legend: 'How this template is made', size: 'small', selected: template.mode, items: [
+						{value: 'design', label: 'Design it here, with the choices below', icon: lucide('palette'), note: 'Colours, type and layout, chosen on this page.'},
+						{value: 'html', label: 'Write it in HTML, for full control', icon: lucide('code-xml'), note: 'Your own markup, with nothing chosen for you.'},
+					]}) }}
+				</div>
 
 				<fieldset class="cl-template-group">
 					<legend class="h6">Header</legend>
@@ -90,13 +91,13 @@
 					{{ ui('data.key-value-list', {items: ph_items}) }}
 				</fieldset>
 
-				<fieldset class="cl-template-group">
-					<legend class="h6">The plain-text copy</legend>
-					<p class="help">Every email also goes as plain text, for email apps that show no pictures or colours.</p>
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Made from the email'})} %}{% block control %}<input type="radio" name="text_mode" value="made"{{ template.text_mode == 'made' ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Written by me, around {content}'})} %}{% block control %}<input type="radio" name="text_mode" value="own"{{ template.text_mode == 'own' ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				<div class="cl-template-group">
+					{{ ui('form.picture-choice', {name: 'text_mode', legend: 'The plain-text copy', size: 'small', help: 'Every email also goes as plain text, for email apps that show no pictures or colours.', selected: template.text_mode, items: [
+						{value: 'made', label: 'Made from the email', icon: lucide('wand-sparkles'), note: 'The site writes it from what the email says.'},
+						{value: 'own', label: 'Written by me, around {content}', icon: lucide('pen-line'), note: 'Your own words, in the box below.'},
+					]}) }}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'My plain-text copy', for: 'template-text', full_width: true, help: 'Used when written by you. It must hold {content} and {unsubscribe_link}.'})} %}{% block control %}<textarea class="cl-input cl-code-input" id="template-text" name="text_part" rows="6" spellcheck="false" {{ ui_field_attrs(props) }}>{{ template.text_part }}</textarea>{% endblock %}{% endembed %}
-				</fieldset>
+				</div>
 
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 				{% block primary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Save the template', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endif %}{% endblock %}

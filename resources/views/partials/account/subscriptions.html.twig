@@ -24,7 +24,9 @@
 	{{ ui('layout.section-head', {heading: 'News and Updates', summary: 'New courses, offers and news about the site, now and then.'}) }}
 	<form action="/account/subscriptions/news" method="post">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send me News and Updates by email'})} %}{% block control %}<input type="checkbox" name="news" value="1"{{ mailing.news ? ' checked' : '' }}>{% endblock %}{% endembed %}
+		{{ ui('form.picture-choice', {multiple: true, legend: 'News and Updates', legend_hidden: true, size: 'small', selected: mailing.news ? ['news'] : [], items: [
+			{value: 'news', label: 'Send me News and Updates by email', icon: lucide('newspaper'), note: 'Untick it to stop them. Emails about your account and orders still come.'},
+		]}) }}
 		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 	</form>
 {% endblock %}

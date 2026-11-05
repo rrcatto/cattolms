@@ -29,11 +29,11 @@
 {% endembed %}
 				<fieldset class="cl-landing-picture">
 					<legend>Picture</legend>
-					{% for choice in [{value: 'cover', label: 'The course’s cover artwork'}, {value: 'resource', label: 'A picture from the Resource Library'}, {value: 'none', label: 'No picture'}] %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
-{% block control %}<input class="cl-check mt-1" type="radio" name="image" value="{{ choice.value }}"{{ values.image == choice.value ? ' checked' : '' }}>{% endblock %}
-{% endembed %}
-					{% endfor %}
+					{{ ui('form.picture-choice', {name: 'image', legend: 'Where the picture comes from', legend_hidden: true, size: 'small', selected: values.image, items: [
+						{value: 'cover', label: 'The course\'s cover artwork', icon: lucide('image'), note: 'The drawing on its card and page.'},
+						{value: 'resource', label: 'A picture from the Resource Library', icon: lucide('images'), note: 'Choose or upload one below.'},
+						{value: 'none', label: 'No picture', icon: lucide('image-off'), note: 'The words alone.'},
+					]}) }}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Picture from the Resource Library', for: 'landing-picture', help: pictures ? 'Used when A picture from the Resource Library is chosen.' : 'The Resource Library has no pictures yet.'})} %}
 {% block control %}<select id="landing-picture" name="image_resource_id" {{ ui_field_attrs(props) }}><option value="">Choose a picture</option>{% for picture in pictures %}<option value="{{ picture.id }}"{{ values.image_resource_id ~ '' == picture.id ~ '' ? ' selected' : '' }}>{{ picture.title }} ({{ picture.original_filename }})</option>{% endfor %}</select>{% endblock %}
 {% endembed %}
@@ -82,12 +82,10 @@
 						{% endfor %}
 					</fieldset>
 				{% elseif section.type == 'contents' %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show the items inside each section', help: 'Otherwise only the sections are listed.'})} %}
-{% block control %}<input class="cl-check mt-1" type="checkbox" name="show_items" value="1"{{ values.show_items ? ' checked' : '' }}>{% endblock %}
-{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show descriptions', help: 'Each item’s own description, as a short line of text.'})} %}
-{% block control %}<input class="cl-check mt-1" type="checkbox" name="show_descriptions" value="1"{{ values.show_descriptions ? ' checked' : '' }}>{% endblock %}
-{% endembed %}
+					{{ ui('form.picture-choice', {multiple: true, legend: 'What the outline shows', size: 'small', selected: ['show_items', 'show_descriptions']|filter(name => values[name]), items: [
+						{value: 'show_items', label: 'Show the items inside each section', icon: lucide('list-tree'), note: 'Otherwise only the sections are listed.'},
+						{value: 'show_descriptions', label: 'Show descriptions', icon: lucide('text'), note: 'Each item\'s own description, as a short line of text. Otherwise only its title.'},
+					]}) }}
 					<p class="cl-landing-note">The outline is read from the course every time the page is shown: titles and kinds only, never what is inside a lesson or an assessment.</p>
 				{% elseif section.type == 'reviews' %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How many reviews to show', for: 'landing-limit', help: 'The latest approved reviews, from 1 to ' ~ review_limit_max ~ '. The rating counts every approved review.'})} %}

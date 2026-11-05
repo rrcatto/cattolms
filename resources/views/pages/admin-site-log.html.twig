@@ -20,12 +20,13 @@
 	{% set sl_cards = [] %}
 	{% for key, one in kinds %}{% set sl_cards = sl_cards|merge([{value: key, label: one.label, icon: sl_icons[key], note: counts[key]|number_format}]) %}{% endfor %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		<form class="cl-library-lists" method="get" action="/admin/site-analytics/log" data-choose-submits>
+		{% include '@platform/partials/live-status.html.twig' with {live_seconds: 15} %}
+		<form class="cl-library-lists" method="get" action="/admin/site-analytics/log" data-choose-submits {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics/log'} only %}>
 			{% for name, value in carried %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
 			{{ ui('form.picture-choice', {name: 'kind', legend: 'Kinds of request', id: 'site-log-kinds', size: 'small', columns: 4, selected: kind, items: sl_cards}) }}
 			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 		</form>
-		<form action="/admin/site-analytics/log" method="get">
+		<form action="/admin/site-analytics/log" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics/log'} only %}>
 			<input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="filtered" value="1">{% if subject %}<input type="hidden" name="a" value="{{ subject }}">{% endif %}
 			{% if search %}<input type="hidden" name="sitelog_q" value="{{ search }}">{% endif %}
 			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -33,15 +34,17 @@
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', for: 'site-log-from', help: 'With Dates.'})} %}{% block control %}<input type="date" id="site-log-from" name="from" value="{{ period.fromDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', for: 'site-log-to', help: 'With Dates.'})} %}{% block control %}<input type="date" id="site-log-to" name="to" value="{{ period.toDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Country', for: 'site-log-country'})} %}{% block control %}<select id="site-log-country" name="country" {{ ui_field_attrs(props) }}><option value="">Every country</option>{% for one in countries %}<option value="{{ one.code }}"{{ country == one.code ? ' selected' : '' }}>{{ one.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Leave out administrators'})} %}{% block control %}<input type="checkbox" class="cl-check" name="admins" value="1"{{ leave_out ? ' checked' : '' }}>{% endblock %}{% endembed %}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'Administrators', legend_hidden: true, size: 'small', selected: leave_out ? ['admins'] : [], items: [
+					{value: 'admins', label: 'Leave out administrators', icon: lucide('shield-check'), note: 'Untick it to see their requests too.'},
+				]}) }}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{% if filtered %}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/site-analytics/log', icon: 'action-clear'}) }}{% endif %}{% endblock %}{% endembed %}
 			{% endblock %}{% endembed %}
 		</form>
-		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'sitelog', pagination: sitelog_pagination, search: {ds_name: 'sitelog', ds_label: 'Search an address, a person, a page or a browser', ds_value: search, ds_action: '/admin/site-analytics/log', ds_hidden: search_carried}})} %}{% block results %}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'sitelog', pagination: sitelog_pagination, search: {ds_name: 'sitelog', ds_label: 'Search an address, a person, a page or a browser', ds_value: search, ds_action: '/admin/site-analytics/log', ds_hidden: search_carried, ds_push_url: true}})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr><th>When</th><th>Who</th><th>From</th><th>Network</th><th>Page</th><th>Answer</th><th>Browser</th><th><span class="visually-hidden">Lock out</span></th></tr>{% endblock %}
-			{% block body %}{% for row in rows %}<tr data-site-request="{{ row.id }}">
+			{% block body %}{% for row in rows %}<tr id="site-request-{{ row.id }}" data-site-request="{{ row.id }}">
 				<td>{{ row.when }}</td>
 				<td class="cell-text">{% if row.signed_in %}{{ ui('data.person', {name: row.who, href: row.who_href}) }}{% else %}<a href="{{ row.who_href }}">{{ row.who }}</a>{% endif %}{% if row.show_address %}<br><a class="small" href="{{ row.address_href }}">{{ row.address }}</a>{% endif %}{% if row.flag %}<br>{{ ui('feedback.badge', {label: row.flag.label, tone: row.flag.tone, size: 'small'}) }}{% endif %}</td>
 				<td>{{ row.from }}</td>

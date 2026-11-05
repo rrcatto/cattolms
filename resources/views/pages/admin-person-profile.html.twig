@@ -119,20 +119,16 @@
 					{% set pp_current = {owner: 'COMPANY_ADMIN', administrator: 'COMPANY_ADMIN', course_owner: 'COURSE_OWNER', course_editor: 'COURSE_EDITOR'}[company_membership_role|default('')]|default('STUDENT') %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', for: 'person-company-role'})} %}{% block control %}<select id="person-company-role" name="company_role" {{ ui_field_attrs(props) }}>{% for key, label in {STUDENT: 'Student', COURSE_EDITOR: 'Course editor', COURSE_OWNER: 'Course owner', COMPANY_ADMIN: 'Company Administrator'} %}<option value="{{ key }}"{{ key == pp_current ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 				{% endif %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: person_company ? 'Across the whole site' : 'Roles', full_width: true, for: 'profile-role-0', help: (is_own_account and role_options|filter(option => option.role_key == 'ADMIN' and option.selected)|length) ? 'You cannot remove your own Platform Administrator role. Another administrator can.' : ''})} %}
-{% block control %}
-					<div class="role-checkbox-grid">
-						{% for roleOption in role_options|filter(option => option.role_key != 'STUDENT' and (not person_company or option.role_key not in pp_company_keys) and (person_company or option.role_key != 'COMPANY_ADMIN')) %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: roleOption.role_name|role_label(roleOption.role_key)})} %}
-{% block control %}
-{% if is_own_account and roleOption.role_key == 'ADMIN' and roleOption.selected %}{# Kept: a disabled box is not sent, so the role goes with this hidden field. #}<input type="hidden" name="roles[]" value="ADMIN"><input type="checkbox" checked disabled id="profile-role-{{ loop.index0 }}">{% else %}<input type="checkbox" id="profile-role-{{ loop.index0 }}" name="roles[]" value="{{ roleOption.role_key }}"{{ roleOption.selected ? ' checked' : '' }}>{% endif %}
-{% endblock %}
-{% endembed %}
-						{% endfor %}
-					</div>
+				{% set pp_roles = role_options|filter(option => option.role_key != 'STUDENT' and (not person_company or option.role_key not in pp_company_keys) and (person_company or option.role_key != 'COMPANY_ADMIN')) %}
+				{% set pp_keeps_admin = is_own_account and role_options|filter(option => option.role_key == 'ADMIN' and option.selected)|length > 0 %}
+				{% set pp_icons = {ADMIN: 'shield-check', COURSE_OWNER: 'book-user', COURSE_EDITOR: 'pen-line', COMPANY_ADMIN: 'building-2'} %}
+				{% set pp_notes = {ADMIN: 'Runs the whole site.', COURSE_OWNER: 'Owns the courses given to them.', COURSE_EDITOR: 'Edits the courses given to them.', COMPANY_ADMIN: 'Runs their company\'s workspace.'} %}
+				<div class="cl-ui-field--full">
+					{# Kept: a disabled box is not sent, so the role goes with this hidden field. #}
+					{% if pp_keeps_admin %}<input type="hidden" name="roles[]" value="ADMIN">{% endif %}
+					{% if pp_roles %}{{ ui('form.picture-choice', {multiple: true, list: 'roles', legend: person_company ? 'Across the whole site' : 'Roles', size: 'small', help: pp_keeps_admin ? 'You cannot remove your own Platform Administrator role. Another administrator can.' : '', selected: pp_roles|filter(option => option.selected)|map(option => option.role_key), items: pp_roles|map(option => {value: option.role_key, label: option.role_name|role_label(option.role_key), icon: lucide(pp_icons[option.role_key]|default('shield')), note: pp_notes[option.role_key]|default(''), disabled: pp_keeps_admin and option.role_key == 'ADMIN'})}) }}{% endif %}
 					<p class="help">Every account is a Student.</p>
-{% endblock %}
-{% endembed %}
+				</div>
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save company and roles', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 			</form>
 {% endblock %}

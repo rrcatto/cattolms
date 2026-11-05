@@ -39,6 +39,11 @@ use RuntimeException;
 
 final class CourseFile
 {
+    /** What the importer gives a final with no time limit in its head, and so what a file need not say. */
+    private const STANDARD_FINAL_LIMIT = 7200;
+    private const FINAL_LIMIT_META = 'cattolms:final-time-limit';
+    private const STUDY_HOURS_META = 'cattolms:study-hours';
+
     private const SCOPE = '.cl-course-presentation';
 
     /** The icon of each new panel, in the original files' own style. */
@@ -110,7 +115,8 @@ final class CourseFile
         }
         $this->ownBlockArrow = preg_match('/\.block\s*>\s*summary::?(?:before|after)\s*\{[^}]*content/', (string) ($course['presentation_css'] ?? '')) === 1;
         $data = ['QUIZ' => [], 'PRESENTATIONS' => [], 'FLASHCARDS' => [], 'REVIEW' => []];
-        $diagnostic = $review = $final = $preview = '';
+        $diagnostic = $review = $final = $preview = $filesPanel = '';
+        $finalLimit = self::STANDARD_FINAL_LIMIT;
         $diagPass = null;
         $modules = [];
         $number = (int) ($course['first_module_number'] ?? 1);
@@ -118,6 +124,10 @@ final class CourseFile
             if ($row['node_type'] === 'section' && !empty($row['numbered'])) {
                 $modules[] = $this->module($row, $children[(string) $row['node_key']] ?? [], $items, 'm' . $number, $number, $data, $leftOut);
                 $number++;
+                continue;
+            }
+            if ($row['node_type'] === 'section' && $filesPanel === '' && self::onlyFiles($children[(string) $row['node_key']] ?? [], $items)) {
+                $filesPanel = self::filesPanel($row, $children[(string) $row['node_key']] ?? [], $items, (array) ($package['resources'] ?? []));
                 continue;
             }
             if ($row['node_type'] === 'section') {
@@ -138,6 +148,7 @@ final class CourseFile
             } elseif ($kind === 'final') {
                 $data['QUIZ']['final'] = self::questions($item, false);
                 $final = $this->finalAssessment($item);
+                $finalLimit = (int) ($item['time_limit_seconds'] ?? self::STANDARD_FINAL_LIMIT);
             } else {
                 $leftOut[] = 'The ' . str_replace('_', ' ', (string) $item['item_type']) . ' "' . $item['title'] . '" outside the modules.';
             }
@@ -146,10 +157,12 @@ final class CourseFile
         $html = '<!doctype html>' . "\n" . '<html lang="en-ZA">' . "\n" . '<head>' . "\n" . '<meta charset="utf-8">' . "\n"
             . '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n"
             . '<meta name="cattolms:course-code" content="' . self::e((string) ($course['code'] ?? '')) . '">' . "\n"
+            . ($finalLimit === self::STANDARD_FINAL_LIMIT ? '' : '<meta name="' . self::FINAL_LIMIT_META . '" content="' . (int) round($finalLimit / 60) . '">' . "\n")
+            . ((int) ($course['estimated_minutes'] ?? 0) > 0 ? '<meta name="' . self::STUDY_HOURS_META . '" content="' . (int) round((int) $course['estimated_minutes'] / 60) . '">' . "\n" : '')
             . '<title>' . self::e((string) ($course['title'] ?? '')) . '</title>' . "\n"
             . "<style>\n" . $this->stylesheet((string) ($course['presentation_css'] ?? '')) . "\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n"
             . $this->masthead($course, (string) (($package['catalogue']['cover'] ?? null) ?: ''))
-            . self::withScale((string) ($course['introduction_html'] ?? ''), (array) ($package['grade_bands'] ?? []), $leftOut) . "\n\n"
+            . self::descriptionPanel($course) . $filesPanel . self::withScale((string) ($course['introduction_html'] ?? ''), (array) ($package['grade_bands'] ?? []), $leftOut) . "\n\n"
             . $preview . $diagnostic
             . '  <div class="modules">' . "\n" . implode("\n", $modules) . "  </div>\n\n"
             . $review . $final
@@ -189,11 +202,15 @@ final class CourseFile
         $copy = $summary instanceof \Dom\Element ? $summary->cloneNode(true) : null;
         $model = $copy instanceof \Dom\Element ? $copy : null;
         $preview = null;
+        $filesPanel = '';
+        $finalLimit = self::STANDARD_FINAL_LIMIT;
         foreach ($children[''] ?? [] as $row) {
             if ($row['node_type'] === 'section' && !empty($row['numbered'])) {
                 $key = 'm' . $number;
                 $this->framedModule($document, $document->querySelector('.module[id="mod-' . $key . '"]'), $row, $children[(string) $row['node_key']] ?? [], $items, $key, $model, $data, $fill, $leftOut);
                 $number++;
+            } elseif ($row['node_type'] === 'section' && $filesPanel === '' && self::onlyFiles($children[(string) $row['node_key']] ?? [], $items)) {
+                $filesPanel = self::filesPanel($row, $children[(string) $row['node_key']] ?? [], $items, (array) ($package['resources'] ?? []));
             } elseif ($row['node_type'] === 'section') {
                 $this->framedReview($document, $row, $children[(string) $row['node_key']] ?? [], $items, $frame, $model, $data, $fill, $leftOut);
             } else {
@@ -208,6 +225,7 @@ final class CourseFile
                     self::title($document->querySelector('.diag'), (string) $item['title']);
                 } elseif ($kind === 'final') {
                     $data['QUIZ']['final'] = self::questions($item, false);
+                    $finalLimit = (int) ($item['time_limit_seconds'] ?? self::STANDARD_FINAL_LIMIT);
                     self::title($document->querySelector('.final'), (string) $item['title']);
                     self::counted($document->querySelector('.final .m-titles small'), $data['QUIZ']['final']);
                 } else {
@@ -253,7 +271,16 @@ final class CourseFile
             . ($neighbours === '' ? '' : "\n" . '<style data-course-file>' . "\n" . $neighbours . '</style>');
         $document->querySelector('body')?->appendChild($document->createComment('cl:parts'));
 
-        $fill['<!--cl:introduction-->'] = self::framedIntroduction((string) ($course['introduction_html'] ?? ''), (array) ($package['grade_bands'] ?? []), $frame, $leftOut);
+        $stated = (int) ($course['estimated_minutes'] ?? 0);
+        foreach ([self::FINAL_LIMIT_META => $finalLimit === self::STANDARD_FINAL_LIMIT ? 0 : $finalLimit / 60, self::STUDY_HOURS_META => $stated / 60] as $name => $value) {
+            $document->querySelector('meta[name="' . $name . '"]')?->remove();
+            if ($value <= 0 || !$document->head instanceof \Dom\Element) { continue; }
+            $meta = $document->createElement('meta');
+            $meta->setAttribute('name', $name);
+            $meta->setAttribute('content', (string) (int) round($value));
+            $document->head->prepend($meta);
+        }
+        $fill['<!--cl:introduction-->'] = self::descriptionPanel($course) . $filesPanel . self::framedIntroduction((string) ($course['introduction_html'] ?? ''), (array) ($package['grade_bands'] ?? []), $frame, $leftOut);
         $parts = '';
         foreach (['PRESENTATIONS', 'FLASHCARDS'] as $name) {
             if ($data[$name] !== []) { $parts .= 'const ' . $name . ' = ' . self::json($data[$name]) . ";\n"; }
@@ -685,6 +712,55 @@ final class CourseFile
     }
 
     /** The original's markup, such as its coloured word in the title, while its words are still the site's. */
+    /**
+     * What the course's page says, when it says more than the summary (specification 4.7), so that the file holds it and
+     * importing the file gives it back.
+     *
+     * @param array<string,mixed> $course
+     */
+    private static function descriptionPanel(array $course): string
+    {
+        $description = trim((string) ($course['description_html'] ?? ''));
+        if ($description === '' || $description === '<p>' . htmlspecialchars((string) ($course['summary'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>') { return ''; }
+        return '<details class="course-description"><summary>About this course</summary>' . "\n" . $description . "\n</details>\n\n";
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @param array<string,array<string,mixed>> $items
+     */
+    private static function onlyFiles(array $rows, array $items): bool
+    {
+        if ($rows === []) { return false; }
+        foreach ($rows as $row) {
+            if (!in_array((string) ($items[(string) ($row['item_key'] ?? '')]['item_type'] ?? ''), ['pdf', 'downloadable_file'], true)) { return false; }
+        }
+        return true;
+    }
+
+    /**
+     * The section of files, named and not held (specification 6.3; owner, 2026-11-05: "it's not about stuffing them all
+     * into html files"): importing the file places each one the Resource Library has.
+     *
+     * @param array<string,mixed> $section
+     * @param list<array<string,mixed>> $rows
+     * @param array<string,array<string,mixed>> $items
+     * @param array<int|string,mixed> $resources
+     */
+    private static function filesPanel(array $section, array $rows, array $items, array $resources): string
+    {
+        $names = array_column(array_filter($resources, 'is_array'), 'original_filename', 'public_id');
+        $list = '';
+        foreach ($rows as $row) {
+            $item = $items[(string) ($row['item_key'] ?? '')] ?? [];
+            $name = (string) ($names[(string) ($item['resource_public_id'] ?? '')] ?? '');
+            if ($name === '') { continue; }
+            $words = trim(html_entity_decode(strip_tags((string) ($item['description_html'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $list .= '<li><a href="' . self::e($name) . '">' . self::e((string) ($item['title'] ?? '')) . '</a>' . ($words === '' ? '' : ' ' . self::e($words)) . "</li>\n";
+        }
+        return '<details class="course-files"><summary>' . self::e((string) ($section['title'] ?? '')) . '</summary>' . "\n" . trim((string) ($section['introduction_html'] ?? '')) . "\n<ul>\n" . $list . "</ul>\n</details>\n\n";
+    }
+
     private static function keepOrReplace(?\Dom\Element $node, string $words): void
     {
         if ($node instanceof \Dom\Element && $words !== '' && CourseFileFrame::words($node->innerHTML) !== CourseFileFrame::words($words)) { $node->textContent = $words; }

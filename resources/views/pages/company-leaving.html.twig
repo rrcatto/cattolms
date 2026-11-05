@@ -43,7 +43,9 @@
 			{{ ui('layout.section-head', {heading: 'Delete my account', summary: 'Your courses and progress go with it.'}) }}
 			<form action="/leaving/{{ token }}/delete" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand my courses and progress go too'})} %}{% block control %}<input type="checkbox" id="leaving-understood" name="understood" value="1" required>{% endblock %}{% endembed %}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'Deleting my account', legend_hidden: true, size: 'small', required: true, selected: [], items: [
+					{value: 'understood', label: 'I understand my courses and progress go too', icon: lucide('triangle-alert')},
+				]}) }}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Delete my account', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove'}) }}{% endblock %}{% endembed %}
 			</form>
 		{% endblock %}{% endembed %}

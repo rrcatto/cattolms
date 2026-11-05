@@ -182,7 +182,8 @@ Example list item without actions.
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Catalogue'}) }}
-{% set sample_tag = {name: 'Sample tag', slug: 'sample', course_count: 1, weight: 3} %}
+{# The sample tag opens the tags page: a tag that does not exist is a not-found page. #}
+{% set sample_tag = {name: 'Sample tag', slug: 'sample', href: '/courses/tags', course_count: 1, weight: 3} %}
 {# The sample course card opens the catalogue: there is no course called example (2026-10-21: its link was a not-found page). #}
 {% set sample_course = {title: 'Example course', slug: 'example', href: '/courses', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', item_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
 

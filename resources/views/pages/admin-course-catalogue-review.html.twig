@@ -85,11 +85,10 @@
 {% block surface_body %}
 				{{ ui('layout.section-head', {heading: 'Import', heading_level: 2, summary: 'Each course is imported on its own: if one fails, the result page says why and the rest still go in. Importing the same package again changes nothing.'}) }}
 				{% if counts.new > 0 %}
-				<fieldset class="mb-5">
-					<legend class="h6">New courses</legend>
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Give them the package\'s prices', help: can_price ? 'A course already on this site keeps its own prices.' : 'Setting prices needs the course pricing permission.'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="prices" value="1" {{ can_price ? 'checked' : 'disabled' }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Publish those that are published where they came from', help: can_publish ? 'Their publication warnings were accepted where they were published. One with an error, such as no price, stays a draft, and the result page says why.' : 'Publishing needs the course publishing permission: they stay drafts.'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="publish" value="1" {{ can_publish ? 'checked' : 'disabled' }}>{% endblock %}{% endembed %}
-				</fieldset>
+				{{ ui('form.picture-choice', {multiple: true, legend: 'New courses', size: 'small', form: 'catalogue-import', selected: (can_price ? ['prices'] : [])|merge(can_publish ? ['publish'] : []), items: [
+					{value: 'prices', label: 'Give them the package\'s prices', icon: lucide('badge-percent'), note: (can_price ? 'A course already on this site keeps its own prices. Untick it and new courses arrive with no price.' : 'Setting prices needs the course pricing permission.'), disabled: not can_price},
+					{value: 'publish', label: 'Publish those that are published where they came from', icon: lucide('rocket'), note: (can_publish ? 'Their publication warnings were accepted where they were published. One with an error, such as no price, stays a draft, and the result page says why. Untick it and they stay drafts.' : 'Publishing needs the course publishing permission: they stay drafts.'), disabled: not can_publish},
+				]}) }}
 				{% endif %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}<form id="catalogue-import" action="/admin/courses/catalogue/review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ plan.key }}">{{ ui('action.button', {label: 'Import', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-import'}) }}</form>{% endblock %}

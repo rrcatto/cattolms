@@ -466,7 +466,9 @@ final class PlatformAdministrationService
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
         private readonly ?SiteOwner $owner = null,
         private readonly ?\CattoLearning\Company\CompanyService $companyRule = null,
-        private readonly ?\CattoLearning\Auth\IdNumbers $idNumbers = null
+        private readonly ?\CattoLearning\Auth\IdNumbers $idNumbers = null,
+        private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSetup $ownerMessages = null
     ) {
     }
 
@@ -1565,6 +1567,8 @@ final class PlatformAdministrationService
                     'platform_name' => $this->settings->platformName(),
                     'platform_name_source' => $this->settings->platformNameSource(),
                     'mail_settings' => $this->settings->mailAdminView(),
+                    'site_notification' => $this->siteNotification?->settingsView(),
+                    'owner_messages' => $this->ownerMessages?->view(),
                     'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode(), 'heading' => $this->site->heading(), 'notice' => $this->site->notice(), 'email_notice' => $this->site->emailNotice(), 'simulation' => $this->site->simulation(), 'own_words' => $this->site->ownWords(), 'limits' => array_map(static fn(array $word): int => $word['limit'], \CattoLearning\Configuration\SiteMode::WORDS)],
                     'site_owner' => $this->siteOwnerView(),
                 ];
@@ -2771,6 +2775,57 @@ final class PlatformAdministrationService
         $this->transactions->run(function () use ($site, $mode, $actorUserId): void {
             $site->save($mode, $actorUserId);
             $this->audit->record($actorUserId, 'platform.site_mode_changed', ['mode' => $site->mode()]);
+        });
+    }
+
+    /** @param array<string,mixed> $input */
+    public function saveSiteNotification(array $input, int $actorUserId): void
+    {
+        $notification = $this->siteNotification ?? throw new InvalidArgumentException('The site notification cannot be changed here.');
+        $this->transactions->run(function () use ($notification, $input, $actorUserId): void {
+            $before = $notification->saved();
+            $notification->save($input, $actorUserId);
+            if ($before !== $notification->saved()) $this->audit->record($actorUserId, 'platform.site_notification_changed', ['old' => $before, 'new' => $notification->saved()]);
+        });
+    }
+
+    /**
+     * @param array{key:string,username:string} $input
+     * @return bool whether it is connected now
+     */
+    public function connectOwnerTelegram(array $input, int $actorUserId): bool
+    {
+        $setup = $this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.');
+        $done = $setup->connect($input, $actorUserId);
+        $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['key_changed' => $done['key_changed'], 'connected' => $done['connected']]);
+
+        return $done['connected'];
+    }
+
+    public function saveOwnerMessageChoices(bool $onRegister, bool $onSale, int $actorUserId): void
+    {
+        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->saveChoices($onRegister, $onSale, $actorUserId);
+        $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['on_register' => $onRegister, 'on_sale' => $onSale]);
+    }
+
+    public function sendOwnerTestMessage(): void
+    {
+        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->sendTest();
+    }
+
+    public function disconnectOwnerMessages(int $actorUserId): void
+    {
+        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->disconnect($actorUserId);
+        $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['disconnected' => true]);
+    }
+
+    public function removeSiteNotification(int $actorUserId): void
+    {
+        $notification = $this->siteNotification ?? throw new InvalidArgumentException('The site notification cannot be changed here.');
+        $this->transactions->run(function () use ($notification, $actorUserId): void {
+            $before = $notification->saved();
+            $notification->remove();
+            $this->audit->record($actorUserId, 'platform.site_notification_changed', ['old' => $before, 'new' => null]);
         });
     }
 

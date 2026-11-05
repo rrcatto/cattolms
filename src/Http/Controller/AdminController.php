@@ -110,6 +110,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class AdminController extends BaseController
 {
+    private const OWNER_MESSAGES_PAGE = '/admin/settings?section=owner-messages#settings-owner-messages';
+
     /**
      * Datasets whose pagination state travels in the query string with a dataset prefix.
      *
@@ -1001,6 +1003,81 @@ final class AdminController extends BaseController
     }
 
     /** Settings > Site mode (owner, 2026-11-03): what a demo site's pages, emails and checkouts say. */
+    #[Route('/admin/settings/site-notification', name: 'admin_save_site_notification', methods: ['POST'])]
+    public function saveSiteNotification(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveSiteNotification([
+                'show' => isset($_POST['show']), 'on_course_pages' => isset($_POST['on_course_pages']), 'kind' => (string) ($_POST['kind'] ?? ''), 'heading' => (string) ($_POST['heading'] ?? ''),
+                'message' => (string) ($_POST['message'] ?? ''), 'countdown_words' => (string) ($_POST['countdown_words'] ?? ''), 'ends_at' => (string) ($_POST['ends_at'] ?? ''),
+            ], $user->id);
+            $this->flash('success', 'The site notification is saved.');
+            $this->redirect('/admin/settings?section=site-notification#settings-site-notification');
+        }, '/admin/settings?section=site-notification#settings-site-notification');
+    }
+
+    #[Route('/admin/settings/site-notification/remove', name: 'admin_remove_site_notification', methods: ['POST'])]
+    public function removeSiteNotification(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->removeSiteNotification($user->id);
+            $this->flash('success', 'The site notification is removed.');
+            $this->redirect('/admin/settings?section=site-notification#settings-site-notification');
+        }, '/admin/settings?section=site-notification#settings-site-notification');
+    }
+
+    /** Connect to Telegram (owner, 2026-11-05: "Rather something like CONNECT TO TELEGRAM"). What it says stays beside the buttons. */
+    #[Route('/admin/settings/owner-messages/connect', name: 'admin_connect_owner_telegram', methods: ['POST'])]
+    public function connectOwnerTelegram(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        try {
+            $this->platformAdministration->connectOwnerTelegram(['key' => (string) ($_POST['bot_key'] ?? ''), 'username' => (string) ($_POST['telegram_username'] ?? '')], $user->id);
+        } catch (\InvalidArgumentException|\RuntimeException $refused) {
+            $_SESSION['owner_messages_note'] = ['tone' => 'danger', 'words' => $refused->getMessage()];
+        }
+        $this->redirect(self::OWNER_MESSAGES_PAGE);
+    }
+
+    /** The two ticks save as they change, with a Save button only without JavaScript. */
+    #[Route('/admin/settings/owner-messages/choices', name: 'admin_owner_message_choices', methods: ['POST'])]
+    public function saveOwnerMessageChoices(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->platformAdministration->saveOwnerMessageChoices(isset($_POST['on_register']), isset($_POST['on_sale']), $user->id);
+        if ($this->request()->headers->has('HX-Request')) return new Response('', 204);
+        $this->redirect(self::OWNER_MESSAGES_PAGE);
+    }
+
+    #[Route('/admin/settings/owner-messages/test', name: 'admin_test_owner_message', methods: ['POST'])]
+    public function testOwnerMessage(): Response
+    {
+        $this->requireCsrf();
+        $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        try {
+            $this->platformAdministration->sendOwnerTestMessage();
+            $_SESSION['owner_messages_note'] = ['tone' => 'success', 'words' => 'Test message sent. Check your phone.'];
+        } catch (\InvalidArgumentException|\RuntimeException $refused) {
+            $_SESSION['owner_messages_note'] = ['tone' => 'danger', 'words' => $refused->getMessage()];
+        }
+        $this->redirect(self::OWNER_MESSAGES_PAGE);
+    }
+
+    #[Route('/admin/settings/owner-messages/disconnect', name: 'admin_disconnect_owner_messages', methods: ['POST'])]
+    public function disconnectOwnerMessages(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->platformAdministration->disconnectOwnerMessages($user->id);
+        $this->redirect(self::OWNER_MESSAGES_PAGE);
+    }
+
     #[Route('/admin/settings/demo-words', name: 'admin_save_demo_words', methods: ['POST'])]
     public function saveDemoWords(): Response
     {
@@ -1425,6 +1502,9 @@ final class AdminController extends BaseController
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
                 'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
+            $data['owner_messages_note'] = $_SESSION['owner_messages_note'] ?? null;
+            $data['can_view_telegram_log'] = $this->currentUser()?->hasPermission('PLATFORM.SITEANALYTICS.VIEW') ?? false;
+            unset($_SESSION['owner_messages_note']);
             // How news is sent and the sending discipline (mailing, step 2; owner, 2026-10-26).
             // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
             $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);

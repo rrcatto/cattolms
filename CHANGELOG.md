@@ -2,6 +2,85 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-05 — v1.0.9 Pages that change in place, the site notification, messages by Telegram, the end of an assessment and what a buyer reads
+
+### Installing and updating
+
+- **No clean installation is needed from v1.0.8:** a v1.0.8 site updates in place once it has one new table, `owner_messages`, added by hand with the baseline's definition (the baseline holds it, so a new site has it). The site notification is saved with the site's other settings.
+- **One new scheduled job,** `owner_messages`, every minute, which the existing scheduler runs. Restart the scheduler after updating.
+- **One new third party a server talks to, if you connect it:** Telegram (`api.telegram.org`), which then receives the name and country of each person who registers and the order number, what was bought, the amount and how it was paid for each order paid, each with the site's domain. Nothing goes to it until you save a bot key in Settings.
+- **The Privacy Policy changes** (dated 2026-11-05): Who receives your information gains a messaging service, naming no provider.
+- **No new `.env` settings, packages or permissions.** Updated: Lucide 1.69.0 (ISC, as before), 4 more icons to choose from for categories and tags, none redrawn or removed.
+- **One address is removed:** `/admin/site-analytics/now`. The Overview now refreshes as a whole, the people on the site with it.
+- **`public_html` changes:** `css/catto-platform.css`, `js/platform-overrides.js` and `img/nav-icons.svg`.
+- **Addresses added:** `/admin/courses/{id}/course-package` (Download with its files), `/admin/site-analytics/telegram-log` (the Telegram log), and the forms behind Settings' two new sections, under `/admin/settings/site-notification` and `/admin/settings/owner-messages`.
+
+### The site notification
+
+- **A message of your own at the top of the site's pages,** under the demo notice, for everyone who visits, on a demo site and a live one: a promotion, or a warning that the site is going offline. Administration > Settings > Site notification, straight after Site mode.
+- **Not while taking a course, unless you say so:** Also while taking a course puts it on the lessons and assessments too, for a warning learners need to see.
+- **Three kinds, each with its own look in every theme and on the pages where a course is taken:** Promotion is green with a megaphone, Information blue with an information sign, and Warning amber with a warning triangle. Settings shows all three. A heading is optional, and the text is plain, up to 300 characters.
+- **An optional countdown** to a date and time in the site's time, in weeks, days, hours, minutes and seconds, with words of your own before it (for example Offer ends in) and the date after it. It ticks in the browser, shows the count without JavaScript too, and is not fooled by a visitor's wrong clock.
+- **It goes away by itself** when the count reaches zero. Unticking Show this notification hides it and keeps its words, Remove clears them, and every change is in the activity log with the old and new words.
+
+### Messages to you
+
+- **A message to your phone by Telegram** when someone registers (`New registration: Thandi Mokoena, South Africa (example.com)`) and when an order is paid in full (`Sale: Order CL-00001042, Garden Design Basics, R1,250, paid by EFT (example.com)`), at Administration > Settings > Messages to you. Each names its site, because one bot may serve several, and a demo site's start with `[DEMO]`. Each event can be unticked.
+- **The Telegram log,** under Site Analytics straight after Site Log and linked from Messages to you: every message sent, newest first, with when it went or why it did not, and a card each for registrations, sales, test messages and those not sent. Sent messages are kept for 30 days, and those not sent for 7 days.
+- **Set it up from the page:** make a bot with @BotFather, paste its key, type your own Telegram username and press Connect to Telegram. If Telegram has not seen you yet, the page gives a button to your bot: send it hello and press Connect again. The section's title says what is connected to what, the fields go once it is connected and come back after Disconnect. Only the account with that username is connected, whoever else finds the bot, and no phone number is asked for. The key is kept encrypted, never shown again and never put in an error or the activity log. Disconnect forgets it.
+- **It never holds anything up:** each message is kept with what it is about and sent in the background every minute. If Telegram is down it waits, Settings says why, and it goes when Telegram is back. One still unsent after 7 days is dropped, and sent ones are cleared after 30 days.
+- **Once each:** one message per person registering and one per order, never when an order is only placed or part paid. An account an administrator adds sends none, nor does anyone at an address reserved for testing or invented by Seed Database.
+
+### Notices
+
+- **Every notice now shows what kind of message it is:** green for success, blue for information, amber for a warning and red for danger, with a solid edge, the same in every theme and on the pages where a course is taken. A rule meant for notices outside a card had turned them white, and several themes' tones were all but the same. "Correct." and "Not correct." in practice now look different.
+
+### Radio buttons and checkboxes
+
+- **Feature cards are now the rule across the site:** about 80 plain ticks and radio buttons in course editing, checkout, promotions, mailing, Register, settings and site protection are feature cards with an icon, a title and a note. Ticks in table rows, the permissions grid, tree destinations, a question's right answer and a learner's answer options stay as they were, because a card cannot work there. `form.picture-choice` gains `list`, `tick_value`, `required`, `legend_hidden`, `columns: 1`, an item's `disabled` and the blocks `item_label` and `item_note`.
+
+### Smaller changes
+
+- **A large catalogue exports and imports:** Import & Export Catalogue held every course in memory at once, and a large catalogue ran out of memory on a 128 MB site. It now handles one course at a time, so the memory it needs no longer grows with the catalogue.
+- **Tables on a phone keep their columns:** a table with two columns of wrapping text gave its other columns no width on a phone (Subscribers, Automatic emails, Course Page Layouts and Sign-up Attempts among them). Each column now keeps its share, and the page checks measure it on every page.
+- **A category or tag that does not exist is not found,** where the whole catalogue used to show.
+- **Show generated outline on introduction is gone from a course's form,** with its column in the baseline, because nothing read it. A site may drop `courses.show_outline_on_intro` or leave it.
+
+### Moving a course with its files
+
+- **Replacing a course keeps it published:** importing over a course used to put it back to draft, which took it out of the catalogue. It now keeps its status, and the same goes for a catalogue package's Replace.
+- **Download with its files (.zip)** on a course's page gives the whole course with its PDFs and downloads, as a catalogue package that imports back at Import and Export Catalogue.
+- **A PDF part's Download is a proper button,** as a download part's is.
+- **Importing a course file over a course with files warns first,** naming the files, when the file does not name them itself.
+
+### What a buyer reads about a course
+
+- **The public preview opens with the course's introduction,** as a learner's course does. A visitor was shown one line in its place, so what a course says about itself before its modules reached nobody until they had bought it.
+- **About this course can say more:** a table and a row of the courses in a series now look right in every theme, and scroll inside themselves on a phone.
+- **A course says how long it takes:** a Study time in hours on its form replaces Estimated minutes. Where set, the course's page and the outline show it, each module its equal share. Empty adds up the parts as before, which counts only reading and watching.
+- **Course specification 4.9:** the study time goes in a file's head, `cattolms:study-hours`.
+- **Course specification 4.8:** a course file may name the files the course uses, in `.course-files`, which an import places when the Resource Library has them and otherwise names in its review. It holds no file itself. A final assessment's time limit goes in its head, `cattolms:final-time-limit`, in minutes.
+- **Course specification 4.7:** a course file may hold what its page says, in an optional closed panel, `.course-description`. Importing the file takes it, and Download as one HTML file writes it, so a description longer than the summary survives the round trip. Without the panel a page shows the summary, as before. A card shows only about the first 100 characters of a summary, and the specification now says to put what sells the course first.
+
+### The end of an assessment
+
+- **Practice says how the last answer went,** as it does for every other answer, with a View my result button, instead of going straight to the result. The public preview does the same.
+- **A result's buttons are at the bottom of the page,** after the question report, with nothing beside the report. After practice there is one, Assessment options, which leads to the graded assessment. After a graded attempt there are Assessment options and Next, or Course overview after the last part. A readiness check has Take diagnostic again and Next. A practice-only assessment has Assessment options and Next, having no graded attempt to lead to.
+- **After the final assessment** the page shows the course's result beside the assessment's, with how it is made up (half the module assessments, half the final), and the bottom row has Assessment options, Course overview and the learner's next step: Verify my identity, or View certificate.
+- **A result's figures are easier to read:** the score and the grade no longer run together, and times are in words (42 minutes 10 seconds, 1 second, in place of 00:42:10 and 1 seconds), and points without needless decimals (1 / 1, in place of 1.00 / 1).
+
+### Site Analytics
+
+- **The cards, filters and Period change only the data shown,** on the Site Log, Flagged Activity, Lockouts and the Overview, without reloading the page. The scroll position stays, the address follows and Back works. Without JavaScript the same forms load the page.
+- **The pages update by themselves.** The Site Log refreshes every 15 seconds. The Overview, Flagged Activity, Lockouts and each address's page refresh every 30, because their records mostly change when the rules run once a minute. Each says so, with Pause.
+- **A refresh waits while you are busy:** typing, with text selected or a menu open, on a later page whose rows would otherwise move, or with the tab out of sight. Words typed in a form that has not been sent are never taken.
+- **A page's refresh of itself is not a visit,** so it adds nothing to the Site Log, which v1.0.8's Overview did every 30 seconds. Only the pages that refresh themselves honour this, so a visitor cannot hide from the Site Log by claiming to be one. A page changed in place still counts as a page.
+- **Signed out meanwhile,** a refresh goes to sign in.
+
+### Building pages
+
+- **Pages change in place by default, and live data refreshes itself with htmx:** UX rules 8.6a and 8.6b, `partials/in-place-attrs.html.twig` and `partials/live-status.html.twig`, in `docs/UI-COMPONENTS.md`.
+
 ## 2026-11-04 — v1.0.8 Site analytics and lockouts
 
 ### The fault this fixes

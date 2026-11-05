@@ -175,6 +175,11 @@ services:
         resource: '../src/SiteAnalytics/'
         exclude: '../src/SiteAnalytics/{LockoutGate.php,LockoutGateRepository.php,VisitorAgent.php,RequestFacts.php,SitePeriod.php,SiteAnalyticsWords.php}'
 
+    # Messages to the owner by Telegram (owner, 2026-11-05).
+    CattoLearning\OwnerMessages\:
+        resource: '../src/OwnerMessages/'
+        exclude: '../src/OwnerMessages/TelegramFailed.php'
+
     # ScheduledJob is the list of scheduled jobs, an enum, not a service.
     CattoLearning\Maintenance\:
         resource: '../src/Maintenance/'

@@ -37,6 +37,7 @@
 				<ul class="mb-0">{% for line in why %}<li>{{ line }}</li>{% endfor %}</ul>
 			{% endblock %}{% endembed %}{% endif %}
 			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'did'})} %}{% block surface_body %}
+				{% include '@platform/partials/live-status.html.twig' with {live_seconds: 30} %}
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'What it did'})} %}{% block section_actions %}{{ ui('action.link', {label: 'All ' ~ figures.requests|number_format ~ ' in the Site Log', variant: 'secondary', size: 'small', icon: 'action-view-all', href: log_href}) }}{% endblock %}{% endembed %}
 				{% if did %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 				{% block header %}<tr><th>When</th><th>Page</th><th>Answer</th></tr>{% endblock %}
@@ -57,7 +58,7 @@
 				{% if own_address %}
 				<p class="mb-0">You are using this address now, so you cannot lock it out.</p>
 				{% else %}
-				<form class="cl-lock-form" action="/admin/site-analytics/lockouts" method="post">
+				<form class="cl-lock-form" action="/admin/site-analytics/lockouts" method="post" hx-morph-skip>
 					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ href }}">
 					<input type="hidden" name="address_value" value="{{ subject }}"><input type="hidden" name="range_value" value="{{ range }}">
 					<input type="hidden" name="owner_value" value="{{ asn }}"><input type="hidden" name="owner_name" value="{{ owner }}">
@@ -74,7 +75,9 @@
 					{% if owner_people %}<div data-lock-warning="owner">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}<p>Signed-in people used this network owner's addresses in the past 30 days: {% for person in owner_people %}{{ ui('data.person', {name: person.name, href: '/admin/people/' ~ person.id}) }}{{ not loop.last ? ', ' }}{% endfor %}. Locking it out locks them out too.</p>{% endblock %}{% endembed %}</div>{% endif %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How long', for: 'lock-length'})} %}{% block control %}<select id="lock-length" name="length" {{ ui_field_attrs(props) }}>{% for value, label in lengths %}<option value="{{ value }}"{{ value == '30d' ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'lock-why', required: true})} %}{% block control %}<textarea id="lock-why" name="why" rows="3" maxlength="500" required {{ ui_field_attrs(props) }}>{{ draft_why }}</textarea>{% endblock %}{% endembed %}
-					{% if firewall_offered %}<div data-lock-firewall>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Also ban it at the server\'s firewall. It then cannot reach any website on this server.', help: 'For an address or a range. A firewall knows nothing of network owners.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="firewall" value="1">{% endblock %}{% endembed %}</div>{% endif %}
+					{% if firewall_offered %}<div data-lock-firewall>{{ ui('form.picture-choice', {multiple: true, legend: 'The server\'s firewall', legend_hidden: true, size: 'small', selected: [], items: [
+	{value: 'firewall', label: 'Also ban it at the server\'s firewall', icon: lucide('shield'), note: 'It then cannot reach any website on this server. For an address or a range. A firewall knows nothing of network owners. Leave it unticked and only this site refuses it.'},
+]}) }}</div>{% endif %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Lock out', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-lock-out'}) }}{% endblock %}{% endembed %}
 				</form>
 				{% endif %}

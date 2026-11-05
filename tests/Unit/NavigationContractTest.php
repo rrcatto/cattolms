@@ -184,7 +184,7 @@ final class NavigationContractTest extends TestCase
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );
         // Who is on the site and what they are doing, and the lockouts (owner, 2026-11-04).
-        self::assertSame(['admin-site-analytics', 'admin-site-log', 'admin-site-flagged', 'admin-site-lockouts', 'admin-site-protection'], $groups['admin-group-site_analytics']);
+        self::assertSame(['admin-site-analytics', 'admin-site-log', 'admin-telegram-log', 'admin-site-flagged', 'admin-site-lockouts', 'admin-site-protection'], $groups['admin-group-site_analytics']);
         // People, then Companies: Find a Person is gone, because the People search finds the same people (owner, 2026-10-21).
         self::assertSame(['admin-people', 'admin-companies'], array_slice($groups['admin-group-directory'], 0, 2));
     }

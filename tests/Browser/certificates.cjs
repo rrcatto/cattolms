@@ -156,17 +156,23 @@ async function fetchPdf(page, href, label) {
     return pdfText(body);
 }
 /* A learner answers the one-question final in the reader and goes back to the course. */
-async function completeFinal(page, answer) {
+async function completeFinal(page, answer, nextStep) {
     await page.goto(base + state.assessment);
     await submit(page, 'Start graded assessment');
     step = 'answer';
     await page.getByLabel(answer).check();
     await submit(page, 'Submit answer');
+    // The approved mockup (2026-11-05): the course's result, and at the bottom the way on with the learner's next step last.
+    step = 'the result page';
+    assert.equal(await page.locator('[data-course-result]').count(), 1, 'the final says the course result');
+    const row = (await page.locator('.cl-course-item-paging a').allInnerTexts()).map((label) => label.trim());
+    assert.deepEqual(row.slice(0, 2), ['Assessment options', 'Course overview'], row.join(' | '));
+    assert.equal(row[2], nextStep, row.join(' | '));
     await page.goto(`${base}/learn/${state.slug}`);
 }
 /* A verified learner completes the final (with the right answer, as the other learner gives the wrong one) and opens the certificate from the course. */
 async function passFinal(page) {
-    await completeFinal(page, 'Correct');
+    await completeFinal(page, 'Correct', 'View certificate');
     return openCertificate(page);
 }
 async function openCertificate(page) {
@@ -374,7 +380,7 @@ async function openCertificate(page) {
         // The second learner fails the final: completing every assessment still earns the certificate,
         // which waits until they are verified.
         const learner = await open(chromium, state.second_token);
-        await completeFinal(learner.page, 'Wrong');
+        await completeFinal(learner.page, 'Wrong', 'Verify my identity');
         step = 'waiting';
         assert.ok(await learner.page.getByText('You have completed every assessment. Verify your identity to receive your certificate and transcript.').isVisible(), 'an unverified learner is told to verify');
         assert.equal(await learner.page.getByRole('link', {name: 'Verify my identity'}).count(), 1, 'with a Verify button');

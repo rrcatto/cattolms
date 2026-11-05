@@ -48,6 +48,7 @@ final class CourseTagController extends BaseController
     {
         $identity = $this->currentUser();
         $selectedTags = $this->courses->activeTagsBySlug(array_filter([$slug]));
+        if ($slug !== '' && $selectedTags === []) throw $this->notFound('The course tag was not found.');
         $search = trim((string) $request->query->get(PlatformAdministrationService::searchParam(self::DATASET), ''));
 
         $filter = new CatalogueFilter(

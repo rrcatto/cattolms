@@ -30,6 +30,9 @@ use Throwable;
 #[AsEventListener(event: KernelEvents::TERMINATE)]
 final class RequestRecorder
 {
+    /** On a request, set by a page that refreshes itself: that refresh is not a visit. */
+    public const LIVE_REFRESH = 'site_analytics.live_refresh';
+
     public function __construct(
         private readonly SiteLogRepository $log,
         private readonly AuthService $auth,
@@ -45,6 +48,7 @@ final class RequestRecorder
         if ($address === '' || $this->environment === 'test') return;
         try {
             $request = $event->getRequest();
+            if ($request->attributes->get(self::LIVE_REFRESH) === true) return;
             $response = $event->getResponse();
             $user = $this->auth->currentUser();
             $agent = (string) $request->headers->get('User-Agent', '');
@@ -54,7 +58,9 @@ final class RequestRecorder
             $form = $request->attributes->get(FormGuard::ATTRIBUTE);
             $form = is_array($form) ? $form : [];
             $networkKind = RequestFacts::isPrivate($address) ? 'private' : ($facts->tor ? 'tor' : ($facts->vpn ? 'vpn' : ($facts->datacenter ? 'hosting' : ($facts->public ? 'home' : ''))));
-            $page = $request->isMethod('GET') && $response->getStatusCode() < 400 && !$request->headers->has('HX-Request')
+            // A page changed in place (UX rule 8.6a) is a page like any other. htmx names its target as main#cl-main.
+            $inPlace = str_ends_with((string) $request->headers->get('HX-Target', ''), 'cl-main');
+            $page = $request->isMethod('GET') && $response->getStatusCode() < 400 && (!$request->headers->has('HX-Request') || $inPlace)
                 && str_starts_with((string) $response->headers->get('Content-Type', 'text/html'), 'text/html');
             $this->log->record([
                 'address' => $address, 'subject' => RequestFacts::subject($address), 'user_id' => $user?->id,

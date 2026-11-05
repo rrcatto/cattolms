@@ -18,13 +18,11 @@
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'campaign-name', full_width: true, help: 'For Administration only, such as "November news". Readers never see it.'})} %}{% block control %}<input class="cl-input" id="campaign-name" name="name" maxlength="160" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% if lists %}
-				<fieldset class="cl-mailing-lists">
-					<legend class="h6">Who it goes to</legend>
-					{% for list in lists %}
-						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: list.name ~ ' (' ~ (list.followers == 1 ? '1 person' : list.followers ~ ' people') ~ ')'})} %}{% block control %}<input type="checkbox" name="list_ids[]" value="{{ list.id }}"{{ list.id == chosen_list or (chosen_list == 0 and list.kind == 'news') ? ' checked' : '' }}>{% endblock %}{% endembed %}
-					{% endfor %}
+				{% set list_icons = {news: 'newspaper', course: 'book-open', category: 'folder', tag: 'tag', own: 'list'} %}
+				<div class="cl-mailing-lists">
+					{{ ui('form.picture-choice', {multiple: true, list: 'list_ids', legend: 'Who it goes to', size: 'small', selected: lists|filter(list => list.id == chosen_list or (chosen_list == 0 and list.kind == 'news'))|map(list => list.id), items: lists|map(list => {value: list.id, label: list.name, icon: lucide(list_icons[list.kind]|default('list')), note: list.followers == 1 ? '1 person' : list.followers ~ ' people'})}) }}
 					<p class="help">Someone on several lists gets it once.</p>
-				</fieldset>
+				</div>
 				{% else %}
 					<p class="help">Nobody follows anything yet. A list appears here when its first person follows it.</p>
 				{% endif %}

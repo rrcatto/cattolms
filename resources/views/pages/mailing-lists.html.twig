@@ -38,7 +38,9 @@
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true, help: 'Such as "Early access to new courses".'})} %}{% block control %}<input class="cl-input" id="list-name" name="name" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show it on everyone\'s My Subscriptions page', help: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'})} %}{% block control %}<input type="checkbox" name="shown" value="1" checked>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'My Subscriptions', legend_hidden: true, size: 'small', selected: ['shown'], items: [
+					{value: 'shown', label: 'Show it on everyone\'s My Subscriptions page', icon: lucide('eye'), note: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'},
+				]}) }}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
 		</form>
 	{% endblock %}{% endembed %}</section>

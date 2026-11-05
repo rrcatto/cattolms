@@ -115,13 +115,18 @@ final class CataloguePackage
         if ($zip->open($path, ZipArchive::OVERWRITE) !== true) throw new RuntimeException('The catalogue package could not be made.');
         $codes = [];
         $files = [];
-        $packages = [];
-        foreach ($chosen as $courseId) $packages[$courseId] = $this->portability->exportCourse($courseId);
-        $chosenCodes = array_map(static fn(array $package): string => (string) $package['course']['code'], $packages);
-        foreach ($packages as $courseId => $package) {
+        $codeOf = array_column($this->repository->catalogueExportRows(), 'code', 'id');
+        $chosenCodes = array_map(static fn(int $id): string => (string) ($codeOf[$id] ?? ''), $chosen);
+        // One course at a time, each kept on disk until the zip is written: a whole catalogue does not fit in memory at once.
+        $written = [];
+        foreach ($chosen as $courseId) {
+            $package = $this->portability->exportCourse($courseId);
             $code = (string) $package['course']['code'];
             $package['catalogue']['related'] = array_values(array_intersect((array) $package['catalogue']['related'], $chosenCodes));
-            $zip->addFromString(self::COURSES . $code . '.json', self::json($package));
+            $json = tempnam(sys_get_temp_dir(), 'catalogue-course');
+            if ($json === false || file_put_contents($json, self::json($package)) === false) throw new RuntimeException('The catalogue package could not be made.');
+            $written[] = $json;
+            $zip->addFile($json, self::COURSES . $code . '.json');
             $codes[] = $code;
             foreach ((array) $package['resources'] as $resource) {
                 $publicId = (string) ($resource['public_id'] ?? '');
@@ -142,7 +147,9 @@ final class CataloguePackage
         if ($site !== null) {
             $zip->addFromString(self::SITE_PRESENTATION, self::json(['item_key' => $site['item_key'], 'name' => $site['name'], 'title' => $site['title'], 'description_html' => $site['description_html'], 'deck' => $site['type_config']]));
         }
-        if (!$zip->close()) throw new RuntimeException('The catalogue package could not be written.');
+        $closed = $zip->close();
+        foreach ($written as $json) @unlink($json);
+        if (!$closed) throw new RuntimeException('The catalogue package could not be written.');
         $this->audit->record($userId, 'catalogue.exported', ['courses' => count($codes), 'categories' => count($categories), 'tags' => count($tags), 'files' => count($files),
             'every_course' => $courseIds === null]);
         return $path;
@@ -244,7 +251,7 @@ final class CataloguePackage
         $codes = [];
         $slugs = [];
         foreach ($package['courses'] as $entry) {
-            $row = $this->planCourse($entry['name'], $entry['data'], $inPackage, $codes, $slugs);
+            $row = $this->planCourse($entry['name'], $this->courseIn($path, $entry['name']), $inPackage, $codes, $slugs);
             $plan['courses'][] = $row;
             $plan['counts'][$row['action']]++;
         }
@@ -272,8 +279,6 @@ final class CataloguePackage
             'courses' => [], 'counts' => ['imported' => 0, 'updated' => 0, 'replaced' => 0, 'unchanged' => 0, 'left_out' => 0, 'skipped' => 0, 'failed' => 0]];
         $report['files_installed'] = $this->installFiles($path, $package['files'], $package['courses'], $userId);
 
-        $data = [];
-        foreach ($package['courses'] as $entry) $data[$entry['name']] = $entry['data'];
         $done = [];
         foreach ($plan['courses'] as $row) {
             $outcome = ['code' => $row['code'], 'title' => $row['title'], 'course_id' => $row['course_id'], 'outcome' => '', 'details' => []];
@@ -287,15 +292,16 @@ final class CataloguePackage
                 $report['counts']['left_out']++;
                 continue;
             }
-            $block = is_array($data[$row['file']]['catalogue'] ?? null) ? $data[$row['file']]['catalogue'] : [];
+            $course = $this->courseIn($path, $row['file']);
+            $block = is_array($course['catalogue'] ?? null) ? $course['catalogue'] : [];
             try {
                 if ($row['action'] === 'new') {
-                    $analysis = $this->portability->analysePackage($data[$row['file']], $row['file']);
+                    $analysis = $this->portability->analysePackage($course, $row['file']);
                     $categoryId = $this->settings->categoryIdByPath((string) ($block['category'] ?? ''));
                     $courseId = $this->portability->importChecked($analysis, $categoryId ?? 0, $userId, null, $row['code']);
                     $details = array_merge([$categoryId === null ? 'Uncategorised' : 'Category: ' . $block['category']],
                         $this->settings->apply($courseId, array_diff_key($block, ['category' => true]), $userId, $prices));
-                    $narrated = $this->installNarrations($path, $package['narrations'], $data[$row['file']], $userId);
+                    $narrated = $this->installNarrations($path, $package['narrations'], $course, $userId);
                     if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     // A new course the package gives no position takes the next free number in its code's range (owner, 2026-11-01).
                     $placed = $this->positions?->fill($courseId, $userId);
@@ -309,14 +315,14 @@ final class CataloguePackage
                     if (in_array($row['code'], $replace, true)) {
                         if ($row['started']) throw new InvalidArgumentException('Learners have started this course, so its content is not replaced.');
                         $current = $this->repository->findById($courseId) ?? throw new InvalidArgumentException('The course is no longer on the site.');
-                        $analysis = $this->portability->analysePackage($data[$row['file']], $row['file']);
+                        $analysis = $this->portability->analysePackage($course, $row['file']);
                         $this->portability->importChecked($analysis, (int) ($current['category_id'] ?? 0), $userId, $courseId, $row['code']);
                         $details[] = 'Content replaced with the package\'s';
-                        $narrated = $this->installNarrations($path, $package['narrations'], $data[$row['file']], $userId);
+                        $narrated = $this->installNarrations($path, $package['narrations'], $course, $userId);
                         if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     }
                     $details = array_merge($details, $this->settings->apply($courseId, $block, $userId, false));
-                    if ($this->portability->adoptFileFrame($courseId, $data[$row['file']])) $details[] = self::FILE_FRAME;
+                    if ($this->portability->adoptFileFrame($courseId, $course)) $details[] = self::FILE_FRAME;
                     $kind = in_array($row['code'], $replace, true) ? 'replaced' : ($details === [] ? 'unchanged' : 'updated');
                     $outcome = array_replace($outcome, ['outcome' => $kind === 'replaced' ? 'content replaced' : $kind, 'details' => $details]);
                     $report['counts'][$kind]++;
@@ -504,13 +510,13 @@ final class CataloguePackage
      * Installs the package's files that are not on the site yet, for the courses that use them.
      *
      * @param array<string,string> $files entry name by public id
-     * @param list<array{name:string,data:array<string,mixed>}> $courses
+     * @param list<array{name:string}> $courses
      */
     private function installFiles(string $path, array $files, array $courses, int $userId): int
     {
         if ($files === []) return 0;
         $described = [];
-        foreach ($courses as $entry) foreach ((array) ($entry['data']['resources'] ?? []) as $resource) {
+        foreach ($courses as $entry) foreach ((array) ($this->courseIn($path, $entry['name'])['resources'] ?? []) as $resource) {
             if (is_array($resource) && isset($resource['public_id'])) $described[(string) $resource['public_id']] = $resource;
         }
         $zip = new ZipArchive();
@@ -534,7 +540,7 @@ final class CataloguePackage
     /**
      * The package's catalogue file, its courses' packages in catalogue order and its files.
      *
-     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string,data:array<string,mixed>}>,files:array<string,string>,site_presentation?:array<string,mixed>,narrations:array<string,string>}
+     * @return array{catalogue:array<string,mixed>,courses:list<array{name:string}>,files:array<string,string>,site_presentation?:array<string,mixed>,narrations:array<string,string>}
      */
     private function read(string $path, string $extension): array
     {
@@ -575,10 +581,24 @@ final class CataloguePackage
             usort($courses, static fn(string $a, string $b): int => [$order[$a] ?? PHP_INT_MAX, $a] <=> [$order[$b] ?? PHP_INT_MAX, $b]);
             $packages = [];
             foreach ($courses as $name) {
-                $packages[] = ['name' => $name, 'data' => self::decode((string) $zip->getFromName($name), $name)];
+                // Read to see it is sound, then let go: a whole catalogue does not fit in memory at once. courseIn reads it when it is wanted.
+                self::decode((string) $zip->getFromName($name), $name);
+                $packages[] = ['name' => $name];
             }
             $site = $zip->getFromName(self::SITE_PRESENTATION);
             return ['catalogue' => $catalogue, 'courses' => $packages, 'files' => $files, 'narrations' => $narrations] + ($site === false ? [] : ['site_presentation' => self::decode($site, self::SITE_PRESENTATION)]);
+        } finally {
+            $zip->close();
+        }
+    }
+
+    /** @return array<string,mixed> One course of a staged package. */
+    private function courseIn(string $path, string $name): array
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) throw new InvalidArgumentException('The catalogue package cannot be read.');
+        try {
+            return self::decode((string) $zip->getFromName($name), $name);
         } finally {
             $zip->close();
         }

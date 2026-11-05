@@ -384,7 +384,6 @@ final class CoursePortabilityService
                 'default_access_period_seconds' => (int) $course['default_access_period_seconds'],
                 'first_module_number' => (int) ($course['first_module_number'] ?? 1),
                 'introduction_html' => $course['introduction_html'],
-                'show_outline_on_intro' => (bool) $course['show_outline_on_intro'],
                 'certificate_enabled' => (bool) $course['certificate_enabled'],
                 'certificate_accreditation' => $course['certificate_accreditation'] ?? '',
                 'course_style_key' => $course['course_style_key'],
@@ -430,6 +429,12 @@ final class CoursePortabilityService
     public function hasStartedLearners(int $courseId): bool
     {
         return $this->portability->hasStartedLearners($courseId);
+    }
+
+    /** @return list<string> */
+    public function fileParts(int $courseId): array
+    {
+        return $this->portability->fileParts($courseId);
     }
 
     public function resetCourse(int $courseId, int $userId): void
@@ -500,6 +505,8 @@ final class CoursePortabilityService
                 if (!array_key_exists($key, $input)) $keep[] = $key;
             }
             if ($data['category_id'] === null) $keep[] = 'category_id';
+            // A file with no study time of its own (specification 6.5) leaves the course's as it is.
+            if (($input['estimated_minutes'] ?? null) === null) $keep[] = 'estimated_minutes';
             foreach ($keep as $key) if (array_key_exists($key, $existing)) $data[$key] = $existing[$key];
             if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug']) !== null) {
                 throw new InvalidArgumentException('A course with the imported slug already exists.');
@@ -509,6 +516,8 @@ final class CoursePortabilityService
             if ($replaceCourseId !== null) {
                 $this->portability->resetCourseContent($replaceCourseId);
                 $this->courses->updateCourse($replaceCourseId, $data, $userId);
+                // The reset makes it a draft and an update never sets a status, so a published course left the catalogue.
+                $this->portability->restorePublication($replaceCourseId, (string) $data['status'], (string) $data['publication_approval_status']);
                 $courseId = $replaceCourseId;
             } else {
                 $courseId = $this->courses->createCourse($data, $userId);
@@ -565,7 +574,6 @@ final class CoursePortabilityService
             'status' => 'draft',
             'default_access_period_seconds' => max(1, (int) ($input['default_access_period_seconds'] ?? 31536000)),
             'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $input['description_html'] ?? '')),
-            'show_outline_on_intro' => (bool) ($input['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) ($input['certificate_enabled'] ?? true),
             'certificate_accreditation' => mb_substr(trim((string) ($input['certificate_accreditation'] ?? '')), 0, 240),
             'course_style_key' => trim((string) ($input['course_style_key'] ?? 'standard')) ?: 'standard',
@@ -731,6 +739,25 @@ final class CoursePortabilityService
         foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $index => $assessment) {
             if (!is_array($assessment)) { continue; }
             $itemKey = $key((string) ($assessment['assessment_key'] ?? 'diagnostic-' . ($index + 1))); $items[] = $this->importAssessmentItem($assessment, $itemKey, 'diagnostic'); $structure[] = ['item_key' => $itemKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+        }
+        // A course file names its files and holds none (specification 6.3): each part is made when the Resource Library has its file.
+        if (is_array($analysis['files'] ?? null)) {
+            $section = null;
+            foreach ((array) $analysis['files']['files'] as $file) {
+                $resource = $this->courseItemRecords->resourceByFilename((string) $file['filename']);
+                if ($resource === null) {
+                    $analysis['warnings'][] = 'The file ' . (string) $file['filename'] . ' is not in the Resource Library, so "' . (string) $file['title'] . '" is left out. Upload it there first, or import the course with its files (.zip).';
+                    continue;
+                }
+                if ($section === null) {
+                    $section = $key('course-files');
+                    $structure[] = ['node_type' => 'section', 'node_key' => $section, 'parent_node_key' => null, 'title' => (string) $analysis['files']['title'], 'introduction_html' => (string) $analysis['files']['introduction_html'], 'public_preview' => false, 'relative_delay_minutes' => 0];
+                }
+                $partKey = $key('file-' . pathinfo((string) $file['filename'], PATHINFO_FILENAME));
+                $items[] = ['item_key' => $partKey, 'item_type' => (string) $resource['resource_type'] === 'pdf' ? 'pdf' : 'downloadable_file', 'title' => (string) $file['title'],
+                    'description_html' => (string) $file['description'] === '' ? '' : '<p>' . htmlspecialchars((string) $file['description'], ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>', 'content_source' => '', 'type_config' => [], 'estimated_minutes' => null, 'resource_id' => (int) $resource['id']];
+                $structure[] = ['item_key' => $partKey, 'parent_node_key' => $section, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+            }
         }
         foreach ((array) ($analysis['modules'] ?? []) as $index => $module) {
             if (!is_array($module)) { continue; }

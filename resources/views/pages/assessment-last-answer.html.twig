@@ -1,0 +1,18 @@
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+		{# Practice says how the last answer went, as it does for every other answer, and the reader goes on to the
+		   result when they are ready (owner, 2026-11-05). The attempt is already finished: nothing here can change it. #}
+		<div class="mb-7">
+			<span class="cl-kicker cl-text-primary">Practice assessment</span>
+			<h1 class="h2 mb-0">
+				{{ session.assessment_title }}
+			</h1>
+		</div>
+		{{ ui('feedback.progress', {value: 100, label: 'Assessment progress', size: 'normal'}) }}
+		<div class="d-flex justify-content-between cl-text-muted mb-7">
+			<span>Answered {{ session.counts.answered }} of {{ session.counts.total }}</span><span>Skipped {{ session.counts.skipped }}</span>
+		</div>
+		{% include '@platform/partials/assessment-feedback.html.twig' %}
+		{% set public_preview = is_public_preview|default(false) %}
+		{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_base: '', paging_previous: null, paging_next: null, paging_next_link: {href: result_url, label: 'View my result', icon: 'action-view'}} %}
+{% endblock %}

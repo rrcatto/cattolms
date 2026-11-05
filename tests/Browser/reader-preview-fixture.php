@@ -45,6 +45,7 @@ if ($action === 'create') {
     $course = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
     $items = $container->get(CourseItemService::class);
     $id = $course['id'];
+    $db->executeStatement('UPDATE courses SET introduction_html = :words WHERE id = :id', ['words' => '<div class="intro-check"><h3>How this course relates to its exam</h3></div>', 'id' => $id]);
     $key = 'reader-' . $fixture->suffix();
     $public = ['public_preview' => '1'];
     $readiness = $items->createAndPlace($id, $public + ['item_key' => $key . '-readiness', 'item_type' => 'diagnostic', 'title' => 'Are you ready to start?', 'pass_mark' => '50'], $admin['id']);

@@ -26,7 +26,9 @@
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}{% block body %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'comes-back'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'If it comes back'}) }}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Each new time-out lasts twice as long as the one before'})} %}{% block control %}<input type="checkbox" class="cl-check" name="doubles" value="1"{{ values.doubles ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'Doubling', legend_hidden: true, size: 'small', selected: values.doubles ? ['doubles'] : [], items: [
+				{value: 'doubles', label: 'Each new time-out lasts twice as long as the one before', icon: lucide('repeat'), note: 'Up to the longest time-out. Untick it and each lasts as long as its rule says.'},
+			]}) }}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Longest time-out', for: 'site-longest'})} %}{% block control %}<input id="site-longest" name="longest" value="{{ values.longest }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Timed out this many times', for: 'site-lock-count'})} %}{% block control %}<input id="site-lock-count" name="lockout_count" value="{{ values.lockout_count }}" inputmode="numeric" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
@@ -36,9 +38,11 @@
 		{% endblock %}{% endembed %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'never-timed-out'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Never timed out automatically'}) }}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'An address an administrator signed in from in the past 30 days'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_administrators" value="1"{{ values.spare_administrators ? ' checked' : '' }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'An address a signed-in person used in the past 30 days. It is flagged for you to decide, because mobile networks share addresses among many people.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_people" value="1"{{ values.spare_people ? ' checked' : '' }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Search engines that prove who they are'})} %}{% block control %}<input type="checkbox" class="cl-check" name="spare_search_engines" value="1"{{ values.spare_search_engines ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'Never timed out automatically', legend_hidden: true, size: 'small', columns: 1, selected: ['spare_administrators', 'spare_people', 'spare_search_engines']|filter(name => values[name]), items: [
+				{value: 'spare_administrators', label: 'An address an administrator signed in from in the past 30 days', icon: lucide('shield-check'), note: 'Untick it and it can be timed out like any other.'},
+				{value: 'spare_people', label: 'An address a signed-in person used in the past 30 days', icon: lucide('user-round'), note: 'It is flagged for you to decide, because mobile networks share addresses among many people. Untick it and it can be timed out.'},
+				{value: 'spare_search_engines', label: 'Search engines that prove who they are', icon: lucide('search'), note: 'Untick it and they can be timed out like anyone else.'},
+			]}) }}
 		{% endblock %}{% endembed %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'never-lock-out'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Never lock out', summary: 'Your own connections. Not even you can lock these out. You are using ' ~ (own_address ?: 'an unknown address') ~ ' now.'}) }}
@@ -48,12 +52,16 @@
 			{{ ui('layout.section-head', {heading: 'Records', summary: 'The daily clean-up deletes anything older. Today the Site Log holds ' ~ log_total ~ ' requests.'}) }}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep the Site Log for', for: 'site-log-keep'})} %}{% block control %}<input id="site-log-keep" name="log_kept_for" value="{{ values.log_kept_for }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep flagged activity and ended lockouts for', for: 'site-flags-keep'})} %}{% block control %}<input id="site-flags-keep" name="flags_kept_for" value="{{ values.flags_kept_for }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Leave administrators out of the Overview\'s figures'})} %}{% block control %}<input type="checkbox" class="cl-check" name="leave_out_administrators" value="1"{{ values.leave_out_administrators ? ' checked' : '' }}>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'The Overview', legend_hidden: true, size: 'small', selected: values.leave_out_administrators ? ['leave_out_administrators'] : [], items: [
+				{value: 'leave_out_administrators', label: 'Leave administrators out of the Overview\'s figures', icon: lucide('chart-no-axes-column'), note: 'Untick it and their requests count in the figures.'},
+			]}) }}
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'firewall', section_spacing: true})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'The server\'s firewall', summary: server.available ? (server.stale ? 'The server last told this site what it refuses ' ~ server.written_words|lower ~ ', so it may have stopped.' : 'The server told this site what it refuses ' ~ server.written_words|lower ~ '.') : 'This server has not been set up for this yet, so the tick does nothing until it is.'}) }}
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Let a lockout also ban at the server\'s firewall. A lockout then offers this as a tick, and the address cannot reach any website on the server.'})} %}{% block control %}<input type="checkbox" class="cl-check" name="firewall_link" value="1"{{ values.firewall_link ? ' checked' : '' }}>{% endblock %}{% endembed %}
+		{{ ui('form.picture-choice', {multiple: true, legend: 'The server\'s firewall', legend_hidden: true, size: 'small', selected: values.firewall_link ? ['firewall_link'] : [], items: [
+			{value: 'firewall_link', label: 'Let a lockout also ban at the server\'s firewall', icon: lucide('shield'), note: 'A lockout then offers this as a tick, and the address cannot reach any website on the server. Leave it unticked and a lockout stops at this site.'},
+		]}) }}
 	{% endblock %}{% endembed %}
 	</form></section>
 	{% if can_manage %}

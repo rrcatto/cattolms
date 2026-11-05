@@ -423,13 +423,14 @@ final class LegacyHtmlCourseImporter
                 'title' => $title,
                 'subtitle' => $courseSubtitle,
                 'summary' => $summary,
-                'description_html' => $summary !== '' ? '<p>' . htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '',
+                // What the course's page says about it: the file's .course-description panel, else the summary (specification 4.7).
+                'description_html' => $this->courseDescription($xpath) ?? ($summary !== '' ? '<p>' . htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : ''),
                 'introduction_html' => $this->courseHtml->preserve($introductionHtml),
                 'level' => $this->detectLevel($xpath),
                 // A course whose first module is mod-m0, one that only sets the learner up, numbers its modules from 0
                 // (specification 4.4, section 8; owner, 2026-10-29).
                 'first_module_number' => (($modules[0]['module_key'] ?? '') === 'm0') ? 0 : 1,
-                'estimated_minutes' => null,
+                'estimated_minutes' => $this->studyMinutes($xpath),
                 'default_access_period_seconds' => 31536000,
                 'module_weight' => 0.5,
                 'final_weight' => 0.5,
@@ -440,6 +441,7 @@ final class LegacyHtmlCourseImporter
             ],
             'modules' => $modules,
             // The course preview, a presentation of its own outside the modules (owner, 2026-11-03: everything is exported).
+            'files' => $this->courseFiles($xpath),
             'trailer' => $this->presentation(is_array($presentations['trailer'] ?? null) ? ['kind' => 'trailer'] + $presentations['trailer'] : null, 'The course preview', false, $warnings),
             // The course's cover, an SVG drawing in the masthead's .course-cover (owner, 2026-11-01), set after import.
             'catalogue' => ($cover = $this->cover($xpath, $title, $warnings)) === null ? null : ['cover' => $cover],
@@ -457,7 +459,7 @@ final class LegacyHtmlCourseImporter
                 'practice_question_count' => min(10, count($finalQuestions)),
                 'graded_question_count' => count($finalQuestions),
                 'maximum_attempts' => 1,
-                'time_limit_seconds' => 7200,
+                'time_limit_seconds' => $this->finalTimeLimit($xpath),
                 'score_policy' => 'highest',
                 'randomise_questions' => true,
                 'randomise_options' => true,
@@ -555,11 +557,72 @@ final class LegacyHtmlCourseImporter
         return $bands;
     }
 
+    /** The words of the file's course description panel, without its <summary>, or null when it has none. */
+    private function courseDescription(DOMXPath $xpath): ?string
+    {
+        $panel = $xpath->query('//details[contains(concat(" ", normalize-space(@class), " "), " course-description ")][1]')->item(0);
+        if (!$panel instanceof DOMElement) { return null; }
+        $html = '';
+        foreach ($panel->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === 'summary') { continue; }
+            $html .= $child instanceof DOMElement ? CourseHtml::html($child) : htmlspecialchars((string) $child->textContent, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        }
+        $html = trim($html);
+        return $html === '' ? null : $this->courseHtml->preserve($html);
+    }
+
+    /** How long the final assessment allows, in minutes in the file's head (specification 6.4), or two hours. */
+    private function finalTimeLimit(DOMXPath $xpath): int
+    {
+        $nodes = $xpath->query('//meta[@name="cattolms:final-time-limit"]/@content');
+        $minutes = $nodes->length > 0 ? (int) $nodes->item(0)?->nodeValue : 0;
+        return $minutes >= 1 && $minutes <= 1440 ? $minutes * 60 : 7200;
+    }
+
+    /** The whole course's study time, in hours in the file's head (specification 6.5), or null: the page adds up its parts. */
+    private function studyMinutes(DOMXPath $xpath): ?int
+    {
+        $nodes = $xpath->query('//meta[@name="cattolms:study-hours"]/@content');
+        $hours = $nodes->length > 0 ? (int) $nodes->item(0)?->nodeValue : 0;
+        return $hours >= 1 && $hours <= 10000 ? $hours * 60 : null;
+    }
+
+    /**
+     * The section of files the course names (specification 6.3): a file holds no PDF or spreadsheet, only their names.
+     *
+     * @return array{title:string,introduction_html:string,files:list<array{filename:string,title:string,description:string}>}|null
+     */
+    private function courseFiles(DOMXPath $xpath): ?array
+    {
+        $panel = $xpath->query('//details[contains(concat(" ", normalize-space(@class), " "), " course-files ")][1]')->item(0);
+        if (!$panel instanceof DOMElement) { return null; }
+        $title = '';
+        $introduction = '';
+        $files = [];
+        foreach ($panel->childNodes as $child) {
+            if (!$child instanceof DOMElement) { continue; }
+            $tag = strtolower($child->tagName);
+            if ($tag === 'summary') { $title = trim((string) $child->textContent); continue; }
+            if ($tag === 'p') { $introduction .= CourseHtml::html($child); continue; }
+            if ($tag !== 'ul' && $tag !== 'ol') { continue; }
+            foreach ($child->getElementsByTagName('li') as $row) {
+                $link = $row->getElementsByTagName('a')->item(0);
+                if (!$link instanceof DOMElement) { continue; }
+                $name = trim((string) $link->textContent);
+                $files[] = [
+                    'filename' => basename(rawurldecode($link->getAttribute('href'))), 'title' => $name,
+                    'description' => trim((string) preg_replace('/\s+/u', ' ', str_replace($name, '', (string) $row->textContent))),
+                ];
+            }
+        }
+        return $files === [] ? null : ['title' => $title !== '' ? $title : 'Course files', 'introduction_html' => $this->courseHtml->preserve($introduction), 'files' => $files];
+    }
+
     /** A section the importer takes in its own right: a module, the review, the final assessment or the readiness check. */
     private static function importedElsewhere(DOMElement $node): bool
     {
         $class = ' ' . (string) preg_replace('/\s+/', ' ', (string) $node->getAttribute('class')) . ' ';
-        foreach (['module', 'review', 'final', 'diag', 'course-preview'] as $name) { if (str_contains($class, ' ' . $name . ' ')) return true; }
+        foreach (['module', 'review', 'final', 'diag', 'course-preview', 'course-description', 'course-files'] as $name) { if (str_contains($class, ' ' . $name . ' ')) return true; }
         $id = (string) $node->getAttribute('id');
         return in_array($id, ['diagnostic', 'final', 'mod-review'], true) || str_starts_with($id, 'mod-');
     }

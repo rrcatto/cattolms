@@ -90,7 +90,8 @@ final class AdminCourseController extends BaseController
         private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
         private readonly \CattoLearning\Course\CoursePageLayouts $pageLayouts,
         private readonly \CattoLearning\Course\CourseQuickEdit $quickEdit,
-        private readonly \CattoLearning\Course\CourseFile $courseFile
+        private readonly \CattoLearning\Course\CourseFile $courseFile,
+        private readonly \CattoLearning\Course\CataloguePackage $cataloguePackage
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -661,6 +662,8 @@ final class AdminCourseController extends BaseController
             }
             if ($existingCourse !== null) {
                 $analysis['warnings'] = array_values(array_diff((array) ($analysis['warnings'] ?? []), (array) ($analysis['key_conflicts'] ?? [])));
+                // A course file holds no files, so replacing from one takes them away: say so before it happens.
+                $existingCourse['file_parts'] = (array) ($analysis['resources'] ?? []) === [] ? $this->portability->fileParts($existingCourse['id']) : [];
             }
             // The code it will have: the file's, a replaced course's own, else one suggested from its title.
             $importCode = $fileCode !== '' ? $fileCode : ($existingCourse !== null ? $existingCourse['code'] : $this->courses->suggestCourseCode((string) ($analysis['course']['title'] ?? '')));
@@ -815,6 +818,25 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($courseId): Response {
             $file = $this->courseFile->fromCourse($courseId);
             return $this->htmlFile($file['html'], $file['filename']);
+        }, '/admin/courses/' . $courseId);
+    }
+
+    /**
+     * A course on the site with its PDFs and downloads (owner, 2026-11-05: "export the courses using the appropriate
+     * method and make sure the import process works with whatever you export"): the catalogue package of this one course,
+     * which imports back at Import & Export Catalogue. A course file cannot hold them.
+     */
+    #[Route('/admin/courses/{id}/course-package', name: 'admin_course_package', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function coursePackage(): Response
+    {
+        $this->requirePermission('COURSE.EXPORT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        return $this->handle(function () use ($courseId): Response {
+            $path = $this->cataloguePackage->export($this->requireUser()->id, [$courseId]);
+            $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($path, 200, ['Content-Type' => 'application/zip', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
+            $response->setContentDisposition(\Symfony\Component\HttpFoundation\ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'course-' . $courseId . '-with-its-files.zip');
+            return $response->deleteFileAfterSend();
         }, '/admin/courses/' . $courseId);
     }
 

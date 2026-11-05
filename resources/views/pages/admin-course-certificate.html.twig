@@ -15,7 +15,9 @@
 <div class="cl-certificate-editor-form">
 
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Give learners a certificate when they complete every assessment of this course, pass or fail'})} %}{% block control %}<input type="checkbox" id="certificate-enabled" name="certificate_enabled" value="1" {{ course.certificate_enabled ? 'checked' : '' }}>{% endblock %}{% endembed %}
+	{{ ui('form.picture-choice', {multiple: true, legend: 'Certificate', legend_hidden: true, size: 'small', selected: course.certificate_enabled ? ['certificate_enabled'] : [], items: [
+		{value: 'certificate_enabled', label: 'Give learners a certificate', icon: lucide('award'), note: 'When they complete every assessment of this course, pass or fail. Leave it unticked and this course gives no certificate.'},
+	]}) }}
 {% endblock %}{% endembed %}
 
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}

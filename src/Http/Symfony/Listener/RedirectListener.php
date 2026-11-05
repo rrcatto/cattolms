@@ -28,6 +28,7 @@ namespace CattoLearning\Http\Symfony\Listener;
 use CattoLearning\Http\HttpRedirect;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -41,6 +42,12 @@ final class RedirectListener
             return;
         }
         if (str_starts_with($event->getRequest()->getPathInfo(), '/api/')) {
+            return;
+        }
+
+        // A page refreshing itself must not swap a sign-in page into its main area: it is told to go there instead.
+        if ($event->getRequest()->headers->has('X-Live-Refresh')) {
+            $event->setResponse(new Response('', 200, ['HX-Redirect' => $exception->path]));
             return;
         }
 

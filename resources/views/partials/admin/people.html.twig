@@ -161,11 +161,9 @@
 {% endblock %}
 {% endembed %}
 								<div class="cl-ui-field--full">
-									{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Send plain account notification email'})} %}
-{% block control %}
-<input type="checkbox" name="send_notice" value="1" style="width:auto;margin-right:7px">
-{% endblock %}
-{% endembed %}
+									{{ ui('form.picture-choice', {multiple: true, legend: 'Notification', legend_hidden: true, size: 'small', selected: [], items: [
+										{value: 'send_notice', label: 'Send plain account notification email', icon: lucide('mail'), note: 'Tells them about their new account. Leave it unticked and no email goes.'},
+									]}) }}
 								</div>
 
 {% endblock %}

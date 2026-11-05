@@ -3,8 +3,6 @@
   Unticked, required, and refused by the server without it (CheckoutService::place, accept_start). The
   wording is OrderService::IMMEDIATE_START, recorded in the order's consent.
 #}
-{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: immediate_start})} %}
-{% block control %}
-<input type="checkbox" name="accept_start" value="yes" required>
-{% endblock %}
-{% endembed %}
+{{ ui('form.picture-choice', {multiple: true, legend: 'Starting on payment', legend_hidden: true, size: 'small', tick_value: 'yes', required: true, selected: [], items: [
+{value: 'accept_start', label: immediate_start, icon: lucide('hourglass')},
+]}) }}

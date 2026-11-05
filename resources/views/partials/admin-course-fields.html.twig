@@ -44,10 +44,10 @@
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Estimated minutes', span: 'quarter', for: 'minutes'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Study time in hours', help: 'What a buyer is told the whole course takes. Empty adds up its parts.', span: 'quarter', for: 'study-hours'})} %}
 {% block control %}
 
-		<input class="cl-input" id="minutes" type="number" min="0" name="estimated_minutes" value="{{ course.estimated_minutes }}" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="study-hours" type="number" min="0" name="study_hours" value="{{ course.estimated_minutes|default(0) ? (course.estimated_minutes / 60)|round : '' }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -58,8 +58,6 @@
 
 {% endblock %}
 {% endembed %}
-<input type="hidden" name="show_outline_on_intro" value="0">
-{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Show generated outline on introduction', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="show_outline_on_intro" value="1" {{ course.show_outline_on_intro|default(false) ? 'checked' : '' }}>{% endblock %}{% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Catalogue summary', full_width: true, for: 'summary'})} %}
 {% block control %}
 
