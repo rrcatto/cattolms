@@ -1,0 +1,88 @@
+{#
+	Money Reports (owner, 2026-11-06, the approved mockup REPORTS/money-reports-mockup/Main.dc.html): each month's money in one
+	report, on screen, as a PDF or as an Excel file. The Month changes the page in place, the address following (UX rule 8.6a),
+	and without JavaScript Show does. Six figures, each set against the month before and, once the site has a year of records,
+	the same month last year, each opening the list it adds up with the month's dates filled in. Then money in by method,
+	the orders, what was sold, the refunds and payouts, and the two ticks that email the report and send its one line by
+	Telegram on the 1st, which save as they change.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Money Reports' %}
+	{% set ph_lead = 'Each month\'s money in one report, on screen, as a PDF or as an Excel file.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set month = report.month %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-month'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: month.label ~ (month.so_far ? ', so far' : ''), summary: (month.from|date('j F Y')) ~ ' to ' ~ (month.to|date('j F Y')) ~ '. Each figure opens the list it adds up, with the month\'s dates filled in.'}) }}
+		<form class="cl-money-period" action="/admin/commerce/reports" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/commerce/reports'} only %}>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Month', full_width: false, for: 'money-report-month-choice'})} %}{% block control %}<select id="money-report-month-choice" name="month" onchange="this.form.requestSubmit()" {{ ui_field_attrs(props) }}>{% for choice in months %}<option value="{{ choice.key }}"{{ choice.key == month.key ? ' selected' : '' }}>{{ choice.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}</noscript>
+			{{ ui('action.link', {label: 'Download PDF', variant: 'primary', size: 'normal', href: '/admin/commerce/reports/' ~ month.key ~ '.pdf', icon: 'action-download'}) }}
+			{{ ui('action.link', {label: 'Download Excel', variant: 'secondary', size: 'normal', href: '/admin/commerce/reports/' ~ month.key ~ '.xlsx', icon: 'action-download'}) }}
+		</form>
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 3})} %}{% block body %}
+			{% for figure in report.figures %}{{ ui('data.stat-card', {value: figure.value, label: figure.label, note: figure.note, href: figure.href, icon: figure.icon, size: figure.size}) }}{% endfor %}
+		{% endblock %}{% endembed %}
+		<p class="small mt-3 mb-0">{% if report.year %}Each figure is set against the month before and against {{ report.year.label }}.{% else %}Each figure is set against the month before, and against the same month last year once the site has a year of records.{% endif %} Each opens the list it adds up.</p>
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-methods'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Money in, by method', summary: 'Every payment received. Open a method for its payments.'}) }}
+			{% if report.by_method %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th style="width:50%">Method</th><th class="text-end" style="width:20%">Payments</th><th class="text-end" style="width:30%">Amount</th></tr>{% endblock %}
+			{% block body %}{% for row in report.by_method %}<tr data-money-method="{{ row.method }}"><td><a href="{{ row.href }}">{{ row.label }}</a></td><td class="text-end">{{ row.payments|number_format }}</td><td class="text-end">{{ row.amount }}</td></tr>{% endfor %}{% endblock %}
+			{% block footer %}<tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>{{ report.payments|number_format }}</strong></td><td class="text-end"><strong>{{ report.money_in }}</strong></td></tr></tfoot>{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: 'No money came in during ' ~ month.label ~ '.'}) }}{% endif %}
+			{% if report.wallet_paid.payments > 0 %}<p class="small mt-3 mb-0">Also paid from wallet credit: <a href="{{ report.wallet_paid.href }}">{{ report.wallet_paid.payments|number_format }} {{ report.wallet_paid.payments == 1 ? 'payment' : 'payments' }}, {{ report.wallet_paid.amount }}</a>. Wallet credit is not money in: it came in before, or was given back by a refund.</p>{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-orders'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Orders', summary: 'The orders placed in ' ~ month.label ~ ', as they stand now. Refunded orders are counted among those paid in full.'}) }}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr><th style="width:70%">Orders</th><th class="text-end" style="width:30%">How many</th></tr>{% endblock %}
+			{% block body %}{% for row in report.orders %}<tr data-money-orders="{{ row.key }}"><td><a href="{{ row.href }}">{{ row.label }}</a></td><td class="text-end">{{ row.count|number_format }}</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-sales'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Sales, by course and bundle', summary: 'What the orders placed in ' ~ month.label ~ ' and paid in full bought: how many, the price before promotions, the promotions given and what was paid.'}) }}
+		{% if report.no_sales %}{{ ui('feedback.empty', {summary: 'No sales in ' ~ month.label ~ '.'}) }}{% else %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th style="width:44%">What was bought</th><th class="text-end" style="width:8%">Sold</th><th class="text-end" style="width:16%" data-phone="hide">Before promotions</th><th class="text-end" style="width:16%" data-phone="hide">Promotions</th><th class="text-end" style="width:16%">Paid</th></tr>{% endblock %}
+		{% block body %}{% for row in report.sales %}<tr data-money-sale="{{ row.product_type }}-{{ row.product_id }}"><td class="cell-text">{{ row.name }}</td><td class="text-end">{{ row.sold|number_format }}</td><td class="text-end">{{ row.before }}</td><td class="text-end">{{ row.promotions }}</td><td class="text-end">{{ row.paid }}</td></tr>{% endfor %}{% endblock %}
+		{% block footer %}<tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>{{ report.sold.sold|number_format }}</strong></td><td class="text-end"><strong>{{ report.sold.before }}</strong></td><td class="text-end"><strong>{{ report.sold.promotions }}</strong></td><td class="text-end"><strong>{{ report.sold.paid }}</strong></td></tr></tfoot>{% endblock %}
+		{% endembed %}
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-refunds'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Refunds and payouts', summary: 'Money paid back in ' ~ month.label ~ ', and refunds given as wallet credit, which is no money out.'}) }}
+		{% if report.refunds %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th style="width:18%">Date</th><th style="width:20%">Order</th><th style="width:42%">How</th><th class="text-end" style="width:20%">Amount</th></tr>{% endblock %}
+		{% block body %}{% for row in report.refunds %}<tr data-money-refund="{{ row.id }}"><td>{{ row.date }}</td><td>{% if row.order_href %}<a href="{{ row.order_href }}">{{ row.order }}</a>{% endif %}</td><td class="cell-text"><a href="{{ row.href }}">{{ row.how }}</a></td><td class="text-end">{{ row.amount }}</td></tr>{% endfor %}{% endblock %}
+		{% block footer %}<tfoot><tr><td colspan="3"><strong>Paid back</strong></td><td class="text-end"><strong>{{ report.refund_totals.money_back }}</strong></td></tr>{% if report.refund_totals.wallet_minor > 0 %}<tr><td colspan="3">Given as wallet credit</td><td class="text-end">{{ report.refund_totals.wallet }}</td></tr>{% endif %}</tfoot>{% endblock %}
+		{% endembed %}
+		{% else %}{{ ui('feedback.empty', {summary: 'Nothing was refunded or paid back in ' ~ month.label ~ '.'}) }}{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'money-report-email'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Email me each month', summary: 'On the 1st, at ' ~ email.starts ~ ', the start of the sending hours, last month\'s report goes to your administrator address' ~ (email.address ? ', ' ~ email.address : '') ~ ', with both files attached.'}) }}
+		{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+		<form action="/admin/commerce/reports/settings" method="post"{% if can_manage_settings %} hx-post="/admin/commerce/reports/settings" hx-trigger="change" hx-swap="none"{% endif %} data-money-report-ticks>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="month" value="{{ month.key }}">
+			{{ ui('form.picture-choice', {multiple: true, legend: 'Each month', legend_hidden: true, id: 'money-report-ticks', size: 'small', selected: (email.email ? ['email_report'] : [])|merge(email.telegram ? ['telegram_summary'] : []), items: [
+				{value: 'email_report', label: 'Email the report', icon: '<svg ' ~ icon_attributes ~ '><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>', note: 'The PDF and the Excel file, on the 1st. Untick it and no report is emailed.', disabled: not can_manage_settings},
+				{value: 'telegram_summary', label: 'Telegram summary', icon: '<svg ' ~ icon_attributes ~ '><path d="M21 4 3 11l6 2.5L19 7l-7.5 8 6 4.5z"/></svg>', note: 'One line: money in, what is left, orders paid. Untick it and nothing goes by Telegram.', disabled: not can_manage_settings},
+			]}) }}
+			{% if can_manage_settings %}<noscript>{{ ui('action.button', {label: 'Save', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-save'}) }}</noscript>{% endif %}
+		</form>
+		{% if not email.connected %}<p class="small mt-3 mb-0" data-money-report-telegram>Telegram is not connected, so the summary cannot go yet.{% if can_manage_settings %} <a href="/admin/settings?section=owner-messages#settings-owner-messages">Connect it at Settings, Messages to you</a>.{% endif %}</p>{% endif %}
+		{% if not can_manage_settings %}<p class="small mt-3 mb-0">Only an administrator who manages Settings can change these.</p>{% endif %}
+		<p class="small mt-3 mb-0" data-money-report-sent>{{ email.sent }} {{ email.next }}</p>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

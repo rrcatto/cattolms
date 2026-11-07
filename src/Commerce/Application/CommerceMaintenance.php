@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Settings\CommerceSettings;
@@ -159,7 +160,7 @@ final class CommerceMaintenance
             'number' => MoneyRecords::orderNumber((int) $order['id']), 'name' => (string) ($snapshot['purchaser_name'] ?? ''),
             'account_reference' => AccountReference::format((string) ($snapshot['account_reference'] ?? '')), 'placed' => self::day((string) $order['placed_at']),
             'lines' => $lines, 'total' => Money::ofMinorUnits((int) $order['total_minor'], $currency)->format(), 'paid' => $paid,
-            'url' => $base . '/account/orders/' . (int) $order['id'],
+            'url' => $base . OrderAddress::buyer((int) $order['id']),
         ];
     }
 
@@ -218,7 +219,7 @@ final class CommerceMaintenance
             'paid' => $paid > 0 ? Money::ofMinorUnits($paid, $currency)->format() : '', 'due' => Money::ofMinorUnits($this->records->dueAmount($id), $currency)->format(),
             'pay_by' => self::moment((string) $order['payment_due_at']), 'deadline' => $this->settings->paymentDue()->words(),
             'next' => $starts . ($paymentId !== null ? ' as soon as the rest is paid.' : ' as soon as your payment is confirmed.'),
-            'received' => $received, 'url' => $base . '/account/orders/' . $id,
+            'received' => $received, 'url' => $base . OrderAddress::buyer($id),
         ];
     }
 
@@ -240,7 +241,7 @@ final class CommerceMaintenance
             'account_reference' => AccountReference::format((string) ($snapshot['account_reference'] ?? '')), 'placed' => self::day((string) $order['placed_at']),
             'pay_by' => self::moment((string) $order['payment_due_at']), 'returned' => $paid > 0 ? Money::ofMinorUnits($paid, (string) $order['currency'])->format() : '',
             'wallet_url' => $base . ($company ? '/company/wallet' : '/account/wallet'), 'invoice' => (string) ($this->invoice($id)['number'] ?? ''),
-            'url' => $base . '/account/orders/' . $id, 'again_url' => $base . ($company ? '/company/credits/buy' : '/courses'),
+            'url' => $base . OrderAddress::buyer($id), 'again_url' => $base . ($company ? '/company/credits/buy' : '/courses'),
         ];
     }
 

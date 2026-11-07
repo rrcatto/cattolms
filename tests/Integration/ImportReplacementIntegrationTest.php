@@ -9,14 +9,17 @@ Version: 0.8.8.13
 
 Description:
 Importing a course that is already on the site. Its Course Items collide with the copy imported
-before, so it cannot become a second course; the review says the course is already there, chooses
-it under Replace existing course shell, and lists no key as a problem; a commit that would create a
-second copy says so in one sentence; replacing the course imports cleanly. A conflict of any other
-kind is not mistaken for a course to replace.
+before, so it cannot become a second course. An import knows a course by its code alone (owner,
+2026-11-06, the canonical rules): a file without a code is refused in one sentence that names the
+course and the code that updates it, lists no key as a problem and offers no course to pick by hand;
+with that code in the file, the import updates the course. A conflict of any other kind is not
+mistaken for a course to replace.
 
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/11/07 SAST
+- The canonical import: the code in the file names the course it updates; there is no Replace existing course shell.
 2026/10/07 SAST
 - Created after the owner's second import of a course listed 26 "Resolve the collision" warnings
   without saying the course was already on catto.test or that Replace would import it.
@@ -62,30 +65,35 @@ final class ImportReplacementIntegrationTest extends TestCase
         unset($_SESSION['flash']);
     }
 
-    public function testACourseImportedAgainIsOfferedForReplacementAndReplacesCleanly(): void
+    public function testACourseImportedAgainWithoutItsCodeIsRefusedWithTheCodeThatUpdatesIt(): void
     {
         $title = 'Replacement import ' . $this->suffix;
         $first = $this->portability->commitImport((string) $this->stage($title)['import_key'], 0, $this->userId);
+        $code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $first]);
 
         $again = $this->stage($title);
         self::assertNotSame([], $again['key_conflicts'], 'The second import collides with the first one\'s Course Items.');
         self::assertSame($first, $this->portability->courseHoldingConflicts($again), 'Every collision belongs to the course imported before.');
 
+        $_SESSION['csrf'] = str_repeat('c', 64);
         $page = InProcessPage::run($this->admin, AdminCourseController::class, 'previewImport', [], null, ['key' => (string) $again['import_key']]);
         self::assertSame(200, $page['status']);
-        self::assertStringContainsString('This course is already on the site', $page['body']);
+        self::assertStringContainsString('Its content is already on the site as “' . $title . '” (' . $code . ')', html_entity_decode($page['body']));
+        self::assertStringContainsString('put its code, ' . $code, html_entity_decode($page['body']), 'It says which code updates that course.');
         self::assertStringNotContainsString('Course Item key already exists', $page['body'], 'No key is listed as a problem to resolve.');
-        $document = new \DOMDocument();
-        @$document->loadHTML('<?xml encoding="UTF-8"><body>' . $page['body'] . '</body>');
-        self::assertSame(1, (new \DOMXPath($document))->query('//select[@name="replace_course_id"]/option[@value="' . $first . '" and @selected]')->length, 'The course is chosen under Replace.');
+        self::assertStringNotContainsString('name="replace_course_id"', $page['body'], 'No course is picked by hand: the code picks it.');
+        $refused = InProcessPage::run($this->admin, AdminCourseController::class, 'commitImport', [], ['csrf' => $_SESSION['csrf'], 'import_key' => (string) $again['import_key'], 'code' => 'RPX-' . strtoupper(substr($this->suffix, 0, 6))]);
+        self::assertStringContainsString('/admin/courses/import/preview', (string) $refused['location'], 'Nothing was imported.');
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM courses WHERE title = :t', ['t' => $title]), 'No second copy was made.');
 
-        try {
-            $this->portability->commitImport((string) $again['import_key'], 0, $this->userId);
-            self::fail('A second copy of the course was created.');
-        } catch (\InvalidArgumentException $refused) {
-            self::assertSame('This course is already on the site as “' . $title . '”. To update it, choose it under Replace existing course shell and import again.', $refused->getMessage());
-        }
-        self::assertSame($first, $this->portability->commitImport((string) $again['import_key'], 0, $this->userId, $first), 'Replacing the course imports cleanly.');
+        // With the course's code in the file, the import updates that course.
+        $coded = $this->stage($title . ' again', $code);
+        $review = IntegrationContainer::get()->get(\CattoLearning\Course\CataloguePackage::class)->reviewCourseFile((string) $coded['import_key']);
+        self::assertSame(['update', $first], [$review['action'], $review['course_id']]);
+        $done = IntegrationContainer::get()->get(\CattoLearning\Course\CataloguePackage::class)->importCourseFile((string) $coded['import_key'], ['fingerprint' => $review['fingerprint']], $this->userId);
+        self::assertSame($first, $done['course_id'], 'The course with the code was updated.');
+        self::assertSame($title . ' again', (string) $this->db->fetchOne('SELECT title FROM courses WHERE id = :id', ['id' => $first]));
+        unset($_SESSION['csrf']);
     }
 
     public function testOtherConflictsAreNotMistakenForACourseToReplace(): void
@@ -96,10 +104,10 @@ final class ImportReplacementIntegrationTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function stage(string $title): array
+    private function stage(string $title, string $code = ''): array
     {
         $temporary = (string) tempnam(sys_get_temp_dir(), 'replacement-import-');
-        file_put_contents($temporary, json_encode(['course' => ['slug' => 'replacement-import-' . $this->suffix, 'title' => $title], 'modules' => [['title' => 'Only module', 'module_key' => 'm1', 'assessment_required' => false, 'content_html' => '<p>Hello</p>']]], JSON_THROW_ON_ERROR));
+        file_put_contents($temporary, json_encode(['course' => ['slug' => 'replacement-import-' . $this->suffix, 'title' => $title] + ($code === '' ? [] : ['code' => $code]), 'modules' => [['title' => 'Only module', 'module_key' => 'm1', 'assessment_required' => false, 'content_html' => '<p>Hello</p>']]], JSON_THROW_ON_ERROR));
         try {
             return $this->portability->stageImport(['error' => UPLOAD_ERR_OK, 'size' => filesize($temporary), 'tmp_name' => $temporary, 'name' => 'replacement.json'], $this->userId);
         } finally {

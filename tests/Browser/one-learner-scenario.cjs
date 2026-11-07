@@ -299,8 +299,8 @@ async function signIn(page, address) {
             await learner.locator('input[name=accept_terms]').check();
             await learner.locator('input[name=accept_start]').check();
             await submit(learner, learner.getByRole('button', {name: 'Place my order'}));
-            assert.match(learner.url(), /\/account\/orders\/\d+$/, 'the order page opens');
-            summary.order_id = Number(new URL(learner.url()).pathname.split('/').pop());
+            assert.match(learner.url(), /\/account\/orders\/CL-\d{8}$/, 'the order page opens, named by its number');
+            summary.order_number = new URL(learner.url()).pathname.split('/').pop();
             await shot(learner, '06c-learner-order');
             await learner.goto(`${base}/account/courses`);
             assert.match(clean(await learner.locator('main').innerText()), new RegExp(bought.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'My Courses lists it');
@@ -308,7 +308,7 @@ async function signIn(page, address) {
         });
 
         await step('7. ADMIN reads what was recorded on the order page', async () => {
-            await admin.goto(`${base}/admin/commerce/orders/${summary.order_id}`);
+            await admin.goto(`${base}/admin/commerce/orders/${summary.order_number}`);
             await shot(admin, '07-admin-order');
             summary.order_head = clean(await admin.locator('.cl-page-head').innerText());
             summary.what_happened = clean(await admin.locator('main section.cl-page-section', {has: admin.locator('h2', {hasText: 'What happened'})}).first().innerText());

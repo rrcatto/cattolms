@@ -63,7 +63,8 @@ final class CourseFileIntegrationTest extends TestCase
         $courseId = $this->import(SpecificationExample::html(), 'example.html');
         $file = $this->container->get(CourseFile::class)->fromCourse($courseId);
         self::assertSame([], $file['left_out'], 'The example has nothing a course file cannot hold.');
-        self::assertSame('GDN-101-growing-vegetables-in-small-spaces.html', $file['filename']);
+        self::assertMatchesRegularExpression('/^\d{8}-\d{4}-GDN-101-growing-vegetables-in-small-spaces\.html$/', $file['filename']);
+        self::assertSame('20261105-2030-GDN-101-a-course-on-beans.html', CourseFile::filename(['course' => ['code' => 'GDN-101', 'title' => 'A Course: on Beans']], new \DateTimeImmutable('2026-11-05 20:30')));
         $html = $file['html'];
         self::assertSame(0, preg_match('/<details\b[^>]*\bopen\b|class="[^"]*\bacc-/', $html), 'Every panel is a closed <details>, never a button panel.');
         self::assertSame(1 + 5 + 2 + 1, substr_count($html, '<details class="panel">') + substr_count($html, '<details class="sub ') + substr_count($html, '<details class="block '), 'The module, its five part panels, its two blocks and the final assessment.');

@@ -1,0 +1,6 @@
+{#
+	Two-step sign-in's recovery codes, shown once when they are made (owner, 2026-11-05, the approved mockup). Only their
+	hashes are kept.
+#}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Keep these recovery codes somewhere safe.'})} %}{% block body %}<p class="mb-0">Each one gets you in once if you lose your phone. They are shown only now.</p>{% endblock %}{% endembed %}
+<ul class="cl-recovery-codes" data-recovery-codes>{% for code in codes %}<li>{{ code }}</li>{% endfor %}</ul>

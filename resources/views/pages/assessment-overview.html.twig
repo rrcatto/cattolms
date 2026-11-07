@@ -42,5 +42,5 @@
 {% endif %}
 {% endif %}
 {% set public_preview = is_public_preview|default(false) %}
-{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_base: public_preview ? '/courses/' ~ course.slug ~ '/preview/' : '/learn/' ~ course.slug ~ '/item/', paging_query: public_preview ? course.public_preview_query|default('') : preview_query, paging_previous: assessment.previous_node, paging_next: assessment.next_node} %}
+{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_public: public_preview, paging_query: public_preview ? course.public_preview_query|default('') : preview_query, paging_previous: assessment.previous_node, paging_next: assessment.next_node} %}
 {% endblock %}

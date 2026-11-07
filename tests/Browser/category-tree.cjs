@@ -57,8 +57,10 @@ async function open(browser, options = {}) {
     return {ctx, page};
 }
 const ids = () => state.ids;
+// A category is named by its slug in every address and anchor (owner, 2026-11-06); its number stays in data-node-id.
+const slugs = () => state.slugs;
 const keyOf = () => Object.fromEntries(Object.entries(state.ids).map(([key, id]) => [String(id), key]));
-const row = (page, key) => page.locator(`#category-${ids()[key]} > .cl-tree-row`);
+const row = (page, key) => page.locator(`#category-${slugs()[key]} > .cl-tree-row`);
 const handle = (page, key) => row(page, key).locator('.cl-tree-handle');
 const toggle = (page, key) => row(page, key).locator('.cl-tree-toggle');
 const branch = (page, key) => page.locator(`#category-branch-${ids()[key]}`);
@@ -96,14 +98,14 @@ async function drag(page, fromKey, toKey, fraction, release = true) {
     await page.mouse.move(from.x + from.width / 2 + 4, from.y + from.height / 2 + 4, {steps: 3});
     await page.mouse.move(to.x + to.width / 4, to.y + to.height * fraction, {steps: 12});
     await page.mouse.move(to.x + to.width / 4 + 2, to.y + to.height * fraction, {steps: 2});
-    const indicator = await page.locator(`#category-${ids()[toKey]}`).getAttribute('data-drop');
+    const indicator = await page.locator(`#category-${slugs()[toKey]}`).getAttribute('data-drop');
     if (release) await page.mouse.up();
     return indicator;
 }
 async function saved(page) {
     await page.locator('.cl-tree-status[data-state="saved"]').waitFor({timeout: 10000});
 }
-const stat = (page, label) => page.locator('#category-statistics .cl-ui-stat-card').filter({has: page.locator('.cl-ui-stat-label', {hasText: new RegExp(`^${label}$`)})}).locator('.cl-ui-stat-value').textContent().then(Number);
+const stat = (page, label) => page.locator('#category-tree-statistics .cl-ui-stat-card').filter({has: page.locator('.cl-ui-stat-label', {hasText: new RegExp(`^${label}$`)})}).locator('.cl-ui-stat-value').textContent().then(Number);
 const noSideScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
 
@@ -193,7 +195,7 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
                 body.append('index', '');
                 const response = await fetch(`/admin/courses/categories/${from}/arrange`, {method: 'POST', body, headers: {'HX-Request': 'true'}, credentials: 'same-origin'});
                 return {status: response.status, text: await response.text()};
-            }, {from: ids().D1, into: ids().B1});
+            }, {from: slugs().D1, into: ids().B1});
             assert.equal(answer.status, 422);
             assert.match(answer.text, /three levels deep/);
             assert.equal(await stored(page), START, 'The tree is unchanged.');
@@ -251,7 +253,7 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
             assert.ok((await last.locator(':scope > .cl-tree-row .cl-tree-name').textContent()).includes(state.extra.root), 'It is the last main category.');
             step = 'Add subcategory';
             await row(page, 'B').getByRole('link', {name: `Add a subcategory to ${state.names.B}`}).click();
-            await page.locator(`#category-create-body form[action="/admin/courses/categories/${ids().B}/children"]`).waitFor();
+            await page.locator(`#category-create-body form[action="/admin/courses/categories/${slugs().B}/children"]`).waitFor();
             assert.ok((await page.locator('#category-create-body').textContent()).includes(`inside ${state.names.B}`));
             await page.locator('#category-create-body input[name="name"]').fill(state.extra.sub);
             await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.locator('#category-create-body').getByRole('button', {name: 'Add subcategory'}).click()]);
@@ -260,7 +262,7 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
             assert.equal(await sub.getAttribute('data-depth'), '2');
             step = 'sub-subcategory';
             await row(page, 'B1').getByRole('link', {name: `Add a subcategory to ${state.names.B1}`}).click();
-            await page.locator(`#category-create-body form[action="/admin/courses/categories/${ids().B1}/children"]`).waitFor();
+            await page.locator(`#category-create-body form[action="/admin/courses/categories/${slugs().B1}/children"]`).waitFor();
             await page.locator('#category-create-body input[name="name"]').fill(state.extra.leaf);
             await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.locator('#category-create-body').getByRole('button', {name: 'Add subcategory'}).click()]);
             const leaf = page.locator(`#category-branch-${ids().B1} > li`).last();
@@ -273,12 +275,12 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
             await fresh();
             await expand(page, 'A');
             await Promise.all([page.waitForNavigation(), row(page, 'A1').getByRole('link', {name: `Manage ${state.names.A1}`}).click()]);
-            assert.match(page.url(), new RegExp(`/admin/courses/categories/${ids().A1}$`));
+            assert.match(page.url(), new RegExp(`/admin/courses/categories/${slugs().A1}$`));
             assert.equal(await page.locator('[name="parent_id"]').count(), 0, 'Where it sits is changed in the tree.');
             assert.ok(await page.getByText(`${state.names.A} › ${state.names.A1}`).first().isVisible());
             await page.locator('input[name="name"]').fill(state.extra.renamed);
             await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Save category'}).click()]);
-            assert.match(page.url(), new RegExp(`/admin/courses/categories\\?reveal=${ids().A1}#category-${ids().A1}$`));
+            assert.match(page.url(), new RegExp(`/admin/courses/categories\\?reveal=${slugs().A1}#category-${slugs().A1}$`));
             assert.ok(await row(page, 'A1').isVisible(), 'Its branch is open.');
             assert.ok((await row(page, 'A1').textContent()).includes(state.extra.renamed));
         });
@@ -313,7 +315,7 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
         assert.ok(await row(page, 'G').isVisible(), 'The tree opens at the moved category.');
         step = 'Add subcategory page';
         await Promise.all([page.waitForNavigation(), row(page, 'B').getByRole('link', {name: `Add a subcategory to ${state.names.B}`}).click()]);
-        assert.match(page.url(), new RegExp(`/admin/courses/categories/${ids().B}/new$`));
+        assert.match(page.url(), new RegExp(`/admin/courses/categories/${slugs().B}/new$`));
         await page.locator('input[name="name"]').fill(state.extra.nojs_sub);
         await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Add subcategory'}).click()]);
         assert.ok((await page.locator(`#category-branch-${ids().B}`).textContent()).includes(state.extra.nojs_sub));
@@ -334,7 +336,7 @@ const START = 'A[A1[A1x],A2],B[B1],G,D[D1[D1x]]';
             for (const width of [1440, 390]) {
                 step = `${theme} ${width}`;
                 await page.setViewportSize({width, height: 1400});
-                const response = await page.goto(`${url}?theme_preview=${theme}&open[]=${ids().A}&open[]=${ids().A1}`);
+                const response = await page.goto(`${url}?theme_preview=${theme}&open[]=${slugs().A}&open[]=${slugs().A1}`);
                 assert.equal(response.status(), 200);
                 assert.ok(await row(page, 'A1x').isVisible(), 'Open branches render open.');
                 assert.ok(await noSideScroll(page), `${theme} ${width} does not scroll sideways`);

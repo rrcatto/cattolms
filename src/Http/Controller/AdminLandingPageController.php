@@ -30,6 +30,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\Landing\LandingPageService;
@@ -61,7 +62,7 @@ final class AdminLandingPageController extends BaseController
         parent::__construct($auth, $view, $requests);
     }
 
-    #[Route('/admin/courses/{id}/landing', name: 'admin_course_landing', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/landing', name: 'admin_course_landing', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function show(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
@@ -69,7 +70,7 @@ final class AdminLandingPageController extends BaseController
         return $this->render('admin-course-landing', $this->overview($user, $course));
     }
 
-    #[Route('/admin/courses/{id}/landing', name: 'admin_course_landing_create', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing', name: 'admin_course_landing_create', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function create(): Response
     {
         $this->requireCsrf();
@@ -82,7 +83,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/settings', name: 'admin_course_landing_settings', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/settings', name: 'admin_course_landing_settings', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function settings(): Response
     {
         $this->requireCsrf();
@@ -97,7 +98,7 @@ final class AdminLandingPageController extends BaseController
         $this->redirect(self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/publish', name: 'admin_course_landing_publish', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/publish', name: 'admin_course_landing_publish', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function publish(): Response
     {
         $this->requireCsrf();
@@ -110,7 +111,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/unpublish', name: 'admin_course_landing_unpublish', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/unpublish', name: 'admin_course_landing_unpublish', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function unpublish(): Response
     {
         $this->requireCsrf();
@@ -123,7 +124,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/delete', name: 'admin_course_landing_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/delete', name: 'admin_course_landing_delete', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function delete(): Response
     {
         $this->requireCsrf();
@@ -136,7 +137,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/preview', name: 'admin_course_landing_preview', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/landing/preview', name: 'admin_course_landing_preview', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function preview(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
@@ -152,7 +153,7 @@ final class AdminLandingPageController extends BaseController
         ]);
     }
 
-    #[Route('/admin/courses/{id}/landing/sections', name: 'admin_course_landing_section_add', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections', name: 'admin_course_landing_section_add', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function addSection(): Response
     {
         $this->requireCsrf();
@@ -165,7 +166,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/sections/{section}', name: 'admin_course_landing_section', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}', name: 'admin_course_landing_section', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['GET'])]
     public function section(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
@@ -174,7 +175,7 @@ final class AdminLandingPageController extends BaseController
         return $this->render('admin-course-landing-section', $this->sectionForm($user, $course, $page, $section, self::formValues($section['type'], $section['data'])));
     }
 
-    #[Route('/admin/courses/{id}/landing/sections/{section}', name: 'admin_course_landing_section_update', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}', name: 'admin_course_landing_section_update', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function updateSection(): Response
     {
         $this->requireCsrf();
@@ -194,7 +195,7 @@ final class AdminLandingPageController extends BaseController
         $this->redirect(self::home($course) . '#landing-section-' . $section['id']);
     }
 
-    #[Route('/admin/courses/{id}/landing/sections/{section}/visibility', name: 'admin_course_landing_section_visibility', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}/visibility', name: 'admin_course_landing_section_visibility', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function visibility(): Response
     {
         $this->requireCsrf();
@@ -209,7 +210,7 @@ final class AdminLandingPageController extends BaseController
         }, self::home($course));
     }
 
-    #[Route('/admin/courses/{id}/landing/sections/{section}/remove', name: 'admin_course_landing_section_remove', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}/remove', name: 'admin_course_landing_section_remove', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function removeSection(): Response
     {
         $this->requireCsrf();
@@ -227,7 +228,7 @@ final class AdminLandingPageController extends BaseController
      * A section's width, half or full (owner, 2026-10-31). The list's form posts with htmx and gets the saved list back, the
      * sketch with it; without JavaScript the form's own button posts it and the page comes back.
      */
-    #[Route('/admin/courses/{id}/landing/sections/{section}/width', name: 'admin_course_landing_section_width', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}/width', name: 'admin_course_landing_section_width', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function width(): Response
     {
         $this->requireCsrf();
@@ -240,7 +241,7 @@ final class AdminLandingPageController extends BaseController
     }
 
     /** The ⋯ menu without JavaScript: top, up, down or bottom. */
-    #[Route('/admin/courses/{id}/landing/sections/{section}/move', name: 'admin_course_landing_section_move', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}/move', name: 'admin_course_landing_section_move', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function move(): Response
     {
         $this->requireCsrf();
@@ -255,7 +256,7 @@ final class AdminLandingPageController extends BaseController
      * Dragging and the keyboard: the section goes to index among the other sections after the
      * hero. order[] is the order the page showed; a different stored order refuses the move.
      */
-    #[Route('/admin/courses/{id}/landing/sections/{section}/arrange', name: 'admin_course_landing_section_arrange', requirements: ['id' => '\d+', 'section' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/landing/sections/{section}/arrange', name: 'admin_course_landing_section_arrange', requirements: ['code' => CourseAddress::REQUIREMENT, 'section' => '\d+'], methods: ['POST'])]
     public function arrange(): Response
     {
         $this->requireCsrf();
@@ -307,7 +308,7 @@ final class AdminLandingPageController extends BaseController
         $page = $this->landing->page((int) $course['id']);
         $data = [
             'title' => 'Landing page · ' . (string) $course['title'],
-            'course' => ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'slug' => (string) $course['slug'], 'status' => (string) $course['status']],
+            'course' => ['id' => (int) $course['id'], 'code' => (string) $course['code'], 'title' => (string) $course['title'], 'slug' => (string) $course['slug'], 'status' => (string) $course['status']],
             'landing_page' => null,
             'can_publish' => $user->hasPermission('COURSE.PUBLISH'),
             'settings_error' => '',
@@ -379,7 +380,7 @@ final class AdminLandingPageController extends BaseController
         $type = $section['type'];
         $data = [
             'title' => $type->label() . ' · Landing page · ' . (string) $course['title'],
-            'course' => ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'subtitle' => (string) ($course['subtitle'] ?? ''), 'summary' => (string) ($course['summary'] ?? '')],
+            'course' => ['id' => (int) $course['id'], 'code' => (string) $course['code'], 'title' => (string) $course['title'], 'subtitle' => (string) ($course['subtitle'] ?? ''), 'summary' => (string) ($course['summary'] ?? '')],
             'section' => ['id' => (int) $section['id'], 'type' => $type->value, 'label' => $type->label(), 'description' => $type->description(), 'enabled' => $section['enabled'], 'default_heading' => $type->defaultHeading()],
             'values' => $values,
             'error' => $error,
@@ -453,7 +454,7 @@ final class AdminLandingPageController extends BaseController
     private function managedCourse(CurrentUser $user): array
     {
         try {
-            $course = $this->courses->adminCourse((int) $this->param('id'));
+            $course = $this->courses->adminCourse($this->courseIdFromAddress($this->courses));
         } catch (InvalidArgumentException) {
             throw new NotFoundHttpException('The course does not exist.');
         }
@@ -466,6 +467,6 @@ final class AdminLandingPageController extends BaseController
     /** @param array<string,mixed> $course */
     private static function home(array $course): string
     {
-        return '/admin/courses/' . (int) $course['id'] . '/landing';
+        return CourseAddress::admin($course, '/landing');
     }
 }

@@ -59,6 +59,8 @@ final class CategoryHierarchyIntegrationTest extends TestCase
     private string $suffix = '';
     /** @var array<string,int> */
     private array $ids = [];
+    /** @var array<string,string> Each category's slug, which names it in every address (2026-11-07). */
+    private array $slugs = [];
     private int $userId = 0;
 
     protected function setUp(): void
@@ -71,7 +73,8 @@ final class CategoryHierarchyIntegrationTest extends TestCase
         $this->userId = $this->fixture->createUser('Tree test ' . $this->suffix, 'tree-test-' . $this->suffix . '@seed.test');
         $this->admin = new CurrentUser($this->userId, Uuid::v4(), 'tree-test@seed.test', 'Tree test', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());
         foreach ([['A', null], ['A1', 'A'], ['A1x', 'A1'], ['A2', 'A'], ['B', null], ['B1', 'B'], ['C', null], ['D', null], ['D1', 'D']] as [$key, $parent]) {
-            $this->ids[$key] = $this->fixture->createCategory($this->label($key), 'tree-test-' . strtolower($key) . '-' . $this->suffix, $parent === null ? 0 : $this->ids[$parent]);
+            $this->slugs[$key] = 'tree-test-' . strtolower($key) . '-' . $this->suffix;
+            $this->ids[$key] = $this->fixture->createCategory($this->label($key), $this->slugs[$key], $parent === null ? 0 : $this->ids[$parent]);
         }
         $_SESSION['csrf'] = str_repeat('t', 64);
     }
@@ -189,11 +192,12 @@ final class CategoryHierarchyIntegrationTest extends TestCase
         $this->assertCompact();
 
         // Through the controller the parent is the one in the address; a parent_id in the form is ignored.
-        $created = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'createChild', ['id' => $this->ids['B']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('From the row'), 'parent_id' => (string) $this->ids['D']]);
-        $id = (int) $this->db->fetchOne('SELECT id FROM course_categories WHERE name = :name', ['name' => $this->label('From the row')]);
-        self::assertSame($this->ids['B'], $this->db->fetchOne('SELECT parent_id FROM course_categories WHERE id = :id', ['id' => $id]));
-        self::assertSame('/admin/courses/categories?reveal=' . $id . '#category-' . $id, $created['location']);
-        $refused = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'createChild', ['id' => $this->ids['B']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('From the row')]);
+        $created = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'createChild', ['slug' => $this->slugs['B']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('From the row'), 'parent_id' => (string) $this->ids['D']]);
+        $row = $this->db->fetchAssociative('SELECT id, slug FROM course_categories WHERE name = :name', ['name' => $this->label('From the row')]);
+        self::assertIsArray($row);
+        self::assertSame($this->ids['B'], $this->db->fetchOne('SELECT parent_id FROM course_categories WHERE id = :id', ['id' => (int) $row['id']]));
+        self::assertSame('/admin/courses/categories?reveal=' . $row['slug'] . '#category-' . $row['slug'], $created['location'], 'The tree opens at the new category, named by its slug.');
+        $refused = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'createChild', ['slug' => $this->slugs['B']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('From the row')]);
         self::assertSame(422, $refused['status']);
         self::assertStringContainsString('The category was not created.', $refused['body']);
         self::assertStringContainsString('already uses the slug', $refused['body']);
@@ -209,28 +213,30 @@ final class CategoryHierarchyIntegrationTest extends TestCase
         self::assertNotNull($tree, 'The tree is one ordered list of main categories.');
         self::assertSame(0, $xpath->query('//ol[contains(@class,"cl-tree-children") and not(@hidden)]')->length, 'Every branch starts closed.');
         self::assertSame(0, $xpath->query('//button[contains(@class,"cl-tree-toggle") and @aria-expanded="true"]')->length);
-        $toggle = $xpath->query('//li[@id="category-' . $this->ids['A'] . '"]/div/div/button[contains(@class,"cl-tree-toggle")]')->item(0);
+        $toggle = $xpath->query('//li[@id="category-' . $this->slugs['A'] . '"]/div/div/button[contains(@class,"cl-tree-toggle")]')->item(0);
         self::assertInstanceOf(\DOMElement::class, $toggle, 'A category with subcategories has a disclosure button.');
-        self::assertSame(['submit', 'category-tree-view', 'toggle', (string) $this->ids['A'], 'false', 'category-branch-' . $this->ids['A']], [$toggle->getAttribute('type'), $toggle->getAttribute('form'), $toggle->getAttribute('name'), $toggle->getAttribute('value'), $toggle->getAttribute('aria-expanded'), $toggle->getAttribute('aria-controls')]);
-        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->ids['C'] . '"]//button[contains(@class,"cl-tree-toggle")]')->length, 'A category with nothing inside has no disclosure button.');
-        self::assertSame(1, $xpath->query('//li[@id="category-' . $this->ids['C'] . '"]/ol[contains(@class,"cl-tree-children") and @hidden]')->length, 'But it can still take a drop inside.');
-        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->ids['A1x'] . '"]/ol')->length, 'A sub-subcategory cannot hold anything.');
-        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->ids['A1x'] . '"]//a[starts-with(normalize-space(.),"Add subcategory")]')->length, 'and offers no Add subcategory.');
+        self::assertSame(['submit', 'category-tree-view', 'toggle', $this->slugs['A'], 'false', 'category-branch-' . $this->ids['A']], [$toggle->getAttribute('type'), $toggle->getAttribute('form'), $toggle->getAttribute('name'), $toggle->getAttribute('value'), $toggle->getAttribute('aria-expanded'), $toggle->getAttribute('aria-controls')]);
+        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->slugs['C'] . '"]//button[contains(@class,"cl-tree-toggle")]')->length, 'A category with nothing inside has no disclosure button.');
+        self::assertSame(1, $xpath->query('//li[@id="category-' . $this->slugs['C'] . '"]/ol[contains(@class,"cl-tree-children") and @hidden]')->length, 'But it can still take a drop inside.');
+        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->slugs['A1x'] . '"]/ol')->length, 'A sub-subcategory cannot hold anything.');
+        self::assertSame(0, $xpath->query('//li[@id="category-' . $this->slugs['A1x'] . '"]//a[starts-with(normalize-space(.),"Add subcategory")]')->length, 'and offers no Add subcategory.');
         foreach (['A', 'A1', 'A1x', 'C'] as $key) {
-            self::assertSame(1, $xpath->query('//li[@id="category-' . $this->ids[$key] . '"]/div//a[@href="/admin/courses/categories/' . $this->ids[$key] . '" and starts-with(normalize-space(.),"Manage")]')->length, $key . ' keeps Manage.');
+            self::assertSame(1, $xpath->query('//li[@id="category-' . $this->slugs[$key] . '"]/div//a[@href="/admin/courses/categories/' . $this->slugs[$key] . '" and starts-with(normalize-space(.),"Manage")]')->length, $key . ' keeps Manage, by its slug.');
+            self::assertSame(1, $xpath->query('//li[@id="category-' . $this->slugs[$key] . '" and @data-arrange-url="/admin/courses/categories/' . $this->slugs[$key] . '/arrange"]')->length, $key . '\'s row gives the tree\'s script its address.');
         }
-        self::assertStringContainsString('id="category-statistics"', $page['body']);
+        self::assertStringNotContainsString('/admin/courses/categories/' . $this->ids['A'] . '"', $page['body'], 'No category is named by its number.');
+        self::assertStringContainsString('id="category-tree-statistics"', $page['body']);
         self::assertStringContainsString('Main categories', $page['body']);
 
-        $opened = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['open' => [(string) $this->ids['A']], 'toggle' => (string) $this->ids['B']]);
+        $opened = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['open' => [$this->slugs['A']], 'toggle' => $this->slugs['B']]);
         $xpath = self::xpath($opened['body']);
         foreach (['A', 'B'] as $key) {
             self::assertSame(1, $xpath->query('//ol[@id="category-branch-' . $this->ids[$key] . '" and not(@hidden)]')->length, $key . ' is open: one kept open, one toggled open, as the GET form asks.');
         }
-        self::assertSame(1, $xpath->query('//form[@id="category-tree-view"]/input[@name="open[]" and @value="' . $this->ids['B'] . '"]')->length, 'The view form carries the open branches to the next toggle.');
-        $closed = self::xpath(InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['open' => [(string) $this->ids['A']], 'toggle' => (string) $this->ids['A']])['body']);
+        self::assertSame(1, $xpath->query('//form[@id="category-tree-view"]/input[@name="open[]" and @value="' . $this->slugs['B'] . '"]')->length, 'The view form carries the open branches to the next toggle, by slug.');
+        $closed = self::xpath(InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['open' => [$this->slugs['A']], 'toggle' => $this->slugs['A']])['body']);
         self::assertSame(1, $closed->query('//ol[@id="category-branch-' . $this->ids['A'] . '" and @hidden]')->length, 'Toggling an open branch closes it.');
-        $revealed = self::xpath(InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['reveal' => (string) $this->ids['A1x']])['body']);
+        $revealed = self::xpath(InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'index', [], null, ['reveal' => $this->slugs['A1x']])['body']);
         foreach (['A', 'A1'] as $key) {
             self::assertSame(1, $revealed->query('//ol[@id="category-branch-' . $this->ids[$key] . '" and not(@hidden)]')->length, 'The branches above a revealed category open.');
         }
@@ -240,23 +246,23 @@ final class CategoryHierarchyIntegrationTest extends TestCase
     {
         $mainBefore = CourseService::categoryStatistics($this->service->categories())['main'];
         $_SERVER['HTTP_HX_REQUEST'] = 'true';
-        $saved = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'arrange', ['id' => $this->ids['C']], ['csrf' => $_SESSION['csrf'], 'parent_id' => (string) $this->ids['B'], 'index' => '', 'from_parent' => '']);
+        $saved = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'arrange', ['slug' => $this->slugs['C']], ['csrf' => $_SESSION['csrf'], 'parent_id' => (string) $this->ids['B'], 'index' => '', 'from_parent' => '']);
         self::assertSame(200, $saved['status']);
         self::assertStringContainsString('id="category-tree"', $saved['body']);
         self::assertStringContainsString('data-error=""', $saved['body']);
-        self::assertSame($mainBefore - 1, (int) self::xpath($saved['body'])->evaluate('string(//div[@id="category-statistics"]//*[contains(@class,"cl-ui-stat-card")][1]//*[contains(@class,"cl-ui-stat-value")])'), 'The counts come back with the tree: one main category fewer.');
+        self::assertSame($mainBefore - 1, (int) self::xpath($saved['body'])->evaluate('string(//div[@id="category-tree-statistics"]//*[contains(@class,"cl-ui-stat-card")][1]//*[contains(@class,"cl-ui-stat-value")])'), 'The counts come back with the tree: one main category fewer.');
 
-        $refused = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'arrange', ['id' => $this->ids['A']], ['csrf' => $_SESSION['csrf'], 'parent_id' => (string) $this->ids['A1x'], 'index' => '', 'from_parent' => '']);
+        $refused = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'arrange', ['slug' => $this->slugs['A']], ['csrf' => $_SESSION['csrf'], 'parent_id' => (string) $this->ids['A1x'], 'index' => '', 'from_parent' => '']);
         self::assertSame(422, $refused['status']);
         self::assertStringContainsString('data-error="A category cannot be moved into itself', $refused['body']);
         self::assertNull($this->parent('A'), 'The stored tree is unchanged.');
         unset($_SERVER['HTTP_HX_REQUEST']);
 
-        $plain = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'move', ['id' => $this->ids['A2']], ['csrf' => $_SESSION['csrf'], 'direction' => 'up']);
-        self::assertSame('/admin/courses/categories?reveal=' . $this->ids['A2'] . '#category-' . $this->ids['A2'], $plain['location'], 'Without the script the move redirects back to the tree, open at the category.');
+        $plain = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'move', ['slug' => $this->slugs['A2']], ['csrf' => $_SESSION['csrf'], 'direction' => 'up']);
+        self::assertSame('/admin/courses/categories?reveal=' . $this->slugs['A2'] . '#category-' . $this->slugs['A2'], $plain['location'], 'Without the script the move redirects back to the tree, open at the category.');
         self::assertSame(['A2', 'A1'], $this->children('A'));
 
-        $into = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'moveInto', ['id' => $this->ids['A1']]);
+        $into = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'moveInto', ['slug' => $this->slugs['A1']]);
         $choices = self::xpath($into['body'])->query('//input[@type="radio" and @name="parent_id"]/@value');
         $values = array_map(static fn(\DOMNode $value): string => (string) $value->nodeValue, iterator_to_array($choices));
         self::assertContains('', $values, 'Main category is offered.');
@@ -265,13 +271,33 @@ final class CategoryHierarchyIntegrationTest extends TestCase
         self::assertNotContains((string) $this->ids['A1x'], $values, 'Nothing inside it is offered.');
     }
 
+    /** A category's number names nothing (owner, 2026-11-06: no row id in an address), and neither does a slug that is not one. */
+    public function testACategoryIsOpenedByItsSlugAndItsNumberIsNotFound(): void
+    {
+        self::assertSame(200, InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'edit', ['slug' => $this->slugs['A1']])['status']);
+        foreach ([(string) $this->ids['A1'], strtoupper($this->slugs['A1']), $this->slugs['A1'] . '-x'] as $key) {
+            try {
+                InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'edit', ['slug' => $key]);
+                self::fail('"' . $key . '" opened a category.');
+            } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+                self::addToAssertionCount(1);
+            }
+        }
+        try {
+            $this->service->createCategory(['name' => $this->label('Digits'), 'slug' => '2026'], $this->userId);
+            self::fail('A slug of digits alone was taken.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString('at least one letter', $refused->getMessage());
+        }
+    }
+
     public function testEditingChangesDetailsOnlyAndReturnsToTheTree(): void
     {
-        $edit = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'edit', ['id' => $this->ids['A1x']]);
+        $edit = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'edit', ['slug' => $this->slugs['A1x']]);
         self::assertStringNotContainsString('name="parent_id"', $edit['body'], 'Where it sits is changed in the tree.');
         self::assertStringContainsString($this->label('A') . ' › ' . $this->label('A1') . ' › ' . $this->label('A1x'), $edit['body']);
-        $saved = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'update', ['id' => $this->ids['A1x']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('Renamed'), 'slug' => 'tree-test-renamed-' . $this->suffix, 'description' => '', 'parent_id' => (string) $this->ids['D']]);
-        self::assertSame('/admin/courses/categories?reveal=' . $this->ids['A1x'] . '#category-' . $this->ids['A1x'], $saved['location']);
+        $saved = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'update', ['slug' => $this->slugs['A1x']], ['csrf' => $_SESSION['csrf'], 'name' => $this->label('Renamed'), 'slug' => 'tree-test-renamed-' . $this->suffix, 'description' => '', 'parent_id' => (string) $this->ids['D']]);
+        self::assertSame('/admin/courses/categories?reveal=tree-test-renamed-' . $this->suffix . '#category-tree-test-renamed-' . $this->suffix, $saved['location'], 'A new slug is the category\'s new address.');
         self::assertSame([$this->ids['A1'], 3], [$this->parent('A1x'), $this->level('A1x')], 'A parent_id in the form changes nothing.');
 
         $this->db->executeStatement('DELETE FROM course_categories WHERE id = :id', ['id' => $this->ids['A1x']]);

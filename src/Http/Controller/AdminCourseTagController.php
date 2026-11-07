@@ -19,6 +19,8 @@ and a tag is cross-cutting classification, so an installation may reasonably del
 the other.
 
 Changelog:
+2026/11/07 SAST
+- A tag is named by its slug in its addresses (/admin/courses/tags/raised-beds), never its row id (owner, 2026-11-06).
 2026/10/17 SAST
 - No course_group: the Courses group tab strip is gone.
 
@@ -35,6 +37,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Support\Address\CatalogueAddress;
 use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
@@ -53,7 +56,8 @@ final class AdminCourseTagController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
-        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -113,58 +117,64 @@ final class AdminCourseTagController extends BaseController
 
 
     /** A tag's own page: its name and its icon (owner, 2026-10-20: "each tag also needs a custom svg icon"). */
-    #[Route('/admin/courses/tags/{id}', name: 'admin_course_tag_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/tags/{slug}', name: 'admin_course_tag_edit', requirements: ['slug' => CatalogueAddress::TAG], methods: ['GET'])]
     public function edit(): Response
     {
         $this->requirePermission('COURSE.TAG.MANAGE');
-        $tag = $this->courses->tag((int) $this->param('id'));
+        $tag = $this->courses->tag($this->tagId());
         $iconQuery = trim((string) $this->request()->query->get('icon_q', ''));
         return $this->render('admin-course-tag-edit', ['title' => 'Edit tag · ' . (string) $tag['name'], 'tag' => $tag,
             'followers' => $this->mailingLists->followersOf('tag', (int) $tag['id']) + ['name' => (string) $tag['name']],
             // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
-            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $tag['name'], $iconQuery), 'action' => '/admin/courses/tags/' . (int) $tag['id']]]);
+            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $tag['name'], $iconQuery), 'action' => CatalogueAddress::tag($tag)]]);
     }
 
-    #[Route('/admin/courses/tags/{id}', name: 'admin_course_tag_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/tags/{slug}', name: 'admin_course_tag_update', requirements: ['slug' => CatalogueAddress::TAG], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $tagId = (int) $this->param('id');
+        $tagId = $this->tagId();
         return $this->handle(function () use ($user, $tagId): void {
             $this->courses->updateTag($tagId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The tag was updated.');
             $this->redirect('/admin/courses/tags');
-        }, '/admin/courses/tags/' . $tagId);
+        }, CatalogueAddress::tag($this->courses->tag($tagId)));
     }
 
 
     /** The tag's icon, from its own card: one chosen from the icon library or an SVG uploaded (owner, 2026-10-20). */
-    #[Route('/admin/courses/tags/{id}/icon', name: 'admin_course_tag_icon', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/tags/{slug}/icon', name: 'admin_course_tag_icon', requirements: ['slug' => CatalogueAddress::TAG], methods: ['POST'])]
     public function icon(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $id = (int) $this->param('id');
+        $id = $this->tagId();
         return $this->handle(function () use ($user, $id): void {
             $icon = UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon') ?? $this->icons->chosen($_POST['library_icon'] ?? '');
             if ($icon === null) throw new \InvalidArgumentException('Choose an icon from the library or upload an SVG file.');
             $this->courses->replaceTagIcon($id, $icon, $user->id);
             $this->flash('success', 'The icon was saved.');
-            $this->redirect('/admin/courses/tags/' . $id . '#icon');
-        }, '/admin/courses/tags/' . $id . '#icon');
+            $this->redirect(CatalogueAddress::tag($this->courses->tag($id), '#icon'));
+        }, CatalogueAddress::tag($this->courses->tag($id), '#icon'));
     }
 
-    #[Route('/admin/courses/tags/{id}/delete', name: 'admin_course_tag_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/tags/{slug}/delete', name: 'admin_course_tag_delete', requirements: ['slug' => CatalogueAddress::TAG], methods: ['POST'])]
     public function delete(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $tagId = (int) $this->param('id');
+        $tagId = $this->tagId();
         return $this->handle(function () use ($user, $tagId): void {
             $this->courses->deleteTag($tagId, $user->id);
             $this->flash('success', 'The tag was deleted and detached from every course that carried it.');
             $this->redirect('/admin/courses/tags');
         }, '/admin/courses/tags');
+    }
+
+    /** The tag the address names by its slug (owner, 2026-11-06: no row id in an address), as its row id. */
+    private function tagId(): int
+    {
+        return $this->keys->tag($this->param('slug')) ?? throw $this->notFound('We could not find that tag.');
     }
 }

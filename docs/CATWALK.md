@@ -37,14 +37,14 @@ and saved separately"). `Course\Catwalk\PresentationEditor` makes every change, 
 part of the stored deck and saving it only when `SlideDeck::validate` accepts the whole; `Course\Catwalk\PresentationPages`
 gathers what each page shows; `Http\Controller\AdminPresentationController` serves them.
 
-- **The presentation's page**, `/admin/course-items/{id}` (Course Content's and the Library's Edit Course Item;
+- **The presentation's page**, `/admin/course-items/{slug of its name}`, such as `/admin/course-items/gdn-101-module-1-presentation` (Course Content's and the Library's Edit Course Item;
   `AdminCourseComponentController::edit` draws it for a Presentation): the preview at the top, at full size; Details
   (name, title, description) with Edit details; the slides as a list or a grid of their pictures (`Support\ListView`,
   `slides`), dragged by a handle (`presentation_slides_controller.js` on the shared sortable tree, one level: up and down
   in the list, left and right in the grid), moved by the keyboard or the ⋯ menu, copied and deleted, each move saved at
   once with the order the page showed (`PresentationEditor::STALE` when it differs); a slide's picture shows it in the
   preview; then where it is placed and its checks (`SlideDeck::warnings` and the recordings).
-- **A slide's page**, `/admin/course-items/{id}/slides/{slide}`: the row of slides at the top (`slide_strip_controller.js`:
+- **A slide's page**, `/admin/course-items/{item}/slides/{slide}`: the row of slides at the top (`slide_strip_controller.js`:
   first, back, on and last, icons alone), Preview (a window showing what the form holds, saving nothing;
   `slide_editor_controller.js`), Save slide (stays on the page), Close (back to the presentation; `unsaved_changes_controller.js`
   asks first while a change is not saved), the layout drawn with Change layout, the layout's fields, the background
@@ -56,7 +56,7 @@ gathers what each page shows; `Http\Controller\AdminPresentationController` serv
   form (`form.picture-choice`'s `form`), so what was typed comes along and the slide is drawn again in the new layout,
   unsaved (`PresentationEditor::inLayout`: fields both layouts share stay, points and steps become each other). Add a
   slide asks where it goes, before an Up next or call to action that ends the slides.
-- **The details page**, `/admin/course-items/{id}/details`: name, title, description, key, time to study, and what it
+- **The details page**, `/admin/course-items/{item}/details`: name, title, description, key, time to study, and what it
   is for and its look chosen by picture; Save details goes back to the presentation, Close asks first. Below, Make a copy
   (Save As) and Delete, which also removes the recordings' files.
 
@@ -101,7 +101,7 @@ Each slide's narration is recorded on the slide's page (its Narration card: the 
 20 MB), and kept by `Course\Catwalk\Narrations` in `course_slide_narrations` with its file in
 `storage/course-narrations/`. The slide's Narration box shows what is saved apart from a new take: a take, recorded or
 chosen, is heard first, then kept or discarded. Keep saves it at once and Remove the narration deletes it at once
-(`/admin/course-items/{id}/narration/{slide}` and `.../remove`), so neither waits for Save slide. The script is saved on
+(`/admin/course-items/{item}/narration/{slide}` and `.../remove`), so neither waits for Save slide. The script is saved on
 its own by Save the script, in place (htmx, `/slides/{slide}/narration`); without JavaScript that form posts, an
 uploaded file going with the script, and Remove sends it. Leaving the page with a recording nobody
 kept asks first. A new clip replaces the slide's old one, and a slide removed from the deck takes its clip with it. `/narrations/{public_id}` plays

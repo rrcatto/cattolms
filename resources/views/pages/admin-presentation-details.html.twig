@@ -9,7 +9,7 @@
 {% extends layout %}
 {% block page_body %}
 {{ importmap() }}
-	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set base = course_item_url(item) %}
 	{% set ph_back_href = base %}{% set ph_back_label = 'The presentation: ' ~ item.title %}
 	{% set ph_kicker = item.name %}{% set ph_title = 'Presentation details' %}
 	{% include '@platform/partials/page-head.html.twig' %}

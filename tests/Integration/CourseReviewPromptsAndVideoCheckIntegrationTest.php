@@ -177,7 +177,7 @@ final class CourseReviewPromptsAndVideoCheckIntegrationTest extends TestCase
             $videos = array_values(array_filter($container->get(AdminAttention::class)->items($actor), static fn(array $row): bool => $row['kind'] === 'video'
                 && str_ends_with($row['title'], ' in ' . $course['title'] . ' no longer plays')));
             self::assertSame(['Compost in a month in ' . $course['title'] . ' no longer plays', 'Containers on a balcony in ' . $course['title'] . ' no longer plays'], array_column($videos, 'title'));
-            self::assertSame('/admin/course-items/' . $gone, $videos[0]['href']);
+            self::assertSame(\CattoLearning\Support\Address\CourseItemAddress::admin((string) $db->fetchOne('SELECT name FROM course_items WHERE id = :i', ['i' => $gone])), $videos[0]['href'], 'The video opens by its item\'s name, never its number.');
             self::assertStringStartsWith(CourseVideoCheck::FINDINGS['removed'] . ' Found on 2 November 2026.', $videos[0]['summary']);
 
             // YouTube cannot be reached for one video: what was found before stands. The private one plays again.

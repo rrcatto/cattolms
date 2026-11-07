@@ -25,14 +25,14 @@ final class CourseReaderContractTest extends TestCase
         $renderer = $this->renderer();
         $base = ['item_key' => 'reader-item', 'title' => 'Reader item', 'description_html' => self::DESCRIPTION, 'type_config' => ['youtube_id' => 'abc', 'caption' => 'Caption'], 'resource_id' => null];
         foreach (['html_lesson', 'markdown', 'youtube', 'audio', 'assessment', 'diagnostic', 'downloadable_file'] as $type) {
-            $html = $renderer->render(['item_type' => $type, 'content_source' => '<p>Body</p>'] + $base, 'reader', 7);
+            $html = $renderer->render(['item_type' => $type, 'content_source' => '<p>Body</p>'] + $base, 'reader', 'module-1-lesson');
             self::assertSame(1, substr_count($html, self::DESCRIPTION), $type . ' prints its description once.');
         }
-        $download = $renderer->render(['item_type' => 'downloadable_file'] + $base, 'reader', 7);
+        $download = $renderer->render(['item_type' => 'downloadable_file'] + $base, 'reader', 'module-1-lesson');
         self::assertMatchesRegularExpression('~^<section class="cl-course-item-download">' . preg_quote(self::DESCRIPTION, '~') . '<p class="cl-course-item-download-meta">~', $download, 'A Downloadable File keeps its description inside the card.');
-        $lesson = $renderer->render(['item_type' => 'html_lesson', 'content_source' => '<p>Body</p>'] + $base, 'reader', 7);
+        $lesson = $renderer->render(['item_type' => 'html_lesson', 'content_source' => '<p>Body</p>'] + $base, 'reader', 'module-1-lesson');
         self::assertSame('<div class="cl-course-item-description">' . self::DESCRIPTION . '</div><p>Body</p>', $lesson, 'A lesson prints its description above its content.');
-        $override = $renderer->render(['item_type' => 'downloadable_file', 'display_description_override' => '<p>This course only.</p>'] + $base, 'reader', 7);
+        $override = $renderer->render(['item_type' => 'downloadable_file', 'display_description_override' => '<p>This course only.</p>'] + $base, 'reader', 'module-1-lesson');
         self::assertStringContainsString('<p>This course only.</p>', $override, "A placement's description override replaces the item's own.");
         self::assertStringNotContainsString(self::DESCRIPTION, $override);
     }

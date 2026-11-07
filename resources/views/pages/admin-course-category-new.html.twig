@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-	{% set ph_back_href = '/admin/courses/categories' ~ (create_parent ? '?reveal=' ~ create_parent.id ~ '#category-' ~ create_parent.id : '') %}
+	{% set ph_back_href = '/admin/courses/categories' ~ (create_parent ? '?reveal=' ~ create_parent.slug ~ '#' ~ category_anchor(create_parent) : '') %}
 	{% set ph_back_label = 'Course categories' %}
 	{% set ph_kicker = 'Course metadata' %}
 	{% set ph_title = create_parent ? 'Add a subcategory to ' ~ create_parent.name : 'Add a main category' %}

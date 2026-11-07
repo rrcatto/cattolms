@@ -233,7 +233,7 @@ final class AssessmentService
         foreach ($this->itemRecords->structure($courseId) as $node) {
             if ($node['node_type'] !== 'item') { continue; }
             foreach ($this->itemRecords->reachableItems((int) $node['course_item_id']) as $item) {
-                if (isset($items[(int) $item['id']]) && $items[(int) $item['id']]['node_id'] === null) { $items[(int) $item['id']]['node_id'] = (int) $node['id']; }
+                if (isset($items[(int) $item['id']]) && $items[(int) $item['id']]['node_id'] === null) { $items[(int) $item['id']]['node_id'] = (int) $node['id']; $items[(int) $item['id']]['part_name'] = (string) $node['part_name']; }
             }
         }
         return array_values($items);

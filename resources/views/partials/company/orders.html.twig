@@ -16,9 +16,9 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Order'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Placed'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Placed by'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Total'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Still owed'}} %}</tr>{% endblock %}
 			{% block body %}{% for order in company_orders %}<tr>
-				<td><a href="/account/orders/{{ order.id }}">{{ order.number }}</a></td>
+				<td><a href="{{ my_order_url(order.id) }}">{{ order.number }}</a></td>
 				<td>{{ order.placed_at|date('j M Y') }}</td>
-				<td class="cell-text">{{ ui('data.person', {name: order.purchaser_name|default('') ?: 'Someone', reference: order.purchaser_reference|default(''), href: '/company/people/' ~ order.purchaser_user_id}) }}</td>
+				<td class="cell-text">{{ ui('data.person', {name: order.purchaser_name|default('') ?: 'Someone', reference: order.purchaser_reference|default(''), href: company_person_url(order.purchaser_reference)}) }}</td>
 				<td>{{ order.state_label }}</td>
 				<td>{{ order.total_label }}</td>
 				<td>{{ order.due_label ? order.due_label ~ ' by ' ~ order.payment_due_at|date('j M Y') : 'Nothing' }}</td>

@@ -10,6 +10,9 @@ Description:
 Handles the consolidated Account workspace and standalone account sections. Profile contains only personal/account identity fields; dashboard, learning, login sessions and audit activity are independent sections with direct routes.
 
 Changelog:
+2026/11/07 SAST
+- A learner's certificate is named by its certificate number in its addresses (/account/certificates/CL-2026-…/visibility,
+  #certificate-CL-2026-…), never its row id; someone else's number is not found.
 2026/10/19 SAST
 - My Certificates (/account/certificates): each certificate and transcript private or public, decided
   separately by the learner, and a new address for either at any time (owner, 2026-10-19).
@@ -65,6 +68,8 @@ final class AccountController extends BaseController
         private readonly \CattoLearning\Mailing\MailingConsents $mailing,
         private readonly \CattoLearning\Mailing\MailingSettings $mailingSettings,
         private readonly \CattoLearning\Mailing\SubscriberRepository $subscribers,
+        private readonly \CattoLearning\Application\AccountSecurity $security,
+        private readonly \CattoLearning\Application\AccountFavourites $favouriteLists,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -105,6 +110,28 @@ final class AccountController extends BaseController
     }
 
     /**
+     * Favourites, its own page after My Courses (owner, 2026-11-06: "Favourites must get its own page and menu-item"): the
+     * courses and bundles the person starred, as the catalogue's cards or a list, filtered by All, Courses or Bundles.
+     */
+    #[Route('/account/favourites', name: 'account_favourites', methods: ['GET'])]
+    public function favourites(): Response
+    {
+        $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
+        $data = $this->favouritesData($user->id);
+        \CattoLearning\Support\ListView::rememberAsked('favourites', $_GET);
+        return $this->renderAccountSection('favourites', $data);
+    }
+
+    /** Course Requests, its own page (owner, 2026-11-06), only for an account that belongs to a company: anyone else's is not found. */
+    #[Route('/account/requests', name: 'account_requests', methods: ['GET'])]
+    public function requests(): Response
+    {
+        $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
+        if ($this->companies->forUser($user->id) === null) throw new NotFoundHttpException('There is no such page.');
+        return $this->renderAccountSection('requests', $this->requestsData($user->id));
+    }
+
+    /**
      * The learner's certificates and transcripts, and who can see each one (owner, 2026-10-19): private
      * (only the learner) until the learner makes it public (anyone with its address), each decided
      * separately and changed at any time, and each can be given a new address.
@@ -116,13 +143,13 @@ final class AccountController extends BaseController
         return $this->renderAccountSection('certificates', $this->certificateData($user->id));
     }
 
-    #[Route('/account/certificates/{id}/visibility', name: 'account_certificate_visibility', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/account/certificates/{number}/visibility', name: 'account_certificate_visibility', requirements: ['number' => \CattoLearning\Support\Address\RecordAddress::CERTIFICATE], methods: ['POST'])]
     public function certificateVisibility(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.CERTIFICATE.VIEW');
-        $id = (int) $this->param('id');
-        $back = '/account/certificates#certificate-' . $id;
+        $id = $this->ownCertificateId($user->id);
+        $back = '/account/certificates#' . \CattoLearning\Support\Address\RecordAddress::certificateAnchor($this->param('number'));
         return $this->handle(function () use ($user, $id, $back): void {
             $document = (string) ($_POST['document'] ?? '');
             $public = ($_POST['public'] ?? '') === '1';
@@ -134,19 +161,28 @@ final class AccountController extends BaseController
         }, $back);
     }
 
-    #[Route('/account/certificates/{id}/address', name: 'account_certificate_address', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/account/certificates/{number}/address', name: 'account_certificate_address', requirements: ['number' => \CattoLearning\Support\Address\RecordAddress::CERTIFICATE], methods: ['POST'])]
     public function certificateAddress(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.CERTIFICATE.VIEW');
-        $id = (int) $this->param('id');
-        $back = '/account/certificates#certificate-' . $id;
+        $id = $this->ownCertificateId($user->id);
+        $back = '/account/certificates#' . \CattoLearning\Support\Address\RecordAddress::certificateAnchor($this->param('number'));
         return $this->handle(function () use ($user, $id, $back): void {
             $document = (string) ($_POST['document'] ?? '');
             $this->sharing->newAddress($user->id, $id, $document);
             $this->flash('success', ($document === 'transcript' ? 'Your transcript' : 'Your certificate') . ' has a new address. The old address no longer works.');
             $this->redirect($back);
         }, $back);
+    }
+
+    /**
+     * The learner's own certificate the address names by its number, as its row id (owner, 2026-11-06: no row id in an
+     * address); a number that is no certificate, or someone else's, is not found.
+     */
+    private function ownCertificateId(int $userId): int
+    {
+        return $this->sharing->ownedBy($userId, $this->param('number')) ?? throw $this->notFound('We could not find that certificate.');
     }
 
     #[Route('/account/profile', name: 'account_profile', methods: ['GET'])]
@@ -356,6 +392,25 @@ final class AccountController extends BaseController
     }
 
 
+    /**
+     * Account > Sign-in and security (owner, 2026-11-05, the approved mockup): Telegram and two-step sign-in. While it waits for
+     * Telegram, the Telegram card refreshes itself, which is not a visit.
+     */
+    #[Route('/account/security', name: 'account_security', methods: ['GET'])]
+    public function security(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.SESSION.VIEW');
+        $this->liveRefreshIsNotAVisit();
+        return $this->renderAccountSection('security', $this->securityData($user, (string) ($_GET['two_step'] ?? '')));
+    }
+
+    /** @return array<string,mixed> */
+    private function securityData(CurrentUser $user, string $ask = ''): array
+    {
+        return ['security' => $this->security->view($user, $ask),
+            'can_manage_security' => $user->hasPermission('ACCOUNT.SESSION.MANAGE')];
+    }
+
     #[Route('/account/sessions', name: 'account_sessions', methods: ['GET'])]
     public function sessions(): Response
     {
@@ -474,14 +529,12 @@ final class AccountController extends BaseController
      */
     private function learningData(int $userId, array $request): array
     {
-        $companyAccount = $this->companies->forUser($userId) !== null;
         // A list the account does not have is not found (owner, 2026-10-21: "make it a 404").
-        if ($request['list'] !== null && !in_array($request['list'], $this->learning->libraryLists($companyAccount), true)) {
+        if ($request['list'] !== null && !array_key_exists((string) $request['list'], LearningService::LIBRARY_DATASETS)) {
             throw new NotFoundHttpException('There is no such list of courses.');
         }
         return $this->learning->courseLibraryView(
             $userId,
-            $companyAccount,
             $request,
             fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
             fn(string $dataset, $pagination, string $label, string $search, string $list) => $this->platformAdministration->paginationView(
@@ -490,6 +543,46 @@ final class AccountController extends BaseController
                 '/account/courses',
                 $label,
                 ['list' => $list] + ($search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search])
+            )
+        );
+    }
+
+    /**
+     * Favourites (owner, 2026-11-06): the chosen kind, view, page, page size and search term from the address.
+     *
+     * @return array<string,mixed>
+     */
+    private function favouritesData(int $userId): array
+    {
+        $request = ['kind' => isset($_GET['kind']) ? (is_string($_GET['kind']) ? $_GET['kind'] : '') : null,
+            'favourites_view' => \CattoLearning\Support\ListView::chosen('favourites', $_GET, $_COOKIE)];
+        foreach ([PlatformAdministrationService::pageParam('favourites'), PlatformAdministrationService::sizeParam('favourites'), PlatformAdministrationService::searchParam('favourites')] as $param) {
+            $request[$param] = $_GET[$param] ?? null;
+        }
+        try {
+            return $this->favouriteLists->view($userId, $request);
+        } catch (\InvalidArgumentException $missing) {
+            throw new NotFoundHttpException($missing->getMessage());
+        }
+    }
+
+    /**
+     * Course Requests (owner, 2026-11-06): its page, page size and search term from the address.
+     *
+     * @return array<string,mixed>
+     */
+    private function requestsData(int $userId): array
+    {
+        $request = [];
+        foreach ([PlatformAdministrationService::pageParam('requests'), PlatformAdministrationService::sizeParam('requests'), PlatformAdministrationService::searchParam('requests')] as $param) {
+            $request[$param] = $_GET[$param] ?? null;
+        }
+        return $this->learning->courseRequestsView(
+            $userId,
+            $request,
+            fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
+            fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
+                $dataset, $pagination, '/account/requests', $label, $search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search]
             )
         );
     }
@@ -530,7 +623,10 @@ final class AccountController extends BaseController
                 'emails' => $this->emailData($user->id),
                 'social' => $this->socialData($user->id),
                 'learning' => $this->learningData($user->id, $this->libraryRequest()),
+                'favourites' => $this->favouritesData($user->id),
+                'requests' => $this->requestsData($user->id),
                 'certificates' => $this->certificateData($user->id),
+                'security' => $this->securityData($user),
                 'sessions' => ['sessions' => $this->auth->activeSessions($user->id)],
                 'activity' => ['account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100)],
                 default => [],
@@ -549,13 +645,19 @@ final class AccountController extends BaseController
             'emails' => 'ACCOUNT.PROFILE.VIEW',
             'social' => 'ACCOUNT.PROFILE.VIEW',
             'learning' => 'LEARNING.LIBRARY.VIEW',
+            'favourites' => 'LEARNING.LIBRARY.VIEW',
+            'requests' => 'LEARNING.LIBRARY.VIEW',
             'certificates' => 'LEARNING.CERTIFICATE.VIEW',
+            'security' => 'ACCOUNT.SESSION.VIEW',
             'sessions' => 'ACCOUNT.SESSION.VIEW',
             'activity' => 'ACCOUNT.ACTIVITY.VIEW',
         ];
+        // Course Requests only for an account that belongs to a company (owner, 2026-10-21).
+        $companyAccount = $this->companies->forUser($user->id) !== null;
         return array_values(array_filter(
             $this->sections->all(),
             static fn(array $section): bool => $user->hasPermission($permissions[(string) $section['key']] ?? 'ACCOUNT.VIEW')
+                && ($section['key'] !== 'requests' || $companyAccount)
         ));
     }
 

@@ -12,6 +12,9 @@ Provides mail infrastructure for mailer interface, supporting Catto Learning ema
 
 Changelog:
 
+2026/11/06 SAST
+
+- sendMoneyReport(): last month's money report to the administrator address, with its PDF and Excel file (owner, 2026-11-06).
 2026/10/19 SAST
 
 - sendPaymentInstructions() and sendOrderCancelled(): an EFT buyer is told how to pay, what arrived after
@@ -138,4 +141,13 @@ interface MailerInterface
      * @param array{number:string,name:string,account_reference:string,placed:string,pay_by:string,returned:string,wallet_url:string,invoice:string,url:string,again_url:string} $order
      */
     public function sendOrderCancelled(string $email, array $order): void;
+
+    /**
+     * Last month's money report, to the administrator address on the 1st (owner, 2026-11-06, Money Reports): its figures
+     * as lines, a month with no sales saying so, a link to the report on the site, and the PDF and the Excel file attached.
+     *
+     * @param array{month:string,lines:list<array{label:string,value:string,note:string}>,no_sales:string,url:string} $report
+     * @param array<string,string> $files file name (.pdf or .xlsx) => its bytes
+     */
+    public function sendMoneyReport(string $email, array $report, array $files): void;
 }

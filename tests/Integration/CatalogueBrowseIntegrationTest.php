@@ -437,16 +437,22 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         self::assertContains($this->card($root, 4), $top['subcategories']);
     }
 
+    /** A category's address, which the catalogue's choices name it by (owner, 2026-11-06). */
+    private function slugOf(int $categoryId): string
+    {
+        return (string) $this->service->category($categoryId)['slug'];
+    }
+
     /**
      * A category's card, as categoryNavigation() gives it: a category without an icon gets the plain one.
      *
      * @param array<string,mixed> $category
-     * @return array{id:int,label:string,href:string,count:int,icon:string,description:string}
+     * @return array{id:int,slug:string,label:string,href:string,count:int,icon:string,description:string}
      */
     private function card(array $category, int $count): array
     {
         $icon = trim((string) ($category['icon_svg'] ?? ''));
-        return ['id' => (int) $category['id'], 'label' => (string) $category['name'], 'href' => '/courses/category/' . $category['slug'], 'count' => $count,
+        return ['id' => (int) $category['id'], 'slug' => (string) $category['slug'], 'label' => (string) $category['name'], 'href' => '/courses/category/' . $category['slug'], 'count' => $count,
             'icon' => $icon !== '' ? (string) $category['icon_svg'] : CourseService::CATEGORY_ICON, 'description' => trim((string) ($category['description'] ?? ''))];
     }
 
@@ -479,11 +485,12 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     public function testCategoryPickerNestsTheWholeTreeWithPathsAndTheChosenCategory(): void
     {
         $picker = $this->service->catalogueCategoryPicker($this->service->category($this->leafId));
-        self::assertSame((string) $this->leafId, $picker['selected']);
+        // Each category by its address, never its number (owner, 2026-11-06).
+        self::assertSame($this->slugOf($this->leafId), $picker['selected']);
         self::assertSame(['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], $picker['items'][0]);
-        $find = static function (array $items, int $id) use (&$find): ?array {
+        $find = function (array $items, int $id) use (&$find): ?array {
             foreach ($items as $item) {
-                if ($item['value'] === (string) $id) return $item;
+                if ($item['value'] === $this->slugOf($id)) return $item;
                 $inside = $find($item['children'] ?? [], $id);
                 if ($inside !== null) return $inside;
             }
@@ -491,7 +498,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         };
         $rootItem = $find($picker['items'], $this->rootId);
         self::assertNotNull($rootItem, 'The root is a main category in the picker.');
-        self::assertContains((string) $this->rootId, array_column($picker['items'], 'value'), 'Main categories are the top level.');
+        self::assertContains($this->slugOf($this->rootId), array_column($picker['items'], 'value'), 'Main categories are the top level.');
         $branchItem = $find($rootItem['children'] ?? [], $this->branchId);
         self::assertNotNull($branchItem, 'The branch is inside its root.');
         $leafItem = $find($branchItem['children'] ?? [], $this->leafId);
@@ -526,16 +533,21 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         self::assertTrue($tree[array_key_last($tree)]['is_last_sibling']);
     }
 
-    public function testChoosingACategorySubmitsItsIdAndLandsOnItsCategoryUrl(): void
+    public function testChoosingACategorySubmitsItsAddressAndLandsOnItsCategoryUrl(): void
     {
-        self::assertSame('/courses/category/' . $this->rootSlug, $this->redirectTarget('/courses?category=' . $this->rootId));
+        // The picker and the cards choose a category by its address (owner, 2026-11-06: a public page's address carries
+        // its name, never a number); a number names nothing.
+        self::assertSame('/courses/category/' . $this->rootSlug, $this->redirectTarget('/courses?category=' . $this->rootSlug));
+        self::assertSame(404, $this->answerStatus('/courses?category=' . $this->rootId), 'A category\'s number opens nothing.');
+        $named = $this->page('/courses');
+        self::assertSame(1, $named->query('//form[@id="catalogue-category" and @data-named-pages="/courses/category/"]')->length, 'With JavaScript the picker opens the named page itself.');
         self::assertSame('/courses', $this->redirectTarget('/courses/category/' . $this->rootSlug . '?category='));
         $page = $this->page('/courses/category/' . $this->rootSlug);
         $toggle = $page->query('//form[@id="catalogue-category" and @method="get" and @action="/courses"]//button[@popovertarget="catalogue-category-picker-options"]');
         self::assertSame(1, $toggle->length);
         $leaf = $this->service->category($this->rootId);
         self::assertSame($leaf['name'], trim((string) $toggle->item(0)?->textContent));
-        self::assertSame(1, $page->query('//*[@popover and @id="catalogue-category-picker-options"]//button[@type="submit" and @name="category" and @value="' . $this->rootId . '" and @aria-current="true" and @autofocus]')->length);
+        self::assertSame(1, $page->query('//*[@popover and @id="catalogue-category-picker-options"]//button[@type="submit" and @name="category" and @value="' . $this->rootSlug . '" and @aria-current="true" and @autofocus]')->length);
         self::assertSame(0, $page->query('//*[contains(@class,"cl-category-tile") or contains(@class,"cl-filter-rail")]')->length);
         $form = $page->query('//form[@id="catalogue-category"]')->item(0);
         $search = $page->query('//form[@data-server-search]')->item(0);
@@ -548,7 +560,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         $base = '/courses/category/' . $this->rootSlug;
         $normal = $this->page($base);
         self::assertSame(4, $normal->query('//article[contains(@class,"cl-course-card")]')->length, 'The root shows its own course and every course beneath it.');
-        self::assertSame(1, $normal->query('//button[@name="category" and @value="' . $this->rootId . '" and @aria-current="true"]')->length);
+        self::assertSame(1, $normal->query('//button[@name="category" and @value="' . $this->rootSlug . '" and @aria-current="true"]')->length);
         self::assertSame(1, $normal->query('//form[@action="' . $base . '" and @data-server-search]')->length);
         $trail = '//*[@id="catalogue-results"]//nav[@aria-label="Category path"]';
         self::assertSame(1, $normal->query($trail . '//a[@href="/courses" and normalize-space()="All courses"]')->length);
@@ -557,7 +569,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         // The categories beneath are feature cards, a native radio each, in a form that opens the chosen one (owner, 2026-10-20).
         $cards = '//*[@id="catalogue-results"]//form[@method="get" and @action="/courses" and @data-choose-submits]//fieldset[@id="catalogue-categories" and contains(@class,"cl-ui-picture-choice--four")]';
         self::assertSame('Subcategories', trim((string) $normal->query($cards . '/legend')->item(0)?->textContent));
-        self::assertSame(1, $normal->query($cards . '//label[.//*[@class="cl-ui-picture-choice-label" and normalize-space()="' . $branch['name'] . '"]]/input[@type="radio" and @name="category" and @value="' . $this->branchId . '"]')->length);
+        self::assertSame(1, $normal->query($cards . '//label[.//*[@class="cl-ui-picture-choice-label" and normalize-space()="' . $branch['name'] . '"]]/input[@type="radio" and @name="category" and @value="' . $branch['slug'] . '"]')->length);
         self::assertSame(1, $normal->query($cards . '//label//*[@class="cl-ui-picture-choice-icon"]/*[local-name()="svg"]')->length, 'Each card has its icon.');
         self::assertSame(1, $normal->query('//form[@data-choose-submits]/noscript')->length, 'Show courses submits the choice without JavaScript.');
         $search = $this->page($base . '?catalogue_q=Browse%20Seed%20Course');
@@ -593,7 +605,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     {
         $empty = $this->fixture->createCategory('Empty ' . $this->fixture->suffix(), 'empty-' . $this->fixture->suffix());
         $picker = $this->service->catalogueCategoryPicker(null);
-        self::assertContains((string) $empty, array_column($picker['items'], 'value'));
+        self::assertContains($this->slugOf($empty), array_column($picker['items'], 'value'));
         self::assertArrayHasKey($this->tagId, array_column($this->service->tagIndex(), null, 'id'));
         $this->db->executeStatement('DELETE FROM course_tags WHERE tag_id = :tag', ['tag' => $this->tagId]);
         self::assertArrayNotHasKey($this->tagId, array_column($this->service->tagIndex(), null, 'id'), 'A tag with no courses is not listed.');
@@ -621,11 +633,12 @@ final class CatalogueBrowseIntegrationTest extends TestCase
             self::assertGreaterThan(0, $second->query('//article[contains(@class,"cl-course-card")]')->length);
             self::assertLessThanOrEqual(24, $second->query('//article[contains(@class,"cl-course-card")]')->length);
         }
-        // The catalogue opens on every course, a page at a time, not a featured few (owner, 2026-10-19).
+        // The catalogue opens on every course, a page at a time, not a featured few (owner, 2026-10-19). The bundles above
+        // them are cards too (owner, 2026-11-06), in their own row and not among the 24.
         $root = $this->page('/courses');
-        self::assertSame(24, $root->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(24, $root->query('//article[contains(@class,"cl-course-card") and not(ancestor::*[@id="catalogue-bundles"])]')->length);
         self::assertSame(2, $root->query('//nav[@data-pagination="catalogue"]')->length);
-        self::assertSame(1, $root->query('//fieldset[@id="catalogue-categories" and legend="Categories"]//input[@name="category" and @value="' . $this->rootId . '"]')->length);
+        self::assertSame(1, $root->query('//fieldset[@id="catalogue-categories" and legend="Categories"]//input[@name="category" and @value="' . $this->rootSlug . '"]')->length);
     }
 
     public function testFavouriteStateAndCsrfSurviveFullAndHtmxWorkspaceRendering(): void
@@ -657,6 +670,17 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     }
 
     /** Actual route dispatch and strict Twig rendering, with no client-side rendering involved. */
+    private function answerStatus(string $url): int
+    {
+        $boot = \CattoLearning\Application\CliBootstrap::boot();
+        $kernel = new \CattoLearning\Kernel('test', true, $boot['instance_root']);
+        try {
+            return $kernel->handle(\Symfony\Component\HttpFoundation\Request::create($url, 'GET'))->getStatusCode();
+        } finally {
+            $kernel->shutdown();
+        }
+    }
+
     private function redirectTarget(string $url): string
     {
         $boot = \CattoLearning\Application\CliBootstrap::boot();

@@ -27,6 +27,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class CoursePopularityPageTest extends TestCase
 {
+    private string $leaderCode = '';
     private Database $db;
     private IntegrationDataFixture $fixture;
     private string $suffix;
@@ -51,6 +52,7 @@ final class CoursePopularityPageTest extends TestCase
         $this->fixture->grantRole($this->learner, 'STUDENT');
         $company = $this->company = $this->fixture->createCompany($this->admin, 'Popularity page ' . $this->suffix, 'popularity-' . $this->suffix . '.seed.test');
         $this->leader = $this->fixture->createCourse($this->admin, $company, 'popularity-leader-' . $this->suffix, 'Popular leader ' . $this->suffix);
+        $this->leaderCode = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->leader]);
         $this->free = $this->fixture->createCourse($this->admin, $company, 'popularity-free-' . $this->suffix, 'Popular free ' . $this->suffix);
         $this->db->executeStatement(
             "INSERT INTO course_price_variants (public_id,course_id,access_period_seconds,price_minor_units,currency_code,label,position,is_active,is_default,created_by_user_id,updated_by_user_id)
@@ -81,7 +83,7 @@ final class CoursePopularityPageTest extends TestCase
             self::assertStringContainsString($text, $html);
         }
         self::assertLessThan(strpos($html, 'Popular free ' . $this->suffix), strpos($html, 'Popular leader ' . $this->suffix), 'The leader is listed first.');
-        self::assertStringContainsString('href="/admin/reports/popularity/' . $this->leader . '"', $html);
+        self::assertStringContainsString('href="/admin/reports/popularity/' . $this->leaderCode . '"', $html);
         self::assertMatchesRegularExpression('~Popular leader ' . $this->suffix . '</strong></a></td>\s*<td><strong>[0-9.]+</strong></td>\s*<td>12</td>~', $html, 'The score and twelve distinct viewers are shown.');
         self::assertStringContainsString('Free', $html, 'A free course is labelled.');
     }
@@ -116,7 +118,7 @@ final class CoursePopularityPageTest extends TestCase
     public function testTheBreakdownShowsEveryComponent(): void
     {
         $this->signIn($this->admin);
-        $html = $this->html('/admin/reports/popularity/' . $this->leader);
+        $html = $this->html('/admin/reports/popularity/' . $this->leaderCode);
         foreach (['Score components', 'View score', 'Favourite score', 'Purchase score', 'Refund penalty', 'Rating score', 'Momentum score', 'Final score',
             'Source metrics', 'Unique discovery viewers', '12 (course page and public preview)', '1 paid order line, 1 unit', 'No approved reviews', 'Learners in the reader'] as $text) {
             self::assertStringContainsString($text, $html);
@@ -130,7 +132,7 @@ final class CoursePopularityPageTest extends TestCase
         self::assertStringContainsString('href="/admin/reports/popularity"', $this->html('/admin/reports'));
         $this->signIn($this->learner);
         self::assertNotSame(200, $this->send('/admin/reports/popularity')->getStatusCode());
-        self::assertNotSame(200, $this->send('/admin/reports/popularity/' . $this->leader)->getStatusCode());
+        self::assertNotSame(200, $this->send('/admin/reports/popularity/' . $this->leaderCode)->getStatusCode());
     }
 
     private function signIn(int $user): void

@@ -26,7 +26,7 @@
 					<p class="cl-tree-status" role="status" aria-live="polite" data-category-tree-target="status"></p>
 					<p class="cl-tree-error" role="alert" data-category-tree-target="error" hidden></p>
 					{# The disclosure buttons submit this form without JavaScript: open[] keeps the branches already open, toggle opens or closes one more. #}
-					<form id="category-tree-view" action="/admin/courses/categories" method="get">{% for id in open_ids %}<input type="hidden" name="open[]" value="{{ id }}">{% endfor %}</form>
+					<form id="category-tree-view" action="/admin/courses/categories" method="get">{% for slug in open_slugs %}<input type="hidden" name="open[]" value="{{ slug }}">{% endfor %}</form>
 					{% include '@platform/partials/admin/category-tree.html.twig' %}
 				</div>
 

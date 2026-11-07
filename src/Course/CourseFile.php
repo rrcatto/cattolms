@@ -23,6 +23,11 @@ certificate, public preview, assessment settings) are in the catalogue package. 
 written as the author wrote it (CattoLMS's confinement taken off again), after a small frame stylesheet for the panels.
 
 Changelog:
+2026/11/07 SAST
+- <meta name="cattolms:part-names">: the parts whose names their places would not give them (moved or added later), so a
+  course replaced from its file keeps every part's address (specification 4.11, section 6.6).
+2026/11/05 SAST
+- A file's name opens with when it was made and carries the course's title, the owner's naming convention.
 2026/11/03 SAST
 - A course with an original file keeps its frame. The stylesheet is split only between rules, never inside a quoted address
   (a Google Fonts address holds semicolons: breaking it across lines lost every rule after it), and its @import comes first.
@@ -35,6 +40,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Support\Slug;
+use DateTimeImmutable;
 use RuntimeException;
 
 final class CourseFile
@@ -43,6 +50,8 @@ final class CourseFile
     private const STANDARD_FINAL_LIMIT = 7200;
     private const FINAL_LIMIT_META = 'cattolms:final-time-limit';
     private const STUDY_HOURS_META = 'cattolms:study-hours';
+    /** The parts whose names their places would not give them (specification 6.6): "module-1=module-3 module-3=module-1". */
+    private const PART_NAMES_META = 'cattolms:part-names';
 
     private const SCOPE = '.cl-course-presentation';
 
@@ -71,15 +80,30 @@ final class CourseFile
     }
 
     /**
-     * The file's name: the course's code and address, as "GDN-101-growing-vegetables.html".
+     * The meta's words: each part whose name its place would not give it, as the place's name, an equals sign and the
+     * part's own name, separated by spaces ("module-1=module-3 module-3=module-1"); empty when every part has its place's name.
      *
      * @param array<string,mixed> $package
      */
-    public static function filename(array $package): string
+    private static function partNames(array $package): string
+    {
+        $pairs = [];
+        foreach ((array) ($package['moved_part_names'] ?? []) as $place => $name) { $pairs[] = $place . '=' . $name; }
+        return implode(' ', $pairs);
+    }
+
+    /**
+     * The file's name (owner, 2026-11-05: "YYYYMMDD-HHMM-[COURSE CODE]-[COURSE TITLE].html"): when it was made, the
+     * course's code and its title, as "20261105-2030-GDN-101-growing-vegetables.html".
+     *
+     * @param array<string,mixed> $package
+     */
+    public static function filename(array $package, ?DateTimeImmutable $at = null): string
     {
         $course = (array) ($package['course'] ?? []);
-        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) ($course['code'] ?? '') . '-' . (string) ($course['slug'] ?? '')), '-.');
-        return ($name === '' ? 'course' : $name) . '.html';
+        $title = trim((string) ($course['title'] ?? ''));
+        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) ($course['code'] ?? '') . '-' . ($title === '' ? '' : Slug::from($title))), '-.');
+        return ($at ?? new DateTimeImmutable())->format('Ymd-Hi') . '-' . ($name === '' ? 'course' : $name) . '.html';
     }
 
     /**
@@ -90,6 +114,9 @@ final class CourseFile
     public function fromCourse(int $courseId): array
     {
         $package = $this->portability->exportCourse($courseId);
+        // Each part's address keeps working when the course comes back from its file (2026-11-07): the file names the parts
+        // whose names their places would not give them.
+        $package['moved_part_names'] = $this->portability->movedPartNames($courseId);
         return $this->render($package) + ['filename' => self::filename($package)];
     }
 
@@ -159,6 +186,7 @@ final class CourseFile
             . '<meta name="cattolms:course-code" content="' . self::e((string) ($course['code'] ?? '')) . '">' . "\n"
             . ($finalLimit === self::STANDARD_FINAL_LIMIT ? '' : '<meta name="' . self::FINAL_LIMIT_META . '" content="' . (int) round($finalLimit / 60) . '">' . "\n")
             . ((int) ($course['estimated_minutes'] ?? 0) > 0 ? '<meta name="' . self::STUDY_HOURS_META . '" content="' . (int) round((int) $course['estimated_minutes'] / 60) . '">' . "\n" : '')
+            . (self::partNames($package) === '' ? '' : '<meta name="' . self::PART_NAMES_META . '" content="' . self::e(self::partNames($package)) . '">' . "\n")
             . '<title>' . self::e((string) ($course['title'] ?? '')) . '</title>' . "\n"
             . "<style>\n" . $this->stylesheet((string) ($course['presentation_css'] ?? '')) . "\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n"
             . $this->masthead($course, (string) (($package['catalogue']['cover'] ?? null) ?: ''))
@@ -278,6 +306,13 @@ final class CourseFile
             $meta = $document->createElement('meta');
             $meta->setAttribute('name', $name);
             $meta->setAttribute('content', (string) (int) round($value));
+            $document->head->prepend($meta);
+        }
+        $document->querySelector('meta[name="' . self::PART_NAMES_META . '"]')?->remove();
+        if (self::partNames($package) !== '' && $document->head instanceof \Dom\Element) {
+            $meta = $document->createElement('meta');
+            $meta->setAttribute('name', self::PART_NAMES_META);
+            $meta->setAttribute('content', self::partNames($package));
             $document->head->prepend($meta);
         }
         $fill['<!--cl:introduction-->'] = self::descriptionPanel($course) . $filesPanel . self::framedIntroduction((string) ($course['introduction_html'] ?? ''), (array) ($package['grade_bands'] ?? []), $frame, $leftOut);

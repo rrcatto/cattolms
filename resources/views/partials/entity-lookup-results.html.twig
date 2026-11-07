@@ -10,7 +10,7 @@
 					<button type="button"
                       class="lookup-result"
                       data-lookup-target="{{ lookup_target }}"
-                      data-lookup-id="{{ result.id }}"
+                      data-lookup-id="{{ lookup_by_code|default(false) ? result.code : result.id }}"
                       data-lookup-label="{{ result.label }}">
 					<span class="lookup-result-label">{{ result.label }}</span>
 					<span class="lookup-result-detail">{{ result.detail }}</span>

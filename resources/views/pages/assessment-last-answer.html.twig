@@ -14,5 +14,5 @@
 		</div>
 		{% include '@platform/partials/assessment-feedback.html.twig' %}
 		{% set public_preview = is_public_preview|default(false) %}
-		{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_base: '', paging_previous: null, paging_next: null, paging_next_link: {href: result_url, label: 'View my result', icon: 'action-view'}} %}
+		{% include '@platform/partials/course-item-paging.html.twig' with {paging_label: public_preview ? 'Public Course Content' : 'Course Content', paging_previous: null, paging_next: null, paging_next_link: {href: result_url, label: 'View my result', icon: 'action-view'}} %}
 {% endblock %}

@@ -8,7 +8,7 @@
 	{% if not is_preview|default(false) and course.certificate_waiting|default(false) %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: course.certificate_waiting_message})} %}{% block body %}{{ ui('action.link', {label: 'Verify my identity', variant: 'primary', size: 'small', href: '/account/verification?return=' ~ ('/learn/' ~ course.slug)|url_encode, icon: 'action-verify'}) }}{% endblock %}{% endembed %}
 	{% elseif not is_preview|default(false) and course.certificate|default(null) and session.assessment_role|default('') == 'final' %}
-		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'You have completed every assessment. Your certificate and transcript are ready.'})} %}{% block body %}{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id, icon: 'action-view'}) }}{% if course.certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', size: 'small', href: '/transcripts/' ~ course.certificate.transcript_public_id, icon: 'action-view'}) }}{% endif %} {{ ui('action.link', {label: 'Who can see them', variant: 'quiet', size: 'small', href: '/account/certificates#certificate-' ~ course.certificate.id, icon: 'action-share'}) }}{% endblock %}{% endembed %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'You have completed every assessment. Your certificate and transcript are ready.'})} %}{% block body %}{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id, icon: 'action-view'}) }}{% if course.certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', size: 'small', href: '/transcripts/' ~ course.certificate.transcript_public_id, icon: 'action-view'}) }}{% endif %} {{ ui('action.link', {label: 'Who can see them', variant: 'quiet', size: 'small', href: '/account/certificates#' ~ certificate_anchor(course.certificate), icon: 'action-share'}) }}{% endblock %}{% endembed %}
 	{% endif %}
 		{# The score, and after the final assessment the course's result beside it (owner-approved mockup, 2026-11-05). #}
 		{% set course_result = session.course_result|default(null) %}
@@ -91,7 +91,7 @@
 						{% for item in session.diagnostic_remediation_items %}
 							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
-{% if item.node_id %}<a href="{{ item_base|default('/learn/' ~ session.slug ~ '/item/') }}{{ item.node_id }}/content{{ item_query|default(is_preview ? '?preview=1' : '') }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
+{% if item.part_name|default('') %}<a href="{{ is_public_preview|default(false) ? preview_part_url(course, item) : part_url(course, item) }}{{ item_query|default(is_preview ? '?preview=1' : '') }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
 {% endblock %}
 {% endembed %}
 						{% endfor %}
@@ -170,7 +170,7 @@
 		{% set stop_after = options_only or next_step ? null : session.next_node|default(null) %}
 		{% include '@platform/partials/course-item-paging.html.twig' with {
 			paging_label: public_preview ? 'Public Course Content' : 'Course Content',
-			paging_base: public_preview ? '/courses/' ~ course.slug ~ '/preview/' : '/learn/' ~ course.slug ~ '/item/',
+			paging_public: public_preview,
 			paging_query: public_preview ? course.public_preview_query|default('') : preview_query,
 			paging_previous: null,
 			paging_previous_link: options_only ? null : {href: retake_url, label: session.is_diagnostic ? 'Take diagnostic again' : 'Assessment options', icon: session.is_diagnostic ? 'action-refresh' : 'action-back'},

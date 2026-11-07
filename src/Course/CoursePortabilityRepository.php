@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for course portability records.
 
 Changelog:
+2026/11/07 SAST
+- openPartNames() and openParts(): what is open before buying, by part name, so a course replaced from an HTML file
+  (which never says) keeps it.
 2026/10/29 SAST
 - A preview enrolment runs for the period a buyer gets (the course's default price option, else its default
   period) instead of a fixed ten years, which the start page names; one not started follows the prices.
@@ -231,6 +234,37 @@ final class CoursePortabilityRepository
              ON CONFLICT (course_id) DO UPDATE SET frame = EXCLUDED.frame, updated_at = NOW()',
             ['id' => $courseId, 'frame' => json_encode($frame, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
         );
+    }
+
+    /**
+     * The names of the course's parts open before buying (the public preview): its sections and placed items so marked.
+     *
+     * @return list<string>
+     */
+    public function openPartNames(int $courseId): array
+    {
+        return array_map('strval', $this->db->fetchFirstColumn(
+            'SELECT n.part_name FROM course_structure_nodes n
+             LEFT JOIN course_sections s ON s.node_id = n.id
+             LEFT JOIN course_item_placements p ON p.node_id = n.id
+             WHERE n.course_id = :course AND COALESCE(s.public_preview, p.public_preview, FALSE)
+             ORDER BY n.id',
+            ['course' => $courseId]
+        ));
+    }
+
+    /**
+     * Opens the course's parts of these names before buying again (a course replaced from a file that does not say).
+     *
+     * @param list<string> $names
+     */
+    public function openParts(int $courseId, array $names): void
+    {
+        foreach ($names as $name) {
+            $node = ['course' => $courseId, 'name' => $name];
+            $this->db->executeStatement('UPDATE course_sections SET public_preview = TRUE WHERE node_id = (SELECT id FROM course_structure_nodes WHERE course_id = :course AND part_name = :name)', $node);
+            $this->db->executeStatement('UPDATE course_item_placements SET public_preview = TRUE WHERE course_id = :course AND node_id = (SELECT id FROM course_structure_nodes WHERE course_id = :course AND part_name = :name)', $node);
+        }
     }
 
     /** @return array<string,mixed> */

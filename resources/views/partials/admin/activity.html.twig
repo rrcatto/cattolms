@@ -33,7 +33,7 @@
 
 {% endblock %}
 {% endembed %}
-		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'actor_id', lk_type: 'people', lk_label: 'Person / actor', lk_selected: activity_selected_actor, lk_empty: 'All people', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course_id', lk_type: 'courses', lk_label: 'Course', lk_selected: activity_selected_course, lk_empty: 'All courses', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: activity_selected_company, lk_empty: 'All companies', lk_required: 0} %}
+		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'actor', lk_by_code: true, lk_type: 'people', lk_label: 'Person / actor', lk_selected: activity_selected_actor, lk_empty: 'All people', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course', lk_by_code: true, lk_type: 'courses', lk_label: 'Course', lk_selected: activity_selected_course, lk_empty: 'All courses', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company', lk_by_code: true, lk_type: 'companies', lk_label: 'Company', lk_selected: activity_selected_company, lk_empty: 'All companies', lk_required: 0} %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'field-activity-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 

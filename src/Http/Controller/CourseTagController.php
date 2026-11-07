@@ -108,7 +108,8 @@ final class CourseTagController extends BaseController
                 'empty_heading' => $showing ? 'No courses match this selection' : 'Explore the catalogue by tag',
                 'empty_summary' => $showing ? 'Try another term or choose another tag.' : 'Choose a tag above or search for a course.',
                 // The tag shown can be followed (mailing, step 1; owner, 2026-10-26).
-                'follow' => $tag === null ? null : ['kind' => 'tag', 'id' => (int) $tag['id'], 'name' => (string) $tag['name'], 'following' => $identity !== null && $this->mailing->isSubscribed($identity->id, 'tag', (int) $tag['id']), 'signed_in' => $identity !== null, 'return' => $base . '#follow'] + $this->mailing->followChoice($identity === null ? 0 : $identity->id),
+                // Followed by its slug (owner, 2026-11-06: no row id in an address).
+                'follow' => $tag === null ? null : ['href' => \CattoLearning\Support\Address\CatalogueAddress::follow('tag', $tag), 'intent' => 'tag:' . (string) $tag['slug'], 'kind' => 'tag', 'id' => (int) $tag['id'], 'name' => (string) $tag['name'], 'following' => $identity !== null && $this->mailing->isSubscribed($identity->id, 'tag', (int) $tag['id']), 'signed_in' => $identity !== null, 'return' => $base . '#follow'] + $this->mailing->followChoice($identity === null ? 0 : $identity->id),
             ],
             'catalogue_search' => $search,
             'universe_query' => '',

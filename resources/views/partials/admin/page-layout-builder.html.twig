@@ -16,7 +16,7 @@
 <div class="cl-page-builder" data-controller="page-layout" data-page-layout-present-value="{{ plb_present }}" data-page-layout-locked-value="{{ plb_locked|default(false) ? 'true' : 'false' }}"{% if plb_layouts_json|default('') %} data-page-layout-layouts-value="{{ plb_layouts_json }}"{% endif %}>
 	<input type="hidden" name="order" value="{{ plb.order }}" data-page-layout-target="order">
 	{# The course the sketch is drawn for, so a save comes back to it. #}
-	{% if plb_courses|default([]) %}<input type="hidden" name="course" value="{{ (plb_courses|filter(c => c.selected)|first).id|default('') }}" data-page-layout-target="courseField">{% endif %}
+	{% if plb_courses|default([]) %}<input type="hidden" name="course" value="{{ (plb_courses|filter(c => c.selected)|first).code|default('') }}" data-page-layout-target="courseField">{% endif %}
 	<div class="cl-page-builder-work">
 		<div class="cl-page-builder-part" data-page-layout-target="lockable">
 			<div class="cl-page-builder-part-head">
@@ -79,7 +79,7 @@
 			{# Drawn for one course at a time: a block with nothing to show on that course is left out of its page. #}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show it for', for: 'page-layout-course'})} %}
 {% block control %}<select class="cl-select" id="page-layout-course" name="course" form="{{ plb_course_form }}" data-action="change->page-layout#course" {{ ui_field_attrs(props) }}>
-					{% for course in plb_courses %}<option value="{{ course.id }}" data-present="{{ course.present|join(',') }}"{% if course.selected %} selected{% endif %}>{{ course.label }}</option>{% endfor %}
+					{% for course in plb_courses %}<option value="{{ course.code }}" data-present="{{ course.present|join(',') }}"{% if course.selected %} selected{% endif %}>{{ course.label }}</option>{% endfor %}
 				</select>{% endblock %}
 {% endembed %}
 			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', form: plb_course_form, icon: 'action-filter'}) }}</noscript>

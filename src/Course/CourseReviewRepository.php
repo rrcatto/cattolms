@@ -39,7 +39,7 @@ final class CourseReviewRepository
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT e.id AS enrolment_id, ue.email, COALESCE(NULLIF(btrim(u.first_name), ''), NULLIF(split_part(btrim(COALESCE(u.display_name, '')), ' ', 1), ''), '') AS first_name,
-                    c.title AS course_title, c.slug AS course_slug
+                    c.title AS course_title, c.code AS course_code, c.slug AS course_slug
                FROM course_enrolments e
                JOIN users u ON u.id = e.user_id AND u.status = 'active'
                JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary
@@ -210,7 +210,7 @@ final class CourseReviewRepository
     {
         [$where, $bindings] = self::moderationFilter($filters);
         return $this->db->fetchAllAssociative(
-            "SELECT r.*, c.title AS course_title, c.slug AS course_slug,
+            "SELECT r.*, c.title AS course_title, c.code AS course_code, c.slug AS course_slug,
                     COALESCE(NULLIF(u.sort_name,''), 'User ' || u.id) AS learner_name, u.account_reference AS learner_reference, " . self::PUBLIC_NAME . " AS reviewer,
                     m.sort_name AS moderator_name, m.account_reference AS moderator_reference
                FROM course_reviews r
@@ -253,8 +253,8 @@ final class CourseReviewRepository
      */
     public function reviewedCourses(): array
     {
-        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'title' => (string) $row['title']], $this->db->fetchAllAssociative(
-            'SELECT c.id, c.title FROM courses c WHERE EXISTS (SELECT 1 FROM course_reviews r WHERE r.course_id = c.id) ORDER BY lower(c.title), c.id'
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'title' => (string) $row['title']], $this->db->fetchAllAssociative(
+            'SELECT c.id, c.code, c.title FROM courses c WHERE EXISTS (SELECT 1 FROM course_reviews r WHERE r.course_id = c.id) ORDER BY lower(c.title), c.id'
         ));
     }
 

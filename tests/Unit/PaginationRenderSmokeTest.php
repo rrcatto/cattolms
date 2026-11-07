@@ -147,9 +147,10 @@ final class PaginationRenderSmokeTest extends TestCase
         $hive['can_delete_courses'] = true;
         $hive['courses_pagination'] = self::pagination('courses', '/admin/courses');
         $html = RenderHarness::render('partials/admin/courses.html.twig', $hive);
-        self::assertStringContainsString('action="/admin/courses/1/delete"', $html, 'A course nobody bought can be deleted.');
-        self::assertStringNotContainsString('action="/admin/courses/2/delete"', $html, 'A bought course cannot.');
-        self::assertStringContainsString('action="/admin/courses/2/reset"', $html, 'It can still be reset.');
+        // Each course by its code (owner, 2026-11-06: no row id in an address).
+        self::assertStringContainsString('action="/admin/courses/T-101/delete"', $html, 'A course nobody bought can be deleted.');
+        self::assertStringNotContainsString('action="/admin/courses/U-101/delete"', $html, 'A bought course cannot.');
+        self::assertStringContainsString('action="/admin/courses/U-101/reset"', $html, 'It can still be reset.');
     }
 
     /** Consolidated preview mode: no pagination array is set, so defaults must carry the template. */
@@ -233,7 +234,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $markup = (string) file_get_contents(self::root() . '/resources/views/partials/entity-lookup.html.twig');
 
         self::assertStringNotContainsString('@lk_selected.id ?:', $markup);
-        self::assertStringContainsString('lk_selected ? lk_selected.id', $markup);
+        self::assertStringContainsString('lk_selected ? (lk_by_code|default(false) ? lk_selected.code : lk_selected.id)', $markup);
     }
 
     /**

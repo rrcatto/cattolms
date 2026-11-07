@@ -10,6 +10,9 @@
  *   a missing page is a page built like every other (page head, card, what to do next) in plain words, and a signed-in
  *   reader refused a page keeps their header and identity band, with Go to your account and Sign out.
  *
+ *   an order and its documents are named by their numbers (owner, 2026-11-06: no row id in an address), and the
+ *   order's row id, or the number written another way, is a plain not found.
+ *
  * Uses the financial documents fixture (tests/Browser/financial-documents-fixture.php create ... cleanup): its orders
  * are placed through the real checkout. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -77,13 +80,29 @@ async function as(browser, token) {
 
         await scenario('anyone else finds no such order in their account, and nothing says whose it is', browserName, async () => {
             const {ctx, page} = await as(browser, state.tokens.other);
-            for (const address of [`/account/orders/${order}`, `/account/orders/${order}/documents/${invoice}`, '/account/orders/999999999']) {
+            for (const address of [`/account/orders/${order}`, `/account/orders/${order}/documents/${invoice}`, '/account/orders/CL-99999999']) {
                 const response = await page.goto(base + address);
                 assert.equal(response.status(), 404, address);
                 const text = clean(await page.locator('main').innerText());
                 assert.match(text, /We could not find that order in your account\./, address);
                 assert.doesNotMatch(text, /another purchaser|belongs to/i, address);
             }
+            await ctx.close();
+        });
+
+        await scenario('an order opens by its number only: its row id, or the number written another way, is not found', browserName, async () => {
+            const {ctx, page} = await as(browser, state.tokens.learner[0]);
+            assert.match(order, /^CL-\d{8}$/, 'the fixture names the order by its number');
+            assert.match(invoice, /^INV-\d{8}$/, 'and its invoice by the invoice\'s');
+            const rowId = String(Number(order.slice(3)));
+            for (const address of [`/account/orders/${rowId}`, `/account/orders/CL-${rowId}`, `/account/orders/${order.toLowerCase()}`, `/account/orders/${order}/documents/1`]) {
+                const response = await page.goto(base + address);
+                assert.equal(response.status(), 404, address);
+            }
+            await page.goto(`${base}/account/orders/${order}`);
+            const hrefs = await page.locator('main [href]').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+            assert.ok(hrefs.includes(`/account/orders/${order}/documents/${invoice}`), 'the invoice opens by its number');
+            assert.deepEqual(hrefs.filter((href) => /^\/account\/orders\/\d+(\/|\?|$)/.test(href)), [], 'no link names the order by its row id');
             await ctx.close();
         });
 

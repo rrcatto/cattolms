@@ -18,6 +18,9 @@ first (lower case raised, spaces and underscores made hyphens), so "gdn 101" is 
 gets a suggestion from its title's initials, or a random C- code where nobody chose (generated()).
 
 Changelog:
+2026/11/06 SAST
+- A code holds a letter (owner, 2026-11-06: no row id in an address, and a course is named there by its code), so no code
+  can be mistaken for a row id; a suggestion from digits alone starts with C.
 2026/10/23 SAST
 - Created with the course code.
 */
@@ -33,8 +36,9 @@ final class CourseCode
     /** The meta tag in a course HTML file's head that carries its code. */
     public const META_NAME = 'cattolms:course-code';
     public const MAXIMUM = 20;
-    public const RULE = 'A course code is capital letters and digits, in parts joined by hyphens, such as GDN-101 (2 to 20 characters).';
-    private const PATTERN = '/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/';
+    public const RULE = 'A course code is capital letters and digits, in parts joined by hyphens, with at least one letter, such as GDN-101 (2 to 20 characters).';
+    // At least one letter (owner, 2026-11-06: a course is its code in an address, so a code never looks like a row id).
+    private const PATTERN = '/^(?=[A-Z0-9-]*[A-Z])[A-Z0-9]+(?:-[A-Z0-9]+)*$/';
     // Words left out of a suggested code: "An Introduction to Garden Design" suggests IGD-101.
     private const MINOR_WORDS = ['a', 'an', 'and', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'with', 'your'];
 
@@ -77,7 +81,8 @@ final class CourseCode
             if (preg_match('/^[A-Z0-9]$/', $letter) === 1) $initials .= $letter;
             if (strlen($initials) === 4) break;
         }
-        $prefix = strlen($initials) >= 2 ? $initials : 'C' . $initials;
+        // A code holds a letter: initials that are only digits ("101 Recipes") start with C.
+        $prefix = strlen($initials) >= 2 && preg_match('/[A-Z]/', $initials) === 1 ? $initials : 'C' . $initials;
         for ($number = 101; $number < 1000; $number++) {
             if (!$taken($prefix . '-' . $number)) return $prefix . '-' . $number;
         }

@@ -3,9 +3,18 @@
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
-		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people', ds_help: 'Searches every page by name, any email address or account reference.', ds_hidden: people_created|default(null) ? people_created.carried : {}}})} %}
 {% block toolbar %}{% if people_view_switch is defined and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: people_view_switch} %}{% if people_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'people', gs_headers: people_sort_headers, gs_pager: people_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
+
+				{# The accounts made between two days, as Money Reports' New accounts opens it (owner, 2026-11-06). #}
+				{% if people_created|default(null) %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+						<p class="mb-0" data-people-created><strong>{{ people_created.label }}:</strong> {{ people_created.total }} {{ people_created.total == 1 ? 'account' : 'accounts' }}. {{ ui('action.link', {label: 'Show everyone', variant: 'quiet', size: 'small', href: '/admin/people', icon: 'action-clear'}) }}</p>
+{% endblock %}
+{% endembed %}
+				{% endif %}
 
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
@@ -23,11 +32,11 @@
 					{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'People'})} %}
 {% block body %}
 						{% for person in people %}
-							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: '/admin/people/' ~ person.id, picture: 'round'})} %}
+							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: person_url(person), picture: 'round'})} %}
 {% block picture %}{% if person.picture_url|default('') %}<img src="{{ person.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
-{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/admin/people/' ~ person.id}) }}{% endblock %}
+{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: person_url(person)}) }}{% endblock %}
 {% block details %}
-								<p class="cl-ui-card-line">{% if person.company_id|default(null) %}<a href="/admin/companies/{{ person.company_id }}">{{ person.company_name }}</a>{% else %}No company{% endif %}</p>
+								<p class="cl-ui-card-line">{% if person.company_id|default(null) %}<a href="{{ company_url(person.company_reference) }}">{{ person.company_name }}</a>{% else %}No company{% endif %}</p>
 								<div class="role-list">
 									{% if person.status|default('') == 'awaiting_approval' %}{{ ui('feedback.badge', {label: 'Awaiting approval', tone: 'warning'}) }}{% endif %}{% if person.status|default('') == 'deactivated' %}{{ ui('feedback.badge', {label: 'Deactivated', tone: 'neutral'}) }}{% endif %}
 									{% for role in person.roles %}{{ ui('feedback.badge', {label: role|role_label, tone: 'info'}) }}{% endfor %}
@@ -35,7 +44,7 @@
 								</div>
 								<p class="cl-ui-card-line cl-ui-card-quiet">{{ person.course_count }} {{ person.course_count == 1 ? 'course' : 'courses' }} · Last sign-in {{ person.last_login_at ?: 'never' }}</p>
 {% endblock %}
-{% block actions %}{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}{% endblock %}
+{% block actions %}{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: person_url(person), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}{% endblock %}
 {% endembed %}
 						{% endfor %}
 {% endblock %}
@@ -63,12 +72,12 @@
 										   initials, and no email address, so Last login has room. The search still finds a person by email. #}
 										<div class="person">
 											<div>
-												<strong title="{{ person.name }}">{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/admin/people/' ~ person.id}) }}</strong>
+												<strong title="{{ person.name }}">{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: person_url(person)}) }}</strong>
 											</div>
 										</div>
 									</td>
 									<td>
-										{% if person.company_id|default(null) %}<a href="/admin/companies/{{ person.company_id }}">{{ person.company_name }}</a>{% else %}—{% endif %}
+										{% if person.company_id|default(null) %}<a href="{{ company_url(person.company_reference) }}">{{ person.company_name }}</a>{% else %}—{% endif %}
 									</td>
 									<td>
 										<div class="role-list">
@@ -96,7 +105,7 @@
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
-											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}
+											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: person_url(person), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}
 
 {% endblock %}
 {% endembed %}

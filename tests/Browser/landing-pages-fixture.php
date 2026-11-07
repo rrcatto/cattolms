@@ -54,8 +54,8 @@ $title = static function () use ($db): array {
     throw new RuntimeException('Every property course title is in use.');
 };
 $node = static fn(int $course, ?int $parent, int $position, string $type): int => (int) $db->fetchOne(
-    'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type) VALUES (:p,:c,:parent,:position,:type) RETURNING id',
-    ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type]
+    'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,part_name) VALUES (:p,:c,:parent,:position,:type,:part) RETURNING id',
+    ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type, 'part' => \CattoLearning\Support\Address\CoursePartAddress::provisional()]
 );
 $item = static fn(int $owner, string $key, string $type, string $title, string $description, string $content): int => (int) $db->fetchOne(
     'INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id) VALUES (:p,:k,:k,:t,:title,:d,:content,:u,:u) RETURNING id',
@@ -136,7 +136,8 @@ if ($action === 'create') {
     $state = [
         'company' => $company,
         'scrub' => $fixture->seeds(),
-        'courses' => ['a' => $a, 'b' => $b],
+        // Each with its code, which its Administration addresses name it by (owner, 2026-11-06).
+        'courses' => array_map(static fn(array $course): array => $course + ['code' => (string) $db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $course['id']])], ['a' => $a, 'b' => $b]),
         'users' => ['owner' => $owner['id'], 'admin' => $admin['id'], 'learner' => $learner['id'], 'holder' => $holder['id'], 'reviewer' => $reviewer['id']],
         'tokens' => [
             'admin' => $session($admin['id'], $admin['email']),

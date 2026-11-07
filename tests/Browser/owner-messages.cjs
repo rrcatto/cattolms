@@ -123,20 +123,22 @@ async function run(browserType, name) {
     const menu = await page.locator('a[href^="/admin/site-analytics"]').evaluateAll((all) => all.map((a) => a.getAttribute('href')));
     check(`${name}: in the menu it comes straight after Site Log`, menu.indexOf('/admin/site-analytics/telegram-log') === menu.indexOf('/admin/site-analytics/log') + 1, menu.join(' '));
     const logWords = await page.locator('main').innerText();
-    check(`${name}: it lists the test message and the sale, each with its status`, /Test message: your messages from this site will arrive here/.test(logWords) && /A message from the browser check\./.test(logWords) && /Sent/i.test(logWords) && /Failed/i.test(logWords), logWords.slice(0, 400));
+    check(`${name}: it lists the test message and the sale, each with its status`, /Test message: your messages from this site will arrive here/.test(logWords) && /A message from the browser check\./.test(logWords) && /Sent/i.test(logWords) && /Not sent/i.test(logWords), logWords.slice(0, 400));
     const dates = await page.locator('[data-telegram-message] td:first-child').allInnerTexts();
     check(`${name}: newest first`, dates.length >= 2);
     await page.locator('input[name=list][value=test]').check({force: true});
     await page.waitForURL(/list=test/);
     await page.locator('[data-telegram-message]').first().waitFor();
     const kinds = await page.locator('[data-telegram-message] td:nth-child(2)').allInnerTexts();
-    check(`${name}: a card shows only that kind, in place`, kinds.length >= 2 && kinds.every((kind) => kind.includes('Test message')), kinds.join(','));
+    check(`${name}: a card shows only that kind, in place`, kinds.length >= 2 && kinds.every((kind) => kind.trim() === 'Test'), kinds.join(','));
     await page.setViewportSize({width: 390, height: 900});
+    // The page fits its columns again 200 ms after the window changes size (platform-overrides.js): measure what it settles on.
+    await page.waitForTimeout(500);
     check(`${name}: the log does not scroll sideways on a phone`, await sideways(page) <= 0, String(await sideways(page)));
     const phoneColumns = await page.locator('[data-telegram-message]').first().locator('td').evaluateAll((cells) => cells.map((cell) => `${getComputedStyle(cell).display}:${Math.round(cell.getBoundingClientRect().left)}-${Math.round(cell.getBoundingClientRect().right)}`));
     const phoneBox = await page.locator('.cl-ui-table').first().evaluate((box) => `${box.scrollLeft}/${box.scrollWidth}/${box.clientWidth}`);
     const wide = (column) => { const [from, to] = column.split(':')[1].split('-').map(Number); return !column.startsWith('none') && to - from >= 40; };
-    check(`${name}: on a phone the log says when, the message and the status, without scrolling inside its box`, wide(phoneColumns[0]) && wide(phoneColumns[2]) && wide(phoneColumns[3]) && phoneBox.split('/')[1] === phoneBox.split('/')[2], `${phoneColumns.join(' ')} box ${phoneBox}`);
+    check(`${name}: on a phone the log says when, the message and the status, without scrolling inside its box`, wide(phoneColumns[0]) && wide(phoneColumns[3]) && wide(phoneColumns[4]) && phoneBox.split('/')[1] === phoneBox.split('/')[2], `${phoneColumns.join(' ')} box ${phoneBox}`);
     if (shots) await page.screenshot({path: `${shots}/${name}-log-390.png`, fullPage: true});
     await page.setViewportSize({width: 1440, height: 1000});
     if (shots) { await page.goto(`${base}/admin/site-analytics/telegram-log`, {waitUntil: 'load'}); await page.screenshot({path: `${shots}/${name}-log-1440.png`, fullPage: true}); }

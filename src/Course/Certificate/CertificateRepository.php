@@ -17,6 +17,8 @@ verified account, in the verified name, with the original completion date. A rev
 revoked: a later issue never brings it back.
 
 Changelog:
+2026/11/07 SAST
+- byNumber(): a certificate by its number, the key of its addresses.
 2026/10/19 SAST
 - Who sees a certificate or transcript (owner, 2026-10-19): addresses are 32-digit hex codes
   (CertificateAddress), forLearner() lists a learner's own with their addresses and whether each is
@@ -174,6 +176,17 @@ final class CertificateRepository
     }
 
     /**
+     * A certificate by its number, exactly as it is printed (certificates_certificate_number_key): its address in
+     * Administration and on its learner's account (owner, 2026-11-06).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function byNumber(string $number): ?array
+    {
+        return $this->one('cert.certificate_number = :key', $number);
+    }
+
+    /**
      * The certificate behind a public verification address, revoked or not.
      *
      * @return array<string,mixed>|null
@@ -285,7 +298,8 @@ final class CertificateRepository
         [$where, $bindings] = self::issuedFilter($search, $state);
         return $this->db->fetchAllAssociative(
             'SELECT cert.id, cert.certificate_number, cert.learner_name, cert.course_title, cert.completed_at, cert.issued_at,
-                    cert.revoked_at, cert.is_public, tr.is_public AS transcript_is_public, tr.transcript_number, ce.user_id, ce.course_id, lu.account_reference AS learner_reference
+                    cert.revoked_at, cert.is_public, tr.is_public AS transcript_is_public, tr.transcript_number, ce.user_id, ce.course_id,
+                    (SELECT c.code FROM courses c WHERE c.id = ce.course_id) AS course_code, lu.account_reference AS learner_reference
                FROM certificates cert
                JOIN course_enrolments ce ON ce.id = cert.enrolment_id
                JOIN users lu ON lu.id = ce.user_id
@@ -325,7 +339,7 @@ final class CertificateRepository
     private function one(string $where, int|string $key): ?array
     {
         $row = $this->db->fetchAssociative(
-            'SELECT cert.*, c.slug AS course_slug, c.id AS course_id, t.name AS template_name, ce.user_id,
+            'SELECT cert.*, c.slug AS course_slug, c.id AS course_id, c.code AS course_code, t.name AS template_name, ce.user_id,
                     tr.id AS transcript_id, tr.public_id AS transcript_public_id, tr.is_public AS transcript_is_public, tr.transcript_number,
                     COALESCE(NULLIF(trim(concat_ws(\' \', rb.first_name, rb.last_name)), \'\'), rb.display_name) AS revoked_by_name, rb.account_reference AS revoked_by_reference,
                     lu.account_reference AS learner_reference

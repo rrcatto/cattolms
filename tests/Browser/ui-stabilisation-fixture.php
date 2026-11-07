@@ -35,8 +35,8 @@ if (($argv[1] ?? '') === 'create') {
     $reader = $fixture->course($user, $company, 'published');
     $course = $reader['id'];
     $node = static fn(?int $parent, int $position, string $type): int => (int) $db->fetchOne(
-        'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type) VALUES (:p,:c,:parent,:position,:type) RETURNING id',
-        ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type]);
+        'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,part_name) VALUES (:p,:c,:parent,:position,:type,:part) RETURNING id',
+        ['p' => Uuid::v4(), 'c' => $course, 'parent' => $parent, 'position' => $position, 'type' => $type, 'part' => \CattoLearning\Support\Address\CoursePartAddress::provisional()]);
     $section = $node(null, 1, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Getting started')", ['n' => $section]);
     $lesson = (int) $db->fetchOne("INSERT INTO course_items (public_id,item_key,name,item_type,title,description_html,content_source,created_by_user_id,updated_by_user_id)

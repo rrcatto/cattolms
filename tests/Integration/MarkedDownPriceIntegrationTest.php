@@ -141,11 +141,13 @@ final class MarkedDownPriceIntegrationTest extends TestCase
         self::assertSame([$this->rand(250000), $this->rand(320000), $this->rand(70000) . ' (21%)'], [$detail['price_label'], $detail['was_label'], $detail['saving_label']], '21.875% is rounded down, never up.');
         $card = array_values(array_filter($bundles->catalogue(200, 0), static fn(array $b): bool => $b['slug'] === $slug))[0];
         self::assertSame(['label' => 'Price', 'value' => $this->rand(250000), 'was' => $this->rand(320000)], $card['facts'][2]);
-        self::assertSame(21, $card['saving_percent'], 'The bundle card flags it as a special.');
+        self::assertSame('Save ' . $this->rand(70000), $card['saving_badge'], 'The bundle card says what it saves under its price (the approved mockup, 2026-11-06).');
 
         $page = $this->html(InProcessPage::run(null, BundleController::class, 'show', ['slug' => $slug])['body']);
-        self::assertSame(1, $page->query('//aside//s[contains(@class,"cl-price-was") and contains(normalize-space(),"' . $this->rand(320000) . '")]')->length);
-        self::assertSame(1, $page->query('//aside//*[contains(@class,"cl-course-purchase-saving") and normalize-space()="You save ' . $this->rand(70000) . ' (21%)"]')->length);
+        // The bundle page's purchase card, its own row at the foot of the page (owner, 2026-11-06), no longer an aside.
+        $box = '//section[contains(@class,"cl-page-section")][.//h2[normalize-space()="Bundle price"]]';
+        self::assertSame(1, $page->query($box . '//s[contains(@class,"cl-price-was") and contains(normalize-space(),"' . $this->rand(320000) . '")]')->length);
+        self::assertSame(1, $page->query($box . '//*[contains(@class,"cl-course-purchase-saving") and normalize-space()="You save ' . $this->rand(70000) . ' (21%)"]')->length);
     }
 
     public function testCourseAndBundlePagesAnnounceTheAutomaticPromotionsThatCoverThem(): void

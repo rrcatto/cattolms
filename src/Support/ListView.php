@@ -22,6 +22,8 @@ The address names a choice as ?<list>_view=grid or list; the choice is then reme
 searching links need not carry it.
 
 Changelog:
+2026/11/06 SAST
+- Administration's bundles (a table until chosen) and a person's Favourites (cards until chosen), 4 to a row.
 2026/10/26 SAST
 - Company People (owner, 2026-10-26: "a grid view on by default when there's 10 or less people. 10+ people default to
   list"): a default given by the caller, and five cards to a row.
@@ -47,10 +49,14 @@ final class ListView
         'subscribers' => self::LIST,
         // A presentation's slides (owner, 2026-10-30): a list of their pictures, or a grid of larger ones.
         'slides' => self::LIST,
+        // Administration's bundles, edited in place like the courses (owner, 2026-11-06), and a person's Favourites, its
+        // courses and bundles as the catalogue's cards.
+        'bundles' => self::LIST,
+        'favourites' => self::GRID,
     ];
 
     /** Cards to a row in the grid at full width. */
-    public const COLUMNS = ['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5];
+    public const COLUMNS = ['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4];
 
     /** Company People opens as cards for this many people or fewer, else as its table (owner, 2026-10-26). */
     public const COMPANY_PEOPLE_GRID_UP_TO = 10;
@@ -63,6 +69,8 @@ final class ListView
         'courses' => [24, 48, 96],
         'catalogue' => [24],
         'subscribers' => [30, 60, 90],
+        'bundles' => [24, 48, 96],
+        'favourites' => [24, 48, 96],
     ];
 
     private const COOKIE_PREFIX = 'cl_view_';

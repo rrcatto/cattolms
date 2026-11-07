@@ -6,10 +6,10 @@
 #}
 {% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, label: 'Actions', icon: 'action-more', aria_label: 'Actions for ' ~ row.name})} %}
 {% block body %}
-	{{ ui('action.link', {label: 'Open their subscriptions', variant: 'secondary', size: 'small', href: '/mailing/subscribers/' ~ row.user_id, icon: 'action-open'}) }}
-	{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ row.user_id, icon: 'action-manage'}) }}
+	{{ ui('action.link', {label: 'Open their subscriptions', variant: 'secondary', size: 'small', href: person_to('subscriber', row), icon: 'action-open'}) }}
+	{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: person_url(row), icon: 'action-manage'}) }}
 	{% if can_manage and not row.never_emailed %}
-	<form action="/mailing/subscribers/{{ row.user_id }}/stop" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ return_to }}">{{ ui('action.button', {label: 'Never email this address', variant: 'danger', size: 'small', type: 'submit', icon: 'action-disable', confirm: 'Stop all news to ' ~ row.email ~ '? ' ~ row.name ~ ' is taken off every list and the address goes on Addresses never emailed.'}) }}</form>
+	<form action="{{ person_to('subscriber', row) }}/stop" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ return_to }}">{{ ui('action.button', {label: 'Never email this address', variant: 'danger', size: 'small', type: 'submit', icon: 'action-disable', confirm: 'Stop all news to ' ~ row.email ~ '? ' ~ row.name ~ ' is taken off every list and the address goes on Addresses never emailed.'}) }}</form>
 	{% endif %}
 {% endblock %}
 {% endembed %}

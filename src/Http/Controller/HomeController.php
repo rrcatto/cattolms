@@ -11,6 +11,9 @@ Description:
 Handles web requests for home operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/06 SAST
+- The home page's head: the Organization and WebSite structured data, the site's share picture and the Search Console
+  and Bing Webmaster Tools codes (Search\PageMetadata::home).
 2026/10/13 SAST
 - /privacy moved to LegalController with the other public legal pages.
 2026/10/04 SAST
@@ -44,13 +47,17 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class HomeController extends BaseController
 {
+    /** What the home page says the site is, in its hero's words. */
+    private const DESCRIPTION = 'Learn useful things. Prove what you know. Structured modules, meaningful assessments and a course library that remembers your progress securely.';
+
     public function __construct(
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly CourseFavouriteService $favourites,
-        private readonly SitePresentation $presentation
+        private readonly SitePresentation $presentation,
+        private readonly \CattoLearning\Search\PageMetadata $metadata
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -78,6 +85,9 @@ final class HomeController extends BaseController
             'can_favourite' => $user !== null,
             'favourite_return' => '/',
             'site_presentation' => $this->presentation->ready(),
+            // The business and the site for search engines and AI assistants, the site's share picture, and the codes that
+            // prove the site is the owner's to Google and Bing (owner, 2026-11-06).
+            'page_meta' => $this->metadata->home(self::DESCRIPTION),
         ]);
     }
 

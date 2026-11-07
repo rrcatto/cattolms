@@ -1,11 +1,14 @@
 {#
 	The Telegram log (owner, 2026-11-05: "a telegram messages sent log, so I can see what messages you sent and I can check if I
-	got them"): every message to the owner's Telegram, newest first, one table chosen by feature cards (UX rule 2.6c).
+	got them"; the approved mockup, and "The Telegram log does not say which telegram account a message was sent to"): every
+	message the site sends by Telegram, newest first, with who it went to, one table chosen by feature cards (UX rule 2.6c).
+	To names the person on this site with their Telegram username at the moment of sending, or You for the owner's own. A
+	sign-in message's code and link are never kept. On a phone, To goes under the message.
 #}
 {% extends layout %}
 {% block page_body %}
 	{% set ph_kicker = 'Site Analytics' %}{% set ph_title = 'Telegram log' %}
-	{% set ph_lead = 'Every message sent to your Telegram, newest first.' %}
+	{% set ph_lead = 'Every message the site sends by Telegram, newest first, and who it went to.' %}
 	{% if can_manage_settings %}{% set ph_actions %}{{ ui('action.link', {label: 'Telegram settings', variant: 'secondary', size: 'small', href: '/admin/settings?section=owner-messages#settings-owner-messages', icon: 'nav-settings'}) }}{% endset %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
@@ -14,7 +17,10 @@
 		<form class="cl-library-lists" method="get" action="/admin/site-analytics/telegram-log" data-choose-submits {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics/telegram-log'} only %}>
 			{{ ui('form.picture-choice', {name: 'list', legend: 'Which messages', id: 'telegram-log-lists', size: 'small', selected: list, items: [
 				{value: 'all', label: 'All', icon: '<svg ' ~ a ~ '><path d="M4 6h16M4 12h16M4 18h16"/></svg>', note: counts.all|number_format},
+				{value: 'sign_in', label: 'Sign-ins', icon: '<svg ' ~ a ~ '><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>', note: counts.sign_in|number_format},
+				{value: 'connected', label: 'Connections', icon: '<svg ' ~ a ~ '><path d="M21 4 3 11l6 2.5L19 7l-7.5 8 6 4.5z"/></svg>', note: counts.connected|number_format},
 				{value: 'registration', label: 'Registrations', icon: '<svg ' ~ a ~ '><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M18 8v6"/><path d="M15 11h6"/></svg>', note: counts.registration|number_format},
+				{value: 'order', label: 'Orders', icon: '<svg ' ~ a ~ '><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.5L22 7H6"/></svg>', note: counts.order|number_format},
 				{value: 'sale', label: 'Sales', icon: '<svg ' ~ a ~ '><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>', note: counts.sale|number_format},
 				{value: 'test', label: 'Test messages', icon: '<svg ' ~ a ~ '><path d="M14.5 21.7a.5.5 0 0 0 .9 0l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0 0 .9l7.9 3.2a2 2 0 0 1 1.1 1.1z"/><path d="m21.9 2.1-11 11"/></svg>', note: counts.test|number_format},
 				{value: 'unsent', label: 'Not sent', icon: '<svg ' ~ a ~ '><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>', note: counts.unsent|number_format},
@@ -24,16 +30,17 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'telegramlog', pagination: telegramlog_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr><th>When</th><th data-phone="hide">What</th><th>Message</th><th>Status</th></tr>{% endblock %}
-			{% block body %}{% for row in rows %}<tr data-telegram-message="{{ row.id }}">
-				<td>{{ row.when }}</td>
+			{% block header %}<tr><th>When</th><th data-phone="hide">What</th><th data-phone="hide">To</th><th>Message</th><th>Status</th></tr>{% endblock %}
+			{% block body %}{% for row in rows %}{% set to %}{% if row.to.own %}{% if can_manage_settings %}<a href="/admin/settings?section=owner-messages#settings-owner-messages">You</a>{% else %}You{% endif %}{% elseif row.to.name %}{{ ui('data.person', {name: row.to.name, href: row.to.href}) }}{% endif %}{% if row.to.handle %}{% if row.to.own or row.to.name %}<br>{% endif %}<span class="small" data-telegram-handle>{{ row.to.handle }}</span>{% endif %}{% endset %}<tr data-telegram-message="{{ row.id }}">
+				<td class="cell-text">{{ row.when }}</td>
 				<td>{{ row.kind }}</td>
-				<td class="cell-text">{{ row.body }}</td>
+				<td class="cell-text" data-telegram-to>{{ to }}</td>
+				<td class="cell-text">{{ row.body }}{% set to_words = ((row.to.own ? 'You' : row.to.name) ~ ' ' ~ row.to.handle)|trim %}{% if to_words %}<span class="cl-telegram-to-inline">To {{ to_words }}</span>{% endif %}</td>
 				<td class="cell-text">{{ ui('feedback.badge', {label: row.status.label, tone: row.status.tone, size: 'small'}) }}{% if row.sent %}<br><span class="small">{{ row.sent }}</span>{% endif %}{% if row.error %}<br><span class="small">{{ row.error }}</span>{% endif %}</td>
 			</tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}{{ ui('feedback.empty', {summary: 'No messages here yet.'}) }}{% endif %}
 		{% endblock %}{% endembed %}
-		<p class="small mb-0 mt-5">Sent messages are kept for 30 days, and those not sent for 7 days.</p>
+		<p class="small mb-0 mt-5">A sign-in code or link is never kept, so nobody reading this page can use one. The To column records the account at the moment of sending, and names the person on this site when there is one. Sent messages are kept for 30 days, and those not sent for 7 days.</p>
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

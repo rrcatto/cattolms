@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const {inspect, judge} = require('./page-construction.cjs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-page-state.json'));
-const tab = `${base}/admin/courses/${state.course_id}?tab=page-layout`;
+const tab = `${base}/admin/courses/${state.course_code}?tab=page-layout`;
 const layoutsPage = `${base}/admin/courses/page-layouts`;
 const coursePage = `${base}/courses/${state.slug}`;
 const results = [];
@@ -86,7 +86,7 @@ async function withScript(browserType, name) {
     // Course Page Layouts: the layouts and every course.
     await page.goto(layoutsPage, {waitUntil: 'networkidle'});
     check(`${name}: Course Page Layouts lists the default layout, marked`, await page.locator('#your-layouts .cl-ui-card').filter({hasText: state.default_layout_name}).filter({hasText: 'Default layout'}).count() >= 1);
-    const row = page.locator('#courses-layouts tr').filter({has: page.locator(`a[href="/admin/courses/${state.course_id}?tab=page-layout"]`)});
+    const row = page.locator('#courses-layouts tr').filter({has: page.locator(`a[href="/admin/courses/${state.course_code}?tab=page-layout"]`)});
     const rowText = (await row.textContent()).replace(/\s+/g, ' ');
     check(`${name}: the check's course is listed on the default layout, with what its page leaves out and why`, rowText.includes('Default layout')
         && rowText.includes('Reviews (no approved review)') && rowText.includes('Related courses (no related course)'), rowText);
@@ -96,7 +96,7 @@ async function withScript(browserType, name) {
     await page.waitForLoadState('networkidle');
     await page.locator('#page-layout-name').fill(buy);
     await page.locator('#page-layout-purpose').fill('Course access first, for a course people know they want.');
-    await page.locator('#page-layout-course').selectOption(String(state.course_id));
+    await page.locator('#page-layout-course').selectOption(String(state.course_code));
     check(`${name}: the sketch is drawn for the course chosen, with what it leaves out`, (await page.locator('.cl-page-builder-preview .cl-page-sketch-left-out').innerText()).includes('Reviews (no approved review)'));
     for (let step = 0; step < 9; step++) {
         const up = page.getByRole('button', {name: 'Move Course access up'});

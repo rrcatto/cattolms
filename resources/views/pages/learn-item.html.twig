@@ -2,9 +2,9 @@
 {% block course_item_body %}
 <h1>{{ item.node_type == 'section' ? (item.section_number|default(null) is not null ? 'Module ' ~ item.section_number ~ ': ' : '') ~ item.section_title : (item.display_title_override ?: item.item_title) }}</h1>
 {# A module's lesson, summary, flash cards and practical work download as PDFs (owner, 2026-10-28, decision 6A). #}
-{% if item.node_type == 'item' and item.part|default('') in ['lesson', 'summary', 'review', 'flashcards', 'practical'] %}<p class="cl-course-item-pdf">{{ ui('action.link', {label: 'Download as PDF', variant: 'secondary', size: 'small', href: '/learn/' ~ course.slug ~ '/item/' ~ item.id ~ '/pdf' ~ preview_query, icon: 'action-download'}) }}</p>{% endif %}
+{% if item.node_type == 'item' and item.part|default('') in ['lesson', 'summary', 'review', 'flashcards', 'practical'] %}<p class="cl-course-item-pdf">{{ ui('action.link', {label: 'Download as PDF', variant: 'secondary', size: 'small', href: part_url(course, item, '/pdf') ~ preview_query, icon: 'action-download'}) }}</p>{% endif %}
 <div class="cl-course-item-body cl-course-presentation catto-standalone">{{ item.rendered_html|raw }}</div>
 {% include '@platform/partials/course-section-outline.html.twig' %}
 {# Previous, the learner's own tick on this part (a toggle, owner 2026-11-01; a section ticks itself once every part in it is) and Next. #}
-{% include '@platform/partials/course-item-paging.html.twig' with {paging_base: '/learn/' ~ course.slug ~ '/item/', paging_query: preview_query, paging_previous: item.previous_node, paging_next: item.next_node, paging_complete: item.node_type == 'item' and item.item_type|default('') not in ['assessment', 'diagnostic'] ? {action: '/learn/' ~ course.slug ~ '/item/' ~ item.id ~ '/complete' ~ preview_query, done: item.is_done|default(false)} : null} %}
+{% include '@platform/partials/course-item-paging.html.twig' with {paging_query: preview_query, paging_previous: item.previous_node, paging_next: item.next_node, paging_complete: item.node_type == 'item' and item.item_type|default('') not in ['assessment', 'diagnostic'] ? {action: part_url(course, item, '/complete') ~ preview_query, done: item.is_done|default(false)} : null} %}
 {% endblock %}

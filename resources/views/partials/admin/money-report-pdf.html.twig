@@ -1,0 +1,125 @@
+{#
+	A month's money report as a PDF (owner, 2026-11-06, the approved mockup REPORTS/money-reports-mockup/Pdf.dc.html): A4,
+	drawn by DocumentPdfRenderer::renderPage from the one report MoneyReports makes, so it carries the page's numbers. The
+	month and the Site Owner's trading name and when it was made at the top; a demo site's month says so there, as its
+	documents do; the figures, then money in by method, the orders, what was sold and the refunds and payouts, each the
+	platform's table; and at every page's foot where the figures come from and the page number. VAT is never charged, and
+	only the foot says so. The figures are laid out as table cells, not a grid, because the PDF engine lays out tables.
+	Fonts are the bundled ones.
+#}
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Money report, {{ report.month.label }} - {{ trading_name }}</title>
+<style>
+	@page { margin: 16mm 16mm 22mm 16mm; }
+	body { font-family: 'Plex Sans', sans-serif; font-size: 9pt; line-height: 1.35; color: #1f1915; }
+	#pdf-foot { position: fixed; left: 0; right: 0; bottom: -14mm; height: 9mm; border-top: 0.6pt solid #d8c8b4; padding-top: 1.8mm; font-size: 7.6pt; color: #5a4d42; }
+	.pdf-foot-row { display: table; width: 100%; }
+	.pdf-foot-words, .pdf-foot-page { display: table-cell; vertical-align: top; }
+	.pdf-foot-page { text-align: right; white-space: nowrap; }
+	{# The PDF engine counts the page but not the pages, so the report is drawn twice and the second knows how many. #}
+	.pdf-page-number:after { content: "Page " counter(page){% if page_total|default(0) > 0 %} " of {{ page_total }}"{% endif %}; }
+
+	.pdf-top { display: table; width: 100%; border-bottom: 1.6pt solid #1f1915; padding-bottom: 3mm; margin-bottom: 4.5mm; }
+	.pdf-top-month, .pdf-top-who { display: table-cell; vertical-align: bottom; }
+	.pdf-top-who { text-align: right; color: #5a4d42; }
+	.pdf-kicker { font-size: 7.8pt; letter-spacing: 1.4pt; text-transform: uppercase; color: #8a3f22; }
+	.pdf-month { font-family: Cormorant, serif; font-size: 24pt; font-weight: bold; line-height: 1.1; margin: 0.5mm 0 0; }
+	.pdf-demo { margin: 0 0 4.5mm; padding: 2mm 3mm; border-left: 2pt solid #b07d1e; background: #fbf3dd; font-size: 8.5pt; }
+
+	.cl-ui-table table { border-collapse: collapse; width: 100%; }
+	.cl-ui-table-tip { display: none; }
+	/* The figures three to a row, laid out as a table of boxes. */
+	.pdf-figures { display: table; border-collapse: separate; border-spacing: 2.4mm; margin: -2.4mm -2.4mm 1.5mm; }
+	.pdf-figure-row { display: table-row; }
+	.pdf-figure { display: table-cell; width: 33%; border: 0.6pt solid #d8c8b4; padding: 2.4mm 3mm; vertical-align: top; }
+	.pdf-figure-label { display: block; font-size: 7.2pt; letter-spacing: 0.8pt; text-transform: uppercase; color: #5a4d42; }
+	.pdf-figure-value { display: block; font-family: Cormorant, serif; font-size: 17pt; font-weight: bold; line-height: 1.2; }
+	.pdf-figure-note { display: block; font-size: 7.4pt; color: #5a4d42; }
+
+	h2 { font-family: Cormorant, serif; font-size: 13.5pt; font-weight: bold; margin: 4.5mm 0 1.2mm; page-break-after: avoid; }
+	th { font-size: 7.2pt; letter-spacing: 0.6pt; text-transform: uppercase; color: #5a4d42; text-align: left; font-weight: normal; padding: 1.2mm 2mm 1.2mm 0; border-bottom: 0.6pt solid #d8c8b4; }
+	td { padding: 1.4mm 2mm 1.4mm 0; border-top: 0.4pt solid #efe6d9; vertical-align: top; }
+	.n { text-align: right; white-space: nowrap; }
+	tfoot td { font-weight: bold; border-top: 0.8pt solid #1f1915; }
+	tr { page-break-inside: avoid; }
+	thead { display: table-header-group; }
+	/* A section starts on the next page rather than leave its heading at the foot of this one. */
+	.pdf-section { page-break-inside: avoid; }
+	.pdf-quiet { color: #5a4d42; font-size: 8pt; margin: 1.2mm 0 0; }
+	.pdf-none { color: #5a4d42; margin: 0.5mm 0 0; }
+</style>
+</head>
+<body>
+	<div id="pdf-foot"><div class="pdf-foot-row">
+		<div class="pdf-foot-words">Counted from the site's money records. VAT is not charged on this site.</div>
+		<div class="pdf-foot-page"><span class="pdf-page-number"></span></div>
+	</div></div>
+
+	<div class="pdf-top">
+		<div class="pdf-top-month"><div class="pdf-kicker">Money report</div><div class="pdf-month">{{ report.month.label }}{% if report.month.so_far %}, so far{% endif %}</div></div>
+		<div class="pdf-top-who">{% if trading_name %}{{ trading_name }}<br>{% endif %}Made {{ report.made }}</div>
+	</div>
+	{% if report_demo %}<div class="pdf-demo"><strong>{{ report_demo_heading }}.</strong> {{ report_demo_notice }}</div>{% endif %}
+
+	{% set by_key = {} %}{% for figure in report.figures %}{% set by_key = by_key|merge({(figure.key): figure}) %}{% endfor %}
+	{% set boxes = [
+		{label: 'Money in', value: by_key.money_in.value, note: by_key.money_in.note},
+		{label: 'Refunds and payouts', value: by_key.refunds.value, note: by_key.refunds.note},
+		{label: 'What is left', value: by_key.left.value, note: 'After ' ~ report.card_fees ~ ' card fees · ' ~ by_key.left.changes|join(' · ')},
+		{label: 'Orders paid', value: by_key.orders_paid.value, note: by_key.orders_paid.note},
+		{label: 'New accounts', value: by_key.new_accounts.value, note: by_key.new_accounts.note},
+		{label: 'Promotions given', value: report.sold.promotions, note: 'On ' ~ report.sold.promoted_orders ~ (report.sold.promoted_orders == 1 ? ' order' : ' orders')},
+	] %}
+	<div class="pdf-figures">
+		{% for row in boxes|batch(3) %}
+		<div class="pdf-figure-row">{% for box in row %}<div class="pdf-figure"><span class="pdf-figure-label">{{ box.label }}</span><span class="pdf-figure-value">{{ box.value }}</span><span class="pdf-figure-note">{{ box.note }}</span></div>{% endfor %}</div>
+		{% endfor %}
+	</div>
+
+	<div class="pdf-section">
+	<h2>Money in, by method</h2>
+	{% if report.by_method %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:50%">Method</th><th class="n" style="width:20%">Payments</th><th class="n" style="width:30%">Amount</th></tr>{% endblock %}
+	{% block body %}{% for row in report.by_method %}<tr><td>{{ row.label }}</td><td class="n">{{ row.payments|number_format }}</td><td class="n">{{ row.amount }}</td></tr>{% endfor %}{% endblock %}
+	{% block footer %}<tfoot><tr><td>Total</td><td class="n">{{ report.payments|number_format }}</td><td class="n">{{ report.money_in }}</td></tr></tfoot>{% endblock %}
+	{% endembed %}
+	{% else %}<p class="pdf-none">No money came in.</p>{% endif %}
+	{% if report.wallet_paid.payments > 0 %}<p class="pdf-quiet">Also paid from wallet credit: {{ report.wallet_paid.payments|number_format }} {{ report.wallet_paid.payments == 1 ? 'payment' : 'payments' }}, {{ report.wallet_paid.amount }}. Wallet credit is not money in: it came in before, or was given back by a refund.</p>{% endif %}
+	</div>
+
+	<div class="pdf-section">
+	<h2>Orders</h2>
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:70%">Orders</th><th class="n" style="width:30%">How many</th></tr>{% endblock %}
+	{% block body %}{% for row in report.orders %}<tr><td>{{ row.label }}</td><td class="n">{{ row.count|number_format }}</td></tr>{% endfor %}{% endblock %}
+	{% endembed %}
+	<p class="pdf-quiet">The orders placed in the month, as they stand now. Refunded orders are counted among those paid in full.</p>
+	</div>
+
+	<div class="pdf-section">
+	<h2>Sales, by course and bundle</h2>
+	{% if report.no_sales %}<p class="pdf-none">No sales in {{ report.month.label }}.</p>{% else %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:52%">What was bought</th><th class="n" style="width:12%">Sold</th><th class="n" style="width:18%">Promotions</th><th class="n" style="width:18%">Paid</th></tr>{% endblock %}
+	{% block body %}{% for row in report.sales %}<tr><td>{{ row.name }}</td><td class="n">{{ row.sold|number_format }}</td><td class="n">{{ row.promotions }}</td><td class="n">{{ row.paid }}</td></tr>{% endfor %}{% endblock %}
+	{% block footer %}<tfoot><tr><td>Total</td><td class="n">{{ report.sold.sold|number_format }}</td><td class="n">{{ report.sold.promotions }}</td><td class="n">{{ report.sold.paid }}</td></tr></tfoot>{% endblock %}
+	{% endembed %}
+	{% endif %}
+	</div>
+
+	<div class="pdf-section">
+	<h2>Refunds and payouts</h2>
+	{% if report.refunds %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:16%">Date</th><th style="width:18%">Order</th><th style="width:46%">How</th><th class="n" style="width:20%">Amount</th></tr>{% endblock %}
+	{% block body %}{% for row in report.refunds %}<tr><td>{{ row.date }}</td><td>{{ row.order }}</td><td>{{ row.how }}</td><td class="n">{{ row.amount }}</td></tr>{% endfor %}{% endblock %}
+	{% block footer %}<tfoot><tr><td colspan="3">Paid back</td><td class="n">{{ report.refund_totals.money_back }}</td></tr>{% if report.refund_totals.wallet_minor > 0 %}<tr><td colspan="3">Given as wallet credit</td><td class="n">{{ report.refund_totals.wallet }}</td></tr>{% endif %}</tfoot>{% endblock %}
+	{% endembed %}
+	{% else %}<p class="pdf-none">Nothing was refunded or paid back.</p>{% endif %}
+	</div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{#
+	One difference between a catalogue package and this site on the import review (owner, 2026-11-06: "By default, what
+	is in the import file wins"): the difference in words as the legend, then two feature cards, Use the file's (chosen)
+	and Keep this site's. When the file's cannot be taken (a learner has started the course, a category that cannot be
+	made, or a permission the importer lacks), its card is greyed out with why and this site's is chosen. The radios belong
+	to the import form at the foot of the page, so the choice is sent with Import and works without JavaScript.
+	cd: {name, difference: {kind, words}, allowed, why_not, file_note, form}: form is the import form's id, catalogue-import
+	unless given (Administration > Courses > Import's is course-import, 2026-11-07).
+#}
+{{ ui('form.picture-choice', {name: cd.name, legend: cd.difference.words, size: 'small', form: cd.form|default('catalogue-import'), selected: cd.allowed ? 'file' : 'site', items: [
+	{value: 'file', label: 'Use the file\'s', icon: lucide('file-input'), note: cd.allowed ? cd.file_note : cd.why_not, disabled: not cd.allowed},
+	{value: 'site', label: 'Keep this site\'s', icon: lucide('house'), note: 'This site\'s stays exactly as it is.'},
+]}) }}

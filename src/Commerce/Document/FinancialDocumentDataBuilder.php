@@ -191,7 +191,7 @@ final class FinancialDocumentDataBuilder
 
     public static function orderNumber(int $orderId): string
     {
-        return 'CL-' . str_pad((string) $orderId, 8, '0', STR_PAD_LEFT);
+        return \CattoLearning\Commerce\Domain\OrderNumber::format($orderId);
     }
 
     /**

@@ -10,6 +10,13 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/07 SAST (v1.1.0)
+- Advanced PLATFORM_ASSET_VERSION to 1.1.0.
+2026/11/06 SAST (money reports)
+- Credits & Orders > Money Reports, after Money Ledger, with the Money Ledger's permission (owner, 2026-11-06).
+2026/11/06 SAST
+- Search engines and AI (owner, 2026-11-06): the head's meta also carries X's card, the site verification codes and the
+  structured data a public page sets, and a public page's trail as a BreadcrumbList (Search\StructuredData).
 2026/11/05 SAST (v1.0.9)
 - Advanced PLATFORM_ASSET_VERSION to 1.0.9.
 2026/11/04 SAST (v1.0.8)
@@ -147,7 +154,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.0.9';
+    private const PLATFORM_ASSET_VERSION = '1.1.0';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -346,6 +353,9 @@ final class ThemeRenderer
         // The site notification stays off the pages where a course is taken, unless ADMIN ticked them (owner, 2026-11-05).
         if (in_array($family, ['course-player', 'assessment'], true) && !($model['site_notification']['on_course_pages'] ?? false)) $model['site_notification'] = null;
 
+        // Course Requests is a page only an account that belongs to a company has (owner, 2026-10-21; its own page since
+        // 2026-11-06): a company account is the one the cart says may not buy for itself.
+        $data['is_company_account'] ??= (bool) ($data['is_authenticated'] ?? false) && !(bool) ($model['cart_summary']['buyer'] ?? true);
         $navigation = $this->navigation($data, $csrf);
         // Bootstrap 6 underneath (6.0.0-alpha.1): only its reboot, grid and utilities files, the reboot first
         // because it declares the cascade layer order. Core's stylesheet follows, unlayered, so it and the
@@ -448,6 +458,16 @@ final class ThemeRenderer
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
         $model['meta'] = self::pageMeta((array) ($data['page_meta'] ?? []));
+        // The trail every theme draws above a public page, as structured data (owner, 2026-11-06): never on a page that is
+        // not public or asks not to be indexed (an ADMIN preview), and never on a demo site's word alone, which follows.
+        if (\CattoLearning\Search\StructuredData::isPublicPage($page) && !str_contains($model['meta']['robots'], 'noindex')) {
+            $base = \CattoLearning\Search\StructuredData::base($appUrl);
+            $trail = $base === null ? null : \CattoLearning\Search\StructuredData::breadcrumbs($model['breadcrumbs'], $base, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'));
+            if ($trail !== null) $model['meta']['structured_data'][] = \CattoLearning\Search\StructuredData::encode($trail);
+        } else {
+            $model['meta']['structured_data'] = [];
+            $model['meta']['verification'] = [];
+        }
         // A demo site asks search engines not to list any page (PlatformResponseHeadersListener says so too).
         if ($model['site_demo']) $model['meta']['robots'] = 'noindex, nofollow';
         $model['sidebar'] = '';
@@ -758,6 +778,8 @@ final class ThemeRenderer
             // are not in the menu (owner, 2026-10-19): an order's page shows its own, each linking to its page.
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PAYMENT.VIEW')) {
                 $grandchildren[] = $child('admin-money-ledger', 'Money Ledger', '/admin/commerce/ledger', 'credits');
+                // Each month's money in one report, on the page, as a PDF and as an Excel file (owner, 2026-11-06).
+                $grandchildren[] = $child('admin-money-reports', 'Money Reports', '/admin/commerce/reports', 'reports');
             }
             // Refunds asked for in the LMS, every wallet, and the commerce settings (owner, 2026-10-17).
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.REFUND.VIEW')) {
@@ -821,7 +843,10 @@ final class ThemeRenderer
                 'subscriptions' => 'ACCOUNT.PROFILE.VIEW',
                 'social' => 'ACCOUNT.PROFILE.VIEW',
                 'learning' => 'LEARNING.LIBRARY.VIEW',
+                'favourites' => 'LEARNING.LIBRARY.VIEW',
+                'requests' => 'LEARNING.LIBRARY.VIEW',
                 'certificates' => 'LEARNING.CERTIFICATE.VIEW',
+                'security' => 'ACCOUNT.SESSION.VIEW',
                 'sessions' => 'ACCOUNT.SESSION.VIEW',
                 'activity' => 'ACCOUNT.ACTIVITY.VIEW',
             ];
@@ -858,7 +883,10 @@ final class ThemeRenderer
                     $coursesChildren[] = $child('account-learning','My Courses','/account/courses','learning');
                     continue;
                 }
-                if ($section['key'] === 'certificates') {
+                // Favourites and, for a company account, Course Requests follow My Courses, each its own page (owner, 2026-11-06:
+                // "Favourites must get its own page and menu-item").
+                if ($section['key'] === 'requests' && !(bool) ($data['is_company_account'] ?? false)) continue;
+                if (in_array($section['key'], ['favourites', 'requests', 'certificates'], true)) {
                     $coursesChildren[] = $entry;
                     continue;
                 }
@@ -907,18 +935,9 @@ final class ThemeRenderer
     private function footerSocial(array $data): array
     {
         $configured = $data['platform_social'] ?? [];
-        $configured = is_array($configured) ? $configured : [];
 
-        $marks = [];
-        foreach (['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'] as $key) {
-            $marks[] = [
-                'key' => $key,
-                'label' => SocialPlatform::label($key),
-                'href' => trim((string) ($configured[$key] ?? '')) ?: SocialPlatform::home($key),
-            ];
-        }
-
-        return $marks;
+        // The same marks the home page's Organization reads its social profiles from (Search\PageMetadata).
+        return SocialPlatform::footerMarks(is_array($configured) ? $configured : []);
     }
 
     /**
@@ -1176,26 +1195,36 @@ final class ThemeRenderer
 
     /**
      * The head metadata partials/head-meta.html.twig draws: a description for every page, and the
-     * canonical address, robots rule and Open Graph tags only for a page that sets them.
+     * canonical address, robots rule, Open Graph tags, X's card, the site verification codes and the
+     * structured data only for a page that sets them (Search\PageMetadata, owner 2026-11-06).
      *
      * @param array<array-key,mixed> $meta
-     * @return array{description:string,canonical:string,robots:string,og:array<string,string>}
+     * @return array{description:string,canonical:string,robots:string,og:array<string,string>,twitter_card:string,verification:array<string,string>,structured_data:list<string>}
      */
     private static function pageMeta(array $meta): array
     {
         $og = [];
-        foreach (['type', 'title', 'description', 'url', 'image'] as $property) {
+        foreach (['type', 'title', 'description', 'url', 'image', 'image:type', 'image:width', 'image:height', 'image:alt'] as $property) {
             $value = trim((string) (((array) ($meta['og'] ?? []))[$property] ?? ''));
             if ($value !== '') {
                 $og[$property] = $value;
             }
         }
+        $verification = [];
+        foreach ((array) ($meta['verification'] ?? []) as $name => $content) {
+            if (in_array($name, ['google-site-verification', 'msvalidate.01'], true) && preg_match('/^[A-Za-z0-9_-]{8,100}$/D', (string) $content) === 1) $verification[(string) $name] = (string) $content;
+        }
         $description = trim((string) ($meta['description'] ?? ''));
+        $card = (string) ($meta['twitter_card'] ?? '');
         return [
             'description' => $description !== '' ? $description : self::DEFAULT_DESCRIPTION,
             'canonical' => trim((string) ($meta['canonical'] ?? '')),
             'robots' => trim((string) ($meta['robots'] ?? '')),
             'og' => $og,
+            'twitter_card' => in_array($card, ['summary', 'summary_large_image'], true) ? $card : '',
+            'verification' => $verification,
+            // Each one a JSON-LD node already encoded so it cannot close its script (StructuredData::encode).
+            'structured_data' => array_values(array_filter((array) ($meta['structured_data'] ?? []), 'is_string')),
         ];
     }
 
@@ -1219,7 +1248,7 @@ final class ThemeRenderer
         if (str_starts_with($page, 'assessment-')) return 'assessment';
         return match ($page) {
             'home' => 'home', 'courses' => 'catalogue', 'course-detail', 'landing-page' => 'course-detail', 'course-public-preview','course-public-preview-item' => 'course-player',
-            'login','login-sent','register','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
+            'login','login-sent','login-telegram','login-two-step','login-two-step-setup','register','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
             'library' => 'library', 'learn-course','learn-item' => 'course-player',
             'certificate' => 'certificate', 'company-control-centre','company-section' => 'company', 'error' => 'error',
             default => 'content',

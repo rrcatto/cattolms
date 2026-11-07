@@ -20,7 +20,7 @@ const results = [], failures = [];
 
 /* The saved tree as text, e.g. "A[a1,a2],c", read from the page the server renders. */
 async function savedTree(page, state) {
-    await page.goto(`${base}/admin/courses/${state.course}/content`);
+    await page.goto(`${base}/admin/courses/${state.course_code}/content`);
     return renderedTree(page, state);
 }
 async function renderedTree(page, state) {
@@ -74,7 +74,7 @@ async function scenario(name, browserName, run) {
         const page = await context.newPage();
         const pageErrors = [];
         page.on('pageerror', (error) => pageErrors.push(error.message));
-        const url = () => `${base}/admin/courses/${state.course}/content`;
+        const url = () => `${base}/admin/courses/${state.course_code}/content`;
         const n = () => state.nodes;
 
         await scenario('renders styled, with handles revealed', browserName, async () => {
@@ -420,7 +420,7 @@ async function scenario(name, browserName, run) {
         const context = await browser.newContext({ignoreHTTPSErrors: true, javaScriptEnabled: false});
         await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
         const page = await context.newPage();
-        await page.goto(`${base}/admin/courses/${state.course}/content`);
+        await page.goto(`${base}/admin/courses/${state.course_code}/content`);
         assert.equal(await handle(page, state.nodes.a1).isHidden(), true, 'No drag handle without JavaScript.');
         assert.equal(await page.locator('#course-content-insert').isHidden(), true, 'The empty insert modal is not shown without JavaScript.');
         await row(page, state.nodes.a3).locator('summary.cl-ui-row-trigger').click();

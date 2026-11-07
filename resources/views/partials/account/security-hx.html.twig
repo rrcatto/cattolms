@@ -1,0 +1,5 @@
+{#
+	What a form on Sign-in and security carries to change its card in place (owner, 2026-11-05; UX rule 8.6a): htmx posts it,
+	follows the answer back to the page and swaps in only the card. Without JavaScript the same form posts and the page loads.
+	hx_action: where it posts; hx_card: the card's id.
+#}hx-post="{{ hx_action }}" hx-target="#{{ hx_card }}" hx-select="#{{ hx_card }}" hx-swap="outerHTML"

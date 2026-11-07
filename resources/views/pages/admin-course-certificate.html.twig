@@ -1,15 +1,15 @@
 {% extends layout %}
 {% block page_body %}
 {{ importmap() }}
-{% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Certificate' %}{% set ph_title = course.title %}{% set ph_lead = 'Whether this course gives a certificate, and which design it is drawn in.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Certificate' %}{% set ph_title = course.title %}{% set ph_lead = 'Whether this course gives a certificate, and which design it is drawn in.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
-<form action="/admin/courses/{{ course.id }}/certificate" method="post" data-controller="certificate-preview" data-certificate-preview-button-value="course-certificate-preview-button">
+<form action="{{ course_admin_url(course, '/certificate') }}" method="post" data-controller="certificate-preview" data-certificate-preview-button-value="course-certificate-preview-button">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <div class="cl-certificate-editor">
 <aside class="cl-certificate-editor-preview" aria-label="Preview">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 	{{ ui('layout.section-head', {heading: 'Preview', heading_level: 2, summary: 'This course’s certificate for a sample learner, exactly as the PDF prints.'}) }}
-	{% include '@platform/partials/certificate-preview.html.twig' with {cp_name: 'course-certificate-preview', cp_src: '/admin/courses/' ~ course.id ~ '/certificate/preview.pdf', cp_title: 'Preview of this course’s certificate'} %}
+	{% include '@platform/partials/certificate-preview.html.twig' with {cp_name: 'course-certificate-preview', cp_src: course_admin_url(course, '/certificate/preview.pdf'), cp_title: 'Preview of this course’s certificate'} %}
 {% endblock %}{% endembed %}
 </aside>
 <div class="cl-certificate-editor-form">
@@ -24,8 +24,8 @@
 	{{ ui('layout.section-head', {heading: 'Design', heading_level: 2, summary: 'Click the design this course’s certificate should use.'}) }}
 	{% if can_manage_designs or can_view_designs %}
 	{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-		{% if can_manage_designs %}{{ ui('action.link', {label: 'Edit this design', size: 'small', href: '/admin/certificates/designs/' ~ selected_design ~ '?return_to=' ~ ('/admin/courses/' ~ course.id ~ '/certificate')|url_encode, icon: 'action-edit'}) }}
-		{{ ui('action.link', {label: 'New design', size: 'small', icon: 'action-add', href: '/admin/certificates/designs/new?return_to=' ~ ('/admin/courses/' ~ course.id ~ '/certificate')|url_encode}) }}{% endif %}
+		{% if can_manage_designs %}{{ ui('action.link', {label: 'Edit this design', size: 'small', href: '/admin/certificates/designs/' ~ selected_design ~ '?return_to=' ~ (course_admin_url(course, '/certificate'))|url_encode, icon: 'action-edit'}) }}
+		{{ ui('action.link', {label: 'New design', size: 'small', icon: 'action-add', href: '/admin/certificates/designs/new?return_to=' ~ (course_admin_url(course, '/certificate'))|url_encode}) }}{% endif %}
 		{% if can_view_designs %}{{ ui('action.link', {label: 'All certificate designs', size: 'small', variant: 'quiet', href: '/admin/certificates/designs', icon: 'action-back'}) }}{% endif %}
 	{% endblock %}{% endembed %}
 	{% endif %}
@@ -39,7 +39,7 @@
 
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 	{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
-	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'course-certificate-preview-button', form_action: '/admin/courses/' ~ course.id ~ '/certificate/preview.pdf', form_target: 'course-certificate-preview', icon: 'action-refresh'}) }}{% endblock %}
+	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'course-certificate-preview-button', form_action: course_admin_url(course, '/certificate/preview.pdf'), form_target: 'course-certificate-preview', icon: 'action-refresh'}) }}{% endblock %}
 {% endembed %}
 </div>
 

@@ -107,8 +107,9 @@ const inspect = () => {
     // A column holding words that the table's fitting left no width (a phone, with two columns whose text wraps).
     noWidthColumns: [...main.querySelectorAll('.cl-ui-table > table > thead > tr > th')].filter((th) => th.getClientRects().length && th.textContent.trim() !== '' && !th.querySelector('.visually-hidden') && th.getBoundingClientRect().width < 16).map((th) => th.textContent.trim()),
     // A list longer than the smallest page size keeps its rows drop-down on every page size (owner, 2026-10-21: after
-    // choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way to change the rows per page back down").
-    pagerWithoutSizes: [...main.querySelectorAll('nav.pagination-row')].filter((row) => row.getClientRects().length)
+    // choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way to change the rows per page back down"). A list
+    // with one page size has no drop-down to keep: the catalogue, 24 courses a page (`ListView::GRID_PAGE_SIZES`).
+    pagerWithoutSizes: [...main.querySelectorAll('nav.pagination-row')].filter((row) => row.getClientRects().length && row.dataset.pageSizes !== '1')
       .map((row) => Number((row.querySelector('.pagination-summary')?.textContent.match(/of\s+([\d,]+)\s+·/) || [])[1]?.replace(/,/g, '') || 0) > 25 && !row.querySelector('select') ? row.dataset.pagination : null).filter(Boolean),
     width: innerWidth,
     theme: [...document.querySelectorAll('link[href*="/themes/"]')].map(l => l.getAttribute('href')).join(' '),

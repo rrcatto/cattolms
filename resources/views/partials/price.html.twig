@@ -6,4 +6,4 @@
 #}
 {% set price_saving = price_saving|default(false) %}
 {% set price_was = price.was_label|default(null) %}
-<span class="cl-price{% if price_was %} cl-price--marked-down{% endif %}">{% if price_was %}<s class="cl-price-was"><span class="visually-hidden">Was </span>{{ price_was }}</s> <span class="visually-hidden">now </span>{% endif %}<span class="cl-price-now">{{ price.price_label }}</span>{% if price_was and price_saving and price.saving_label|default(null) %} <span class="cl-price-saving">Save {{ price.saving_label }}</span>{% endif %}</span>
+<span class="cl-price{% if price_was %} cl-price--marked-down{% endif %}">{% if price_was %}<s class="cl-price-was"><span class="visually-hidden">Was </span>{{ price_was }}</s> <span class="visually-hidden">now </span>{% endif %}<span class="cl-price-now">{{ price.price_label }}</span>{% if price_was and price_saving and price.saving_label|default(null) %} <span class="cl-price-saving">Save {{ price.saving_label }}</span>{% endif %}</span>{# Nothing is drawn after the price, not even this line's end, so a comma can follow it straight away. -#}

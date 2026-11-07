@@ -83,7 +83,7 @@ async function toReview(page, fixture, course, method) {
     const fixture = state();
     const chromium = await playwright.chromium.launch({headless: true});
     const firefox = await playwright.firefox.launch({headless: true});
-    let order = 0;
+    let order = '';
     try {
         {
             const admin = await open(chromium, fixture.admin_token);
@@ -135,7 +135,8 @@ async function toReview(page, fixture, course, method) {
             assert.ok(shown.includes(`Use your account reference as the payment reference: ${fixture.learner.reference}.`), 'the EFT reference is the account reference');
             assert.deepEqual(JSON.parse(php('follows', fixture.learner.id)), [['course', fixture.courses.b.id, 'checkout'], ['news', null, 'checkout']], 'what they ticked is kept, given at checkout');
             const placed = JSON.parse(php('order', fixture.learner.id));
-            order = placed.id;
+            // The order is named by its number in its address (owner, 2026-11-06: no row id in an address).
+            order = `CL-${String(placed.id).padStart(8, '0')}`;
             assert.deepEqual([placed.simulation, placed.invoice_simulation, placed.invoice_fake_bank, placed.invoice_reference], [true, true, true, true], 'the order and its invoice are a simulation, with fake bank details and the account reference');
             await page.screenshot({path: path.join(output, 'chromium-order.png'), fullPage: true});
             await ctx.close();

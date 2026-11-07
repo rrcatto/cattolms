@@ -11,6 +11,9 @@ Description:
 Provides course-domain functionality for structured course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/11/07 SAST
+- analysis['file_frame'] is always there: the package's frame, or null when it carries none, so a course replaced from
+  it is left with no frame from an earlier file. A course of the older shape (modules) carries its code too.
 2026/10/23 SAST
 - Reads schema 2.1: 2.0 with the course's code and its catalogue settings (category, tags, cover, position, related
   courses, prices, status), passed on as analysis['catalogue'] (owner, 2026-10-23). A 2.1 package may hold a course
@@ -100,8 +103,8 @@ final class StructuredCourseImporter
             $courseInput['source_filename'] = $sourceFilename;
             return ['format' => 'catto-learning-course', 'schema_version' => $schemaVersion, 'course' => $courseInput,
                 'catalogue' => is_array($data['catalogue'] ?? null) ? $data['catalogue'] : null,
-                // Only a package that carries the course's original file: one made before there was any leaves a course's alone.
-                ...(is_array($data['file_frame'] ?? null) ? ['file_frame' => $data['file_frame']] : []), 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
+                // The frame the package carries, or none: a course replaced from it keeps no frame from an earlier file (2026-11-07).
+                'file_frame' => is_array($data['file_frame'] ?? null) ? $data['file_frame'] : null, 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
         }
 
         $modules = [];
@@ -212,6 +215,8 @@ final class StructuredCourseImporter
             'format' => 'catto-learning-course',
             'schema_version' => $schemaVersion,
             'course' => [
+                // The code, which an import knows a course by alone (2026-11-07), in this older shape too.
+                'code' => CourseCode::normalise((string) ($courseInput['code'] ?? '')),
                 'slug' => trim((string) ($courseInput['slug'] ?? '')) ?: Slug::from($title),
                 'title' => $title,
                 'subtitle' => trim((string) ($courseInput['subtitle'] ?? '')),

@@ -46,7 +46,8 @@ final class CompanyCreditPurchaseService
         private readonly BillingProfileService $billing,
         private readonly FinancialDocuments $documents,
         private readonly WalletService $wallets,
-        private readonly OrderService $orders
+        private readonly OrderService $orders,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null
     ) {}
 
     /**
@@ -248,6 +249,7 @@ final class CompanyCreditPurchaseService
             if ($method === 'eft') $this->orders->queuePaymentInstructions($id);
             elseif ($emailInvoice) $this->records->enqueue('invoice:'.$id,'invoice.email_requested',['order_id'=>$id],$now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));
+            $this->ownerMessages?->orderPlaced($this->records->order($id), $this->records->items($id), $method);
             $this->records->audit($id,$actor->id,'company_credit_order.placed',['company_id'=>$companyId,'request_id'=>$requestId,'total_minor'=>$review['total_minor']],$now->format(DATE_ATOM));
             return [$id,true,$method];
         });

@@ -5,7 +5,7 @@
 	move was refused. data-order is the order this copy shows, sent with a move so a list changed elsewhere is refused
 	rather than guessed at. A slide's picture shows it in the preview above; Edit opens its own page.
 #}
-{% set base = '/admin/course-items/' ~ item.id %}
+{% set base = course_item_url(item) %}
 <div class="cl-tree cl-slide-tree cl-slide-tree--{{ view_switch.view }}" id="presentation-slide-list" data-presentation-slides-target="tree" data-view="{{ view_switch.view }}" data-error="{{ list_error|default('') }}" data-order="{{ presentation.order }}">
 	<ol class="cl-tree-list" data-parent="" aria-label="The slides, in order">
 		{% for slide in presentation.slides %}

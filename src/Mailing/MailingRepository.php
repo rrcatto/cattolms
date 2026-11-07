@@ -119,6 +119,30 @@ final class MailingRepository
     }
 
     /** The name of a category, a published course or a tag that can be followed, or null when there is none. */
+    /** The row id of the course with this code, for a follow that names the course by it (owner, 2026-11-06). */
+    public function courseIdForCode(string $code): ?int
+    {
+        $id = $this->db->fetchOne('SELECT id FROM courses WHERE code = :code', ['code' => $code]);
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /** A category by its slug, as Follow names it (2026-11-07). */
+    public function categoryIdForSlug(string $slug): ?int
+    {
+        $id = $this->db->fetchOne('SELECT id FROM course_categories WHERE slug = :slug', ['slug' => $slug]);
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /** A tag by its slug, as Follow names it (2026-11-07). */
+    public function tagIdForSlug(string $slug): ?int
+    {
+        $id = $this->db->fetchOne('SELECT id FROM tags WHERE slug = :slug', ['slug' => $slug]);
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
     public function subjectName(string $kind, int $id): ?string
     {
         $name = match ($kind) {

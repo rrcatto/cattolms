@@ -10,7 +10,7 @@
 {% else %}
 	{% if courses %}
 		<p>{{ design.course_count == 1 ? 'One course uses' : design.course_count ~ ' courses use' }} this design:</p>
-		<ul>{% for course in courses %}<li><a href="/admin/courses/{{ course.id }}/certificate">{{ course.title }}</a></li>{% endfor %}{% if design.course_count > courses|length %}<li>and {{ design.course_count - courses|length }} more</li>{% endif %}</ul>
+		<ul>{% for course in courses %}<li><a href="{{ course_admin_url(course, '/certificate') }}">{{ course.title }}</a></li>{% endfor %}{% if design.course_count > courses|length %}<li>and {{ design.course_count - courses|length }} more</li>{% endif %}</ul>
 	{% else %}
 		<p>No course uses this design.</p>
 	{% endif %}

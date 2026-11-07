@@ -156,12 +156,12 @@ final class CourseModulePartsIntegrationTest extends TestCase
         $practicalId = $this->items->createAttached($this->course, ['item_key' => 'render-practical-' . $this->suffix, 'item_type' => 'practical', 'title' => 'Practical', 'content_source' => '<p>Do it.</p>', 'answer_html' => '<p>The model answer.</p>'], $this->owner);
         $rows = $this->items->availability($this->course, null, false);
         $deckRow = array_values(array_filter($rows, static fn(array $row): bool => (int) ($row['course_item_id'] ?? 0) === $deckId))[0];
-        $html = $this->renderer->render($deckRow, 'module-parts-' . $this->suffix, (int) $deckRow['id'], false, [], ['continue' => '/learn/module-parts/item/9/content']);
+        $html = $this->renderer->render($deckRow, 'module-parts-' . $this->suffix, (string) $deckRow['part_name'], false, [], ['continue' => '/learn/module-parts/module-1-video']);
         self::assertStringContainsString('class="cw-deck"', $html);
-        self::assertStringContainsString('&quot;continue&quot;:&quot;/learn/module-parts/item/9/content&quot;', $html);
+        self::assertStringContainsString('&quot;continue&quot;:&quot;/learn/module-parts/module-1-video&quot;', $html);
         self::assertStringContainsString('&quot;enrol&quot;:&quot;/courses/module-parts-' . $this->suffix . '&quot;', $html);
         $practicalRow = array_values(array_filter($rows, static fn(array $row): bool => (int) ($row['course_item_id'] ?? 0) === $practicalId))[0];
-        $practical = $this->renderer->render($practicalRow, 'module-parts', (int) $practicalRow['id']);
+        $practical = $this->renderer->render($practicalRow, 'module-parts', (string) $practicalRow['part_name']);
         self::assertStringContainsString('<div class="cl-practical"><p>Do it.</p></div><details class="cl-practical-answer"><summary>Show the model answer</summary><div class="cl-practical-answer-body"><p>The model answer.</p></div></details>', $practical);
     }
 

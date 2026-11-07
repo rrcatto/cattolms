@@ -31,7 +31,7 @@ final class ContactMessageRepository
 {
     /** What the list shows, with the sender's account and the order's number and course's title. */
     private const LIST_SELECT = "SELECT m.id, m.reference, m.reason, m.sender_name, m.sender_email, m.user_id, m.account_reference,
-            m.order_id, m.order_number, m.course_id, c.title AS course_title, c.slug AS course_slug, m.details, m.message,
+            m.order_id, m.order_number, m.course_id, c.title AS course_title, c.code AS course_code, c.slug AS course_slug, m.details, m.message,
             m.created_at, m.emailed_at, m.acknowledged_at, m.answered_at, m.answered_by_user_id,
             COALESCE(NULLIF(trim(concat_ws(' ', answerer.first_name, answerer.last_name)), ''), answerer.display_name) AS answered_by_name,
             answerer.account_reference AS answered_by_reference, sender.account_reference AS sender_reference

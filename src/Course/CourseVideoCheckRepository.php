@@ -72,12 +72,12 @@ final class CourseVideoCheckRepository
     /**
      * The videos that do not play, each with a course it is in, for Needs your attention.
      *
-     * @return list<array{course_item_id:int,title:string,course_id:int,course_title:string,status:string,detail:string,checked_at:string,failing_since:string}>
+     * @return list<array{course_item_id:int,item_name:string,title:string,course_id:int,course_title:string,status:string,detail:string,checked_at:string,failing_since:string}>
      */
     public function failing(): array
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT v.course_item_id, ci.title, c.id AS course_id, c.title AS course_title, v.status, v.detail, v.checked_at, v.failing_since
+            "SELECT v.course_item_id, ci.name AS item_name, ci.title, c.id AS course_id, c.code AS course_code, c.title AS course_title, v.status, v.detail, v.checked_at, v.failing_since
                FROM course_video_checks v
                JOIN course_items ci ON ci.id = v.course_item_id AND ci.type_config->>'youtube_id' = v.youtube_id
                JOIN LATERAL (SELECT p.course_id FROM course_item_placements p WHERE p.course_item_id = ci.id ORDER BY p.course_id LIMIT 1) placed ON TRUE
@@ -85,7 +85,7 @@ final class CourseVideoCheckRepository
               WHERE v.status <> 'plays'
               ORDER BY v.failing_since, v.course_item_id"
         );
-        return array_map(static fn(array $row): array => ['course_item_id' => (int) $row['course_item_id'], 'title' => (string) $row['title'], 'course_id' => (int) $row['course_id'],
+        return array_map(static fn(array $row): array => ['course_item_id' => (int) $row['course_item_id'], 'item_name' => (string) $row['item_name'], 'title' => (string) $row['title'], 'course_id' => (int) $row['course_id'],
             'course_title' => (string) $row['course_title'], 'status' => (string) $row['status'], 'detail' => (string) $row['detail'],
             'checked_at' => (string) $row['checked_at'], 'failing_since' => (string) $row['failing_since']], $rows);
     }

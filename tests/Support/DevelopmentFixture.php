@@ -67,7 +67,9 @@ final class DevelopmentFixture
      * A person with a believable name nobody on the site has (owner, 2026-10-27: no strings of digits, no repeated
      * names), at a private address unless a domain is given, with a role on the site.
      *
-     * @return array{id:int,email:string,first:string,last:string,name:string}
+     * Its account reference, which names it in an address (owner, 2026-11-06), comes with it.
+     *
+     * @return array{id:int,email:string,first:string,last:string,name:string,account_reference:string}
      */
     public function person(string $role = 'STUDENT', string $domain = 'inbox.test'): array
     {
@@ -83,14 +85,15 @@ final class DevelopmentFixture
         $this->grant($id, 'STUDENT');
         if ($role !== 'STUDENT') $this->grant($id, $role);
 
-        return ['id' => $id, 'email' => $email, 'first' => $first, 'last' => $last, 'name' => $first . ' ' . $last];
+        return ['id' => $id, 'email' => $email, 'first' => $first, 'last' => $last, 'name' => $first . ' ' . $last,
+            'account_reference' => (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $id])];
     }
 
     /**
      * A company with a believable name and its own domain, made with its founding Company Administrator, as every
      * company is (owner, 2026-10-27: "It is IMPOSSIBLE for a company to be created and have ZERO people attached").
      *
-     * @return array{id:int,name:string,domain:string,founder:array{id:int,email:string,first:string,last:string,name:string}}
+     * @return array{id:int,name:string,domain:string,founder:array{id:int,email:string,first:string,last:string,name:string,account_reference:string}}
      */
     public function company(): array
     {
@@ -265,8 +268,8 @@ final class DevelopmentFixture
             ['id' => $item, 'maximum' => $maximumAttempts]
         );
         $node = (int) $this->db->fetchOne(
-            "INSERT INTO course_structure_nodes(public_id,course_id,position,node_type) SELECT :public,:course,COALESCE(MAX(position),0)+1,'item' FROM course_structure_nodes WHERE course_id=:course AND parent_node_id IS NULL RETURNING id",
-            ['public' => Uuid::v4(), 'course' => $courseId]
+            "INSERT INTO course_structure_nodes(public_id,course_id,position,node_type,part_name) SELECT :public,:course,COALESCE(MAX(position),0)+1,'item',:part FROM course_structure_nodes WHERE course_id=:course AND parent_node_id IS NULL RETURNING id",
+            ['public' => Uuid::v4(), 'course' => $courseId, 'part' => \CattoLearning\Support\Address\CoursePartAddress::provisional()]
         );
         $this->db->executeStatement('INSERT INTO course_item_placements(node_id,course_id,course_item_id,assessment_role) VALUES (:node,:course,:item,:role)', ['node' => $node, 'course' => $courseId, 'item' => $item, 'role' => $role]);
         return ['item_id' => $item, 'node_id' => $node, 'key' => $key];

@@ -17,7 +17,8 @@ const fs = require('node:fs');
 const {inspect, judge} = require('./page-construction.cjs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-parts-state.json'));
-const page1 = `${base}/admin/course-items/${state.presentation_item}`;
+// The Presentation by the slug of its name (owner, 2026-11-06: no row id in an address).
+const page1 = `${base}${state.presentation_url}`;
 const results = [];
 const check = (name, ok, detail = '') => { results.push({name, ok: !!ok, detail}); if (!ok) console.log('FAIL', name, detail); };
 
@@ -165,7 +166,7 @@ async function slidePages(browserType, name) {
     check(`${at}: Save slide stays on the page`, /\/slides\/[a-z0-9]{6,32}$/.test(page.url()) && (await page.locator('.cl-slide-bar-status').innerText()).startsWith('Saved'));
     answer = 'accept';
     await page.getByRole('link', {name: 'Close'}).click();
-    await page.waitForURL(/\/admin\/course-items\/\d+(#.*)?$/);
+    await page.waitForURL(/\/admin\/course-items\/[a-z0-9-]+(#.*)?$/);
     check(`${at}: Close goes back to the presentation, the slide in its new layout`, (await page.locator('#presentation-slide-list .cl-tree-meta').allInnerTexts()).some((meta) => meta.startsWith('Steps')));
 
     // The narration script, saved in place.
@@ -187,7 +188,7 @@ async function slidePages(browserType, name) {
     await page.getByRole('link', {name: 'Close'}).click();
     check(`${at}: the details' Close asks first`, dialogs.length === 1 && /\/details$/.test(page.url()));
     await page.getByRole('button', {name: 'Save details'}).click();
-    await page.waitForURL(/\/admin\/course-items\/\d+$/);
+    await page.waitForURL(/\/admin\/course-items\/[a-z0-9-]+$/);
     check(`${at}: Save details goes back, the description in the player's top bar`, await page.locator('#presentation-preview .cw-deck').getAttribute('data-cw-title') === 'Module 1: Soil and compost');
 
     await page.setViewportSize({width: 390, height: 900});

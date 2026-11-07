@@ -8,7 +8,7 @@
 	{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'Companies'})} %}
 {% block body %}
 		{% for company in cc_rows %}
-			{% embed ui_template('data.card') with {props: ui_props('data.card', {title: company.name, href: '/admin/companies/' ~ company.id, picture: 'square'})} %}
+			{% embed ui_template('data.card') with {props: ui_props('data.card', {title: company.name, href: company_url(company), picture: 'square'})} %}
 {% block picture %}{% if company.logo_url|default('') %}<img src="{{ company.logo_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
 {% block details %}
 				{% if company.domain|default('') %}<p class="cl-ui-card-line cl-ui-card-quiet">{{ company.domain }}</p>{% endif %}
@@ -28,7 +28,7 @@
 					</form>
 				{% endif %}
 				{% if can_manage_companies %}
-					{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ company.id, icon: 'action-edit'}) }}
+					{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ company.account_reference, icon: 'action-edit'}) }}
 				{% endif %}
 {% endblock %}
 {% endembed %}

@@ -108,7 +108,9 @@ async function signedIn(browser, options = {}) {
   main = await text(page);
   for (const words of ['All requests', 'People signed in', 'Other people', 'Automated', 'Not found', 'Refused', 'Flagged']) check(main.includes(words), `the Site Log has a card for ${words}`);
   check(main.includes('GET /m/u/••••') && !main.includes('0123456789abcdef'), 'a secret in an address is written as ••••');
-  await page.evaluate(() => window.scrollTo(0, 120));
+  // Scrolled down, with the cards still on screen: a site notification above them (the owner's own may be on) would
+  // otherwise leave them below the fold, and the click would scroll to them.
+  await page.locator('#site-log-kinds').evaluate((cards) => window.scrollTo(0, Math.max(120, cards.getBoundingClientRect().top + window.scrollY - 200)));
   const scrolled = await page.evaluate(() => window.scrollY);
   await inPlace(page, () => page.locator('#site-log-kinds input[value="missing"]').check({force: true}), 'kind=missing', 'a kind of request card');
   check(page.url().includes('kind=missing'), 'a card chooses its list');

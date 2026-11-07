@@ -99,9 +99,9 @@ if ($action === 'create') {
     $verify($first['id'], $first['first'], $first['last']);
     $designs = ['Heritage Certificate', 'Coastal Certificate', 'Executive Certificate', 'Short Course Certificate', 'Professional Development Certificate', 'Attendance Certificate'];
     shuffle($designs);
-    $state = ['slug' => $slug, 'course' => $course, 'course_title' => $title, 'company' => $provider['id'], 'scrub' => $fixture->seeds(),
+    $state = ['slug' => $slug, 'course' => $course, 'course_code' => $made['code'], 'course_title' => $title, 'company' => $provider['id'], 'scrub' => $fixture->seeds(),
         'first_name' => $first['name'], 'second_name' => $second['name'], 'second_first' => $second['first'], 'second_last' => $second['last'], 'design_name' => $designs[0], 'background_name' => $designs[1], 'nojs_design_name' => $designs[2],
-        'assessment' => '/learn/' . $slug . '/item/' . $final['node_id'] . '/assessment/' . $final['key'],
+        'assessment' => \CattoLearning\Support\Address\CoursePartAddress::reader($slug, (string) $db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $final['node_id']]), '/assessment/' . $final['key']),
         'admin_id' => $admin['id'], 'admin_tokens' => $admin['tokens'],
         'first_id' => $first['id'], 'first_tokens' => $first['tokens'], 'second_id' => $second['id'], 'second_token' => $second['token'],
         'default_design' => (int) $db->fetchOne("SELECT id FROM document_templates WHERE document_type = 'certificate' AND is_current"),

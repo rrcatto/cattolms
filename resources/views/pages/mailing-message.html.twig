@@ -238,7 +238,7 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'What became of it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Clicked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Detail'}} %}</tr>{% endblock %}
 			{% block body %}{% for copy in copies %}<tr>
-				<td class="cell-text">{% if copy.user_id %}{{ ui('data.person', {name: copy.name, href: '/admin/people/' ~ copy.user_id}) }}{% else %}{{ copy.email }}{% endif %}</td>
+				<td class="cell-text">{% if copy.user_id %}{{ ui('data.person', {name: copy.name, href: person_url(copy.account_reference)}) }}{% else %}{{ copy.email }}{% endif %}</td>
 				<td>{{ ui('feedback.badge', {label: delivery_statuses[copy.status][0], tone: delivery_statuses[copy.status][1]}) }}{% if copy.unsubscribed_at %} {{ ui('feedback.badge', {label: 'Unsubscribed', tone: 'neutral'}) }}{% endif %}</td>
 				<td>{{ copy.first_opened_at ? copy.first_opened_at|date('j M H:i', site_zone) : '' }}</td>
 				<td>{{ copy.first_clicked_at ? copy.click_count ~ (copy.click_count == 1 ? ' click' : ' clicks') : '' }}</td>

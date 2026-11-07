@@ -29,8 +29,14 @@ documents to this site.
   document number or date of birth.
 - Without the keys in .env, verification is not available and certificates wait. Verification is
   never skipped.
+- A live site never takes a result from Didit's sandbox (owner, 2026-11-06: "build the sandbox
+  safeguard"): sandbox checks are mocked and can be forced to pass, so a result whose environment is
+  "sandbox" is ignored on a live site, by the webhook and on the learner's return alike, and recorded
+  in the Activity log. A demo site takes both, so catto.test tests on the sandbox.
 
 Changelog:
+2026/11/06 SAST
+- A live site ignores a sandbox result.
 2026/10/20 SAST
 - No verification before a purchase; no parent or guardian's consent: a verified learner under 18 is
   issued nothing (adults only).
@@ -43,6 +49,7 @@ declare(strict_types=1);
 namespace CattoLearning\Identity;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Course\Certificate\CertificateAwards;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -69,6 +76,7 @@ final class IdentityVerificationService
         private readonly AuditRepository $audit,
         private readonly TransactionManager $transactions,
         private readonly ClockInterface $clock,
+        private readonly ?SiteMode $site = null,
     ) {}
 
     public function isVerified(int $userId): bool
@@ -134,7 +142,7 @@ final class IdentityVerificationService
         if ($row === null || (int) $row['user_id'] !== $user->id) throw new InvalidArgumentException('That identity check could not be found.');
         try {
             $report = $this->didit->decision($sessionId);
-            $this->apply($sessionId, (string) ($report['status'] ?? ''), $report);
+            if (!$this->sandboxOnLiveSite($report, $sessionId)) $this->apply($sessionId, (string) ($report['status'] ?? ''), $report);
         } catch (RuntimeException $unreachable) {
             // The webhook still brings the result; the learner sees the check as it stands.
         }
@@ -149,7 +157,8 @@ final class IdentityVerificationService
      */
     public function webhook(string $rawBody, array $headers): void
     {
-        if (!DiditSignature::verify($rawBody, $headers['x-signature-v2'] ?? '', $headers['x-signature'] ?? '', $headers['x-timestamp'] ?? '', $this->settings->webhookSecret(), $this->now()->getTimestamp())) {
+        if (!DiditSignature::verify($rawBody, $headers['x-signature-v2'] ?? '', $headers['x-signature'] ?? '', $headers['x-timestamp'] ?? '', $this->settings->webhookSecret(), $this->now()->getTimestamp(),
+            $headers['x-signature-v2-previous'] ?? '', $headers['x-signature-previous'] ?? '')) {
             throw new InvalidDiditWebhook('The webhook signature is not valid.');
         }
         try {
@@ -162,7 +171,23 @@ final class IdentityVerificationService
         if ($sessionId === '' || $this->records->bySession($sessionId) === null) return;
         $eventId = (string) ($event['event_id'] ?? '');
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $eventId) === 1 && !$this->records->rememberEvent($eventId)) return;
+        if ($this->sandboxOnLiveSite($event, $sessionId)) return;
         $this->apply($sessionId, (string) ($event['status'] ?? ''), is_array($event['decision'] ?? null) ? $event['decision'] : []);
+    }
+
+    /**
+     * True, and recorded, when a live site is handed a result from Didit's sandbox: its checks are mocked and can be
+     * forced to pass, so it never verifies anyone here. Didit marks every webhook and decision with its environment.
+     *
+     * @param array<string,mixed> $data the webhook event or the decision report
+     */
+    private function sandboxOnLiveSite(array $data, string $sessionId): bool
+    {
+        if ($this->site === null || $this->site->isDemo()) return false;
+        if (strtolower(trim((string) ($data['environment'] ?? ''))) !== 'sandbox') return false;
+        $row = $this->records->bySession($sessionId);
+        $this->audit->record(null, 'identity.sandbox_ignored', ['user_id' => $row === null ? null : (int) $row['user_id'], 'session_id' => $sessionId]);
+        return true;
     }
 
     /**

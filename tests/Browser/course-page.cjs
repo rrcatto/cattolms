@@ -98,7 +98,7 @@ async function scenario(name, run) {
             const page = await ctx.newPage();
             await page.goto(page_url);
             const href = await page.getByRole('link', {name: 'Watch course presentation'}).getAttribute('href');
-            assert.equal(href, `/courses/${state.slug}/preview/${state.trailer_node}/content`);
+            assert.equal(href, `/courses/${state.slug}/preview/${state.trailer_part}`);
             assert.equal((await page.goto(base + href)).status(), 200);
             assert.ok(await page.locator('.cw-deck').count() > 0, 'the trailer plays there');
             await ctx.close();

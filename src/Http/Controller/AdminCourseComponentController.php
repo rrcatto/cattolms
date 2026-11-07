@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Course\Catwalk\Narrations;
 use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\CourseItemService;
@@ -12,6 +13,8 @@ use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\CourseStructureArrangement;
 use CattoLearning\Course\ResourceLibraryService;
+use CattoLearning\Support\Address\CourseItemAddress;
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -22,7 +25,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /** Administration routes for reusable Course Items, course placements and the Resource Library. */
 final class AdminCourseComponentController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseItemService $items, private readonly ResourceLibraryService $resources, private readonly CourseService $courses, private readonly Narrations $narrations, private readonly \CattoLearning\Course\CourseRestructurer $restructurer, private readonly \CattoLearning\Course\Catwalk\PresentationPages $presentations)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseItemService $items, private readonly ResourceLibraryService $resources, private readonly CourseService $courses, private readonly Narrations $narrations, private readonly \CattoLearning\Course\CourseRestructurer $restructurer, private readonly \CattoLearning\Course\Catwalk\PresentationPages $presentations, private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -38,7 +41,7 @@ final class AdminCourseComponentController extends BaseController
     public function createForm(): Response
     {
         $this->requirePermission('COURSE.EDIT');
-        $courseId = max(0, (int) ($_GET['course_id'] ?? 0));
+        $courseId = $this->courseFromForm($_GET);
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
         // Started from a Resource: offer only the item types that can use that file.
         $resource = null; $types = CourseItemService::TYPES;
@@ -58,7 +61,7 @@ final class AdminCourseComponentController extends BaseController
         if (!in_array($type, $types, true)) {
             if (count($types) === 1) { $type = $types[0]; }
             else {
-                $data = ['title' => $resource === null ? 'Create new Course Item' : 'Create a Course Item from ' . $resource['title'], 'course_id' => $courseId, 'resource' => $resource, 'type_choices' => $this->typeChoices($types), 'placement' => $placement];
+                $data = ['title' => $resource === null ? 'Create new Course Item' : 'Create a Course Item from ' . $resource['title'], 'course_id' => $courseId, 'course_code' => $courseId > 0 ? $this->courseCode($courseId) : '', 'resource' => $resource, 'type_choices' => $this->typeChoices($types), 'placement' => $placement];
                 return $this->inModal($courseId) ? $this->renderFragment('partials/admin/course-item-type-choice', $data + ['in_modal' => true]) : $this->render('admin-course-item-type', $data);
             }
         }
@@ -70,7 +73,7 @@ final class AdminCourseComponentController extends BaseController
     #[Route('/admin/course-items', name: 'admin_course_item_create', methods: ['POST'])]
     public function create(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = max(0, (int) ($_POST['course_id'] ?? 0));
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseFromForm($_POST);
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
         if (isset($_POST['question_action']) || isset($_POST['card_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
         if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->blankItem((string) ($_POST['item_type'] ?? 'downloadable_file')), $courseId, '/admin/course-items', $user->id); }
@@ -90,11 +93,11 @@ final class AdminCourseComponentController extends BaseController
         return $this->handle(function () use ($user): void {
             $id = $this->items->create($this->withUploadedResource($_POST, $user->id), $user->id);
             $this->flash('success', 'The Course Item was created.');
-            $this->redirect('/admin/course-items/' . $id);
+            $this->redirect($this->itemUrl($id));
         }, '/admin/course-items/new');
     }
 
-    #[Route('/admin/course-items/{item_id}', name: 'admin_course_item_edit', requirements: ['item_id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/course-items/{item}', name: 'admin_course_item_edit', requirements: ['item' => CourseItemAddress::REQUIREMENT], methods: ['GET'])]
     public function edit(): Response
     {
         $this->requirePermission('COURSE.EDIT');
@@ -104,17 +107,17 @@ final class AdminCourseComponentController extends BaseController
             \CattoLearning\Support\ListView::rememberAsked('slides', $_GET);
             return $this->render('admin-presentation', $this->presentations->page($item, \CattoLearning\Support\ListView::chosen('slides', $_GET, $_COOKIE), $this->editReturn()) + ['load_ckeditor' => false]);
         }
-        return $this->itemForm($item, 0, '/admin/course-items/' . $item['id']);
+        return $this->itemForm($item, 0, CourseItemAddress::admin($item));
     }
 
-    #[Route('/admin/course-items/{item_id}', name: 'admin_course_item_update', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/course-items/{item}', name: 'admin_course_item_update', requirements: ['item' => CourseItemAddress::REQUIREMENT], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $item = $this->requireManagedItem($id);
         // A Presentation's parts are each saved on its own pages (AdminPresentationController).
-        if ((string) $item['item_type'] === 'slide_deck') { $this->redirect('/admin/course-items/' . $id); }
-        if (isset($_POST['question_action']) || isset($_POST['card_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id); }
-        if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->items->item($id), 0, '/admin/course-items/' . $id, $user->id); }
+        if ((string) $item['item_type'] === 'slide_deck') { $this->redirect(CourseItemAddress::admin($item)); }
+        if (isset($_POST['question_action']) || isset($_POST['card_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, CourseItemAddress::admin($item)); }
+        if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->items->item($id), 0, CourseItemAddress::admin($item), $user->id); }
         // A refused save shows the form again with what was entered and where editing began.
         try {
             if (($_POST['item_action'] ?? '') === 'save_as') {
@@ -124,33 +127,33 @@ final class AdminCourseComponentController extends BaseController
                 $this->items->update($id, $this->withUploadedResource($_POST, $user->id), $user->id);
             }
         } catch (InvalidArgumentException|\RuntimeException $exception) {
-            return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id, ['tone' => 'danger', 'text' => $exception->getMessage()], 422);
+            return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, CourseItemAddress::admin($item), ['tone' => 'danger', 'text' => $exception->getMessage()], 422);
         }
         if (isset($copy)) {
             $this->flash('success', 'An independent Course Item was created.');
             $this->redirect($this->editPath($copy));
         }
         $this->flash('success', 'The Course Item was saved.');
-        $this->redirect($this->editReturn() ?? '/admin/course-items/' . $id);
+        $this->redirect($this->editReturn() ?? $this->itemUrl($id));
     }
 
-    #[Route('/admin/course-items/{item_id}/save-as', name: 'admin_course_item_save_as', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/save-as', name: 'admin_course_item_save_as', requirements: ['item' => CourseItemAddress::REQUIREMENT], methods: ['POST'])]
     public function saveAs(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
         return $this->handle(function () use ($user, $id): void { $copy = $this->items->saveAs($id, $_POST, $user->id); $this->flash('success', 'An independent Course Item was created.'); $this->redirect($this->editPath($copy)); }, $this->editPath($id));
     }
 
-    #[Route('/admin/course-items/{item_id}/delete', name: 'admin_course_item_delete', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/delete', name: 'admin_course_item_delete', requirements: ['item' => CourseItemAddress::REQUIREMENT], methods: ['POST'])]
     public function delete(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
         // A Presentation's recordings go with it: their rows by the database, their files here once it is gone.
         $clips = array_values($this->narrations->forItem($id));
-        return $this->handle(function () use ($user, $id, $clips): void { $this->items->delete($id, $user->id); $this->narrations->removeFiles($clips); $this->flash('success', 'The unused Course Item was deleted.'); $this->redirect('/admin/course-items'); }, '/admin/course-items/' . $id);
+        return $this->handle(function () use ($user, $id, $clips): void { $this->items->delete($id, $user->id); $this->narrations->removeFiles($clips); $this->flash('success', 'The unused Course Item was deleted.'); $this->redirect('/admin/course-items'); }, $this->itemUrl($id));
     }
 
-    #[Route('/admin/courses/{id}/content', name: 'admin_course_content', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/content', name: 'admin_course_content', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function content(): Response
     {
         $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
@@ -159,7 +162,7 @@ final class AdminCourseComponentController extends BaseController
     }
 
     /** A course of the older shape arranged into numbered module sections, in one step (CourseRestructurer). */
-    #[Route('/admin/courses/{id}/content/arrange-modules', name: 'admin_course_content_arrange_modules', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/arrange-modules', name: 'admin_course_content_arrange_modules', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function arrangeModules(): Response
     {
         $this->requireCsrf(); $courseId = $this->courseId(); $user = $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
@@ -173,12 +176,12 @@ final class AdminCourseComponentController extends BaseController
             $this->flash('success', $report['modules'] === 0
                 ? implode(' and ', $moved) . ' moved out of the lessons into parts of their own.'
                 : sprintf('The course is arranged into %d modules%s. %d videos, %d summaries, %d review study aids and %d practical work items became parts of their own.', $report['modules'], $report['review'] ? ' and a review' : '', $report['videos'], $report['summaries'], $report['review_aids'], $report['practicals']));
-            $this->redirect('/admin/courses/' . $courseId . '/content');
-        }, '/admin/courses/' . $courseId . '/content');
+            $this->redirect($this->contentUrl($courseId));
+        }, $this->contentUrl($courseId));
     }
 
     /** The tree alone, which the editor swaps in after an insertion. */
-    #[Route('/admin/courses/{id}/content/tree', name: 'admin_course_content_tree', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/content/tree', name: 'admin_course_content_tree', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function tree(): Response
     {
         $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
@@ -186,7 +189,7 @@ final class AdminCourseComponentController extends BaseController
     }
 
     /** "+ Add here" → Add existing item or Add section: the modal body, or a page without JavaScript. */
-    #[Route('/admin/courses/{id}/content/insert/{kind}', name: 'admin_course_content_insert', requirements: ['id' => '\\d+', 'kind' => 'existing|section'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/content/insert/{kind}', name: 'admin_course_content_insert', requirements: ['code' => CourseAddress::REQUIREMENT, 'kind' => 'existing|section'], methods: ['GET'])]
     public function insertForm(): Response
     {
         $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
@@ -195,7 +198,7 @@ final class AdminCourseComponentController extends BaseController
         return $this->insertPanel($courseId, $this->param('kind'), $place, ['q' => trim((string) ($_GET['q'] ?? ''))]);
     }
 
-    #[Route('/admin/courses/{id}/content/sections', name: 'admin_course_content_section', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/sections', name: 'admin_course_content_section', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function addSection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
@@ -204,7 +207,7 @@ final class AdminCourseComponentController extends BaseController
         return $this->inserted($courseId, $node, 'The section was added.');
     }
 
-    #[Route('/admin/courses/{id}/content/placements', name: 'admin_course_content_placement', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/placements', name: 'admin_course_content_placement', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function addPlacement(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
@@ -213,41 +216,41 @@ final class AdminCourseComponentController extends BaseController
         return $this->inserted($courseId, $node, 'The existing Course Item was added to this course.');
     }
 
-    #[Route('/admin/courses/{id}/content/{node_id}/placement', name: 'admin_course_content_placement_update', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/{part}/placement', name: 'admin_course_content_placement_update', requirements: ['code' => CourseAddress::REQUIREMENT, 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePlacement(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updatePlacement($courseId, $nodeId, $_POST, $user->id); $this->flash('success', 'The placement was saved.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId($courseId);
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updatePlacement($courseId, $nodeId, $_POST, $user->id); $this->flash('success', 'The placement was saved.'); $this->redirect($this->contentUrl($courseId)); }, $this->contentUrl($courseId));
     }
 
-    #[Route('/admin/courses/{id}/content/{node_id}/section', name: 'admin_course_content_section_update', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/{part}/section', name: 'admin_course_content_section_update', requirements: ['code' => CourseAddress::REQUIREMENT, 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function updateSection(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updateSection($courseId, $nodeId, $_POST, $user->id); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId($courseId);
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updateSection($courseId, $nodeId, $_POST, $user->id); $this->redirect($this->contentUrl($courseId)); }, $this->contentUrl($courseId));
     }
 
-    #[Route('/admin/courses/{id}/content/move-selection', name: 'admin_course_content_move_selection', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/move-selection', name: 'admin_course_content_move_selection', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function moveSelection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
         $selected = $this->postedNodeIds();
         if (($_POST['direction'] ?? '') === 'into') {
-            if ($selected === []) { $this->flash('danger', 'Select one or more Course Content rows.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }
-            $this->redirect('/admin/courses/' . $courseId . '/content/move-into?' . http_build_query(['node_ids' => $selected]));
+            if ($selected === []) { $this->flash('danger', 'Select one or more Course Content rows.'); $this->redirect($this->contentUrl($courseId)); }
+            $this->redirect($this->contentUrl($courseId, '/move-into?' . http_build_query(['node_ids' => $selected])));
         }
         return $this->arranged($courseId, fn() => $this->items->move($courseId, $selected, (string) ($_POST['direction'] ?? ''), $user->id), 'The selected rows were moved.');
     }
 
-    #[Route('/admin/courses/{id}/content/{node_id}/move', name: 'admin_course_content_move', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/{part}/move', name: 'admin_course_content_move', requirements: ['code' => CourseAddress::REQUIREMENT, 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function move(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId($courseId);
         return $this->arranged($courseId, fn() => $this->items->move($courseId, [$nodeId], (string) ($_POST['direction'] ?? ''), $user->id), 'The row was moved.');
     }
 
     /** Drag and drop, and the Move into page: rows go under a parent (empty for the outer level) at a position (empty for last). */
-    #[Route('/admin/courses/{id}/content/arrange', name: 'admin_course_content_arrange', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/arrange', name: 'admin_course_content_arrange', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function arrange(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
@@ -258,7 +261,7 @@ final class AdminCourseComponentController extends BaseController
         }, 'The row was moved.');
     }
 
-    #[Route('/admin/courses/{id}/content/move-into', name: 'admin_course_content_move_into', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/content/move-into', name: 'admin_course_content_move_into', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function moveInto(): Response
     {
         $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
@@ -269,14 +272,14 @@ final class AdminCourseComponentController extends BaseController
             $moving = array_values(array_filter($course['structure'], static fn(array $row): bool => in_array((int) $row['id'], $selected, true)));
             $choices = array_values(array_filter($course['structure'], static fn(array $row): bool => in_array((int) $row['id'], $destinations, true)));
             return $this->render('admin-course-content-move-into', ['title' => 'Move into', 'course' => $course, 'moving' => $moving, 'choices' => $choices]);
-        }, '/admin/courses/' . $courseId . '/content');
+        }, $this->contentUrl($courseId));
     }
 
-    #[Route('/admin/courses/{id}/content/{node_id}/remove', name: 'admin_course_content_remove', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/content/{part}/remove', name: 'admin_course_content_remove', requirements: ['code' => CourseAddress::REQUIREMENT, 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function remove(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->removeFromCourse($courseId, $nodeId, $user->id); $this->flash('success', 'The placement was removed. The shared Course Item remains in the library.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId($courseId);
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->removeFromCourse($courseId, $nodeId, $user->id); $this->flash('success', 'The placement was removed. The shared Course Item remains in the library.'); $this->redirect($this->contentUrl($courseId)); }, $this->contentUrl($courseId));
     }
 
     #[Route('/admin/resources', name: 'admin_resource_library', methods: ['GET'])]
@@ -388,7 +391,7 @@ final class AdminCourseComponentController extends BaseController
         $course = $courseId > 0 ? $this->items->courseContent($courseId) : null;
         $creating = (int) ($item['id'] ?? 0) === 0;
         $returnTo = $creating ? null : $this->editReturn();
-        $data = ['return_to' => $returnTo ?? '', 'title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item: ' . CourseItemService::TYPE_LABELS[$type], 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])]
+        $data = ['return_to' => $returnTo ?? '', 'title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item: ' . CourseItemService::TYPE_LABELS[$type], 'item' => $item, 'course_id' => $courseId, 'course_code' => $course['code'] ?? '', 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])]
             + $this->partEditorData($item);
         if ($creating && $this->inModal($courseId)) { return $this->renderFragment('partials/admin/course-item-form', $data + ['in_modal' => true], $status); }
         return $this->render('admin-course-item-form', $data + ['load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true), 'load_catwalk' => $type === 'slide_deck', 'load_narration_recorder' => $type === 'slide_deck' && (int) ($item['id'] ?? 0) > 0], $status);
@@ -419,7 +422,7 @@ final class AdminCourseComponentController extends BaseController
      * The Presentation editor's recorder sends each slide's narration here as it is kept (narration-recorder.js):
      * the item must be saved, the slide in it, and the person able to edit it.
      */
-    #[Route('/admin/course-items/{item_id}/narration/{slide_id}', name: 'admin_course_item_narration', requirements: ['item_id' => '\\d+', 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/narration/{slide_id}', name: 'admin_course_item_narration', requirements: ['item' => CourseItemAddress::REQUIREMENT, 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
     public function recordNarration(): Response
     {
         $this->requireCsrf();
@@ -438,7 +441,7 @@ final class AdminCourseComponentController extends BaseController
     }
 
     /** A slide's narration removed where it is shown, at once (owner, 2026-10-29: "there is no button to delete the recording - this is necessary"). */
-    #[Route('/admin/course-items/{item_id}/narration/{slide_id}/remove', name: 'admin_course_item_narration_remove', requirements: ['item_id' => '\\d+', 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/narration/{slide_id}/remove', name: 'admin_course_item_narration_remove', requirements: ['item' => CourseItemAddress::REQUIREMENT, 'slide_id' => '[a-z0-9]{6,32}'], methods: ['POST'])]
     public function removeNarration(): Response
     {
         $this->requireCsrf();
@@ -479,9 +482,38 @@ final class AdminCourseComponentController extends BaseController
         return $course;
     }
 
-    private function courseId(): int { $id = (int) $this->param('id'); if ($id < 1) { throw new InvalidArgumentException('Invalid course identifier.'); } return $id; }
-    private function itemId(): int { $id = (int) $this->param('item_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Item identifier.'); } return $id; }
-    private function nodeId(): int { $id = (int) $this->param('node_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Content row.'); } return $id; }
+    /** The course the address names by its code, as its row id (owner, 2026-11-06: a course is its code in an address). */
+    private function courseId(): int { return $this->courseIdFromAddress($this->courses); }
+
+    /**
+     * The course a Create new item form or link names by its code (`course`, from "+ Add here"), as its row id; 0 for an
+     * item made in the Course Item Library. A code that names no course is not found.
+     *
+     * @param array<string,mixed> $source
+     */
+    private function courseFromForm(array $source): int
+    {
+        $code = is_string($source['course'] ?? null) ? trim($source['course']) : '';
+        return $code === '' ? 0 : ($this->courses->courseIdForCode($code) ?? throw $this->notFound('We could not find that course.'));
+    }
+
+    private function courseCode(int $courseId): string
+    {
+        return $this->courses->courseCodeForId($courseId) ?? throw $this->notFound('We could not find that course.');
+    }
+
+    /** The course's Course Content, by its code (owner, 2026-11-06), with what follows it. */
+    private function contentUrl(int $courseId, string $rest = ''): string
+    {
+        return CourseAddress::admin($this->courseCode($courseId), '/content' . $rest);
+    }
+    /** The Course Item the address names by the slug of its name (owner, 2026-11-06: no row id in an address), as its row id. */
+    private function itemId(): int { return $this->keys->courseItem($this->param('item')) ?? throw $this->notFound('We could not find that Course Item.'); }
+
+    /** A Course Item's page, by the slug of its name as it is now (a save may have renamed it). */
+    private function itemUrl(int $id, string $rest = ''): string { return CourseItemAddress::admin($this->items->itemName($id), $rest); }
+    /** The part the address names by its part name (owner, 2026-11-06: no row id in an address); an unknown one is not found. */
+    private function nodeId(int $courseId): int { return $this->keys->part($courseId, $this->param('part')) ?? throw $this->notFound('We could not find that part of the course.'); }
 
     /**
      * Where editing a Course Item began, carried as `return_to` from the link that opened the editor
@@ -497,15 +529,18 @@ final class AdminCourseComponentController extends BaseController
 
     public static function safeReturn(string $value): ?string
     {
-        if (preg_match('~\A/admin/courses/[1-9][0-9]{0,17}/content(?:#course-node-[1-9][0-9]{0,17})?\z~', $value) === 1) { return $value; }
-        return $value === '/admin/course-items' ? $value : null;
+        // Course Content of a course named by its code (owner, 2026-11-06), at one of its rows.
+        if (preg_match('~\A/admin/courses/' . CourseAddress::REQUIREMENT . '/content(?:#course-node-[1-9][0-9]{0,17})?\z~', $value) === 1) { return $value; }
+        // The Course Item Library, or an item's own page by the slug of its name (2026-11-07).
+        if (preg_match('~\A/admin/course-items(?:/' . CourseItemAddress::REQUIREMENT . ')?\z~', $value) === 1 && $value !== '/admin/course-items/new') { return $value; }
+        return null;
     }
 
     /** The editor for an item, keeping the return context of the edit that led there. */
     private function editPath(int $id): string
     {
         $returnTo = $this->editReturn();
-        return '/admin/course-items/' . $id . ($returnTo === null ? '' : '?' . http_build_query(['return_to' => $returnTo]));
+        return $this->itemUrl($id, $returnTo === null ? '' : '?' . http_build_query(['return_to' => $returnTo]));
     }
 
     /** A Course Content insertion asked from the editor's modal, which wants the form alone. */
@@ -578,7 +613,7 @@ final class AdminCourseComponentController extends BaseController
     {
         if ($this->isHtmxRequest()) { return $this->renderFragment('partials/admin/course-content-insert-refused', ['message' => $message], 422); }
         $this->flash('danger', $message);
-        $this->redirect('/admin/courses/' . $courseId . '/content');
+        $this->redirect($this->contentUrl($courseId));
     }
 
     /**
@@ -591,7 +626,7 @@ final class AdminCourseComponentController extends BaseController
             return new Response('', 204, ['HX-Trigger' => json_encode(['course-content-inserted' => ['target' => '#course-content-insert', 'node' => $nodeId, 'message' => $message]], JSON_THROW_ON_ERROR)]);
         }
         $this->flash('success', $message);
-        $this->redirect('/admin/courses/' . $courseId . '/content#course-node-' . $nodeId);
+        $this->redirect($this->contentUrl($courseId, '#course-node-' . $nodeId));
     }
 
     /** @return list<int> */
@@ -608,7 +643,7 @@ final class AdminCourseComponentController extends BaseController
     private function arranged(int $courseId, callable $move, string $success): Response
     {
         if (!$this->isHtmxRequest()) {
-            return $this->handle(function () use ($move, $success): void { $move(); $this->flash('success', $success); }, '/admin/courses/' . $courseId . '/content');
+            return $this->handle(function () use ($move, $success): void { $move(); $this->flash('success', $success); }, $this->contentUrl($courseId));
         }
         $error = '';
         try { $move(); }

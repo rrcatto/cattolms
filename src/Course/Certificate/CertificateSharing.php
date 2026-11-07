@@ -18,6 +18,8 @@ time: the old address stops working at once.
 Each change is the learner's own and is recorded in the Activity log without the address.
 
 Changelog:
+2026/11/07 SAST
+- ownedBy(): a learner's own certificate by its number, for the addresses on their account.
 2026/10/19 SAST
 - Created.
 */
@@ -77,6 +79,16 @@ final class CertificateSharing
             $row['transcript_url'] = $row['transcript_public_id'] === null ? null : self::address('transcript', (string) $row['transcript_public_id']);
             return $row;
         }, $this->certificates->forLearner($userId));
+    }
+
+    /**
+     * The learner's own certificate by its number (its address on their account, /account/certificates/CL-2026-…), as
+     * its row id: null for a number that is no certificate or someone else's, which is simply not found to them.
+     */
+    public function ownedBy(int $userId, string $number): ?int
+    {
+        $certificate = $this->certificates->byNumber($number);
+        return $certificate !== null && (int) $certificate['user_id'] === $userId ? (int) $certificate['id'] : null;
     }
 
     /** The learner makes their certificate or its transcript public or private. */

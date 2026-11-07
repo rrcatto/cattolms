@@ -11,6 +11,9 @@ secrets written as •••• and nothing after a question mark, the address t
 because one machine can hold billions of addresses), and where a visitor came from by the name of the site alone.
 
 Changelog:
+2026/11/07 SAST
+- A record's name in an address (a Course Item's slug, a part name, long and holding digits) is kept, and only keys are
+  hidden: the Site Log says which page was asked for now that addresses name records by codes and names.
 2026/11/04 SAST
 - Created.
 */
@@ -32,10 +35,19 @@ final class RequestFacts
         $path = parse_url($requestUri, PHP_URL_PATH);
         if (!is_string($path) || $path === '') $path = '/';
         $path = (string) preg_replace(self::SECRET_PATHS, '$1' . self::MASK, $path);
-        // Anything else that looks like a key, wherever it comes up: 32 or more hexadecimal or URL-safe characters together.
-        $path = (string) preg_replace('#(?<=/)(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}#', self::MASK, $path);
+        // Anything else that looks like a key, wherever it comes up: 32 or more hexadecimal or URL-safe characters together,
+        // holding a digit. Words joined by hyphens are not a key but a record's name (2026-11-07: a Course Item's slug, a
+        // part name such as module-12-practical-work-and-model-answers), and are kept: lower case, a hyphen between words,
+        // and a letter after f, which no hexadecimal id or UUID holds.
+        $path = (string) preg_replace_callback('#(?<=/)(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}#', static fn(array $key): string => self::isName($key[0]) ? $key[0] : self::MASK, $path);
 
         return mb_substr($path, 0, 500);
+    }
+
+    /** Lowercase words joined by hyphens, holding a letter no hexadecimal key holds: a record's name, never a secret. */
+    private static function isName(string $segment): bool
+    {
+        return preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)+$/', $segment) === 1 && preg_match('/[g-z]/', $segment) === 1;
     }
 
     /** The address the rules count and a lockout holds: the address, or an IPv6 address's /64. */

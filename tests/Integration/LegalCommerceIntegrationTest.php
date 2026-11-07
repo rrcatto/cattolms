@@ -137,7 +137,7 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertSame(0, $this->records->orderCount($buyer->id));
 
         $placed = InProcessPage::run($buyer, CommerceController::class, 'place', [], $form + ['accept_terms' => 'yes', 'accept_start' => 'yes']);
-        self::assertMatchesRegularExpression('#^/account/orders/[0-9]+$#', (string) $placed['location']);
+        self::assertMatchesRegularExpression('#^/account/orders/CL-[0-9]{8}$#', (string) $placed['location'], 'The placed order opens by its number.');
         self::assertSame(1, $this->records->orderCount($buyer->id));
     }
 
@@ -231,7 +231,7 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertSame('refunded', $this->records->order($orderId)['state'], 'The refund itself works as any refund does.');
         self::assertSame('revoked', $this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:i', ['i' => $item['id']]));
 
-        $page = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['id' => (string) $orderId])['body'];
+        $page = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
         self::assertStringContainsString('Outside the Refund Policy (', $page, 'The order page says an override was used');
         self::assertStringContainsString('Override reason: ', $page, 'and why.');
         self::assertStringContainsString('Override reason: The course video would not play for this learner.', $page, 'and why.');
@@ -320,7 +320,7 @@ final class LegalCommerceIntegrationTest extends TestCase
         $item = $this->records->items($orderId)[0];
         $admin = $this->admin();
 
-        $page = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['id' => (string) $orderId])['body'];
+        $page = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
         self::assertStringContainsString('Outside the Refund Policy', $page, 'A bought course has started, so the rule refuses at once.');
         self::assertStringContainsString('The course started on ', $page);
         self::assertStringContainsString('name="override_reason"', $page);
@@ -339,13 +339,13 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertStringContainsString('Nothing to do', $page);
 
         $form = ['csrf' => $_SESSION['csrf'], 'item_id' => (string) $item['id'], 'basis' => 'goodwill', 'reason' => 'Customer request', 'quantity' => '1', 'amount' => '500.00', 'destination' => 'wallet'];
-        $refused = InProcessPage::run($admin, PaymentAdministrationController::class, 'refund', ['id' => (string) $orderId], $form + ['request_key' => Uuid::v4()]);
-        self::assertSame('/admin/commerce/orders/' . $orderId, $refused['location']);
+        $refused = InProcessPage::run($admin, PaymentAdministrationController::class, 'refund', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)], $form + ['request_key' => Uuid::v4()]);
+        self::assertSame('/admin/commerce/orders/' . \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId), $refused['location']);
         self::assertSame('danger', end($_SESSION['flash'])['type']);
         self::assertStringStartsWith(self::REFUSED, end($_SESSION['flash'])['message']);
         self::assertSame(0, $this->records->refundedAmount($orderId));
 
-        InProcessPage::run($admin, PaymentAdministrationController::class, 'refund', ['id' => (string) $orderId], $form + ['request_key' => Uuid::v4(), 'override_reason' => 'Approved by the owner after a complaint.']);
+        InProcessPage::run($admin, PaymentAdministrationController::class, 'refund', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)], $form + ['request_key' => Uuid::v4(), 'override_reason' => 'Approved by the owner after a complaint.']);
         self::assertSame('success', end($_SESSION['flash'])['type']);
         self::assertSame('Approved by the owner after a complaint.', $this->db->fetchOne('SELECT override_reason FROM commerce_refunds WHERE order_id=:o', ['o' => $orderId]));
     }
@@ -359,7 +359,7 @@ final class LegalCommerceIntegrationTest extends TestCase
         $lines = array_column($this->records->items($orderId), null, 'course_id');
         $refunds = $this->refunds();
         $admin = $this->admin();
-        $page = fn(): string => InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId])['body'];
+        $page = fn(): string => InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
         self::assertStringContainsString('Your courses are ready in', $page());
 
         $refunds->approve($admin, $orderId, (int) $lines[$this->course['A']['id']]['id'], Uuid::v4(), 'service_failure', 'Customer request', 1, 50000, 'The course could not be provided.');
@@ -388,12 +388,12 @@ final class LegalCommerceIntegrationTest extends TestCase
         $admin = $this->admin();
         $requests = $this->requests();
 
-        $page = InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId])['body'];
+        $page = InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
         self::assertStringContainsString('Ask for a refund', $page, 'The order page offers the request');
         self::assertStringContainsString('The course started on ', $page, 'and says what the rule says');
         self::assertStringContainsString('If the course is faulty, is not as described or cannot be provided, tell us below', $page, 'and how to report a faulty course.');
 
-        InProcessPage::run($buyer, CommerceController::class, 'refundRequest', ['id' => (string) $orderId], ['csrf' => $_SESSION['csrf'], 'item_id' => (string) $item['id'], 'reason' => 'The videos in module 2 do not play.', 'destination' => 'wallet']);
+        InProcessPage::run($buyer, CommerceController::class, 'refundRequest', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)], ['csrf' => $_SESSION['csrf'], 'item_id' => (string) $item['id'], 'reason' => 'The videos in module 2 do not play.', 'destination' => 'wallet']);
         self::assertSame('success', end($_SESSION['flash'])['type']);
         $request = $this->db->fetchAssociative('SELECT * FROM commerce_refund_requests WHERE order_id=:o', ['o' => $orderId]) ?: [];
         self::assertSame(['requested', 'wallet', 'The videos in module 2 do not play.'], [$request['status'], $request['destination'], $request['customer_reason']]);
@@ -415,7 +415,7 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertSame([(int) $request['id']], array_map(static fn(array $row): int => (int) $row['id'], array_values(array_filter($queue, static fn(array $row): bool => (int) $row['order_id'] === $orderId))));
         $requests->refuse($admin, (int) $request['id'], 'The videos play: we checked them in three browsers.');
         self::assertSame('refused', $this->db->fetchOne('SELECT status FROM commerce_refund_requests WHERE id=:id', ['id' => $request['id']]));
-        self::assertStringContainsString('Your refund request was refused on ', InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId])['body']);
+        self::assertStringContainsString('Your refund request was refused on ', InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body']);
 
         $second = $requests->requestForOwnOrder($buyer, $orderId, (int) $item['id'], 'wallet', 'Module 3 is missing entirely.');
         try {

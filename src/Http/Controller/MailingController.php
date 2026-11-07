@@ -13,6 +13,8 @@ Unfollow from any category, course or tag page and from My Subscriptions; and, i
 2026-10-27), the Overview, the lists with each list's followers, and Sending settings.
 
 Changelog:
+2026/11/07 SAST
+- Follow names a category or a tag by its slug, /follow/category/garden-design, never its row id (owner, 2026-11-06).
 2026/10/28 SAST
 - The Mailing menu (owner, 2026-10-27): Overview at /mailing, the lists at /mailing/lists, Sending settings at
   /mailing/settings (out of Administration › Settings).
@@ -25,6 +27,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Mailing\MailingConsents;
 use CattoLearning\Mailing\MailingRepository;
 use CattoLearning\Mailing\MailingSettings;
@@ -180,21 +183,24 @@ final class MailingController extends BaseController
     /**
      * The Follow window's words for a browser without JavaScript: signed out, an account is needed first (owner,
      * 2026-10-28, 8B); signed in for the first follow, how the person would like their updates (round two 4C). What is
-     * followed is in the address, /follow/course/12; a list is joined at its own join link.
+     * followed is in the address: a course by its code, /follow/course/GDN-101 (owner, 2026-11-06: no row id in an
+     * address), a category or a tag by its slug, /follow/category/garden-design; a list is joined at its own join link. A
+     * number names nothing.
      */
-    #[Route('/follow/{kind}/{id}', name: 'follow_account', requirements: ['kind' => 'category|course|tag', 'id' => '[1-9][0-9]{0,17}'], methods: ['GET'])]
+    #[Route('/follow/{kind}/{key}', name: 'follow_account', requirements: ['kind' => 'category|course|tag', 'key' => CourseAddress::REQUIREMENT . '|' . \CattoLearning\Support\Address\CatalogueAddress::SLUG], methods: ['GET'])]
     public function followAccount(): Response
     {
         $return = self::back((string) ($_GET['return'] ?? '/courses'));
-        $intent = \CattoLearning\Mailing\FollowIntent::of($this->param('kind'), (int) $this->param('id'));
+        $intent = \CattoLearning\Mailing\FollowIntent::of($this->param('kind'), $this->param('key'));
         $name = $this->mailing->nameOf($intent);
-        if ($intent === null || $name === null) throw $this->notFound('There is nothing to follow at that address.');
+        $subjectId = $this->mailing->subjectId($intent);
+        if ($intent === null || $name === null || $subjectId === null) throw $this->notFound('There is nothing to follow at that address.');
         $user = $this->currentUser();
         $choice = $this->mailing->followChoice($user === null ? 0 : $user->id);
-        if ($user !== null && (!$choice['choose_how'] || $this->mailing->isSubscribed($user->id, $intent->kind, $intent->id))) $this->redirect($return);
+        if ($user !== null && (!$choice['choose_how'] || $this->mailing->isSubscribed($user->id, $intent->kind, $subjectId))) $this->redirect($return);
 
         return $this->render('follow-account', ['title' => 'Follow ' . $name, 'follow' => $intent->text(), 'follow_name' => $name, 'return_path' => $return,
-            'signed_in' => $user !== null, 'follow_kind' => $intent->kind, 'follow_id' => $intent->id, 'how' => $choice['how']]);
+            'signed_in' => $user !== null, 'follow_kind' => $intent->kind, 'follow_id' => $subjectId, 'how' => $choice['how']]);
     }
 
     /** How the reader gets updates, for everything they follow (round two 2A). */

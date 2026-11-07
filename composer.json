@@ -13,6 +13,7 @@
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
         "ext-zip": "*",
+        "bacon/bacon-qr-code": "^3.1.1",
         "dicebear/core": "^10.7",
         "dicebear/styles": "^10.6",
         "doctrine/dbal": "^4.0",
@@ -23,6 +24,7 @@
         "league/omnipay": "^3",
         "mcp/sdk": "^0.9",
         "omnipay/dummy": "^3",
+        "openspout/openspout": "^5.13.0",
         "psr/container": "^2.0",
         "robmorgan/phinx": "^0.16",
         "symfony/asset-mapper": "~8.1.10",
@@ -138,7 +140,7 @@
             "role": "Project creator and maintainer"
         }
     ],
-    "version": "1.0.9",
+    "version": "1.1.0",
     "extra": {
         "public-dir": "public_html"
     }

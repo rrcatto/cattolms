@@ -5,7 +5,7 @@
 {% block body %}
 {% for row in rows %}
 {% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}<a href="/account/orders/{{ row.id }}">Order {{ row.id }}</a> · {{ row.placed_at|date('d M Y H:i') }} · {{ row.total_label }} · {{ row.state|replace({'_':' '})|capitalize }}{% endblock %}
+{% block body %}<a href="{{ my_order_url(row.id) }}">Order {{ order_number(row.id) }}</a> · {{ row.placed_at|date('d M Y H:i') }} · {{ row.total_label }} · {{ row.state|replace({'_':' '})|capitalize }}{% endblock %}
 {% endembed %}
 {% endfor %}
 {% endblock %}

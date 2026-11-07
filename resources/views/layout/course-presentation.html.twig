@@ -16,7 +16,7 @@
 {% if course is defined %}
 {% set admin_public_preview = public_preview and course.public_preview_query|default('') == '?preview=1' %}
 <header class="cl-course-presentation-head">
-<a href="{{ admin_public_preview ? '/admin/courses/' ~ course.id ~ '/content' : (public_preview ? '/courses/' ~ course.slug : (is_preview|default(false) ? '/admin/courses/' ~ course.id ~ '/content' : '/account/courses')) }}">← {{ admin_public_preview ? 'Exit public preview' : 'Exit course' }}</a>
+<a href="{{ admin_public_preview ? course_admin_url(course, '/content') : (public_preview ? '/courses/' ~ course.slug : (is_preview|default(false) ? course_admin_url(course, '/content') : '/account/courses')) }}">← {{ admin_public_preview ? 'Exit public preview' : 'Exit course' }}</a>
 <strong>{{ course.title }}</strong>
 {% if course.remaining_access_label|default('') %}<span>Access remaining: {{ course.remaining_access_label }}</span>{% endif %}
 </header>
@@ -62,7 +62,8 @@
 {% set part_labels = constant('CattoLearning\\Course\\CourseItemService::PART_LABELS') %}
 {% set node_part = node.node_type == 'item' and node.module_of|default(null) is not null ? part_labels[node.part|default('')]|default('') : '' %}
 {% set node_time = node.node_type == 'section' ? (node.section_number|default(null) is not null ? node.total_minutes_label|default('') : '') : (node.module_of|default(null) is not null ? node.minutes_label|default('') : '') %}
-{% set node_href = is_assessment ? (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/assessment/' ~ node.item_key ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/assessment/' ~ node.item_key ~ presentation_query) : (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/content' ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/content' ~ presentation_query) %}
+{# A stop's address names it by its part name, never its row id (owner, 2026-11-06). #}
+{% set node_href = public_preview ? stop_url('preview', course, node, course.public_preview_query|default('')) : stop_url('reader', course, node, presentation_query) %}
 {# A big green tick on each part the learner has done, and on a section once every part in it is (owner, 2026-11-01). #}
 {% set node_inner %}{% if node.is_done|default(false) %}<span class="cl-course-outline-done" role="img" aria-label="Completed"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg></span>{% endif %}{% if node_part %}<span class="cl-course-outline-part">{{ node_part }}</span>{% endif %}{{ node_label }}{% if node_time %}<span class="cl-course-outline-time">{{ node_time }}</span>{% endif %}{% endset %}
 {% set row %}
@@ -74,5 +75,5 @@
 <a{% if course.current_node_id|default(0) == node.id %} aria-current="page"{% endif %} href="{{ node_href }}">{{ node_inner }}</a>
 {% else %}<span>{{ node_inner }}</span>{% endif %}
 {% endset %}
-<{{ tag }} id="cl-outline-row-{{ node.id }}" class="{{ row_classes }}">{{ row }}{% if tag == 'summary' %}<span class="cl-course-outline-toggle" aria-hidden="true"></span>{% endif %}</{{ tag }}>
+<{{ tag }} id="cl-outline-row-{{ node.part_name }}" class="{{ row_classes }}">{{ row }}{% if tag == 'summary' %}<span class="cl-course-outline-toggle" aria-hidden="true"></span>{% endif %}</{{ tag }}>
 {% endmacro %}

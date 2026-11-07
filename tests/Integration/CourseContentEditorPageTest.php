@@ -29,6 +29,7 @@ final class CourseContentEditorPageTest extends TestCase
     private CourseItemService $items;
     private int $owner;
     private int $course;
+    private string $code;
     private int $section;
     private int $part;
     private int $lesson;
@@ -50,6 +51,7 @@ final class CourseContentEditorPageTest extends TestCase
         $this->fixture->grantRole($this->owner, 'ADMIN');
         $company = $this->fixture->createCompany($this->owner, 'Content Editor ' . $suffix, 'content-editor-' . $suffix . '.seed.test');
         $this->course = $this->fixture->createCourse($this->owner, $company, 'content-editor-' . $suffix, 'Content Editor ' . $suffix);
+        $this->code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
         $this->section = $this->items->addSection($this->course, ['title' => 'Week one'], $this->owner);
         $this->part = $this->items->addSection($this->course, ['title' => 'Part one', 'parent_node_id' => (string) $this->section], $this->owner);
         $this->itemId = $this->items->create(['item_key' => 'content-editor-' . $suffix, 'item_type' => 'html_lesson', 'title' => 'Lesson', 'content_source' => '<p>Lesson</p>'], $this->owner);
@@ -76,7 +78,7 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testTheEditorRendersTheNestedTreeWithItsControls(): void
     {
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
         foreach ([$this->section, $this->part, $this->lesson] as $node) {
             self::assertStringContainsString('id="course-node-' . $node . '"', $html);
         }
@@ -94,13 +96,13 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testTheTopAddItemAreaIsGoneAndAddHereOpensTheInsertModal(): void
     {
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
         foreach (['id="add-item"', 'id="add-new"', 'id="add-existing"', 'id="add-section"', '>Add item<'] as $removed) {
             self::assertStringNotContainsString($removed, $html, 'The top Add item area is removed: ' . $removed);
         }
         self::assertStringContainsString('id="course-content-insert"', $html, 'One insert modal.');
         self::assertStringContainsString('id="course-content-insert-body"', $html);
-        $existing = '/admin/courses/' . $this->course . '/content/insert/existing?insert_parent=' . $this->section . '&amp;insert_index=0';
+        $existing = '/admin/courses/' . $this->code . '/content/insert/existing?insert_parent=' . $this->section . '&amp;insert_index=0';
         self::assertStringContainsString('href="' . $existing . '"', $html, 'Without JavaScript the link opens the form on its own page.');
         self::assertStringContainsString('hx-get="' . $existing . '" hx-target="#course-content-insert-body"', $html, 'With JavaScript the form loads into the modal.');
         self::assertStringContainsString('data-open-modal="course-content-insert"', $html);
@@ -109,7 +111,7 @@ final class CourseContentEditorPageTest extends TestCase
     public function testAddHereIsOfferedAtEveryPlace(): void
     {
         $empty = $this->items->addSection($this->course, ['title' => 'Empty'], $this->owner);
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
         $places = [
             ['', 0, 'the start of the course'],
             [(string) $this->section, 0, 'the start of a section'],
@@ -121,36 +123,36 @@ final class CourseContentEditorPageTest extends TestCase
         foreach ($places as [$parent, $index, $label]) {
             self::assertStringContainsString('content/insert/section?insert_parent=' . $parent . '&amp;insert_index=' . $index . '"', $html, '+ Add here at ' . $label . '.');
         }
-        $create = '/admin/course-items/new?course_id=' . $this->course . '&amp;parent_node_id=' . $empty . '&amp;insert_index=0';
+        $create = '/admin/course-items/new?course=' . $this->code . '&amp;parent_node_id=' . $empty . '&amp;insert_index=0';
         self::assertStringContainsString('hx-get="' . $create . '"', $html, 'Create new item knows the place too.');
     }
 
     public function testAnEmptyCourseStillOffersAddHere(): void
     {
         $this->db->executeStatement('DELETE FROM course_structure_nodes WHERE course_id=:course', ['course' => $this->course]);
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
         self::assertStringContainsString('No Course Content yet', $html);
         self::assertStringContainsString('aria-label="Add here, in this empty course"', $html);
         self::assertStringContainsString('content/insert/section?insert_parent=&amp;insert_index=0"', $html);
-        $node = $this->insertedNode($this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'First', 'parent_node_id' => '', 'insert_index' => '0']));
+        $node = $this->insertedNode($this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => 'First', 'parent_node_id' => '', 'insert_index' => '0']));
         self::assertSame([$node], $this->children(null));
     }
 
     public function testTheModalFormsLoadAsFragmentsAndAsPagesWithoutJavaScript(): void
     {
-        $base = '/admin/courses/' . $this->course . '/content/insert/';
+        $base = '/admin/courses/' . $this->code . '/content/insert/';
         $section = $this->ok($base . 'section?insert_parent=' . $this->section . '&insert_index=1', true);
         self::assertStringNotContainsString('<!doctype html>', $section, 'The modal receives the form alone.');
-        self::assertStringContainsString('hx-post="/admin/courses/' . $this->course . '/content/sections"', $section);
+        self::assertStringContainsString('hx-post="/admin/courses/' . $this->code . '/content/sections"', $section);
         self::assertStringContainsString('inside “Week one”, as row 2', $section);
         self::assertStringContainsString('data-close-modal', $section, 'Cancel closes the modal.');
         $existing = $this->ok($base . 'existing?insert_parent=&insert_index=0&q=content-editor', true);
-        self::assertStringContainsString('hx-post="/admin/courses/' . $this->course . '/content/placements"', $existing);
+        self::assertStringContainsString('hx-post="/admin/courses/' . $this->code . '/content/placements"', $existing);
         self::assertStringContainsString('value="' . $this->itemId . '"', $existing, 'The search lists matching Course Items.');
-        $types = $this->ok('/admin/course-items/new?course_id=' . $this->course . '&parent_node_id=' . $this->section . '&insert_index=0', true);
+        $types = $this->ok('/admin/course-items/new?course=' . $this->code . '&parent_node_id=' . $this->section . '&insert_index=0', true);
         self::assertStringContainsString('hx-get="/admin/course-items/new"', $types);
         self::assertStringContainsString('name="insert_index" value="0"', $types);
-        $form = $this->ok('/admin/course-items/new?course_id=' . $this->course . '&type=html_lesson&parent_node_id=' . $this->section . '&insert_index=0', true);
+        $form = $this->ok('/admin/course-items/new?course=' . $this->code . '&type=html_lesson&parent_node_id=' . $this->section . '&insert_index=0', true);
         self::assertStringContainsString('hx-post="/admin/course-items"', $form);
         self::assertStringContainsString('Create new item · HTML lesson', $form);
         self::assertStringContainsString('name="insert_index" value="0"', $form);
@@ -163,32 +165,32 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testEachActionInsertsAtTheChosenPlace(): void
     {
-        $section = $this->insertedNode($this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'Between', 'introduction_html' => '<p>Intro</p>', 'delay_days' => '2', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']));
+        $section = $this->insertedNode($this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => 'Between', 'introduction_html' => '<p>Intro</p>', 'delay_days' => '2', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']));
         self::assertSame([$section, $this->part], $this->children($this->section), 'Add section lands first inside Week one.');
         self::assertSame(2880, (int) $this->db->fetchOne('SELECT relative_delay_minutes FROM course_structure_nodes WHERE id=:id', ['id' => $section]), 'Its availability is kept.');
 
-        $placed = $this->insertedNode($this->post('/admin/courses/' . $this->course . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => '', 'insert_index' => '0']));
+        $placed = $this->insertedNode($this->post('/admin/courses/' . $this->code . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => '', 'insert_index' => '0']));
         self::assertSame([$placed, $this->section], $this->children(null), 'Add existing item lands at the start of the course.');
 
-        $response = $this->post('/admin/course-items', ['course_id' => (string) $this->course, 'item_type' => 'html_lesson', 'item_key' => 'inserted-' . $this->suffix, 'title' => 'Inserted', 'content_source' => '<p>New</p>', 'parent_node_id' => (string) $section, 'insert_index' => '0']);
+        $response = $this->post('/admin/course-items', ['course' => $this->code, 'item_type' => 'html_lesson', 'item_key' => 'inserted-' . $this->suffix, 'title' => 'Inserted', 'content_source' => '<p>New</p>', 'parent_node_id' => (string) $section, 'insert_index' => '0']);
         $created = $this->insertedNode($response);
         self::assertSame([$created], $this->children($section), 'Create new item lands inside the empty section, already attached.');
         self::assertSame('Inserted', $this->db->fetchOne('SELECT ci.title FROM course_item_placements p JOIN course_items ci ON ci.id=p.course_item_id WHERE p.node_id=:node', ['node' => $created]));
 
-        $plain = $this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'Plain', 'parent_node_id' => '', 'insert_index' => '1'], false);
+        $plain = $this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => 'Plain', 'parent_node_id' => '', 'insert_index' => '1'], false);
         self::assertSame(303, $plain->getStatusCode(), 'Without JavaScript the form returns to Course Content.');
-        self::assertMatchesRegularExpression('~/admin/courses/' . $this->course . '/content#course-node-\d+$~', (string) $plain->headers->get('Location'));
+        self::assertMatchesRegularExpression('~/admin/courses/' . $this->code . '/content#course-node-\d+$~', (string) $plain->headers->get('Location'));
         self::assertSame($placed, $this->children(null)[0]);
     }
 
     public function testASectionCanBeMarkedForThePublicPreview(): void
     {
-        $node = $this->insertedNode($this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'Open to all', 'public_preview' => '1', 'parent_node_id' => '', 'insert_index' => '0']));
+        $node = $this->insertedNode($this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => 'Open to all', 'public_preview' => '1', 'parent_node_id' => '', 'insert_index' => '0']));
         self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $node]));
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
-        self::assertMatchesRegularExpression('~action="/admin/courses/' . $this->course . '/content/' . $node . '/section".*?name="public_preview" value="1" checked~s', $html, 'Edit section shows the flag, so saving it keeps it.');
-        self::assertStringNotContainsString('name="public_preview" value="1" checked', substr($html, (int) strpos($html, 'action="/admin/courses/' . $this->course . '/content/' . $this->section . '/section"'), 4000), 'A section not marked public is unchecked.');
-        $form = $this->ok('/admin/courses/' . $this->course . '/content/insert/section?insert_parent=&insert_index=0', true);
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
+        self::assertMatchesRegularExpression('~action="/admin/courses/' . $this->code . '/content/' . $this->partName($node) . '/section".*?name="public_preview" value="1" checked~s', $html, 'Edit section shows the flag, so saving it keeps it.');
+        self::assertStringNotContainsString('name="public_preview" value="1" checked', substr($html, (int) strpos($html, 'action="/admin/courses/' . $this->code . '/content/' . $this->partName($this->section) . '/section"'), 4000), 'A section not marked public is unchecked.');
+        $form = $this->ok('/admin/courses/' . $this->code . '/content/insert/section?insert_parent=&insert_index=0', true);
         self::assertStringContainsString('name="public_preview"', $form, 'Add section offers the flag too.');
     }
 
@@ -198,36 +200,36 @@ final class CourseContentEditorPageTest extends TestCase
         $other = $this->fixture->createCourse($this->owner, (int) $this->db->fetchOne('SELECT owner_company_id FROM courses WHERE id=:id', ['id' => $this->course]), 'content-editor-other-' . $this->suffix, 'Other ' . $this->suffix);
         $foreign = $this->items->addSection($other, ['title' => 'Elsewhere'], $this->owner);
 
-        $missingTitle = $this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => '', 'introduction_html' => '<p>Kept intro</p>', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']);
+        $missingTitle = $this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => '', 'introduction_html' => '<p>Kept intro</p>', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']);
         self::assertSame(422, $missingTitle->getStatusCode());
         self::assertStringContainsString('A section needs a title.', (string) $missingTitle->getContent());
         self::assertStringContainsString('&lt;p&gt;Kept intro&lt;/p&gt;', (string) $missingTitle->getContent(), 'Entered values stay in the form.');
 
-        $tooDeep = $this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'Too deep', 'parent_node_id' => (string) $this->lesson, 'insert_index' => '0']);
+        $tooDeep = $this->post('/admin/courses/' . $this->code . '/content/sections', ['title' => 'Too deep', 'parent_node_id' => (string) $this->lesson, 'insert_index' => '0']);
         self::assertSame(422, $tooDeep->getStatusCode());
         self::assertStringContainsString('at most 3 levels', (string) $tooDeep->getContent());
 
-        $foreignParent = $this->post('/admin/courses/' . $this->course . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => (string) $foreign, 'insert_index' => '0']);
+        $foreignParent = $this->post('/admin/courses/' . $this->code . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => (string) $foreign, 'insert_index' => '0']);
         self::assertSame(422, $foreignParent->getStatusCode());
         self::assertStringContainsString('not part of this course', (string) $foreignParent->getContent());
 
-        $badIndex = $this->post('/admin/courses/' . $this->course . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => (string) $this->section, 'insert_index' => '7']);
+        $badIndex = $this->post('/admin/courses/' . $this->code . '/content/placements', ['course_item_id' => (string) $this->itemId, 'parent_node_id' => (string) $this->section, 'insert_index' => '7']);
         self::assertSame(422, $badIndex->getStatusCode());
         self::assertStringContainsString('valid position', (string) $badIndex->getContent());
 
-        $noItem = $this->post('/admin/courses/' . $this->course . '/content/placements', ['course_item_id' => '999999999', 'parent_node_id' => '', 'insert_index' => '0']);
+        $noItem = $this->post('/admin/courses/' . $this->code . '/content/placements', ['course_item_id' => '999999999', 'parent_node_id' => '', 'insert_index' => '0']);
         self::assertSame(422, $noItem->getStatusCode());
 
-        $duplicateKey = $this->post('/admin/course-items', ['course_id' => (string) $this->course, 'item_type' => 'html_lesson', 'item_key' => 'content-editor-' . $this->suffix, 'title' => 'Kept title', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']);
+        $duplicateKey = $this->post('/admin/course-items', ['course' => $this->code, 'item_type' => 'html_lesson', 'item_key' => 'content-editor-' . $this->suffix, 'title' => 'Kept title', 'parent_node_id' => (string) $this->section, 'insert_index' => '0']);
         self::assertSame(422, $duplicateKey->getStatusCode());
         self::assertStringContainsString('value="Kept title"', (string) $duplicateKey->getContent(), 'The modal form keeps what was entered.');
         self::assertStringContainsString('hx-post="/admin/course-items"', (string) $duplicateKey->getContent());
 
-        $badPlace = $this->post('/admin/course-items', ['course_id' => (string) $this->course, 'item_type' => 'html_lesson', 'item_key' => 'orphan-' . $this->suffix, 'title' => 'Orphan', 'parent_node_id' => (string) $foreign, 'insert_index' => '0']);
+        $badPlace = $this->post('/admin/course-items', ['course' => $this->code, 'item_type' => 'html_lesson', 'item_key' => 'orphan-' . $this->suffix, 'title' => 'Orphan', 'parent_node_id' => (string) $foreign, 'insert_index' => '0']);
         self::assertSame(422, $badPlace->getStatusCode());
         self::assertFalse($this->db->fetchOne('SELECT id FROM course_items WHERE item_key=:key', ['key' => 'orphan-' . $this->suffix]), 'A refused placement leaves no new Course Item behind.');
 
-        $refused = $this->send($this->htmx(Request::create('/admin/courses/' . $this->course . '/content/insert/section?insert_parent=' . $foreign . '&insert_index=0', 'GET')));
+        $refused = $this->send($this->htmx(Request::create('/admin/courses/' . $this->code . '/content/insert/section?insert_parent=' . $foreign . '&insert_index=0', 'GET')));
         self::assertSame(422, $refused->getStatusCode(), 'A place outside the course is refused before any form is shown.');
         self::assertStringContainsString('no longer in this course', (string) $refused->getContent());
 
@@ -237,11 +239,11 @@ final class CourseContentEditorPageTest extends TestCase
     public function testAdminEditingAndPreviewsAreNotCourseViews(): void
     {
         $slug = (string) $this->db->fetchOne('SELECT slug FROM courses WHERE id=:id', ['id' => $this->course]);
-        $this->ok('/admin/courses/' . $this->course . '/content');
-        $this->ok('/admin/course-items/' . $this->itemId);
+        $this->ok('/admin/courses/' . $this->code . '/content');
+        $this->ok(\CattoLearning\Support\Address\CourseItemAddress::admin($this->items->itemName($this->itemId)));
         $this->db->executeStatement('UPDATE course_item_placements SET public_preview=TRUE WHERE node_id=:node', ['node' => $this->lesson]);
         $this->ok('/courses/' . $slug . '/preview?preview=1');
-        $this->ok('/courses/' . $slug . '/preview/' . $this->lesson . '/content?preview=1');
+        $this->ok('/courses/' . $slug . '/preview/' . $this->partName($this->lesson) . '?preview=1');
         $this->send(Request::create('/learn/' . $slug . '?preview=1', 'GET'));
         self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM analytics_events WHERE course_id=:course', ['course' => $this->course]), 'Authoring and ADMIN previews record no views.');
     }
@@ -249,7 +251,7 @@ final class CourseContentEditorPageTest extends TestCase
     public function testTheAnalyticsEventsPageShowsRecordedEvents(): void
     {
         $this->db->executeStatement("INSERT INTO analytics_events (event_type,source,occurred_at,user_id,course_id,metadata) VALUES ('course_view','course_detail',NOW(),:user,:course,'{\"context\":\"course_page\"}')", ['user' => $this->owner, 'course' => $this->course]);
-        $html = $this->ok('/admin/analytics/events?type=course_view&course_id=' . $this->course);
+        $html = $this->ok('/admin/analytics/events?type=course_view&course=' . $this->code);
         self::assertStringContainsString('Analytics events', $html);
         self::assertStringContainsString('<code>course_view</code>', $html);
         self::assertStringContainsString('Content Editor ' . $this->suffix, $html, 'The course and person are named.');
@@ -260,7 +262,7 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testTheMoveIntoPageOffersOnlyValidDestinations(): void
     {
-        $html = $this->ok('/admin/courses/' . $this->course . '/content/move-into?node_ids%5B%5D=' . $this->part);
+        $html = $this->ok('/admin/courses/' . $this->code . '/content/move-into?node_ids%5B%5D=' . $this->part);
         self::assertStringContainsString('Section · Week one', $html);
         self::assertStringNotContainsString('Section · Part one', $html, 'A row cannot move into itself.');
         self::assertStringNotContainsString('Item · Lesson', $html, 'A row cannot move into its own descendant.');
@@ -268,7 +270,7 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testTheDragEndpointSavesAndReturnsTheTree(): void
     {
-        $response = $this->post('/admin/courses/' . $this->course . '/content/arrange', ['node_ids' => [(string) $this->lesson], 'parent_node_id' => '', 'index' => '0']);
+        $response = $this->post('/admin/courses/' . $this->code . '/content/arrange', ['node_ids' => [(string) $this->lesson], 'parent_node_id' => '', 'index' => '0']);
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('id="course-content-tree"', (string) $response->getContent());
         self::assertStringContainsString('data-error=""', (string) $response->getContent());
@@ -277,7 +279,7 @@ final class CourseContentEditorPageTest extends TestCase
 
     public function testARefusedDropReturnsTheAuthoritativeTreeAndTheReason(): void
     {
-        $response = $this->post('/admin/courses/' . $this->course . '/content/arrange', ['node_ids' => [(string) $this->section], 'parent_node_id' => (string) $this->lesson, 'index' => '']);
+        $response = $this->post('/admin/courses/' . $this->code . '/content/arrange', ['node_ids' => [(string) $this->section], 'parent_node_id' => (string) $this->lesson, 'index' => '']);
         self::assertSame(422, $response->getStatusCode());
         self::assertStringContainsString('data-error="A row cannot be moved inside itself', (string) $response->getContent());
         self::assertNull($this->db->fetchOne('SELECT parent_node_id FROM course_structure_nodes WHERE id=:id', ['id' => $this->section]));
@@ -344,5 +346,11 @@ final class CourseContentEditorPageTest extends TestCase
             $_GET = [];
             unset($_SERVER['HTTP_HX_REQUEST']);
         }
+    }
+
+    /** A part's name, which names it in Course Content's and the reader's addresses (owner, 2026-11-06). */
+    private function partName(int $node): string
+    {
+        return (string) $this->db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id=:id', ['id' => $node]);
     }
 }

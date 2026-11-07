@@ -10,6 +10,8 @@ How the Site Analytics pages say things (owner, 2026-11-04): when, who, from whe
 someone is doing, each in plain words.
 
 Changelog:
+2026/11/07 SAST
+- A signed-in person is linked by their account reference (owner, 2026-11-06).
 2026/11/04 SAST
 - Created.
 */
@@ -98,7 +100,8 @@ final class SiteAnalyticsWords
             'when' => self::when((string) $row['at'], true),
             'signed_in' => $signedIn,
             'who' => $signedIn ? (string) $row['user_name'] : ($named ? (string) $row['agent_label'] : (string) $row['address']),
-            'who_href' => $signedIn ? '/admin/people/' . (int) $row['user_id'] : self::addressHref((string) $row['subject']),
+            // A signed-in person by their account reference (owner, 2026-11-06: no row id in an address).
+            'who_href' => $signedIn ? \CattoLearning\Support\Address\PersonAddress::admin((string) $row['user_reference']) : self::addressHref((string) $row['subject']),
             'address' => (string) $row['address'],
             'show_address' => $signedIn || $named,
             'address_href' => self::addressHref((string) $row['subject']),

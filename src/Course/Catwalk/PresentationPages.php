@@ -15,6 +15,8 @@ as a sample slide, in the presentation's look) and the details page's choices. P
 themselves, drawn by DeckRenderer::thumbnail. Nothing here changes anything.
 
 Changelog:
+2026/11/07 SAST
+- A Presentation's address is the slug of its name (Support\Address\CourseItemAddress), never its row id.
 2026/10/30 SAST
 - Created.
 */
@@ -63,12 +65,13 @@ final class PresentationPages
         $first = $overview['placements'][0] ?? null;
         $crumb = match (true) {
             $returnTo === '/admin/course-items' => ['href' => $returnTo, 'label' => 'Course Item Library'],
+            $returnTo !== null && str_starts_with($returnTo, '/admin/course-items/') => ['href' => $returnTo, 'label' => 'Course Item'],
             $returnTo !== null => ['href' => $returnTo, 'label' => 'Course Content'],
-            $first !== null => ['href' => '/admin/courses/' . $first['course_id'] . '/content', 'label' => 'Course Content: ' . $first['course_title']],
+            $first !== null => ['href' => \CattoLearning\Course\CourseAddress::admin($first, '/content'), 'label' => 'Course Content: ' . $first['course_title']],
             default => ['href' => '/admin/course-items', 'label' => 'Course Item Library'],
         };
         return ['title' => 'Edit Course Item: Presentation', 'item' => $item, 'presentation' => $overview, 'crumb' => $crumb, 'list_error' => $error, 'load_catwalk' => true,
-            'view_switch' => ListView::switcher('slides', $view, '/admin/course-items/' . (int) $item['id'])];
+            'view_switch' => ListView::switcher('slides', $view, \CattoLearning\Support\Address\CourseItemAddress::admin($item))];
     }
 
     /**
@@ -222,7 +225,7 @@ final class PresentationPages
      * Where the presentation is placed: each course, and the module it opens there.
      *
      * @param array<string,mixed> $item
-     * @return list<array{course_id:int,course_title:string,module:string}>
+     * @return list<array{course_id:int,course_code:string,course_title:string,module:string}>
      */
     private function placements(array $item): array
     {
@@ -238,7 +241,7 @@ final class PresentationPages
                 $module = $row['module_of'] !== null && isset($sections[$parent]) ? 'Module ' . $row['module_of'] . ': ' . $sections[$parent] : ($sections[$parent] ?? '');
                 break;
             }
-            $placements[] = ['course_id' => (int) $course['id'], 'course_title' => (string) $course['title'], 'module' => $module];
+            $placements[] = ['course_id' => (int) $course['id'], 'course_code' => (string) ($course['code'] ?? ''), 'course_title' => (string) $course['title'], 'module' => $module];
         }
         return $placements;
     }

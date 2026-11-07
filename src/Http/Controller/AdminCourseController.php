@@ -11,6 +11,14 @@ Description:
 Handles web requests for admin course operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/07 SAST
+- Import (an HTML course file or a course JSON) follows the catalogue's canonical rules (CataloguePackage::
+  reviewCourseFile and importCourseFile): the file's code names the course it updates, with no course picked by hand;
+  the review lists each difference with Use the file's and Keep this site's, and an out-of-date review is refused.
+2026/11/06 SAST
+- Every address names the course by its code, /admin/courses/GDN-101/... (owner, 2026-11-06: no row id in any address;
+  CourseAddress), read again after a save that can change it; the list's row and anchor are the code's (edit=GDN-101,
+  #course-GDN-101).
 2026/11/01 SAST
 - Download as one HTML file gives the course file (CourseFile, /admin/courses/{id}/course-file), which works on its own
   and imports back (owner: "it must export an html file that can be used on its own and also imports back in"); the
@@ -57,6 +65,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Course\CourseAddress;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -69,7 +78,6 @@ use CattoLearning\View\Artwork\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Support\Pagination;
 
 
 use InvalidArgumentException;
@@ -121,12 +129,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user): void {
             $courseId = $this->courses->createBlank($_POST, $user->id);
             $this->flash('success', 'The course was created.');
-            $this->redirect('/admin/courses/' . $courseId);
+            $this->redirect($this->courseUrl($courseId));
         }, '/admin/courses/new');
     }
 
 
-    #[Route('/admin/courses/{id}', name: 'admin_course_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}', name: 'admin_course_edit', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function edit(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
@@ -139,7 +147,7 @@ final class AdminCourseController extends BaseController
         $tabs = [];
         foreach (self::EDIT_TABS as $key => [$label, $permission]) {
             if ($permission === null || $user->hasPermission($permission)) {
-                $tabs[] = ['key' => $key, 'label' => $label, 'href' => self::tabUrl($courseId, $key)];
+                $tabs[] = ['key' => $key, 'label' => $label, 'href' => CourseAddress::admin($course, $key === 'overview' ? '' : '?tab=' . $key)];
             }
         }
         $activeTab = (string) ($_GET['tab'] ?? 'overview');
@@ -153,7 +161,7 @@ final class AdminCourseController extends BaseController
             // The course's landing page at a glance: none, draft or published.
             'landing_status' => $this->landingPages->statusForCourse($courseId) ?? 'none',
             'active_tab' => $activeTab,
-            'tab_url' => self::tabUrl($courseId, $activeTab),
+            'tab_url' => CourseAddress::admin($course, $activeTab === 'overview' ? '' : '?tab=' . $activeTab),
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
             'page_layout' => $activeTab === 'page-layout' ? $this->pageLayoutView($courseId) : null,
             'category_picker' => null,
@@ -204,9 +212,23 @@ final class AdminCourseController extends BaseController
         'danger' => ['Reset / delete', 'COURSE.DELETE'],
     ];
 
-    private static function tabUrl(int $courseId, string $tab): string
+    private function tabUrl(int $courseId, string $tab): string
     {
-        return '/admin/courses/' . $courseId . ($tab === 'overview' ? '' : '?tab=' . $tab);
+        return $this->courseUrl($courseId, $tab === 'overview' ? '' : '?tab=' . $tab);
+    }
+
+    /**
+     * The course's page in Administration, by its code as it is now (owner, 2026-11-06: no row id in any address, a course
+     * is its code): read again each time, because saving the Details tab or a row can change the code.
+     */
+    private function courseUrl(int $courseId, string $rest = ''): string
+    {
+        return CourseAddress::admin($this->courseCode($courseId), $rest);
+    }
+
+    private function courseCode(int $courseId): string
+    {
+        return $this->courses->courseCodeForId($courseId) ?? throw $this->notFound('We could not find that course.');
     }
 
 
@@ -216,14 +238,14 @@ final class AdminCourseController extends BaseController
      * hidden or shown, or Start again from changes the custom layout and saves it at once (CoursePageLayouts::fromForm).
      * Save as one of your layouts makes the custom layout a layout of its own, which the course then uses.
      */
-    #[Route('/admin/courses/{id}/page-layout', name: 'admin_course_page_layout', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/page-layout', name: 'admin_course_page_layout', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function savePageLayout(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $back = self::tabUrl($courseId, 'page-layout') . '#page-layout-form';
+        $back = $this->tabUrl($courseId, 'page-layout') . '#page-layout-form';
         return $this->handle(function () use ($courseId, $user, $back): void {
             [$layout, $action] = \CattoLearning\Course\CoursePageLayouts::fromForm($_POST);
             if ((string) ($_POST['action'] ?? '') === 'save_as') {
@@ -250,7 +272,7 @@ final class AdminCourseController extends BaseController
      * mode=edit draws it as its form, otherwise as it is (Cancel). For htmx only that row or card is sent; an ordinary
      * request (no JavaScript) goes back to the list, with the row open for mode=edit.
      */
-    #[Route('/admin/courses/{id}/row', name: 'admin_course_row', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/row', name: 'admin_course_row', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function courseRow(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
@@ -258,7 +280,8 @@ final class AdminCourseController extends BaseController
         $this->requireManagedCourse($courseId);
         $edit = ($_GET['mode'] ?? '') === 'edit';
         if (!$this->isHtmxRequest()) {
-            $this->redirect('/admin/courses' . ($edit ? '?edit=' . $courseId : '') . '#course-' . $courseId);
+            $code = $this->courseCode($courseId);
+            $this->redirect('/admin/courses' . ($edit ? '?edit=' . rawurlencode($code) : '') . '#' . CourseAddress::anchor($code));
         }
         return $this->courseRowFragment($user, $courseId, $edit, (string) ($_GET['view'] ?? 'list'), !empty($_GET['arrange']), self::listHref((string) ($_SERVER['HTTP_HX_CURRENT_URL'] ?? '')));
     }
@@ -268,7 +291,7 @@ final class AdminCourseController extends BaseController
      * (CourseQuickEdit). For htmx the row or card comes back as it now is, or as it was typed with why it was refused;
      * without JavaScript the list comes back with a message.
      */
-    #[Route('/admin/courses/{id}/row', name: 'admin_course_row_save', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/row', name: 'admin_course_row_save', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function saveCourseRow(): Response
     {
         $this->requireCsrf();
@@ -277,19 +300,20 @@ final class AdminCourseController extends BaseController
         $this->requireManagedCourse($courseId);
         $list = self::listHref((string) ($_POST['return'] ?? ''));
         $view = (string) ($_POST['view'] ?? 'list');
-        $back = rtrim($list, '?&') . '#course-' . $courseId;
+        $code = $this->courseCode($courseId);
         try {
             $this->quickEdit->save($courseId, $_POST, $user->id, $user->hasPermission('COURSE.PRICING.MANAGE'));
         } catch (InvalidArgumentException|\RuntimeException $refused) {
             if (!$this->isHtmxRequest()) {
                 $this->flash('danger', $refused->getMessage());
-                $this->redirect($list . 'edit=' . $courseId . '#course-' . $courseId);
+                $this->redirect($list . 'edit=' . rawurlencode($code) . '#' . CourseAddress::anchor($code));
             }
             return $this->courseRowFragment($user, $courseId, true, $view, !empty($_POST['arrange']), $list, $refused->getMessage(), $_POST, 422);
         }
         if (!$this->isHtmxRequest()) {
+            // The row may have changed the code: the list comes back at the row under its code as it now is.
             $this->flash('success', 'The course was saved.');
-            $this->redirect($back);
+            $this->redirect(rtrim($list, '?&') . '#' . CourseAddress::anchor($this->courseCode($courseId)));
         }
         return $this->courseRowFragment($user, $courseId, false, $view, !empty($_POST['arrange']), $list, saved: true);
     }
@@ -335,7 +359,7 @@ final class AdminCourseController extends BaseController
         return '/admin/courses?' . ($query === [] ? '' : http_build_query($query) . '&');
     }
 
-    #[Route('/admin/courses/{id}/preview', name: 'admin_course_preview', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/preview', name: 'admin_course_preview', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function preview(): Response
     {
         $user = $this->requirePermission('COURSE.PREVIEW');
@@ -345,7 +369,7 @@ final class AdminCourseController extends BaseController
     }
 
 
-    #[Route('/admin/courses/{id}/preview/reset', name: 'admin_course_reset_preview', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/preview/reset', name: 'admin_course_reset_preview', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function resetPreview(): Response
     {
         $this->requireCsrf();
@@ -354,7 +378,7 @@ final class AdminCourseController extends BaseController
         $this->requireManagedCourse($courseId);
         $this->portability->resetPreview($user->id, $courseId);
         $this->flash('success', 'The preview progress and scores were reset.');
-        $this->redirect(self::tabUrl($courseId, 'test-access'));
+        $this->redirect($this->tabUrl($courseId, 'test-access'));
     }
 
     /**
@@ -362,7 +386,7 @@ final class AdminCourseController extends BaseController
      * after the course in `after` (empty for first), from a drag; or up, down, top or bottom in `direction`, from the ⋯
      * menu without JavaScript. A drag asks for JSON and is answered with each course whose number changed.
      */
-    #[Route('/admin/courses/{id}/catalogue-move', name: 'admin_course_catalogue_move', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/catalogue-move', name: 'admin_course_catalogue_move', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function catalogueMove(): Response
     {
         $this->requireCsrf();
@@ -371,15 +395,19 @@ final class AdminCourseController extends BaseController
         $wantsJson = str_contains((string) $this->request()->headers->get('Accept', ''), 'application/json');
         $move = function () use ($courseId, $user): array {
             if (array_key_exists('after', $_POST)) {
+                // The course it goes after, by its code as the row carries it; empty for first.
                 $after = trim($this->posted('after'));
-                if ($after !== '' && !ctype_digit($after)) throw new InvalidArgumentException('Choose a valid position.');
-                return $this->courses->arrangeInCatalogue($courseId, $after === '' ? null : (int) $after, $user->id);
+                $afterId = $after === '' ? null : ($this->courses->courseIdForCode($after) ?? throw new InvalidArgumentException('Choose a valid position.'));
+                return $this->courses->arrangeInCatalogue($courseId, $afterId, $user->id);
             }
             return $this->courses->moveInCatalogue($courseId, trim($this->posted('direction')), $user->id);
         };
         if ($wantsJson) {
             try {
-                return new \Symfony\Component\HttpFoundation\JsonResponse(['positions' => (object) $move()]);
+                // Each course whose number changed, by its code, which is how its row is found.
+                $positions = [];
+                foreach ($move() as $movedId => $position) $positions[$this->courseCode((int) $movedId)] = $position;
+                return new \Symfony\Component\HttpFoundation\JsonResponse(['positions' => (object) $positions]);
             } catch (InvalidArgumentException $refused) {
                 return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => $refused->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
@@ -391,7 +419,7 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses');
     }
 
-    #[Route('/admin/courses/{id}', name: 'admin_course_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}', name: 'admin_course_update', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf();
@@ -401,12 +429,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updateCourse($courseId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['cover'] ?? null, UploadedSvg::COVER_BYTES, 'cover picture'));
             $this->flash('success', 'The course details were updated.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId);
+            $this->redirect($this->courseUrl($courseId));
+        }, $this->courseUrl($courseId));
     }
 
 
-    #[Route('/admin/courses/{id}/people', name: 'admin_course_update_people', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/people', name: 'admin_course_update_people', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePeople(): Response
     {
         $this->requireCsrf();
@@ -416,12 +444,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updateCoursePeople($courseId, $_POST, $user->id);
             $this->flash('success', 'The course owner and Course Editors were updated.');
-            $this->redirect(self::tabUrl($courseId, 'people'));
-        }, self::tabUrl($courseId, 'people'));
+            $this->redirect($this->tabUrl($courseId, 'people'));
+        }, $this->tabUrl($courseId, 'people'));
     }
 
 
-    #[Route('/admin/courses/{id}/pricing', name: 'admin_course_create_price_variant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/pricing', name: 'admin_course_create_price_variant', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function createPriceVariant(): Response
     {
         $this->requireCsrf();
@@ -431,12 +459,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->createPriceVariant($courseId, $_POST, $user->id);
             $this->flash('success', 'The course price option was added.');
-            $this->redirect(self::tabUrl($courseId, 'pricing'));
-        }, self::tabUrl($courseId, 'pricing'));
+            $this->redirect($this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'));
     }
 
 
-    #[Route('/admin/courses/{id}/pricing/{price_variant_id}', name: 'admin_course_update_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/pricing/{price_variant_id}', name: 'admin_course_update_price_variant', requirements: ['code' => CourseAddress::REQUIREMENT, 'price_variant_id' => '\\d+'], methods: ['POST'])]
     public function updatePriceVariant(): Response
     {
         $this->requireCsrf();
@@ -447,12 +475,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->updatePriceVariant($courseId, $variantId, $_POST, $user->id);
             $this->flash('success', 'The course price option was updated.');
-            $this->redirect(self::tabUrl($courseId, 'pricing'));
-        }, self::tabUrl($courseId, 'pricing'));
+            $this->redirect($this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'));
     }
 
 
-    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/default', name: 'admin_course_set_default_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/pricing/{price_variant_id}/default', name: 'admin_course_set_default_price_variant', requirements: ['code' => CourseAddress::REQUIREMENT, 'price_variant_id' => '\\d+'], methods: ['POST'])]
     public function setDefaultPriceVariant(): Response
     {
         $this->requireCsrf();
@@ -463,12 +491,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->setDefaultPriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The default catalogue price was updated.');
-            $this->redirect(self::tabUrl($courseId, 'pricing'));
-        }, self::tabUrl($courseId, 'pricing'));
+            $this->redirect($this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'));
     }
 
 
-    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/move', name: 'admin_course_move_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/pricing/{price_variant_id}/move', name: 'admin_course_move_price_variant', requirements: ['code' => CourseAddress::REQUIREMENT, 'price_variant_id' => '\\d+'], methods: ['POST'])]
     public function movePriceVariant(): Response
     {
         $this->requireCsrf();
@@ -478,12 +506,12 @@ final class AdminCourseController extends BaseController
         $variantId = $this->priceVariantId();
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->movePriceVariant($courseId, $variantId, (string) ($_POST['direction'] ?? ''), $user->id);
-            $this->redirect(self::tabUrl($courseId, 'pricing'));
-        }, self::tabUrl($courseId, 'pricing'));
+            $this->redirect($this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'));
     }
 
 
-    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/delete', name: 'admin_course_delete_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/pricing/{price_variant_id}/delete', name: 'admin_course_delete_price_variant', requirements: ['code' => CourseAddress::REQUIREMENT, 'price_variant_id' => '\\d+'], methods: ['POST'])]
     public function deletePriceVariant(): Response
     {
         $this->requireCsrf();
@@ -494,12 +522,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->deletePriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The course price option was removed.');
-            $this->redirect(self::tabUrl($courseId, 'pricing'));
-        }, self::tabUrl($courseId, 'pricing'));
+            $this->redirect($this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'));
     }
 
 
-    #[Route('/admin/courses/{id}/status', name: 'admin_course_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/status', name: 'admin_course_status', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function status(): Response
     {
         $this->requireCsrf();
@@ -510,12 +538,12 @@ final class AdminCourseController extends BaseController
             $status = trim((string) ($_POST['status'] ?? ''));
             $this->courses->changeStatus($courseId, $status, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course status is now ' . $status . '.');
-            $this->redirect(self::tabUrl($courseId, 'publication'));
-        }, self::tabUrl($courseId, 'publication'));
+            $this->redirect($this->tabUrl($courseId, 'publication'));
+        }, $this->tabUrl($courseId, 'publication'));
     }
 
 
-    #[Route('/admin/courses/{id}/submit-for-approval', name: 'admin_course_submit_for_approval', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/submit-for-approval', name: 'admin_course_submit_for_approval', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function submitForApproval(): Response
     {
         $this->requireCsrf();
@@ -525,12 +553,12 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->submitForApproval($courseId, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course was submitted for platform approval.');
-            $this->redirect(self::tabUrl($courseId, 'publication'));
-        }, self::tabUrl($courseId, 'publication'));
+            $this->redirect($this->tabUrl($courseId, 'publication'));
+        }, $this->tabUrl($courseId, 'publication'));
     }
 
 
-    #[Route('/admin/courses/{id}/grade-bands', name: 'admin_course_update_grade_bands', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/grade-bands', name: 'admin_course_update_grade_bands', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function updateGradeBands(): Response
     {
         $this->requireCsrf();
@@ -540,8 +568,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->replaceGradeBands($courseId, $_POST, $user->id);
             $this->flash('success', 'The course grade bands were updated.');
-            $this->redirect(self::tabUrl($courseId, 'grades'));
-        }, self::tabUrl($courseId, 'grades'));
+            $this->redirect($this->tabUrl($courseId, 'grades'));
+        }, $this->tabUrl($courseId, 'grades'));
     }
 
 
@@ -636,39 +664,21 @@ final class AdminCourseController extends BaseController
             $analysis['parser_compatibility_count'] = (int) ($parser['compatibility_notice_count'] ?? 0);
             $analysis['parser_structural_count'] = (int) ($parser['structural_warning_count'] ?? 0);
             $analysis['parser_messages'] = (array) ($parser['messages'] ?? []);
-            $user = $this->requireUser();
-            // The replaceable-course picker filters in PHP on hasStartedLearners() and
-            // ownership, so it cannot be paginated without moving both rules into SQL. It is
-            // bounded here at the largest approved page size rather than left unbounded; the
-            // import screen is outside the v0.5.7.6 pagination scope and this surface is
-            // recorded as a follow-up candidate for the entity-lookup pattern.
-            $replaceable = array_values(array_filter(
-                $this->courses->adminCourses(null, true, max(Pagination::PAGE_SIZES), 0),
-                fn(array $course): bool => $user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id
-            ));
-            // A course imported a second time collides with its own Course Items. Say that once and
-            // choose it under Replace, rather than listing every key as a problem to resolve.
-            $holder = $this->portability->courseHoldingConflicts($analysis);
-            // The course with the file's code is the same course (owner, 2026-10-23), before any key collision says so.
+            // The canonical import's review (owner, 2026-11-06: "By default, what is in the import file wins"): the course with
+            // the file's code is the one it updates, with every difference the file states (CataloguePackage).
+            $review = $this->cataloguePackage->reviewCourseFile($key);
+            if ($review['course_id'] !== null && $review['action'] !== 'skip') $this->requireManagedCourse((int) $review['course_id']);
+            // The warnings never name a course's own keys as problems: they are the course it updates, or the one the review
+            // says, in one sentence, it would copy.
+            if ($review['course_id'] !== null) $analysis['warnings'] = array_values(array_diff((array) ($analysis['warnings'] ?? []), (array) ($analysis['key_conflicts'] ?? [])));
+            // A course file holds no files, so replacing from one takes them away: say so before it happens.
+            $fileParts = $review['course_id'] !== null && $review['action'] === 'update' && (array) ($analysis['resources'] ?? []) === [] ? $this->portability->fileParts((int) $review['course_id']) : [];
+            // The code a new course will have: the file's, else one suggested from its title.
             $fileCode = (string) ($analysis['course']['code'] ?? '');
-            $byCode = $this->portability->courseWithCode($fileCode);
-            $existingCourse = null;
-            foreach ($replaceable as $course) {
-                if ($byCode !== null && (int) $course['id'] === (int) $byCode['id']) {
-                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'code' => (string) $course['code'], 'by_code' => true];
-                } elseif ($existingCourse === null && (int) $course['id'] === $holder) {
-                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'code' => (string) $course['code'], 'by_code' => false];
-                }
-            }
-            if ($existingCourse !== null) {
-                $analysis['warnings'] = array_values(array_diff((array) ($analysis['warnings'] ?? []), (array) ($analysis['key_conflicts'] ?? [])));
-                // A course file holds no files, so replacing from one takes them away: say so before it happens.
-                $existingCourse['file_parts'] = (array) ($analysis['resources'] ?? []) === [] ? $this->portability->fileParts($existingCourse['id']) : [];
-            }
-            // The code it will have: the file's, a replaced course's own, else one suggested from its title.
-            $importCode = $fileCode !== '' ? $fileCode : ($existingCourse !== null ? $existingCourse['code'] : $this->courses->suggestCourseCode((string) ($analysis['course']['title'] ?? '')));
+            $importCode = $fileCode !== '' ? $fileCode : $this->courses->suggestCourseCode((string) ($analysis['course']['title'] ?? ''));
             // A course package names its category: chosen already when the site has it (owner, 2026-10-23).
             $packageCategory = is_array($analysis['catalogue'] ?? null) ? $this->catalogueSettings->categoryIdByPath((string) ($analysis['catalogue']['category'] ?? '')) : null;
+            $user = $this->requireUser();
             return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
@@ -676,8 +686,10 @@ final class AdminCourseController extends BaseController
                 'import_code_from_file' => $fileCode !== '',
                 'category_picker' => $this->courses->courseCategoryPicker($packageCategory),
                 'category_places' => $this->courses->categoryLocationPicker(),
-                'replaceable_courses' => $replaceable,
-                'existing_course' => $existingCourse,
+                'review' => $review,
+                'file_parts' => $fileParts,
+                'can_price' => $user->hasPermission('COURSE.PRICING.MANAGE'),
+                'can_publish' => $user->hasPermission('COURSE.PUBLISH'),
             ]);
         }, '/admin/courses/import');
     }
@@ -715,21 +727,30 @@ final class AdminCourseController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.IMPORT');
         $key = trim((string) ($_POST['import_key'] ?? ''));
-        $categoryId = (int) ($_POST['category_id'] ?? 0);
-        $replaceCourseId = (int) ($_POST['replace_course_id'] ?? 0);
-        $code = trim((string) ($_POST['code'] ?? ''));
-        return $this->handle(function () use ($user, $key, $categoryId, $replaceCourseId, $code): void {
-            if ($replaceCourseId > 0) {
-                $this->requireManagedCourse($replaceCourseId);
-            }
-            $courseId = $this->portability->commitImport($key, $categoryId, $user->id, $replaceCourseId > 0 ? $replaceCourseId : null, $code);
-            $this->flash('success', 'The course was imported into PostgreSQL as a draft.');
-            $this->redirect('/admin/courses/' . $courseId);
+        return $this->handle(function () use ($user, $key): void {
+            // The course the file's code names, which only someone who manages it may update.
+            $review = $this->cataloguePackage->reviewCourseFile($key);
+            if ($review['course_id'] !== null && $review['action'] !== 'skip') $this->requireManagedCourse((int) $review['course_id']);
+            // Each difference is the file's unless Keep this site's was chosen for it (owner, 2026-11-06).
+            $result = $this->cataloguePackage->importCourseFile($key, [
+                'fingerprint' => $this->posted('fingerprint'),
+                'keep' => array_map('strval', array_keys(array_filter((array) ($_POST['choice'] ?? []), static fn(mixed $choice): bool => $choice === 'site'))),
+                'may_price' => $user->hasPermission('COURSE.PRICING.MANAGE'),
+                'may_publish' => $user->hasPermission('COURSE.PUBLISH'),
+                'category_id' => (int) ($_POST['category_id'] ?? 0),
+                'code' => trim((string) ($_POST['code'] ?? '')),
+            ], $user->id);
+            $this->flash('success', match ($result['outcome']) {
+                'imported' => 'The course was imported as a draft.',
+                'unchanged' => 'Nothing in the file differs from the course here, so nothing changed.',
+                default => 'The course was updated from the file: ' . implode('. ', $result['details']) . '.',
+            });
+            $this->redirect($this->courseUrl($result['course_id']));
         }, '/admin/courses/import/preview?key=' . rawurlencode($key));
     }
 
 
-    #[Route('/admin/courses/{id}/grant-self', name: 'admin_course_grant_self', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/grant-self', name: 'admin_course_grant_self', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function grantSelf(): Response
     {
         $this->requireCsrf();
@@ -741,11 +762,11 @@ final class AdminCourseController extends BaseController
             $this->courses->grantForTesting($courseId, $user->id, $user->id);
             $this->flash('success', 'The course is in your library. It has not started yet.');
             $this->redirect('/learn/' . rawurlencode((string) $course['slug']));
-        }, self::tabUrl($courseId, 'test-access'));
+        }, $this->tabUrl($courseId, 'test-access'));
     }
 
 
-    #[Route('/admin/courses/{id}/grant', name: 'admin_course_grant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/grant', name: 'admin_course_grant', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function grant(): Response
     {
         $this->requireCsrf();
@@ -761,12 +782,12 @@ final class AdminCourseController extends BaseController
                 $user->id
             );
             $this->flash('success', 'Course access granted to ' . $result['count'] . ' people until ' . $result['expires_at'] . '.');
-            $this->redirect(self::tabUrl($courseId, 'test-access'));
-        }, self::tabUrl($courseId, 'test-access'));
+            $this->redirect($this->tabUrl($courseId, 'test-access'));
+        }, $this->tabUrl($courseId, 'test-access'));
     }
 
 
-    #[Route('/admin/courses/{id}/presentation', name: 'admin_course_import_presentation', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/presentation', name: 'admin_course_import_presentation', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function importPresentation(): Response
     {
         $this->requireCsrf();
@@ -784,12 +805,12 @@ final class AdminCourseController extends BaseController
                 'Course presentation imported from ' . (string) $result['source_filename']
                 . ' (' . number_format((int) $result['css_bytes']) . ' CSS bytes).'
             );
-            $this->redirect(self::tabUrl($courseId, 'css'));
-        }, self::tabUrl($courseId, 'css'));
+            $this->redirect($this->tabUrl($courseId, 'css'));
+        }, $this->tabUrl($courseId, 'css'));
     }
 
 
-    #[Route('/admin/courses/{id}/presentation-css', name: 'admin_course_update_presentation_css', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/presentation-css', name: 'admin_course_update_presentation_css', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePresentationCss(): Response
     {
         $this->requireCsrf();
@@ -799,8 +820,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updatePresentationCss($courseId, (string) ($_POST['presentation_css'] ?? ''), $user->id);
             $this->flash('success', 'The course presentation stylesheet was saved.');
-            $this->redirect(self::tabUrl($courseId, 'css'));
-        }, self::tabUrl($courseId, 'css'));
+            $this->redirect($this->tabUrl($courseId, 'css'));
+        }, $this->tabUrl($courseId, 'css'));
     }
 
 
@@ -809,7 +830,7 @@ final class AdminCourseController extends BaseController
      * html file that can be used on its own and also imports back in"): it works in a browser on its own, and importing
      * it gives the course back.
      */
-    #[Route('/admin/courses/{id}/course-file', name: 'admin_course_file', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/course-file', name: 'admin_course_file', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function courseFile(): Response
     {
         $this->requirePermission('COURSE.EXPORT');
@@ -818,7 +839,7 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($courseId): Response {
             $file = $this->courseFile->fromCourse($courseId);
             return $this->htmlFile($file['html'], $file['filename']);
-        }, '/admin/courses/' . $courseId);
+        }, $this->courseUrl($courseId));
     }
 
     /**
@@ -826,18 +847,20 @@ final class AdminCourseController extends BaseController
      * method and make sure the import process works with whatever you export"): the catalogue package of this one course,
      * which imports back at Import & Export Catalogue. A course file cannot hold them.
      */
-    #[Route('/admin/courses/{id}/course-package', name: 'admin_course_package', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/course-package', name: 'admin_course_package', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function coursePackage(): Response
     {
         $this->requirePermission('COURSE.EXPORT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($courseId): Response {
+            // Named as the course file is, with -with-its-files (owner, 2026-11-06): never by the course's row id.
+            $name = $this->cataloguePackage->downloadName($courseId);
             $path = $this->cataloguePackage->export($this->requireUser()->id, [$courseId]);
             $response = new \Symfony\Component\HttpFoundation\BinaryFileResponse($path, 200, ['Content-Type' => 'application/zip', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
-            $response->setContentDisposition(\Symfony\Component\HttpFoundation\ResponseHeaderBag::DISPOSITION_ATTACHMENT, 'course-' . $courseId . '-with-its-files.zip');
+            $response->setContentDisposition(\Symfony\Component\HttpFoundation\ResponseHeaderBag::DISPOSITION_ATTACHMENT, $name);
             return $response->deleteFileAfterSend();
-        }, '/admin/courses/' . $courseId);
+        }, $this->courseUrl($courseId));
     }
 
     private function htmlFile(string $html, string $filename): Response
@@ -845,7 +868,7 @@ final class AdminCourseController extends BaseController
         return new Response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8', 'Content-Disposition' => 'attachment; filename="' . $filename . '"', 'Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
-    #[Route('/admin/courses/{id}/export', name: 'admin_course_export', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/export', name: 'admin_course_export', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function export(): Response
     {
         $this->requirePermission('COURSE.EXPORT');
@@ -859,7 +882,7 @@ final class AdminCourseController extends BaseController
         } catch (InvalidArgumentException $exception) {
             $this->flash('error', $exception->getMessage());
             // redirect() terminates the request, so there is nothing after this.
-            $this->redirect('/admin/courses/' . $courseId);
+            $this->redirect($this->courseUrl($courseId));
         }
         $filename = (string) $course['slug'] . '.course.json';
         header('Content-Type: application/json; charset=UTF-8');
@@ -869,7 +892,7 @@ final class AdminCourseController extends BaseController
     }
 
 
-    #[Route('/admin/courses/{id}/reset', name: 'admin_course_reset_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/reset', name: 'admin_course_reset_course', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function resetCourse(): Response
     {
         $this->requireCsrf();
@@ -884,7 +907,7 @@ final class AdminCourseController extends BaseController
     }
 
 
-    #[Route('/admin/courses/{id}/delete', name: 'admin_course_delete_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/delete', name: 'admin_course_delete_course', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function deleteCourse(): Response
     {
         $this->requireCsrf();
@@ -944,13 +967,10 @@ final class AdminCourseController extends BaseController
         ];
     }
 
+    /** The course the address names by its code, as its row id (owner, 2026-11-06). */
     private function courseId(): int
     {
-        $id = (int) $this->param('id');
-        if ($id < 1) {
-            throw new InvalidArgumentException('Invalid course identifier.');
-        }
-        return $id;
+        return $this->courseIdFromAddress($this->courses);
     }
 
     private function priceVariantId(): int

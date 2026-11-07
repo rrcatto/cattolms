@@ -169,12 +169,14 @@ final class DownloadableFileIntegrationTest extends TestCase
         $item = $this->downloadItem('embedded', $resource);
         $lesson = $this->items->create(['item_key' => 'host-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => 'Host', 'content_source' => '<p>Before</p>[course-item:embedded-' . $this->suffix . ']'], $this->owner);
         $hostNode = $this->items->addExisting($this->courseA, $lesson, [], $this->owner);
-        $html = $this->renderer->render($this->items->item($lesson), 'downloads-a-' . $this->suffix, $hostNode);
-        self::assertStringContainsString('href="/learn/downloads-a-' . $this->suffix . '/item/' . $hostNode . '/download/embedded-' . $this->suffix . '"', $html);
+        // The download names its placement by the part's name (owner, 2026-11-06: no row id in an address).
+        $hostPart = (string) $this->db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id=:id', ['id' => $hostNode]);
+        $html = $this->renderer->render($this->items->item($lesson), 'downloads-a-' . $this->suffix, $hostPart);
+        self::assertStringContainsString('href="/learn/downloads-a-' . $this->suffix . '/' . $hostPart . '/download/embedded-' . $this->suffix . '"', $html);
         self::assertStringContainsString('embedded-' . $this->suffix . '.zip · ZIP archive · ', $html);
         self::assertStringContainsString('<h3 class="cl-course-item-download-title">Templates and Precedents</h3>', $html);
         self::assertStringNotContainsString('/course-resources/', $html);
-        self::assertStringNotContainsString('href=', $this->renderer->render($this->items->item($item), 'downloads-a-' . $this->suffix, $hostNode, true), 'A public preview offers no link.');
+        self::assertStringNotContainsString('href=', $this->renderer->render($this->items->item($item), 'downloads-a-' . $this->suffix, $hostPart, true), 'A public preview offers no link.');
 
         $learner = $this->startedLearner($this->courseA, 'downloads-a-' . $this->suffix);
         self::assertSame('embedded-' . $this->suffix . '.zip', $this->learning->download($learner, 'downloads-a-' . $this->suffix, $hostNode, 'embedded-' . $this->suffix)['filename']);
@@ -187,7 +189,7 @@ final class DownloadableFileIntegrationTest extends TestCase
         $before = $_COOKIE;
         $_COOKIE = [];
         try {
-            $response = $kernel->handle(\Symfony\Component\HttpFoundation\Request::create('/learn/downloads-a-' . $this->suffix . '/item/1/download/pack-' . $this->suffix, 'GET'));
+            $response = $kernel->handle(\Symfony\Component\HttpFoundation\Request::create('/learn/downloads-a-' . $this->suffix . '/templates-and-precedents/download/pack-' . $this->suffix, 'GET'));
             self::assertNotSame(200, $response->getStatusCode());
             self::assertNull($response->headers->get('Content-Disposition'));
             self::assertStringContainsString('/login', (string) $response->headers->get('Location'), 'A signed-out visitor is sent to sign in.');

@@ -188,6 +188,23 @@ final class CourseFileOriginalBuildIntegrationTest extends TestCase
         self::assertStringContainsString('function gradeQuiz(id)', $less, 'The styling and the script stay.');
     }
 
+    /** data-assessment-required="false" (specification section 10) is an assessment that does not count, and stays so on the way back out. */
+    public function testAnAssessmentMarkedNotToCountComesInAsPracticeAndGoesOutTheSame(): void
+    {
+        $html = str_replace('id="mod-m2" data-assessment-required="true"', 'id="mod-m2" data-assessment-required="false"', OriginalBuildExample::html());
+        self::assertStringContainsString('id="mod-m2" data-assessment-required="false"', $html);
+        $course = $this->import($html, 'grow.html');
+        $roles = [];
+        foreach ($this->container->get(CourseItemService::class)->availability($course, null, false) as $row) {
+            if (($row['item_type'] ?? '') === 'assessment') { $roles[(string) $row['item_title']] = [(string) $row['assessment_role'], (bool) $row['practice']]; }
+        }
+        self::assertSame(['graded', false], $roles['Soil and compost assessment'] ?? null, 'Module 1 counts.');
+        self::assertSame(['content', true], $roles['Sowing and planting assessment'] ?? null, 'Module 2 does not: it is practice, never made graded.');
+        $file = $this->files->render($this->portability->exportCourse($course))['html'];
+        self::assertStringContainsString('id="mod-m2" data-assessment-required="false"', $file, 'The file says so again.');
+        self::assertStringContainsString('id="mod-m1" data-assessment-required="true"', $file);
+    }
+
     public function testTheFileImportsBackAndASecondExportIsTheSame(): void
     {
         $course = $this->import(OriginalBuildExample::html(), 'grow.html');

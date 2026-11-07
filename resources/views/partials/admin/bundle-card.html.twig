@@ -1,0 +1,18 @@
+{#
+	One bundle's card in Administration > Bundles' grid (shown in the grid, and drawn again after it is edited in place,
+	owner 2026-11-06). Variables as bundle-row.html.twig.
+#}
+{% embed ui_template('data.card') with {props: ui_props('data.card', {title: bundle.title, href: bundle_admin_url(bundle), picture: 'wide'})} %}
+{% block picture %}{% if bundle.cover_svg|default('') starts with '<svg' %}{{ bundle.cover_svg|raw }}{% endif %}{% endblock %}
+{% block details %}
+	<span id="{{ bundle_anchor(bundle) }}" class="cl-course-anchor"{% if bundle_saved|default(false) %} data-bundle-saved{% endif %}></span>
+	<p class="cl-ui-card-line"><code class="cl-course-code">{{ bundle.code }}</code></p>
+	<p class="cl-ui-card-line">{% if bundle.price_label %}<strong class="cl-price-now">{{ bundle.price_label }}</strong>{% if bundle.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ bundle.was_label }}</s>{% endif %}{% if bundle.access_label %} <span class="cl-ui-card-quiet">· {{ bundle.access_label }}</span>{% endif %}{% else %}No price yet{% endif %}</p>
+	<div class="role-list">{% include '@platform/partials/bundle-status.html.twig' with {status: bundle.status, on_sale: bundle.offer_active} %}</div>
+	<p class="cl-ui-card-line cl-ui-card-quiet">On sale from {{ bundle.from_label ?? 'now' }}{% if bundle.until_label %} until {{ bundle.until_label }}{% endif %} · {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }} · {{ bundle.sales }} {{ bundle.sales == 1 ? 'sale' : 'sales' }}</p>
+{% endblock %}
+{% block actions %}
+	{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: bundle_admin_url(bundle), icon: 'action-manage'}) }}
+	{% if can_manage %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ bundle.title ~ ' here', title: 'Edit the code, title, status, price, sale dates and access here', icon: 'action-edit', icon_only: true, variant: 'secondary', size: 'small', href: bundles_list_href ~ 'edit=' ~ bundle.code|url_encode ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?mode=edit&view=grid'), target: 'closest li', swap: 'outerHTML'}) }}{% endif %}
+{% endblock %}
+{% endembed %}

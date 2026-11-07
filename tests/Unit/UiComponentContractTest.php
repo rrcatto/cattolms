@@ -241,9 +241,13 @@ final class UiComponentContractTest extends TestCase
     {
         $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
         self::assertStringContainsString("node.item_type in ['assessment', 'diagnostic']", $source);
-        self::assertStringContainsString("'/assessment/' ~ node.item_key", $source);
-        self::assertStringContainsString("'/content'", $source);
+        // Every stop's address, an assessment's own page among them, is made by the part's name in one place (2026-11-07).
+        self::assertStringContainsString("stop_url('reader', course, node, presentation_query)", $source);
+        self::assertStringContainsString("stop_url('preview', course, node,", $source);
         $root = dirname(__DIR__, 2);
+        $address = (string) file_get_contents($root . '/src/Support/Address/CoursePartAddress.php');
+        self::assertStringContainsString("in_array((string) (\$row['item_type'] ?? ''), ['assessment', 'diagnostic'], true)", $address);
+        self::assertStringContainsString("'/assessment/' . rawurlencode((string) (\$row['item_key'] ?? ''))", $address);
         foreach (['src/Http/Controller/LearningController.php', 'src/Http/Controller/CoursePresentationController.php'] as $path) {
             $controller = (string) file_get_contents($root . '/' . $path);
             self::assertStringContainsString("throw \$this->notFound('Assessments open from their direct assessment route.')", $controller);
@@ -268,7 +272,7 @@ final class UiComponentContractTest extends TestCase
     {
         $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
         self::assertStringContainsString("admin_public_preview = public_preview and course.public_preview_query|default('') == '?preview=1'", $source);
-        self::assertStringContainsString("'/admin/courses/' ~ course.id ~ '/content'", $source);
+        self::assertStringContainsString("course_admin_url(course, '/content')", $source);
         self::assertStringContainsString("'Exit public preview'", $source);
     }
 

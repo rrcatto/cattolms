@@ -35,7 +35,7 @@ final class AdminAttentionRepository
     public function pendingReviews(): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT r.id, r.rating, r.submitted_at, r.published_at IS NOT NULL AS is_edit, c.title AS course_title, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
+            'SELECT r.id, r.rating, r.submitted_at, r.published_at IS NOT NULL AS is_edit, c.title AS course_title, c.code AS course_code, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
                FROM course_reviews r JOIN courses c ON c.id = r.course_id JOIN users u ON u.id = r.user_id
               WHERE r.status = \'pending\' ORDER BY r.submitted_at, r.id'
         );
@@ -45,7 +45,7 @@ final class AdminAttentionRepository
     public function pendingCourseRequests(): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT r.id, r.requested_at, c.title AS course_title, co.name AS company_name, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
+            'SELECT r.id, r.requested_at, c.title AS course_title, c.code AS course_code, co.name AS company_name, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
                FROM course_requests r JOIN courses c ON c.id = r.course_id JOIN users u ON u.id = r.user_id
                LEFT JOIN companies co ON co.id = r.company_id
               WHERE r.status = \'pending\' ORDER BY r.requested_at, r.id'
@@ -66,7 +66,7 @@ final class AdminAttentionRepository
     public function draftCourses(): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT id, title, updated_at FROM courses WHERE status = \'draft\' ORDER BY updated_at, id'
+            'SELECT id, code, title, updated_at FROM courses WHERE status = \'draft\' ORDER BY updated_at, id'
         );
     }
 }

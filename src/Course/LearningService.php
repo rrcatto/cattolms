@@ -11,6 +11,8 @@ Description:
 Implements Catto Learning business and application logic for learning operations.
 
 Changelog:
+2026/11/07 SAST
+- A stop's address names its part by its part name (/learn/{slug}/{part}), never its row id (CoursePartAddress).
 2026/11/01 SAST
 - The outline's ticks come from CourseNavigation::withDone(), which the public preview shares; an assessment ticks itself
   once finished (a graded attempt, a readiness check, or practice on a practice-only assessment).
@@ -45,28 +47,23 @@ use CattoLearning\Support\Pagination;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\Slug;
 use CattoLearning\Commerce\Application\AccessService;
+use CattoLearning\Support\Address\CoursePartAddress;
 use InvalidArgumentException;
 
 final class LearningService
 {
     /**
-     * The four datasets the Course Library shows, in render order.
+     * The two lists of My Courses, one shown at a time in one table and chosen by a feature card (owner, 2026-10-21:
+     * "Could these be consolidated into one table and you provide 4 Feature Card Radio Selectors"; since 2026-11-06 "The
+     * My Courses page should be restricted to showing courses you're currently taking and completed courses"): favourites
+     * and course requests are pages of their own (Application\AccountFavourites, courseRequestsView()).
      *
-     * `statuses` narrows the enrolment query; null marks a dataset answered by its own read.
-     */
-    /**
-     * The four lists of My Courses, one shown at a time in one table and chosen by a feature card (owner, 2026-10-21:
-     * "Could these be consolidated into one table and you provide 4 Feature Card Radio Selectors").
+     * `statuses` narrows the enrolment query.
      */
     public const LIBRARY_DATASETS = [
         'current' => ['label' => 'Current courses', 'note' => 'under way or waiting to start', 'statuses' => CourseRepository::LIBRARY_CURRENT],
         'completed' => ['label' => 'Completed courses', 'note' => 'finished, with results and certificates', 'statuses' => CourseRepository::LIBRARY_COMPLETED],
-        'favourites' => ['label' => 'Favourite courses', 'note' => 'marked to come back to', 'statuses' => null],
-        'requests' => ['label' => 'Course requests', 'note' => 'asked for, and where each stands', 'statuses' => null],
     ];
-
-    /** Lists only an account that belongs to a company has (owner, 2026-10-21: course requests are "a function of company accounts, not individuals"). */
-    public const COMPANY_LISTS = ['requests'];
 
     /** The search field shows from this many entries in the chosen list (owner, 2026-10-21). */
     public const LIBRARY_SEARCH_FROM = 5;
@@ -87,11 +84,10 @@ final class LearningService
 
 
     /**
-     * My Courses: a feature card for each of the lists with how many it holds, and the chosen list (`list`, Current
-     * courses when none is named) paged and searched as the one `library` dataset. Course requests are a list only for
-     * an account that belongs to a company. A list the account does not have is refused, never replaced by another
-     * (owner, 2026-10-21: "make it a 404"). The search is offered only when the list holds LIBRARY_SEARCH_FROM entries
-     * or more, or a search is already narrowing it.
+     * My Courses: a feature card for each of its two lists with how many it holds, and the chosen list (`list`, Current
+     * courses when none is named) paged and searched as the one `library` dataset. A list that does not exist is refused,
+     * never replaced by another (owner, 2026-10-21: "make it a 404"). The search is offered only when the list holds
+     * LIBRARY_SEARCH_FROM entries or more, or a search is already narrowing it.
      *
      * Built here rather than in a controller because two screens show it - the standalone
      * /account/courses page and the My Courses section of the consolidated /account workspace.
@@ -99,56 +95,53 @@ final class LearningService
      * @param array<string,mixed> $request  the chosen list, and the library's page, page size and search term
      * @return array<string,mixed>
      */
-    public function courseLibraryView(int $userId, bool $companyAccount, array $request, callable $paginate, callable $paginationView): array
+    public function courseLibraryView(int $userId, array $request, callable $paginate, callable $paginationView): array
     {
-        $offered = array_intersect_key(self::LIBRARY_DATASETS, array_flip($this->libraryLists($companyAccount)));
         $chosen = $request['list'] ?? 'current';
-        if (!is_string($chosen) || !isset($offered[$chosen])) throw new InvalidArgumentException('There is no such list of courses.');
+        if (!is_string($chosen) || !isset(self::LIBRARY_DATASETS[$chosen])) throw new InvalidArgumentException('There is no such list of courses.');
         $lists = [];
         $all = 0;
-        foreach ($offered as $key => $definition) {
-            $count = $this->libraryListCount($userId, $key, '');
+        foreach (self::LIBRARY_DATASETS as $key => $definition) {
+            $count = $this->libraryCount($userId, $definition['statuses']);
             if ($key === $chosen) $all = $count;
             $lists[] = ['value' => $key, 'label' => $definition['label'], 'note' => ($count === 0 ? 'None' : (string) $count) . ' ' . $definition['note']];
         }
         $search = PlatformAdministrationService::searchTerm('library', $request);
-        $total = $search === '' ? $all : $this->libraryListCount($userId, $chosen, $search);
+        $statuses = self::LIBRARY_DATASETS[$chosen]['statuses'];
+        $total = $search === '' ? $all : $this->libraryCount($userId, $statuses, $search);
         /** @var Pagination $pagination */
         $pagination = $paginate('library', $request, $total);
-        $statuses = (array) self::LIBRARY_DATASETS[$chosen]['statuses'];
-        $rows = match ($chosen) {
-            'favourites' => $this->administration->favouritesPage($userId, $pagination->pageSize, $pagination->offset, $search),
-            'requests' => $this->administration->userRequestsPage($userId, $pagination->pageSize, $pagination->offset, $search),
-            default => $this->libraryPage($userId, $statuses, $pagination->pageSize, $pagination->offset, $search),
-        };
 
         return [
             'library_list' => $chosen,
             'library_lists' => $lists,
-            'library_rows' => $rows,
+            'library_rows' => $this->libraryPage($userId, $statuses, $pagination->pageSize, $pagination->offset, $search),
             'library_search' => $search,
             'library_searchable' => $all >= self::LIBRARY_SEARCH_FROM || $search !== '',
         ] + $paginationView('library', $pagination, self::LIBRARY_DATASETS[$chosen]['label'], $search, $chosen);
     }
 
     /**
-     * The lists of My Courses an account has.
+     * Course Requests, a page of its own (owner, 2026-11-06), for an account that belongs to a company: the courses the
+     * person asked their company for, newest first, paged and searched as the `requests` dataset, the search offered from
+     * LIBRARY_SEARCH_FROM requests or while one is narrowing the list.
      *
-     * @return list<string>
+     * @param array<string,mixed> $request the requests' page, page size and search term
+     * @return array<string,mixed>
      */
-    public function libraryLists(bool $companyAccount): array
+    public function courseRequestsView(int $userId, array $request, callable $paginate, callable $paginationView): array
     {
-        return $companyAccount ? array_keys(self::LIBRARY_DATASETS) : array_values(array_diff(array_keys(self::LIBRARY_DATASETS), self::COMPANY_LISTS));
-    }
+        $all = $this->administration->userRequestsCount($userId);
+        $search = PlatformAdministrationService::searchTerm('requests', $request);
+        $total = $search === '' ? $all : $this->administration->userRequestsCount($userId, $search);
+        /** @var Pagination $pagination */
+        $pagination = $paginate('requests', $request, $total);
 
-    /** How many entries one of the four lists holds, narrowed by a search term. */
-    private function libraryListCount(int $userId, string $list, string $search): int
-    {
-        return match ($list) {
-            'favourites' => $this->administration->favouritesCount($userId, $search),
-            'requests' => $this->administration->userRequestsCount($userId, $search),
-            default => $this->libraryCount($userId, (array) self::LIBRARY_DATASETS[$list]['statuses'], $search),
-        };
+        return [
+            'requests_rows' => $this->administration->userRequestsPage($userId, $pagination->pageSize, $pagination->offset, $search),
+            'requests_search' => $search,
+            'requests_searchable' => $all >= self::LIBRARY_SEARCH_FROM || $search !== '',
+        ] + $paginationView('requests', $pagination, 'Course requests', $search);
     }
 
     /** @return list<array<string,mixed>> */
@@ -353,7 +346,7 @@ final class LearningService
         // A Presentation's Continue leads to the next stop, or back to the course after the last (CatWalk, 2026-10-28).
         $next = $around['next'];
         $continue = $next === null ? '/learn/' . rawurlencode((string) $course['slug']) : self::stopPath((string) $course['slug'], $next);
-        $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false, [], ['continue' => $continue . ($preview ? '?preview=1' : '')]);
+        $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], (string) $node['part_name'], false, [], ['continue' => $continue . ($preview ? '?preview=1' : '')]);
         $node['rendered_html'] = GradeScale::resolve($node['rendered_html'], (array) $course['grade_bands']);
         if ($preview) { $node['rendered_html'] = preg_replace('/(href="\/learn\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['item'] = $node;
@@ -400,14 +393,13 @@ final class LearningService
     }
 
     /**
-     * A stop's address in the reader: an assessment's own page, anything else its content page.
+     * A stop's address in the reader, by its part name: an assessment's own page, anything else the part's page.
      *
      * @param array<string,mixed> $row
      */
     private static function stopPath(string $slug, array $row): string
     {
-        $assessment = in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true);
-        return '/learn/' . rawurlencode($slug) . '/item/' . (int) $row['id'] . ($assessment ? '/assessment/' . rawurlencode((string) $row['item_key']) : '/content');
+        return CoursePartAddress::stop('reader', $slug, $row);
     }
 
     private function durationLabel(int $seconds): string

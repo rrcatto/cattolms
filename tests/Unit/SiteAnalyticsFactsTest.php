@@ -27,6 +27,36 @@ final class SiteAnalyticsFactsTest extends TestCase
         self::assertSame('/courses/growing-vegetables', RequestFacts::maskedPath('/courses/growing-vegetables?utm_source=x'));
         self::assertSame('/whatever/••••/x', RequestFacts::maskedPath('/whatever/' . $hex . '/x'), 'anything shaped like a key, wherever it comes');
         self::assertSame('/courses/a-very-long-course-name-with-no-digits-in-it-at-all', RequestFacts::maskedPath('/courses/a-very-long-course-name-with-no-digits-in-it-at-all'));
+        // A random id and a URL-safe token stay hidden wherever they come (2026-11-07).
+        self::assertSame('/learn/x/assessment/session/••••', RequestFacts::maskedPath('/learn/x/assessment/session/550e8400-e29b-41d4-a716-446655440000'));
+        self::assertSame('/x/••••', RequestFacts::maskedPath('/x/Ab3dE_fG-hIjK1mNoPqRsTuVwXyZ0123456789abcde'));
+        self::assertSame('/x/••••', RequestFacts::maskedPath('/x/k7m2x9qa3f9a2c1b7d4e0f1a2b3c4d5e6f'));
+    }
+
+    /**
+     * The keys that name records in addresses are kept, so the Site Log says which page was asked for (owner,
+     * 2026-11-06: no row id in an address, a recognisable code instead): account references, order and document numbers,
+     * certificate numbers in Administration, contact message references, Course Item slugs and part names, long ones with
+     * digits in them too.
+     */
+    public function testTheKeysThatNameRecordsAreKept(): void
+    {
+        foreach ([
+            '/admin/people/CL2026011510423Z',
+            '/company/people/CL2026011510423Z/status',
+            '/admin/companies/CL2026011510418T',
+            '/account/orders/CL-00000689/documents/INV-00000044',
+            '/admin/commerce/orders/CL-00000689',
+            '/admin/certificates/CL-2026-3F9A2C1B7D4E',
+            '/admin/messages/MSG-000043',
+            '/admin/course-items/growing-vegetables-in-small-spaces-m1-presentation',
+            '/admin/course-items/gdn-101-module-12-practical-work-and-model-answers/slides/s1a2b3',
+            '/learn/growing-vegetables-in-small-spaces/module-12-practical-work-and-model-answers-2',
+            '/courses/growing-vegetables/preview/module-1-presentation/pdf',
+            '/admin/courses/categories/garden-design',
+        ] as $path) {
+            self::assertSame($path, RequestFacts::maskedPath($path));
+        }
     }
 
     public function testAnIpv6MachineCountsAsItsWholeSlash64(): void

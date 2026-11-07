@@ -155,7 +155,7 @@ final class CourseItemNamesIntegrationTest extends TestCase
 
         $render = function (int $id): string {
             $row = array_values(array_filter($this->items->availability($this->course, null, false), static fn(array $row): bool => (int) ($row['course_item_id'] ?? 0) === $id))[0];
-            return $this->container->get(CourseItemRenderer::class)->render($row, 'item-names-' . $this->suffix, (int) $row['id']);
+            return $this->container->get(CourseItemRenderer::class)->render($row, 'item-names-' . $this->suffix, (string) $row['part_name']);
         };
         $html = $render($deck);
         self::assertStringContainsString('data-cw-title="The soil &amp; what feeds it"', $html, 'The top bar shows the description, not the title again.');

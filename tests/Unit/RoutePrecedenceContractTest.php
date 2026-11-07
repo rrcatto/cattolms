@@ -26,6 +26,12 @@ Symfony match it last whatever order the files load in.
 Architectural boundary: unit. It reads the route attributes and touches nothing else.
 
 Changelog:
+2026/11/07 SAST
+- Every record's key requirement is read too (KEY_REQUIREMENTS: account references, order and document numbers, codes,
+  slugs, certificate numbers, message references, Course Item slugs and part names).
+2026/11/06 SAST
+- A course code's requirement (CourseAddress::REQUIREMENT, capitals only) is read too, so /admin/courses/{code} is known
+  not to match /admin/courses/new or the other lower-case words beside it.
 2026/09/10 02:25 SAST
 - Created after /courses/tags was swallowed by /courses/{slug}.
 */
@@ -39,6 +45,23 @@ use PHPUnit\Framework\TestCase;
 
 final class RoutePrecedenceContractTest extends TestCase
 {
+    /** The requirement constants a route can hold a record's key to, as the attributes name them. */
+    private const KEY_REQUIREMENTS = [
+        'CourseAddress::REQUIREMENT' => \CattoLearning\Course\CourseAddress::REQUIREMENT,
+        'PersonAddress::REQUIREMENT' => \CattoLearning\Support\Address\PersonAddress::REQUIREMENT,
+        'CompanyAddress::REQUIREMENT' => \CattoLearning\Support\Address\CompanyAddress::REQUIREMENT,
+        'OrderAddress::REQUIREMENT' => \CattoLearning\Support\Address\OrderAddress::REQUIREMENT,
+        'OrderAddress::DOCUMENT_REQUIREMENT' => \CattoLearning\Support\Address\OrderAddress::DOCUMENT_REQUIREMENT,
+        'CatalogueAddress::BUNDLE' => \CattoLearning\Support\Address\CatalogueAddress::BUNDLE,
+        'CatalogueAddress::PROMOTION' => \CattoLearning\Support\Address\CatalogueAddress::PROMOTION,
+        'CatalogueAddress::CATEGORY' => \CattoLearning\Support\Address\CatalogueAddress::CATEGORY,
+        'CatalogueAddress::TAG' => \CattoLearning\Support\Address\CatalogueAddress::TAG,
+        'RecordAddress::CERTIFICATE' => \CattoLearning\Support\Address\RecordAddress::CERTIFICATE,
+        'RecordAddress::MESSAGE' => \CattoLearning\Support\Address\RecordAddress::MESSAGE,
+        'CourseItemAddress::REQUIREMENT' => \CattoLearning\Support\Address\CourseItemAddress::REQUIREMENT,
+        'CoursePartAddress::REQUIREMENT' => \CattoLearning\Support\Address\CoursePartAddress::REQUIREMENT,
+    ];
+
     public function testEveryShadowingPlaceholderRouteIsMatchedLast(): void
     {
         $routes = RouteTable::all();
@@ -111,6 +134,14 @@ final class RoutePrecedenceContractTest extends TestCase
                 PREG_SET_ORDER
             );
             foreach ($matches as $match) {
+                // A course's code is held to CourseAddress::REQUIREMENT (owner, 2026-11-06), which is capitals only, so it
+                // never matches the lower-case words beside it (new, import, catalogue and the rest). Every other
+                // record's key is held to its own (stage 2, 2026-11-07), each of which refuses the words beside it.
+                foreach (self::KEY_REQUIREMENTS as $constant => $value) {
+                    if (preg_match_all("/'(?P<name>\w+)'\s*=>\s*" . preg_quote($constant, '/') . "/", (string) $match['rest'], $named, PREG_SET_ORDER) > 0) {
+                        foreach ($named as $pair) $found[$match['path']][$pair['name']] = $value;
+                    }
+                }
                 if (preg_match_all("/'(?P<name>\w+)'\s*=>\s*'(?P<pattern>[^']*)'/", (string) $match['rest'], $pairs, PREG_SET_ORDER) === 0) {
                     continue;
                 }

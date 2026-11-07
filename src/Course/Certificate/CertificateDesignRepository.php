@@ -115,11 +115,11 @@ final class CertificateDesignRepository
         );
     }
 
-    /** @return list<array{id:int,title:string}> the courses that use a design, by title */
+    /** @return list<array{id:int,code:string,title:string}> the courses that use a design, by title, each with its code for its address */
     public function courses(int $id, int $limit = 50): array
     {
-        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'title' => (string) $row['title']], $this->db->fetchAllAssociative(
-            'SELECT id, title FROM courses WHERE certificate_design_id = :id ORDER BY lower(title), id LIMIT ' . max(1, $limit),
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'title' => (string) $row['title']], $this->db->fetchAllAssociative(
+            'SELECT id, code, title FROM courses WHERE certificate_design_id = :id ORDER BY lower(title), id LIMIT ' . max(1, $limit),
             ['id' => $id]
         ));
     }

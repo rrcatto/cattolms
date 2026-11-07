@@ -34,7 +34,7 @@
 									<td class="cell-text">
 										{# The course opens (owner, 2026-10-26: "The course name is also not clickable"). #}
 										{% if credit.course_slug|default('') and credit.course_status|default('') == 'published' %}<a href="/courses/{{ credit.course_slug }}">{{ credit.course_title }}</a>{% else %}{{ credit.course_title }}{% endif %}
-										{% if can_manage_company_enrolments|default(false) and credit.available_count > 0 %}<br>{{ ui('action.link', {label: 'Assign', variant: 'secondary', size: 'small', href: '/company/credits?assign_course=' ~ credit.course_id ~ '&assign_seconds=' ~ credit.access_period_seconds ~ '#assign-course', icon: 'action-grant'}) }}{% endif %}
+										{% if can_manage_company_enrolments|default(false) and credit.available_count > 0 %}<br>{{ ui('action.link', {label: 'Assign', variant: 'secondary', size: 'small', href: '/company/credits?assign_course=' ~ credit.course_code|url_encode ~ '&assign_seconds=' ~ credit.access_period_seconds ~ '#assign-course', icon: 'action-grant'}) }}{% endif %}
 									</td>
 									<td>
 										{{ credit.access_period_label }}

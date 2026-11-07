@@ -10,7 +10,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
 			{% if is_owner %}
-				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: certificate.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#certificate-' ~ certificate.id, icon: 'action-share'}) }}</p>{% endblock %}{% endembed %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: certificate.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#' ~ certificate_anchor(certificate), icon: 'action-share'}) }}</p>{% endblock %}{% endembed %}
 			{% endif %}
 			{% if certificate.revoked_at %}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This certificate was revoked on ' ~ (certificate.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if certificate.revocation_reason %}<p>{{ certificate.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}

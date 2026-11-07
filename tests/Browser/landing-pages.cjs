@@ -31,7 +31,7 @@ const state = JSON.parse(execFileSync('podman', ['exec', container, 'cat', state
 const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
     .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme).map((t) => `${t.slug}-v${t.version}`);
 const A = state.courses.a, B = state.courses.b;
-const EDITOR = `/admin/courses/${A.id}/landing`;
+const EDITOR = `/admin/courses/${A.code}/landing`;
 const PUBLIC = `/landing/${A.slug}`;
 const HEADLINE = 'Transfer property with confidence';
 const results = [], failures = [];
@@ -103,7 +103,7 @@ async function editSection(page, label) {
 
     await scenario('ADMIN opens the landing page from the course editor and creates it with the recommended sections', 'chromium', async () => {
         const {ctx, page} = await open(chromium, state.tokens.admin);
-        await go(page, `/admin/courses/${A.id}`);
+        await go(page, `/admin/courses/${A.code}`);
         await submit(page, page.getByRole('link', {name: 'Landing page, none yet'}), 'course editor link');
         assert.ok(await page.getByText('This course has no landing page').isVisible());
         await submit(page, page.getByRole('button', {name: 'Create landing page'}), 'create');
@@ -197,7 +197,7 @@ async function editSection(page, label) {
         await flash(page, 'is published');
         assert.equal(clean(await page.locator('#landing-status .cl-ui-badge').first().textContent()), 'Published');
         assert.ok(await page.locator('.cl-landing-address a').isVisible(), 'The address is a link once it is public');
-        await go(page, `/admin/courses/${A.id}`);
+        await go(page, `/admin/courses/${A.code}`);
         assert.ok(await page.getByRole('link', {name: 'Landing page, published'}).isVisible(), 'The course editor shows the state');
         await ctx.close();
     });

@@ -347,7 +347,7 @@
           const response = await fetch(panel.dataset.createUrl || '/admin/courses/categories/inline', { method: 'POST', body, credentials: 'same-origin', headers: { Accept: 'application/json' } });
           const data = await response.json().catch(() => ({}));
           if (!response.ok || !data.category) throw new Error(data.error || 'The category could not be created.');
-          const query = new URLSearchParams({ field_id: field.dataset.fieldId || '', field_name: field.dataset.fieldName || '', selected: String(data.category.id) });
+          const query = new URLSearchParams({ field_id: field.dataset.fieldId || '', field_name: field.dataset.fieldName || '', selected: String(data.category.slug) });
           const page = await fetch(`${field.dataset.refreshUrl}?${query}`, { credentials: 'same-origin', headers: { 'HX-Request': 'true' } });
           const fresh = page.ok ? new DOMParser().parseFromString(await page.text(), 'text/html').querySelector('[data-category-field]') : null;
           if (!fresh) throw new Error(`“${data.category.name}” was created, but the list could not be refreshed. Reload the page to choose it.`);
@@ -385,6 +385,20 @@
       if (!choosing(event.target)) return;
       if (arrowChoice) { arrowChoice = false; return; }
       event.target.form.requestSubmit();
+    });
+
+    /* The catalogue's category choices open the category's own page, /courses/category/{slug} (owner, 2026-11-06:
+       a public page's address carries its name, for search engines, never a number): a form marked data-named-pages
+       goes straight to the chosen value's page, or to its own address for an empty choice (All categories). Without
+       JavaScript the form asks its own address with the value, and the server sends the reader to the same page. */
+    document.addEventListener('submit', event => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.matches('[data-named-pages]') || event.defaultPrevented) return;
+      const from = event.submitter;
+      const field = from instanceof HTMLButtonElement && from.name ? from : form.querySelector('input[type="radio"]:checked');
+      if (!(field instanceof HTMLButtonElement || field instanceof HTMLInputElement)) return;
+      event.preventDefault();
+      window.location.assign(field.value ? form.dataset.namedPages + encodeURIComponent(field.value) : form.action);
     });
 
     /* The catalogue keeps its place (owner, 2026-10-20: "whenever I click a category card, the screen jumps to

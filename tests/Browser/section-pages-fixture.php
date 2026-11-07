@@ -32,7 +32,10 @@ if (($argv[1] ?? '') === 'create') {
     $fixture->course($user['id'], $company['id'], 'draft');
     $token = Token::generate();
     $boot['container']->get(AuthSessionRepository::class)->create($user['id'], Token::hash($token), 7200, '', 'Section pages browser', $user['email']);
-    file_put_contents($statePath, json_encode(['user' => $user['id'], 'email' => $user['email'], 'name' => $user['name'], 'token' => $token, 'company' => $company['id'], 'company_name' => $company['name'], 'scrub' => $fixture->seeds()], JSON_THROW_ON_ERROR));
+    // The person and the company by their account references, which name them in addresses (owner, 2026-11-06).
+    $references = ['user_reference' => (string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $user['id']]),
+        'company_reference' => (string) $db->fetchOne('SELECT account_reference FROM companies WHERE id = :id', ['id' => $company['id']])];
+    file_put_contents($statePath, json_encode(['user' => $user['id'], 'email' => $user['email'], 'name' => $user['name'], 'token' => $token, 'company' => $company['id'], 'company_name' => $company['name']] + $references + ['scrub' => $fixture->seeds()], JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created the section pages browser identity: {$user['name']} of {$company['name']}.\n";
 } elseif (($argv[1] ?? '') === 'cleanup') {

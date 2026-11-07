@@ -200,7 +200,7 @@ final class CertificateDesignService
         return $this->check($this->design($id)['design'])['pdf'] ?? throw new RuntimeException('The design could not be drawn.');
     }
 
-    /** @return list<array{id:int,title:string}> the courses that use a design */
+    /** @return list<array{id:int,code:string,title:string}> the courses that use a design */
     public function coursesUsing(int $id): array
     {
         return $this->designs->courses($id);

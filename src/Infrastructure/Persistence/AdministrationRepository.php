@@ -14,6 +14,10 @@ population, so no Administration or Company surface can truncate silently or rep
 that disagrees with the rows beneath it.
 
 Changelog:
+2026/11/07 SAST
+- People, requests and credits carry the company's account reference for its address (owner, 2026-11-06).
+2026/11/06 SAST
+- People narrowed to the accounts made between two dates (createdBetween()), for Money Reports' New accounts.
 2026/11/01 SAST
 - Enrolment lists count every part the learner has done (owner, 2026-11-01, decision 2A): partsProgressJoin().
 
@@ -337,7 +341,7 @@ SQL);
      *
      * @return list<array<string,mixed>>
      */
-    public function people(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function people(int $limit, int $offset, string $search = '', ?SortOrder $sort = null, string $createdFrom = '', string $createdBefore = ''): array
     {
         $order = $sort === null
             ? self::PEOPLE_ORDER
@@ -364,6 +368,7 @@ SELECT
     ue.email,
     c.id AS company_id,
     c.name AS company_name,
+    c.account_reference AS company_reference,
     COALESCE(string_agg(DISTINCT r.role_key, ',' ORDER BY r.role_key), '') AS role_keys,
     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN ('assigned','active','completed'))::int AS course_count
 FROM page
@@ -374,10 +379,10 @@ LEFT JOIN companies c ON c.id = cu.company_id
 LEFT JOIN user_roles ur ON ur.user_id = u.id
 LEFT JOIN roles r ON r.id = ur.role_id
 LEFT JOIN course_enrolments ce ON ce.user_id = u.id AND ce.is_preview = FALSE
-GROUP BY u.id, ue.email, c.id, c.name
+GROUP BY u.id, ue.email, c.id, c.name, c.account_reference
 SQL;
 
-        [$where, $bindings] = self::searchFilter('u', $search, self::PEOPLE_SEARCH);
+        [$where, $bindings] = self::createdBetween(self::searchFilter('u', $search, self::PEOPLE_SEARCH), $createdFrom, $createdBefore);
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys . $where, $detail, $order, $limit, $offset),
@@ -386,14 +391,32 @@ SQL;
     }
 
     /**
+     * The People list narrowed to the accounts made between two instants (owner, 2026-11-06: Money Reports' New accounts
+     * opens the list it counts), the second not included; either may be empty.
+     *
+     * @param array{0:string,1:array<string,mixed>} $filter a WHERE clause and its bindings
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private static function createdBetween(array $filter, string $from, string $before): array
+    {
+        [$where, $bindings] = $filter;
+        $conditions = [];
+        if ($from !== '') { $conditions[] = 'u.created_at >= CAST(:created_from AS TIMESTAMPTZ)'; $bindings['created_from'] = $from; }
+        if ($before !== '') { $conditions[] = 'u.created_at < CAST(:created_before AS TIMESTAMPTZ)'; $bindings['created_before'] = $before; }
+        if ($conditions === []) return [$where, $bindings];
+
+        return [($where === '' ? ' WHERE ' : $where . ' AND ') . implode(' AND ', $conditions), $bindings];
+    }
+
+    /**
      * Total People rows.
      *
      * Membership must match {@see people()} exactly: the primary-email join is an INNER join
      * there, so a user without a primary email is absent from both the page and the total.
      */
-    public function peopleCount(string $search = ''): int
+    public function peopleCount(string $search = '', string $createdFrom = '', string $createdBefore = ''): int
     {
-        [$where, $bindings] = self::searchFilter('u', $search, self::PEOPLE_SEARCH);
+        [$where, $bindings] = self::createdBetween(self::searchFilter('u', $search, self::PEOPLE_SEARCH), $createdFrom, $createdBefore);
         $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM users u
@@ -714,7 +737,7 @@ SQL;
 
         $detail = 'SELECT ce.id, ce.public_id, ce.status, ce.assigned_at, ce.started_at, ce.expires_at, ce.completed_at,
                     ce.access_removed_at, ce.access_removed_reason,
-                    c.id AS course_id, c.title AS course_title, c.slug,
+                    c.id AS course_id, c.code AS course_code, c.title AS course_title, c.slug,
                     u.id AS user_id, COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
                     part_progress.done_part_count,
@@ -775,9 +798,9 @@ SQL;
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE' . $where;
 
-        $detail = 'SELECT cr.*, c.title AS course_title, c.slug,
+        $detail = 'SELECT cr.*, c.title AS course_title, c.code AS course_code, c.slug,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
-                    ue.email, co.name AS company_name
+                    ue.email, co.name AS company_name, co.account_reference AS company_reference
              FROM page
              JOIN course_requests cr ON cr.id=page.id
              JOIN courses c ON c.id=cr.course_id
@@ -855,9 +878,9 @@ SQL;
         $detail = 'SELECT cc.id, cc.public_id, cc.company_id, cc.user_id, cc.course_id, cc.access_period_seconds,
                     cc.quantity, cc.refunded_quantity, cc.source_type, cc.note, cc.created_at,
                     (cc.commerce_order_item_id IS NULL) AS given_by_hand,
-                    c.title AS course_title,
+                    c.title AS course_title, c.code AS course_code,
                     COALESCE(co.name, NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS holder_name,
-                    u.account_reference AS holder_reference,
+                    u.account_reference AS holder_reference, co.account_reference AS company_reference,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
                     GREATEST(cc.quantity - cc.refunded_quantity - COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
@@ -868,7 +891,7 @@ SQL;
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
-             GROUP BY cc.id,c.title,co.name,u.first_name,u.last_name,u.display_name,u.account_reference,ue.email';
+             GROUP BY cc.id,c.title,c.code,co.name,co.account_reference,u.first_name,u.last_name,u.display_name,u.account_reference,ue.email';
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -973,7 +996,7 @@ SQL;
     {
         return $this->db->fetchAllAssociative(
             'SELECT ce.id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,ce.access_removed_at,
-                    c.id AS course_id,c.title AS course_title,c.slug,
+                    c.id AS course_id, c.code AS course_code,c.title AS course_title,c.slug,
                     (EXISTS (SELECT 1 FROM course_credit_allocations a JOIN course_credits cr ON cr.id = a.credit_id WHERE a.enrolment_id = ce.id AND cr.company_id = :company_id) OR c.owner_company_id = :company_id) AS company_funded,
                     part_progress.done_part_count,part_progress.part_count
              FROM course_enrolments ce
@@ -993,7 +1016,7 @@ SQL;
     public function companyPersonRequests(int $companyId, int $userId): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT cr.id,cr.status,cr.requested_at,cr.decided_at,cr.learner_note,cr.decision_note,c.title AS course_title,c.slug
+            'SELECT cr.id,cr.status,cr.requested_at,cr.decided_at,cr.learner_note,cr.decision_note,c.title AS course_title,c.code AS course_code,c.slug
              FROM course_requests cr JOIN courses c ON c.id=cr.course_id
              WHERE cr.company_id=:company_id AND cr.user_id=:user_id ORDER BY cr.requested_at DESC, cr.id DESC',
             ['company_id' => $companyId, 'user_id' => $userId]
@@ -1035,7 +1058,7 @@ SQL;
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cr.company_id=:company_id' . '' . $match;
 
-        $detail = 'SELECT cr.*,c.title AS course_title,c.slug,
+        $detail = 'SELECT cr.*,c.title AS course_title,c.code AS course_code,c.slug,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email
              FROM page
@@ -1082,7 +1105,7 @@ SQL;
              WHERE ce.is_preview=FALSE' . '' . $match;
 
         $detail = 'SELECT ce.id,ce.public_id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,
-                    ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
+                    ce.access_removed_at,ce.access_removed_reason,c.id AS course_id, c.code AS course_code,c.title AS course_title,c.slug,
                     u.id AS user_id,COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
                     part_progress.done_part_count,
@@ -1139,7 +1162,7 @@ SQL;
              WHERE cc.company_id=:company_id' . '' . $match;
 
         $detail = 'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.refunded_quantity,cc.source_type,cc.note,cc.created_at,
-                    c.title AS course_title, c.slug AS course_slug, c.status AS course_status,
+                    c.title AS course_title, c.code AS course_code, c.slug AS course_slug, c.status AS course_status,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
                     GREATEST(cc.quantity-cc.refunded_quantity-COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
@@ -1147,7 +1170,7 @@ SQL;
              JOIN course_credits cc ON cc.id=page.id
              JOIN courses c ON c.id=cc.course_id
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
-             GROUP BY cc.id,c.title,c.slug,c.status';
+             GROUP BY cc.id,c.title,c.code,c.slug,c.status';
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -1484,7 +1507,7 @@ SQL;
 
         $member = self::COMPANY_LEARNER_ENROLMENT;
         $detail = <<<SQL
-SELECT c.id,c.title,c.status,
+SELECT c.id,c.code,c.title,c.status,
        COUNT(DISTINCT ce.id)::int AS enrolments,
        COUNT(DISTINCT ce.id) FILTER (WHERE ce.started_at IS NOT NULL)::int AS started,
        COUNT(DISTINCT ce.id) FILTER (WHERE ce.status='completed')::int AS completed,
@@ -1738,7 +1761,7 @@ SQL;
     /**
      * @return array{0:string,1:array<string,mixed>}
      */
-    private static function userRequestsQuery(int $userId, string $search, string $select = 'cr.*, c.title AS course_title, c.slug'): array
+    private static function userRequestsQuery(int $userId, string $search, string $select = 'cr.*, c.title AS course_title, c.code AS course_code, c.slug'): array
     {
         [$match, $bindings] = self::andSearch($search, self::COURSE_TITLE_SEARCH);
 
@@ -1808,7 +1831,7 @@ SQL;
     public function requestForUpdate(int $requestId): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT cr.*, c.title AS course_title, c.slug, ue.email, co.name AS company_name
+            'SELECT cr.*, c.title AS course_title, c.code AS course_code, c.slug, ue.email, co.name AS company_name
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              JOIN user_emails ue ON ue.user_id=cr.user_id AND ue.is_primary=TRUE

@@ -60,6 +60,8 @@ const totals = async (page) => {
     const values = await list.locator('dd').allInnerTexts();
     return labels.map((label, i) => [clean(label), clean(values[i])]);
 };
+/* The bundle page's purchase card (owner, 2026-11-06: its own full row, the last on the page, no longer a sticky aside). */
+const PRICE_BOX = 'main .cl-page-section:has(h2:text-is("Bundle price"))';
 const courseOrder = async (page) => (await page.locator('.cl-bundle-courses li strong').allInnerTexts()).map(clean);
 
 async function checkoutToReview(page) {
@@ -84,7 +86,7 @@ async function checkoutToReview(page) {
         await page.locator('#bundle-title').fill(fixture.bundle_title);
         await page.locator('#bundle-short').fill('Four office courses for one price.');
         await submit(page, page.getByRole('button', {name: 'Create bundle'}));
-        assert.match(page.url(), /\/admin\/bundles\/\d+/);
+        assert.match(page.url(), /\/admin\/bundles\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9]+(-[A-Z0-9]+)*$/, 'a new bundle opens at its code, never its number');
         assert.match(await flash(page), /^The bundle was created as a draft/);
         editorUrl = page.url().split('#')[0];
         for (const key of ['a', 'b', 'c', 'd']) {
@@ -109,8 +111,10 @@ async function checkoutToReview(page) {
         await submit(page, page.getByRole('button', {name: 'Save price'}));
         assert.match(await flash(page), /^The bundle price was saved/);
         assert.ok(clean(await page.locator('main').innerText()).includes(`add up to ${rand(160000)}, so the bundle saves ${rand(40000)}`));
-        await submit(page, page.getByRole('button', {name: 'Publish', exact: true}));
-        assert.equal(await flash(page), 'The bundle is published.');
+        // The status is chosen on the bundle form's cards and saved with its details (owner, 2026-11-06).
+        await page.locator('label:has(input[name=status][value=published])').click();
+        await submit(page, page.getByRole('button', {name: 'Save details'}));
+        assert.equal(await flash(page), 'The bundle details were saved, and the bundle is published.');
         bundleUrl = await page.getByRole('link', {name: 'View public page'}).getAttribute('href');
         await page.goto(`${base}/admin/bundles?bundles_q=${encodeURIComponent(fixture.bundle_title)}`);
         assert.match(clean(await page.locator('tbody tr').first().innerText()), /On sale/i, 'listed as on sale (themes may upper-case badges)');
@@ -125,7 +129,7 @@ async function checkoutToReview(page) {
             assert.ok(await page.getByRole('link', {name: fixture.bundle_title}).first().isVisible(), 'the bundle is in the bundle catalogue');
             await page.goto(`${base}${bundleUrl}`);
             assert.equal(await page.locator('main .cl-course-card').count(), 3, 'its courses are shown with the catalogue course cards');
-            const box = clean(await page.locator('main aside').innerText());
+            const box = clean(await page.locator(PRICE_BOX).innerText());
             for (const shown of [rand(120000), `Individual course prices ${rand(160000)}`, `You save ${rand(40000)}`]) assert.ok(box.includes(shown), shown);
             await page.getByRole('button', {name: 'Add bundle to cart'}).focus();
             await Promise.all([page.waitForNavigation(), page.keyboard.press('Enter')]);
@@ -139,7 +143,7 @@ async function checkoutToReview(page) {
             await page.locator('input[name=accept_terms]').check();
             await page.locator('input[name=accept_start]').check();
             await submit(page, page.getByRole('button', {name: 'Place my order'}));
-            assert.match(page.url(), /\/account\/orders\/\d+/);
+            assert.match(page.url(), /\/account\/orders\/CL-\d{8,}$/, 'the order opens at its number');
             const order = clean(await page.locator('main').innerText());
             assert.match(order, /Status: Fulfilled/);
             assert.ok(order.includes(fixture.bundle_title) && order.includes(`Includes: ${['a', 'c', 'b'].map(title).join(', ')}`), 'the order shows the bundle as the item bought, with what it included');
@@ -169,7 +173,7 @@ async function checkoutToReview(page) {
     await scenario('a learner who already has one of the courses is told so, and the price stays the bundle price', 'chromium', async () => {
         const {ctx, page} = await open(chromium, learner('learner-owning-a').token);
         await page.goto(`${base}${bundleUrl}`);
-        const box = clean(await page.locator('main aside').innerText());
+        const box = clean(await page.locator(PRICE_BOX).innerText());
         assert.ok(box.includes('You already have access to 1 of the 3 courses in this bundle.'));
         assert.ok(box.includes(rand(120000)));
         await ctx.close();
@@ -178,10 +182,10 @@ async function checkoutToReview(page) {
     await scenario('a company account is told why it cannot buy the bundle and offered no buttons', 'chromium', async () => {
         const {ctx, page} = await open(chromium, learner('company-learner').token);
         await page.goto(`${base}${bundleUrl}`);
-        const box = clean(await page.locator('main aside').innerText());
+        const box = clean(await page.locator(PRICE_BOX).innerText());
         assert.ok(box.includes('Company accounts cannot buy courses for themselves. Your company gives you your courses.'), 'the reason is shown');
         assert.equal(await page.getByRole('button', {name: 'Add bundle to cart'}).count(), 0, 'no Add bundle to cart');
-        assert.equal(await page.locator('main aside').getByRole('button', {name: 'Buy now'}).count(), 0, 'no Buy now');
+        assert.equal(await page.locator(PRICE_BOX).getByRole('button', {name: 'Buy now'}).count(), 0, 'no Buy now');
         await ctx.close();
     });
 
@@ -209,7 +213,7 @@ async function checkoutToReview(page) {
         const admin = await open(chromium, fixture.admin_token);
         for (const theme of themes) {
             for (const width of [1440, 390]) {
-                for (const [page, url, selector] of [[buyer.page, '/bundles', '.cl-course-card'], [buyer.page, bundleUrl, 'aside'], [buyer.page, '/cart', '.cl-bundle-line'], [admin.page, '/admin/bundles', 'table'], [admin.page, editorUrl.replace(base, ''), '.cl-bundle-courses']]) {
+                for (const [page, url, selector] of [[buyer.page, '/bundles', '.cl-course-card'], [buyer.page, bundleUrl, PRICE_BOX], [buyer.page, '/cart', '.cl-bundle-line'], [admin.page, '/admin/bundles', 'table'], [admin.page, editorUrl.replace(base, ''), '.cl-bundle-courses']]) {
                     await page.setViewportSize({width, height: 1200});
                     const response = await page.goto(`${base}${url}${url.includes('?') ? '&' : '?'}theme_preview=${theme}`);
                     assert.equal(response.status(), 200, `${theme} ${url}`);

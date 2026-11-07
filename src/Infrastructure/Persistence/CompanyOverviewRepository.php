@@ -83,7 +83,7 @@ class CompanyOverviewRepository
     public function pendingRequests(int $companyId): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT cr.id, cr.requested_at, c.title AS course_title, u.id AS user_id, u.account_reference,
+            "SELECT cr.id, cr.requested_at, c.title AS course_title, c.code AS course_code, u.id AS user_id, u.account_reference,
                     COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, ue.email) AS name
              FROM course_requests cr JOIN courses c ON c.id = cr.course_id JOIN users u ON u.id = cr.user_id
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary

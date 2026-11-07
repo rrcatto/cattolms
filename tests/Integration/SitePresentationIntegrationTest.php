@@ -98,13 +98,15 @@ final class SitePresentationIntegrationTest extends TestCase
         IntegrationContainer::get()->get(AuthSessionRepository::class)->create($this->admin, Token::hash($token), 3600, 'qa', 'PHPUnit');
         $_COOKIE[Env::string('AUTH_SESSION_COOKIE', 'catto_learning_session')] = $token;
         $slide = (string) $this->items->item($this->item)['type_config']['slides'][0]['id'];
+        // A Presentation is named by the slug of its name (owner, 2026-11-06: no row id in an address).
+        $home = \CattoLearning\Support\Address\CourseItemAddress::admin($this->items->itemName($this->item));
         // Each kind names its own icon and note on the details page, so a kind without them stops that page for every presentation.
-        $details = $this->get('/admin/course-items/' . $this->item . '/details');
+        $details = $this->get($home . '/details');
         self::assertStringContainsString('Introducing the site', $details);
         self::assertStringContainsString('Course trailer', $details);
-        self::assertStringNotContainsString('Something went wrong', $this->get('/admin/course-items/' . $this->item));
-        self::assertStringNotContainsString('Something went wrong', $this->get('/admin/course-items/' . $this->item . '/slides/' . $slide));
-        $layouts = $this->get('/admin/course-items/' . $this->item . '/slides/add');
+        self::assertStringNotContainsString('Something went wrong', $this->get($home));
+        self::assertStringNotContainsString('Something went wrong', $this->get($home . '/slides/' . $slide));
+        $layouts = $this->get($home . '/slides/add');
         self::assertStringContainsString('value="cta"', $layouts, 'Its call to action can be chosen.');
         self::assertStringNotContainsString('value="next"', $layouts, 'Up next hands back to a course, and it is in none.');
     }

@@ -411,7 +411,7 @@ final class PaginationUiContractTest extends TestCase
             $markup = self::read('resources/views/partials/' . $partial);
             self::assertStringContainsString('entity-lookup.html.twig', $markup);
             self::assertDoesNotMatchRegularExpression(
-                '/<select name="(company_id|user_id|course_id|actor_id)"/',
+                '/<select name="(company_id|user_id|course_id|actor_id|actor|company)"/',
                 $markup,
                 $partial . ' must not reintroduce a whole-table select.'
             );

@@ -106,7 +106,7 @@ async function buyWithWalletAndEft(page, fixture) {
     assert.equal(await page.locator('input[name=accept_start]').evaluate((box) => box.validity.valueMissing), true);
     await page.locator('input[name=accept_start]').check();
     await submit(page, place);
-    assert.match(page.url(), /\/account\/orders\/\d+$/);
+    assert.match(page.url(), /\/account\/orders\/CL-\d{8}$/, 'the order opens by its number');
 }
 
 (async () => {
@@ -145,11 +145,11 @@ async function buyWithWalletAndEft(page, fixture) {
             assert.ok(files.length === 1 && /^INV-\d+\.pdf$/.test(files[0]), 'the invoice is attached: ' + files.join(', '));
         });
         await check(`${name}: an EFT above what is due starts the course and credits the wallet`, async () => {
-            await adminPage.goto(`${base}/admin/commerce/orders/${placed.id}`);
+            await adminPage.goto(`${base}/admin/commerce/orders/${order(placed.id)}`);
             // The order page names the account first and says what to do next (owner, 2026-10-18): under the order number,
             // the person linked to their profile, their account reference and their email, each on its own line (owner, 2026-10-21).
             assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`${learner.name}\\s+${learner.reference}`), 'the name, then the account reference on its own line');
-            assert.equal(await adminPage.locator('.cl-page-head a.cl-ui-person-account').getAttribute('href'), `/admin/people/${learner.id}`, 'the name opens their account');
+            assert.equal(await adminPage.locator('.cl-page-head a.cl-ui-person-account').getAttribute('href'), `/admin/people/${learner.account_reference}`, 'the name opens their account');
             assert.match(await text(adminPage), /Waiting for the EFT payment/);
             if (name === 'chromium') {
                 // Record EFT Payment starts from the bank statement: no hunting for the order (owner, 2026-10-18).
@@ -162,7 +162,7 @@ async function buyWithWalletAndEft(page, fixture) {
                 await submit(adminPage, adminPage.getByRole('button', {name: 'Find the account'}));
                 assert.match(await adminPage.locator('[data-eft-account]').innerText(), new RegExp(learner.reference), 'the account is found from the statement');
                 await submit(adminPage, adminPage.locator(`tr[data-eft-order="${placed.id}"] button`));
-                assert.equal(new URL(adminPage.url()).pathname, `/admin/commerce/orders/${placed.id}`, 'and the payment is recorded against its order');
+                assert.equal(new URL(adminPage.url()).pathname, `/admin/commerce/orders/${order(placed.id)}`, 'and the payment is recorded against its order');
             } else {
                 await adminPage.locator('#bank-amount').fill('150.00');
                 await adminPage.locator('#bank-received-on').fill(today());
@@ -198,7 +198,7 @@ async function buyWithWalletAndEft(page, fixture) {
             assert.equal(await adminPage.getByRole('link', {name: title, exact: true}).count(), 0, 'the item has left the list');
         });
         await check(`${name}: the learner asks for money back, ADMIN overrides the rule and records the payout`, async () => {
-            await page.goto(`${base}/account/orders/${placed.id}`);
+            await page.goto(`${base}/account/orders/${order(placed.id)}`);
             await page.locator('summary', {hasText: 'Ask for a refund'}).click();
             assert.match(await text(page), /A started course is not refunded\. If the course is faulty, is not as described or cannot be provided, tell us below/);
             await page.locator('textarea[name=reason]').fill('Module two will not open.');
@@ -215,7 +215,7 @@ async function buyWithWalletAndEft(page, fixture) {
             await submit(adminPage, form.getByRole('button', {name: 'Override and approve'}));
             assert.equal(JSON.parse(php('order', learner.id)).state, 'refunded');
             assert.equal(php('wallet', learner.id), '25000', 'the wallet part went back to the wallet');
-            await adminPage.goto(`${base}/admin/commerce/orders/${placed.id}`);
+            await adminPage.goto(`${base}/admin/commerce/orders/${order(placed.id)}`);
             const payout = adminPage.locator('form[action$="/payout"]');
             assert.match(clean(await payout.innerText()), /Pay /, 'the order says what to pay out');
             await payout.locator('input[name=paid_on]').fill(today());
@@ -259,7 +259,7 @@ async function buyWithWalletAndEft(page, fixture) {
             assert.equal(await flash(company.page), 'Your course request was sent to your company administrator.');
             await company.ctx.close();
         });
-        if (name === 'chromium') sample = {learner, order: placed.id};
+        if (name === 'chromium' && placed) sample = {learner, order: order(placed.id)};
         await ctx.close();
     }
 
@@ -281,7 +281,7 @@ async function buyWithWalletAndEft(page, fixture) {
         assert.equal(placed.state, 'fulfilled', 'paid by the simulated card, the course started');
         await js.ctx.close();
         const {ctx, page} = await open(chromium, learner.token, {js: false});
-        await page.goto(`${base}/account/orders/${placed.id}`);
+        await page.goto(`${base}/account/orders/${order(placed.id)}`);
         await page.locator('summary', {hasText: 'Ask for a refund'}).click();
         await page.locator('textarea[name=reason]').fill('The videos do not play.');
         await submit(page, page.getByRole('button', {name: 'Send my refund request'}));
@@ -392,7 +392,7 @@ async function buyWithWalletAndEft(page, fixture) {
     /* Every new page in every theme at every width. Learners cannot preview a theme, so each theme is
      * activated in turn and the active theme is restored afterwards. */
     const learnerPages = ['/account/wallet', '/account/dashboard', `/account/orders/${sample?.order}`, '/refunds', '/terms', '/privacy'];
-    const adminPages = ['/admin/dashboard', '/admin/settings', '/admin/commerce/refund-requests', '/admin/wallets', `/admin/wallets/person/${sample?.learner.id}`, `/admin/commerce/orders/${sample?.order}`,
+    const adminPages = ['/admin/dashboard', '/admin/settings', '/admin/commerce/refund-requests', '/admin/wallets', `/admin/wallets/person/${sample?.learner.account_reference}`, `/admin/commerce/orders/${sample?.order}`,
         '/admin/commerce/orders', `/admin/commerce/ledger?order=${sample?.order}`, '/admin/commerce/trail', '/admin/commerce/payment-events', '/admin/commerce/eft', '/admin/commerce/unmatched'];
     try {
         for (const key of themes) {

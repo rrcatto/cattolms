@@ -14,7 +14,9 @@ use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Support\AccountReference;
 use CattoLearning\Support\Uuid;
-use CattoLearning\Tests\Support\{DevelopmentFixture, FakeMailer, IntegrationContainer};
+use CattoLearning\Http\Controller\ContactMessagesController;
+use CattoLearning\Tests\Support\{DevelopmentFixture, FakeMailer, InProcessPage, IntegrationContainer};
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -62,6 +64,8 @@ final class ContactMessageIntegrationTest extends TestCase
         [$toSite, $toSender] = $this->mailer->messages;
         self::assertSame(['contact', $reference, 'Accounting issue', false], [$toSite['type'], $toSite['reference'], $toSite['reason'], $toSite['signed_in']]);
         self::assertContains(['label' => 'EFT amount', 'value' => 'R1 200.00'], $toSite['details']);
+        // The notice opens the message at its reference, never its row id (owner, 2026-11-06).
+        self::assertStringEndsWith('/admin/messages/' . $reference, (string) $toSite['admin_url']);
         self::assertSame(['type' => 'contact_acknowledgement', 'email' => 'sipho@example.test', 'reference' => $reference, 'reason' => 'Accounting issue'], $toSender,
             'The acknowledgement carries nothing the sender typed but the address it goes to.');
     }
@@ -147,7 +151,7 @@ final class ContactMessageIntegrationTest extends TestCase
         self::assertSame(0, $service->count('answered', '', $tag));
         self::assertSame(0, $service->count('all', ContactReason::ORDER, $tag), 'Filtered by reason.');
         $listed = $service->page('new', '', $reference, 25, 0);
-        self::assertSame([$reference, 'Other', 'New', 'warning', '/admin/messages/' . $id], [$listed[0]['reference'], $listed[0]['reason_label'], $listed[0]['status_label'], $listed[0]['status_tone'], $listed[0]['href']]);
+        self::assertSame([$reference, 'Other', 'New', 'warning', '/admin/messages/' . $reference], [$listed[0]['reference'], $listed[0]['reason_label'], $listed[0]['status_label'], $listed[0]['status_tone'], $listed[0]['href']]);
 
         $admin = $this->fixture->createUser('Contact administrator', 'contact-admin-' . $this->fixture->suffix() . '@example.test');
         $before = $service->unansweredCount();
@@ -157,6 +161,21 @@ final class ContactMessageIntegrationTest extends TestCase
         self::assertSame([true, 'Answered'], [$service->find($id)['answered'], $service->find($id)['status_label']]);
         self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'contact.message_answered' AND metadata->>'message_id' = :id", ['id' => (string) $id]), 'Answered once, recorded once.');
         self::assertSame(0, (new ContactMessageRepository($this->db))->deleteBefore(new \DateTimeImmutable('-5 years')), 'A new message outlives the daily clean-up.');
+
+        // Its page and its forms are at its reference, never its row id; the row id or a near miss names nothing (owner, 2026-11-06).
+        $reader = new CurrentUser($admin, Uuid::v4(), 'contact-admin@example.test', 'Contact administrator', ['ADMIN'], ['PLATFORM.PERSON.VIEW', 'PLATFORM.PERSON.MANAGE'], Uuid::v4());
+        $page = InProcessPage::run($reader, ContactMessagesController::class, 'show', ['reference' => $reference]);
+        foreach (['action="/admin/messages/' . $reference . '/unanswered"', $reference] as $shown) self::assertStringContainsString($shown, $page['body']);
+        $reopened = InProcessPage::run($reader, ContactMessagesController::class, 'unanswered', ['reference' => $reference], ['csrf' => $_SESSION['csrf']]);
+        self::assertSame('/admin/messages/' . $reference, $reopened['location']);
+        foreach ([(string) $id, strtolower($reference), 'MSG-' . str_pad((string) $id, 7, '0', STR_PAD_LEFT)] as $miss) {
+            try {
+                InProcessPage::run($reader, ContactMessagesController::class, 'show', ['reference' => $miss]);
+                self::fail($miss . ' names no message.');
+            } catch (NotFoundHttpException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     private function service(): ContactService

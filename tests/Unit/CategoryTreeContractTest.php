@@ -17,8 +17,9 @@ final class CategoryTreeContractTest extends TestCase
 {
     public function testTreeIsNestedListsWithHandlesDisclosureButtonsAndSeparateActions(): void
     {
+        // A category is named by its slug in every address and anchor (owner, 2026-11-06: no row id in an address).
         $node = static fn(int $id, int $level, string $name, array $children, bool $first, bool $last, bool $open, int $height): array => [
-            'id' => $id, 'level' => $level, 'name' => $name, 'course_count' => 1, 'descendant_course_count' => 1, 'children' => $children,
+            'id' => $id, 'slug' => trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($name)), '-'), 'level' => $level, 'name' => $name, 'course_count' => 1, 'descendant_course_count' => 1, 'children' => $children,
             'is_first_sibling' => $first, 'is_last_sibling' => $last, 'open' => $open, 'height' => $height,
         ];
         $leaf = $node(3, 3, 'Project <Management>', [], true, true, false, 1);
@@ -29,8 +30,10 @@ final class CategoryTreeContractTest extends TestCase
         @$document->loadHTML('<?xml encoding="UTF-8"><body><ol>' . $html . '</ol></body>');
         $xpath = new \DOMXPath($document);
 
-        self::assertSame(1, $xpath->query('/html/body/ol/li/ol[@id="category-branch-1"]/li/ol[@id="category-branch-2"]/li[@id="category-3"]')->length, 'Three levels nest as ol > li > ol.');
-        self::assertSame(['1', '3'], [$xpath->evaluate('string(//li[@id="category-1"]/@data-depth)'), $xpath->evaluate('string(//li[@id="category-1"]/@data-height)')], 'Each row carries its depth and the height of its subtree for the drop rules.');
+        self::assertSame(1, $xpath->query('/html/body/ol/li/ol[@id="category-branch-1"]/li/ol[@id="category-branch-2"]/li[@id="category-project-management"]')->length, 'Three levels nest as ol > li > ol.');
+        self::assertSame(['1', '3'], [$xpath->evaluate('string(//li[@id="category-business"]/@data-depth)'), $xpath->evaluate('string(//li[@id="category-business"]/@data-height)')], 'Each row carries its depth and the height of its subtree for the drop rules.');
+        self::assertSame('/admin/courses/categories/business/arrange', $xpath->evaluate('string(//li[@id="category-business"]/@data-arrange-url)'), 'The tree\'s script moves a row at the address the row gives, by its slug.');
+        self::assertStringNotContainsString('/admin/courses/categories/1', $html, 'No category is named by its number.');
         self::assertSame(3, $xpath->query('//li[@data-node-id]/div[contains(@class,"cl-tree-row")]/button[contains(@class,"cl-tree-handle") and @hidden and @aria-label]')->length, 'Every row has a drag handle, shown by the script.');
         $toggles = $xpath->query('//button[contains(@class,"cl-tree-toggle")]');
         self::assertSame(2, $toggles->length, 'Only categories with subcategories get a disclosure button.');
@@ -39,10 +42,10 @@ final class CategoryTreeContractTest extends TestCase
             self::assertSame(['submit', 'category-tree-view', 'toggle', 'category-tree#toggle'], [$toggle->getAttribute('type'), $toggle->getAttribute('form'), $toggle->getAttribute('name'), $toggle->getAttribute('data-action')]);
             self::assertSame(1, $xpath->query('//ol[@id="' . $toggle->getAttribute('aria-controls') . '"]')->length, 'aria-controls names the child list.');
         }
-        self::assertSame('false', $xpath->evaluate('string(//li[@id="category-1"]/div//button[contains(@class,"cl-tree-toggle")]/@aria-expanded)'));
+        self::assertSame('false', $xpath->evaluate('string(//li[@id="category-business"]/div//button[contains(@class,"cl-tree-toggle")]/@aria-expanded)'));
         self::assertSame(1, $xpath->query('//ol[@id="category-branch-1" and @hidden]')->length, 'A closed branch is hidden on the server, so it does not flash open.');
         self::assertSame(1, $xpath->query('//ol[@id="category-branch-2" and not(@hidden)]')->length, 'An open one is not.');
-        self::assertSame(0, $xpath->query('//li[@id="category-3"]/ol')->length, 'A sub-subcategory holds no list.');
+        self::assertSame(0, $xpath->query('//li[@id="category-project-management"]/ol')->length, 'A sub-subcategory holds no list.');
         self::assertStringContainsString('Project &lt;Management&gt;', $html);
         self::assertSame(2, $xpath->query('//a[starts-with(normalize-space(.),"Add subcategory") and contains(@href,"/new")]')->length, 'Add subcategory on levels 1 and 2 only.');
         self::assertSame(3, $xpath->query('//a[contains(@class,"cl-ui-action") and starts-with(normalize-space(.),"Manage")]')->length);
@@ -50,8 +53,8 @@ final class CategoryTreeContractTest extends TestCase
         foreach (['top', 'up', 'down', 'bottom', 'out'] as $direction) {
             self::assertSame(3, $xpath->query('//form[@data-tree-direction="' . $direction . '" and contains(@action,"/move")]')->length, 'Every row can move ' . $direction . ' without JavaScript.');
         }
-        self::assertSame(1, $xpath->query('//li[@id="category-1"]/div//form[@data-tree-direction="out"]//button[@disabled]')->length, 'A main category cannot move out.');
-        self::assertSame(1, $xpath->query('//li[@id="category-1"]/div//form[@data-tree-direction="down"]//button[@disabled]')->length, 'The last sibling cannot move down.');
+        self::assertSame(1, $xpath->query('//li[@id="category-business"]/div//form[@data-tree-direction="out"]//button[@disabled]')->length, 'A main category cannot move out.');
+        self::assertSame(1, $xpath->query('//li[@id="category-business"]/div//form[@data-tree-direction="down"]//button[@disabled]')->length, 'The last sibling cannot move down.');
         self::assertSame(3, $xpath->query('//a[contains(@href,"/move-into")]')->length);
     }
 

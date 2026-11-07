@@ -16,6 +16,8 @@ week-long private cache. Uploads and removals are recorded in the activity log.
 Architectural boundary: application service. SQL in CompanyLogoRepository; the file checks in Support\CompanyLogo.
 
 Changelog:
+2026/11/07 SAST
+- A logo's address names its company by its account reference (owner, 2026-11-06).
 2026/10/26 SAST
 - Created.
 */
@@ -24,6 +26,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Support\Address\CompanyAddress;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyLogoRepository;
 use CattoLearning\Support\CompanyLogo;
@@ -61,7 +64,8 @@ final class CompanyLogos
         $states = $this->logos->states(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $rows));
         foreach ($rows as $index => $row) {
             $state = $states[(int) ($row['id'] ?? 0)] ?? null;
-            $rows[$index]['logo_url'] = $state === null ? '' : '/admin/companies/' . (int) $row['id'] . '/logo?v=' . self::versionOf($state);
+            // By the company's account reference (owner, 2026-11-06: no row id in an address): each row holds it.
+            $rows[$index]['logo_url'] = $state === null ? '' : CompanyAddress::admin($row, '/logo?v=' . self::versionOf($state));
             $rows[$index]['logo_uploaded'] = $state !== null && $state['uploaded'];
         }
 

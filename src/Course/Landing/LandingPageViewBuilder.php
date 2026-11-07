@@ -220,7 +220,7 @@ final class LandingPageViewBuilder
         if ($this->coursePage === null || $this->items === null) { return null; }
         $view = $this->coursePage->view(['structure' => $this->items->availability((int) $course['id'], null, false)] + $course, false);
         if ($view['modules'] === []) { return null; }
-        return $common + ['modules' => $view['modules'], 'paragraph' => $view['paragraph'], 'parts' => $view['parts'], 'after' => $view['after'], 'total' => $view['total'], 'course_slug' => (string) $course['slug']];
+        return $common + ['modules' => $view['modules'], 'paragraph' => $view['paragraph'], 'parts' => $view['parts'], 'after' => $view['after'], 'total' => $view['total'], 'minutes' => $view['minutes'], 'course_slug' => (string) $course['slug']];
     }
 
     /**

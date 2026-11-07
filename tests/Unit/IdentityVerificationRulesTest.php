@@ -57,6 +57,15 @@ final class IdentityVerificationRulesTest extends TestCase
         self::assertFalse(DiditSignature::verify($sent, $v2, '', 'yesterday', self::SECRET, $now), 'A timestamp must be a number.');
         self::assertFalse(DiditSignature::verify($sent, $v2, '', (string) $now, '', $now), 'Without a secret nothing is believed.');
         self::assertNull(DiditSignature::canonical('not json'));
+
+        // For 24 hours after the secret is rotated in Didit, the replaced secret's signatures come as -Previous: a site
+        // still holding the old secret believes them, and nothing else changes (Didit's webhook documentation, 2026-11-06).
+        $rotated = hash_hmac('sha256', $canonical, 'the-new-secret');
+        self::assertFalse(DiditSignature::verify($sent, $rotated, '', (string) $now, self::SECRET, $now), 'The new secret\'s signature alone is not this site\'s.');
+        self::assertTrue(DiditSignature::verify($sent, $rotated, '', (string) $now, self::SECRET, $now, $v2), 'X-Signature-V2-Previous, made with the old secret, is.');
+        self::assertTrue(DiditSignature::verify($sent, '', '', (string) $now, self::SECRET, $now, '', hash_hmac('sha256', $sent, self::SECRET)), 'And X-Signature-Previous over the raw bytes.');
+        self::assertFalse(DiditSignature::verify($sent, $rotated, '', (string) $now, self::SECRET, $now, hash_hmac('sha256', $canonical, 'another-secret')), 'A -Previous signature still has to match.');
+        self::assertFalse(DiditSignature::verify($sent, $rotated, '', (string) $now, self::SECRET, $now + 301, $v2), 'And the 5 minutes still apply.');
     }
 
     public function testAnApprovedResultKeepsOnlyTheIdentityAndNeverAnImage(): void

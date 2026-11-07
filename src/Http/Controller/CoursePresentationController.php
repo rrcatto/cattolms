@@ -22,6 +22,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CoursePartAddress;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -40,7 +42,7 @@ final class CoursePresentationController extends BaseController
     private const ATTEMPTS_KEPT = 20;
     private const FEEDBACK = 'public_assessment_feedback';
 
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseRepository $courses, private readonly CourseItemService $items, private readonly CourseItemRenderer $renderer, private readonly ResourceLibraryService $resources, private readonly AnalyticsEventRecorder $analytics, private readonly Narrations $narrations, private readonly \CattoLearning\Course\Parts\CoursePartPdfs $partPdfs, private readonly PublicAssessmentAttempts $attempts)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseRepository $courses, private readonly CourseItemService $items, private readonly CourseItemRenderer $renderer, private readonly ResourceLibraryService $resources, private readonly AnalyticsEventRecorder $analytics, private readonly Narrations $narrations, private readonly \CattoLearning\Course\Parts\CoursePartPdfs $partPdfs, private readonly PublicAssessmentAttempts $attempts, private readonly AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -55,10 +57,10 @@ final class CoursePresentationController extends BaseController
         return $this->render('course-public-preview', ['title' => (string) $course['title'] . ' preview', 'course' => $course, 'course_content_mode' => true, 'is_public_preview' => true]);
     }
 
-    #[Route('/courses/{slug}/preview/{node_id}/content', name: 'course_public_preview_content', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    #[Route('/courses/{slug}/preview/{part}', name: 'course_public_preview_content', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['GET'])]
     public function item(): Response
     {
-        $course = $this->withVisitorTicks($this->publicCourse()); $nodeId = (int) $this->param('node_id'); $node = null;
+        $course = $this->withVisitorTicks($this->publicCourse()); $nodeId = $this->partNode($course); $node = null;
         // The public structure holds only the sections and Course Items marked for public preview. A
         // public section opens here when it has a page of its own (an introduction or an outline).
         foreach (CourseNavigation::sequence($course['structure']) as $candidate) { if ((int) $candidate['id'] === $nodeId) { $node = $candidate; break; } }
@@ -71,8 +73,8 @@ final class CoursePresentationController extends BaseController
             throw $this->notFound('Assessments open from their direct assessment route.');
         }
         $next = $around['next'];
-        $continue = $next === null ? '/courses/' . rawurlencode((string) $course['slug']) . '/preview' : '/courses/' . rawurlencode((string) $course['slug']) . '/preview/' . (int) $next['id'] . (in_array((string) ($next['item_type'] ?? ''), ['assessment', 'diagnostic'], true) ? '/assessment/' . rawurlencode((string) $next['item_key']) : '/content');
-        $node['rendered_html'] = GradeScale::resolve($isSection ? (string) $node['section_introduction_html'] : $this->renderer->render($node, (string) $course['slug'], $nodeId, true, [], ['continue' => $continue]), $this->courses->gradeBands((int) $course['id']));
+        $continue = $next === null ? '/courses/' . rawurlencode((string) $course['slug']) . '/preview' : CoursePartAddress::stop('preview', $course, $next);
+        $node['rendered_html'] = GradeScale::resolve($isSection ? (string) $node['section_introduction_html'] : $this->renderer->render($node, (string) $course['slug'], (string) $node['part_name'], true, [], ['continue' => $continue]), $this->courses->gradeBands((int) $course['id']));
         if ($course['public_preview_query'] !== '') { $node['rendered_html'] = preg_replace('/(href="\/courses\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['current_node_id'] = $nodeId;
         $this->publicView($course, 'item', $nodeId, $isSection ? null : (int) $node['course_item_id']);
@@ -80,29 +82,29 @@ final class CoursePresentationController extends BaseController
     }
 
     /** A public part's PDF (owner, 2026-10-28, decision 6A): only what the public preview shows. */
-    #[Route('/courses/{slug}/preview/{node_id}/pdf', name: 'course_public_preview_pdf', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    #[Route('/courses/{slug}/preview/{part}/pdf', name: 'course_public_preview_pdf', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['GET'])]
     public function pdf(): Response
     {
-        $course = $this->publicCourse(); $nodeId = (int) $this->param('node_id'); $node = null;
+        $course = $this->publicCourse(); $nodeId = $this->partNode($course); $node = null;
         $course['structure'] = $this->items->availability((int) $course['id'], null, true);
         foreach ($course['structure'] as $candidate) { if ((int) $candidate['id'] === $nodeId) { $node = $candidate; break; } }
         if ($node === null || !(bool) ($node['public_preview'] ?? false) || !\CattoLearning\Course\Parts\CoursePartPdfs::printable($node)) { throw $this->notFound('This part has no PDF.'); }
-        $rendered = GradeScale::resolve($this->renderer->render($node, (string) $course['slug'], $nodeId, true), $this->courses->gradeBands((int) $course['id']));
+        $rendered = GradeScale::resolve($this->renderer->render($node, (string) $course['slug'], (string) $node['part_name'], true), $this->courses->gradeBands((int) $course['id']));
         $heading = \CattoLearning\Course\Parts\CoursePartPdfs::heading($course, $node);
         $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, $rendered)]]);
         return \CattoLearning\Http\FileDownload::attachment($this->partPdfs->file($html), \CattoLearning\Course\Parts\CoursePartPdfs::filename($heading['module'], $heading['part'] === 'Lesson' ? '' : $heading['part']), 'application/pdf');
     }
 
     /** The visitor's tick on a public part, a toggle as the learner's is (owner, 2026-11-01); kept in their session only. */
-    #[Route('/courses/{slug}/preview/{node_id}/complete', name: 'course_public_preview_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/courses/{slug}/preview/{part}/complete', name: 'course_public_preview_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function markPart(): Response
     {
-        $nodeId = (int) $this->param('node_id');
+        $part = $this->param('part');
         // A plain form comes back to the buttons it was pressed at, not the top of the page.
-        $back = '/courses/' . rawurlencode($this->param('slug')) . '/preview/' . $nodeId . '/content' . ((string) ($_GET['preview'] ?? '') === '1' ? '?preview=1' : '') . '#cl-course-item-paging';
+        $back = CoursePartAddress::preview($this->param('slug'), $part) . ((string) ($_GET['preview'] ?? '') === '1' ? '?preview=1' : '') . '#cl-course-item-paging';
         if (!$this->isHtmxRequest()) {
             $this->requireCsrf();
-            $this->tickPart($nodeId);
+            $this->tickPart($this->partNode($this->publicCourse()));
             $this->redirect($back);
         }
         // With JavaScript the page does not reload or move (owner, 2026-11-02). An expired form, or an author's preview
@@ -110,6 +112,7 @@ final class CoursePresentationController extends BaseController
         if ((string) ($_GET['preview'] ?? '') === '1' && $this->currentUser() === null) { return $this->htmxReloadPage(); }
         try {
             $this->requireCsrf();
+            $nodeId = $this->partNode($this->publicCourse());
             $done = $this->tickPart($nodeId);
         } catch (HttpExceptionInterface) {
             return $this->htmxReloadPage();
@@ -119,7 +122,7 @@ final class CoursePresentationController extends BaseController
         return $this->renderFragment('partials/course-part-done', [
             'course' => $course, 'public_preview' => true, 'presentation_query' => '', 'is_preview' => false,
             'rows' => CourseNavigation::rowsUpTo((array) $course['structure'], $nodeId),
-            'paging_complete' => ['action' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview/' . $nodeId . '/complete' . $course['public_preview_query'], 'done' => $done],
+            'paging_complete' => ['action' => CoursePartAddress::preview($course, $part, '/complete') . $course['public_preview_query'], 'done' => $done],
         ]);
     }
 
@@ -135,28 +138,28 @@ final class CoursePresentationController extends BaseController
     }
 
     /** An assessment's start page, the learner's own: practice or graded, or the readiness check. */
-    #[Route('/courses/{slug}/preview/{node_id}/assessment/{key}', name: 'public_course_assessment', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'key' => '[a-zA-Z0-9._-]+'], methods: ['GET'])]
+    #[Route('/courses/{slug}/preview/{part}/assessment/{key}', name: 'public_course_assessment', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT, 'key' => '[a-zA-Z0-9._-]+'], methods: ['GET'])]
     public function assessment(): Response
     {
-        $course = $this->withVisitorTicks($this->publicCourse()); $nodeId = (int) $this->param('node_id'); $key = $this->param('key');
+        $course = $this->withVisitorTicks($this->publicCourse()); $nodeId = $this->partNode($course); $key = $this->param('key');
         try { $data = $this->attempts->overview($course, $nodeId, $key); } catch (\InvalidArgumentException) { throw $this->notFound('The public assessment was not found.'); }
         $course['current_node_id'] = $nodeId;
         $around = CourseNavigation::neighbours((array) $course['structure'], $nodeId);
         $data['assessment']['previous_node'] = $around['previous'];
         $data['assessment']['next_node'] = $around['next'];
-        return $this->render('assessment-overview', $data + ['course' => $course, 'title' => (string) $data['assessment']['title'], 'start_action' => $this->assessmentPath($course, $nodeId, $key) . '/start' . $course['public_preview_query'], 'preview_query' => '', 'is_public_preview' => true]);
+        return $this->render('assessment-overview', $data + ['course' => $course, 'title' => (string) $data['assessment']['title'], 'start_action' => $this->assessmentPath($course, $this->param('part'), $key) . '/start' . $course['public_preview_query'], 'preview_query' => '', 'is_public_preview' => true]);
     }
 
-    #[Route('/courses/{slug}/preview/{node_id}/assessment/{key}/start', name: 'public_course_assessment_start', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'key' => '[a-zA-Z0-9._-]+'], methods: ['POST'])]
+    #[Route('/courses/{slug}/preview/{part}/assessment/{key}/start', name: 'public_course_assessment_start', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT, 'key' => '[a-zA-Z0-9._-]+'], methods: ['POST'])]
     public function startAssessment(): Response
     {
         $this->requireCsrf();
-        $course = $this->publicCourse(); $nodeId = (int) $this->param('node_id'); $key = $this->param('key');
+        $course = $this->publicCourse(); $nodeId = $this->partNode($course); $key = $this->param('key');
         return $this->handle(function () use ($course, $nodeId, $key): void {
             $attempt = $this->attempts->start($course, $nodeId, $key, (string) ($_POST['mode'] ?? 'graded'), array_values($this->storedAttempts()));
             $this->keepAttempt($attempt);
             $this->redirect($this->attemptPath($course, (string) $attempt['public_id']));
-        }, $this->assessmentPath($course, $nodeId, $key) . $course['public_preview_query']);
+        }, $this->assessmentPath($course, $this->param('part'), $key) . $course['public_preview_query']);
     }
 
     /** One question at a time, with Skip, the timer and Finish now. */
@@ -209,7 +212,7 @@ final class CoursePresentationController extends BaseController
         $session = $this->attempts->result($attempt, (array) $course['structure']);
         $session['next_node'] = CourseNavigation::neighbours((array) $course['structure'], (int) $attempt['node_id'])['next'];
         $session['course_result'] = $this->attempts->courseResult($attempt, array_values($this->storedAttempts()));
-        return $this->render('assessment-session-result', ['course' => $course, 'title' => 'Assessment result', 'session' => $session, 'review_prompt' => null, 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '', 'item_base' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview/', 'item_query' => $query, 'course_url' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview' . $query, 'retake_url' => $this->assessmentPath($course, (int) $attempt['node_id'], (string) $attempt['assessment_key']) . $query]);
+        return $this->render('assessment-session-result', ['course' => $course, 'title' => 'Assessment result', 'session' => $session, 'review_prompt' => null, 'is_preview' => false, 'is_public_preview' => true, 'preview_query' => '', 'item_query' => $query, 'course_url' => '/courses/' . rawurlencode((string) $course['slug']) . '/preview' . $query, 'retake_url' => $this->retakeUrl($course, (int) $attempt['node_id'], (string) $attempt['assessment_key']) . $query]);
     }
 
     #[Route('/course-resources/{public_id}', name: 'course_resource_file', requirements: ['public_id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]
@@ -304,9 +307,32 @@ final class CoursePresentationController extends BaseController
     }
 
     /** @param array<string,mixed> $course */
-    private function assessmentPath(array $course, int $nodeId, string $key): string
+    private function assessmentPath(array $course, string $part, string $key): string
     {
-        return '/courses/' . rawurlencode((string) $course['slug']) . '/preview/' . $nodeId . '/assessment/' . rawurlencode($key);
+        return CoursePartAddress::preview($course, $part, '/assessment/' . rawurlencode($key));
+    }
+
+    /**
+     * Where a result's Retake leads: the assessment's page by its part name, or the preview's outline when its part has
+     * since gone or left the preview.
+     *
+     * @param array<string,mixed> $course With its public structure.
+     */
+    private function retakeUrl(array $course, int $nodeId, string $key): string
+    {
+        $row = CourseNavigation::row((array) $course['structure'], $nodeId);
+        return $row === null ? '/courses/' . rawurlencode((string) $course['slug']) . '/preview' : $this->assessmentPath($course, (string) $row['part_name'], $key);
+    }
+
+    /**
+     * The part the address names by its part name (owner, 2026-11-06: no row id in an address); an unknown one is not
+     * found. Whether the part is in the public preview is the caller's to check.
+     *
+     * @param array<string,mixed> $course
+     */
+    private function partNode(array $course): int
+    {
+        return $this->keys->part((int) $course['id'], $this->param('part')) ?? throw $this->notFound('The public Course Item preview was not found.');
     }
 
     /** @param array<string,mixed> $course */

@@ -10,10 +10,13 @@ Version: 1.0.0
 Description:
 A follow asked for by someone not signed in (owner, 2026-10-28, decision 8B: "If they click to follow and they're not
 signed in, take them to the registration page and then once they've signed in, action the follow"): the category,
-course or tag, written "course:12", or a list ADMIN made, written "list:" and its join link's token (decision 7A),
+course or tag by its key, written "course:GDN-101", "category:garden-design" or "tag:raised-beds" (owner, 2026-11-06:
+no row id in an address), or a list ADMIN made, written "list:" and its join link's token (decision 7A),
 carried through the registration or sign-in link and carried out when it is used.
 
 Changelog:
+2026/11/07 SAST
+- A category and a tag are named by their slugs, as a course is by its code: no row id is carried through signing in.
 2026/10/28 SAST
 - Created.
 */
@@ -22,37 +25,59 @@ declare(strict_types=1);
 
 namespace CattoLearning\Mailing;
 
+use CattoLearning\Course\CourseAddress;
+use CattoLearning\Support\Address\AddressKey;
+use CattoLearning\Support\Address\CatalogueAddress;
+
 final class FollowIntent
 {
     public const KINDS = ['category', 'course', 'tag', 'list'];
 
-    /** A list ADMIN made is named by its join link's token, never its number, so only someone given the link can join it. */
-    private function __construct(public readonly string $kind, public readonly int $id, public readonly string $token = '')
+    /** What each kind is named by: a course by its code, a category and a tag by their slugs, a list by its join link's token. */
+    private const KEYS = [
+        'course' => CourseAddress::REQUIREMENT,
+        'category' => CatalogueAddress::CATEGORY,
+        'tag' => CatalogueAddress::TAG,
+        'list' => '[0-9a-f]{32}',
+    ];
+
+    /**
+     * A list ADMIN made is named by its join link's token, never its number, so only someone given the link can join it.
+     * The row id of what is followed is found when the follow is carried out (MailingConsents::subjectId).
+     */
+    private function __construct(public readonly string $kind, public readonly string $key)
     {
     }
 
-    /** "course:12" or "list:<token>" read back, or null when it is not one. */
+    /** "course:GDN-101", "category:garden-design", "tag:raised-beds" or "list:<token>" read back, or null when it is not one. */
     public static function fromText(mixed $text): ?self
     {
-        if (!is_string($text)) return null;
-        if (preg_match('/^list:([0-9a-f]{32})$/', trim($text), $part) === 1) return new self('list', 0, $part[1]);
-        if (preg_match('/^(category|course|tag):([1-9][0-9]{0,17})$/', trim($text), $part) !== 1) return null;
+        if (!is_string($text) || preg_match('/^(category|course|tag|list):(.+)$/', trim($text), $part) !== 1) return null;
 
-        return new self($part[1], (int) $part[2]);
+        return self::of($part[1], $part[2]);
     }
 
-    public static function of(string $kind, int $id): ?self
+    /** A course by its code, a category or a tag by its slug, a list by its token; null when the key is not one. */
+    public static function of(string $kind, string $key): ?self
     {
-        return in_array($kind, ['category', 'course', 'tag'], true) && $id > 0 ? new self($kind, $id) : null;
+        $requirement = self::KEYS[$kind] ?? null;
+
+        return $requirement !== null && AddressKey::fits($key, $requirement) ? new self($kind, $key) : null;
+    }
+
+    /** A course, by its code. */
+    public static function ofCourse(string $code): ?self
+    {
+        return self::of('course', $code);
     }
 
     public static function ofList(string $token): ?self
     {
-        return preg_match('/^[0-9a-f]{32}$/', $token) === 1 ? new self('list', 0, $token) : null;
+        return self::of('list', $token);
     }
 
     public function text(): string
     {
-        return $this->kind . ':' . ($this->kind === 'list' ? $this->token : $this->id);
+        return $this->kind . ':' . $this->key;
     }
 }

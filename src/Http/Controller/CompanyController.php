@@ -8,6 +8,8 @@ Handles the consolidated Company workspace, standalone semantic Company sections
 
 Changelog:
 
+2026/11/07 SAST
+- A member's page and forms are at their account reference (/company/people/CL2026…, owner 2026-11-06).
 
 
 2026/09/07 23:45 SAST
@@ -36,7 +38,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\CompanySectionRegistry;
+use CattoLearning\Course\CourseAddress;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
@@ -70,6 +75,8 @@ final class CompanyController extends BaseController
         private readonly \CattoLearning\Application\CompanyLogos $logos,
         private readonly \CattoLearning\Application\ProfilePictures $pictures,
         private readonly \CattoLearning\Company\CompanyDepartures $departures,
+        private readonly \CattoLearning\Course\CourseService $courses,
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -170,7 +177,7 @@ final class CompanyController extends BaseController
             $asked = $this->departures->deleteCompany($user->id, $companyId, (string) ($_POST['confirm_name'] ?? ''));
             if ($user->hasPermission('PLATFORM.COMPANY.MANAGE')) {
                 $this->flash('success', 'The company is deleted and hidden, its records kept. ' . $asked . ' staff ' . ($asked === 1 ? 'member was' : 'members were') . ' emailed to keep their accounts as private ones.');
-                $this->redirect('/admin/companies/' . $companyId);
+                $this->redirect(CompanyAddress::admin((string) $this->keys->companyReference($companyId)));
             }
 
             return $this->render('company-deleted', ['title' => 'Company deleted', 'staff_asked' => $asked]);
@@ -182,7 +189,8 @@ final class CompanyController extends BaseController
     public function assignLengthOptions(): Response
     {
         $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
-        $courseId = (int) ($_GET['course_id'] ?? 0);
+        // The course by its code, as the form's lookup names it (owner, 2026-11-06).
+        $courseId = $this->courseIdFromCode($_GET['course'] ?? null);
 
         return $this->renderFragment('partials/credit-length-options', ['lengths' => $this->platformAdministration->assignLengths($this->contextCompanyId($user), $courseId), 'course_chosen' => $courseId > 0, 'empty_words' => 'No free credit for this course']);
     }
@@ -372,7 +380,7 @@ final class CompanyController extends BaseController
                 throw new RuntimeException('Select a company before assigning a course.');
             }
 
-            $courseId = (int) ($_POST['course_id'] ?? 0);
+            $courseId = $this->courseIdFromCode($_POST['course'] ?? null);
             $targetUserId = (int) ($_POST['user_id'] ?? 0);
             // A length of the company's credits for the course (owner, 2026-10-26), never typed.
             $seconds = (int) ($_POST['access_period_seconds'] ?? 0);
@@ -424,12 +432,13 @@ final class CompanyController extends BaseController
      * The company is taken from the context the reader is administering, never from the request: a
      * course id in a URL says which course, and it must not be able to say whose favourite it is.
      */
-    #[Route('/company/favourites/{id}/toggle', name: 'company_toggle_favourite', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/company/favourites/{code}/toggle', name: 'company_toggle_favourite', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function toggleFavourite(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.COURSE.MANAGE');
-        $courseId = (int) $this->param('id');
+        $courseId = $this->courseIdFromCode($this->param('code'));
+        if ($courseId === 0) throw $this->notFound('We could not find that course.');
 
         return $this->handle(function () use ($user, $courseId): void {
             $context = $this->companyContext->resolve($user);
@@ -471,16 +480,16 @@ final class CompanyController extends BaseController
      * courses and their course requests, with the company's actions on them. A person outside the company in context is
      * not found.
      */
-    #[Route('/company/people/{id}', name: 'company_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/company/people/{reference}', name: 'company_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function person(): Response
     {
         $user = $this->requirePermission('COMPANY.PERSON.VIEW');
-        $view = $this->platformAdministration->companyPersonView($this->contextCompanyId($user), max(1, (int) $this->param('id')));
+        $view = $this->platformAdministration->companyPersonView($this->contextCompanyId($user), $this->personIdFromAddress($this->keys));
         if ($view === null) throw new NotFoundHttpException('That person is not in this company.');
         // Their picture, uploaded or drawn (owner, 2026-10-26: "why is their profile pic not displayed?").
         $picture = $this->pictures->state((int) $view['person']['id']);
         return $this->render('company-person', $this->companySelectorView($user) + $view + [
-            'person_picture_url' => $picture === null ? '' : '/company/people/' . (int) $view['person']['id'] . '/picture?v=' . $picture['version'],
+            'person_picture_url' => $picture === null ? '' : PersonAddress::company($view['person'], '/picture?v=' . $picture['version']),
             'can_change_role' => $user->hasPermission('COMPANY.PERSON.MANAGE') && (int) $view['person']['id'] !== $user->id,
             // What Delete would do, said before it is pressed (owner, 2026-10-26).
             'delete_assessment' => $this->departures->assess($user->id, $this->contextCompanyId($user), (int) $view['person']['id']),
@@ -491,11 +500,11 @@ final class CompanyController extends BaseController
     }
 
     /** A member's picture, uploaded or drawn, for the Company workspace (owner, 2026-10-26); only for the company's own members. */
-    #[Route('/company/people/{id}/picture', name: 'company_person_picture', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/company/people/{reference}/picture', name: 'company_person_picture', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function personPicture(): Response
     {
         $user = $this->requirePermission('COMPANY.PERSON.VIEW');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
         if ($this->platformAdministration->companyPersonView($this->contextCompanyId($user), $target) === null) throw new NotFoundHttpException('That person is not in this company.');
         try {
             $picture = $this->pictures->picture($target);
@@ -506,11 +515,18 @@ final class CompanyController extends BaseController
         return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
     }
 
+    /** The row id of the course a form or address names by its code (owner, 2026-11-06), or 0 for none or no such course. */
+    private function courseIdFromCode(mixed $code): int
+    {
+        return is_string($code) && $code !== '' ? ($this->courses->courseIdForCode($code) ?? 0) : 0;
+    }
+
     /** Where an action on a person goes back to: their page when it was sent from there, else the list. */
     private function personReturn(string $fallback): string
     {
         $return = (string) ($_POST['return'] ?? '');
-        return preg_match('#^/company/people/\d+$#', $return) === 1 ? $return : $fallback;
+        // A person's page, by their account reference (owner, 2026-11-06).
+        return preg_match('#^/company/people/' . PersonAddress::REQUIREMENT . '$#', $return) === 1 ? $return : $fallback;
     }
 
     /**
@@ -518,12 +534,12 @@ final class CompanyController extends BaseController
      * deleted"), by the rules in Company\CompanyDepartures: never someone who completed a course, someone busy with one
      * asked first, and no answer in 3 days deactivates them, keeping everything.
      */
-    #[Route('/company/people/{id}/delete', name: 'company_delete_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/company/people/{reference}/delete', name: 'company_delete_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function deletePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
         return $this->handle(function () use ($user, $target): void {
             // Someone asked first is still here, on their page; anyone deleted or deactivated is gone from the company.
             $asked = $this->departures->assess($user->id, $this->contextCompanyId($user), $target)['action'] === 'ask';
@@ -550,7 +566,7 @@ final class CompanyController extends BaseController
                 $existing = $this->creditPurchases->startForRequest($user,$this->contextCompanyId($user),$requestId);
                 if ($existing !== null) {
                     $this->flash('info','A company purchase for this request is already in progress.');
-                    $this->redirect('/account/orders/'.$existing);
+                    $this->redirect(\CattoLearning\Support\Address\OrderAddress::buyer((int) $existing));
                 }
                 $this->flash('info', 'A matching company credit is needed. Complete checkout to approve and enrol this learner.');
                 $this->redirect('/company/credits/buy');
@@ -596,12 +612,12 @@ final class CompanyController extends BaseController
     /**
      * Edits the profile fields the company owns for one of its people.
      */
-    #[Route('/company/people/{id}', name: 'company_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/company/people/{reference}', name: 'company_update_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
         return $this->handle(function () use ($user, $target): void {
             // Their names, company email and role, as Add person asks (owner, 2026-10-26).
             $this->platformAdministration->updateCompanyPerson($user->id, $this->contextCompanyId($user), $target, $_POST);
@@ -617,12 +633,12 @@ final class CompanyController extends BaseController
      * once rather than at their next sign-in. Nothing is deleted either way, so enabling returns
      * the learner to exactly where they left off.
      */
-    #[Route('/company/people/{id}/status', name: 'company_set_person_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/company/people/{reference}/status', name: 'company_set_person_status', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function setPersonStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
         $status = (string) ($_POST['status'] ?? '');
         return $this->handle(function () use ($user, $target, $status): void {
             $this->platformAdministration->setCompanyPersonStatus($user->id, $this->contextCompanyId($user), $target, $status);
@@ -688,7 +704,7 @@ final class CompanyController extends BaseController
         $data['company_people_view'] = $view;
         $data['company_people_view_switch'] = ListView::switcher('company_people', $view, '/company/people', $filters);
         if (isset($data['people']) && is_array($data['people']) && array_is_list($data['people'])) {
-            $data['people'] = $this->pictures->withPictures($data['people'], '/company/people/', '/picture');
+            $data['people'] = $this->pictures->withPictures($data['people'], 'company');
         }
 
         return $data;
@@ -749,9 +765,11 @@ final class CompanyController extends BaseController
         $data = $extra + $data;
         if ($key === 'people') $data = $this->peopleView($data, $user->id);
         // A credit's Assign link fills in its course and period (owner, 2026-10-26).
-        if (in_array($key, ['credits', 'enrolments'], true) && (int) ($_GET['assign_course'] ?? 0) > 0) {
-            $data['assign_course'] = $this->platformAdministration->describeEntity('courses', (int) $_GET['assign_course']) ?? 0;
-            $data['assign_lengths'] = $this->platformAdministration->assignLengths($this->contextCompanyId($user), (int) $_GET['assign_course']);
+        // By the course's code (owner, 2026-11-06: no row id in an address).
+        $assignCourse = $this->courseIdFromCode($_GET['assign_course'] ?? null);
+        if (in_array($key, ['credits', 'enrolments'], true) && $assignCourse > 0) {
+            $data['assign_course'] = $this->platformAdministration->describeEntity('courses', $assignCourse) ?? 0;
+            $data['assign_lengths'] = $this->platformAdministration->assignLengths($this->contextCompanyId($user), $assignCourse);
             $data['assign_seconds'] = (int) ($_GET['assign_seconds'] ?? 0);
         }
         $data['company_section'] = $definition;

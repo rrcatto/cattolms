@@ -75,7 +75,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $container = IntegrationContainer::get();
         $this->settings = $container->get(OwnerMessageSettings::class);
         $this->messages = $container->get(OwnerMessageRepository::class);
-        $this->db->executeStatement('DELETE FROM owner_messages');
+        $this->db->executeStatement('DELETE FROM telegram_messages');
         $this->admin = $this->fixture->createUser('Messages administrator');
         $this->owner = $this->fixture->createUser('Messages course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Messages provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.messages.example.test');
@@ -100,7 +100,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
     /** @return list<string> what is kept to send */
     private function bodies(): array
     {
-        return array_map('strval', $this->db->fetchFirstColumn('SELECT body FROM owner_messages ORDER BY id'));
+        return array_map('strval', $this->db->fetchFirstColumn('SELECT body FROM telegram_messages ORDER BY id'));
     }
 
     private function owners(string $mode = 'live'): OwnerMessages
@@ -228,6 +228,46 @@ final class OwnerMessagesIntegrationTest extends TestCase
         self::assertSame(['Sale: Order CL-' . str_pad((string) $order, 8, '0', STR_PAD_LEFT) . ', Pruning Through the Seasons, R2,500, paid by EFT' . $this->site()], $this->bodies());
     }
 
+    /** New Order (owner, 2026-11-06: "I would also like to receive a notification when an order is placed"): once, before it is paid. */
+    public function testAPlacedOrderKeepsOneNewOrderMessageAndPayingItKeepsTheSale(): void
+    {
+        $buyer = $this->buyer();
+        $services = $this->services('live', true);
+        $order = $this->place($buyer, $services, $this->course('Planting a Herb Garden', 250000), 'eft');
+        $number = 'CL-' . str_pad((string) $order, 8, '0', STR_PAD_LEFT);
+        self::assertSame(['New order: Order ' . $number . ', Planting a Herb Garden, R2,500, to be paid by EFT' . $this->site()], $this->bodies(), 'Placed, and not paid: one message.');
+        self::assertSame(['order'], array_map('strval', $this->db->fetchFirstColumn('SELECT kind FROM telegram_messages')));
+        self::assertCount(1, $this->bodies(), 'Nothing more for the same order.');
+        $card = $this->buyer();
+        $paid = $this->place($card, $services, $this->course('Composting at Home', 120000), 'dummy');
+        $cardNumber = 'CL-' . str_pad((string) $paid, 8, '0', STR_PAD_LEFT);
+        self::assertSame(['New order: Order ' . $cardNumber . ', Composting at Home, R1,200, by simulated card' . $this->site(), 'Sale: Order ' . $cardNumber . ', Composting at Home, R1,200, paid by card' . $this->site()],
+            array_slice($this->bodies(), 1), 'An order paid at once keeps its New order and then its sale.');
+    }
+
+    public function testNewOrderUntickedOrAnInventedBuyerKeepsNoMessage(): void
+    {
+        $services = $this->services('live', true);
+        $this->settings->setChoices(true, true, $this->admin, false);
+        $this->place($this->buyer(), $services, $this->course('Planting a Herb Garden', 250000), 'eft');
+        self::assertSame([], $this->bodies(), 'New Order unticked.');
+        $this->settings->setChoices(true, true, $this->admin, true);
+        $this->place($this->buyer('seeded-' . bin2hex(random_bytes(4)) . '@example.invalid'), $services, $this->course('Composting at Home', 120000), 'eft');
+        self::assertSame([], $this->bodies(), 'An address nobody real has.');
+        self::assertTrue($this->settings->saved()['on_order'], 'Ticked again, and kept.');
+    }
+
+    /** @param array<string,mixed> $services */
+    private function place(CurrentUser $buyer, array $services, int $variant, string $method): int
+    {
+        $services['orders']->changeCart($buyer, $variant);
+        $services['billing']->saveOwn($buyer, BillingFixture::personFields('Order Buyer'));
+        $_SESSION['checkout'][$buyer->id] = ['profile_confirmed' => true, 'payment_method' => $method, 'method_token' => $method === 'dummy' ? 'demo_success' : '', 'invoice_email' => false, 'payment_key' => Uuid::v4()];
+        $cart = $services['orders']->cart($buyer);
+
+        return (int) $services['checkout']($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
+    }
+
     public function testABundleIsNamedByItsTitle(): void
     {
         $services = $this->services();
@@ -282,7 +322,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         self::assertSame(['New registration: Thandi Mokoena, South Africa', 'Sale: Order CL-00000002, Course A, R2,500, paid by EFT'], array_map(static fn(array $one): string => $one[1]['text'], $sent));
         self::assertSame('4242', $sent[0][1]['chat_id']);
         self::assertSame('Nothing was waiting.', $job->run(), 'Nothing goes twice.');
-        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM owner_messages WHERE sent_at IS NOT NULL AND tries = 1'));
+        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NOT NULL AND tries = 1'));
     }
 
     public function testATelegramFailureLeavesTheMessageWaitingAndItGoesNextTime(): void
@@ -299,7 +339,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $summary = $job->run();
         self::assertSame(1, $tried, 'It stops at the first failure, because the rest would fail too.');
         self::assertStringNotContainsString(self::KEY, $summary);
-        $row = $this->db->fetchAssociative("SELECT tries, sent_at, last_error FROM owner_messages WHERE reference = 'order:1'");
+        $row = $this->db->fetchAssociative("SELECT tries, sent_at, last_error FROM telegram_messages WHERE reference = 'order:1'");
         self::assertSame([1, null], [(int) $row['tries'], $row['sent_at']], 'It waits.');
         self::assertStringContainsString('could not be reached', (string) $row['last_error']);
         self::assertStringNotContainsString(self::KEY, (string) $row['last_error'], 'The key is never stored with an error.');
@@ -310,7 +350,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
 
         $this->telegramDown = false;
         self::assertSame('Sent 2 messages.', $job->run());
-        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM owner_messages WHERE sent_at IS NOT NULL AND last_error IS NULL'));
+        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NOT NULL AND last_error IS NULL'));
         self::assertNull($setup->view()['last_error'], 'Settings stops saying it failed.');
         self::assertNotSame('', $this->messages->status()['last_sent_at']);
     }
@@ -321,9 +361,9 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $this->messages->record('order:new', 'sale', 'Still waiting');
         $this->messages->record('order:sent', 'sale', 'Sent long ago');
         $this->messages->record('order:recent', 'sale', 'Sent lately');
-        $this->db->executeStatement("UPDATE owner_messages SET created_at = NOW() - INTERVAL '8 days' WHERE reference = 'order:old'");
-        $this->db->executeStatement("UPDATE owner_messages SET created_at = NOW() - INTERVAL '40 days', sent_at = NOW() - INTERVAL '31 days' WHERE reference = 'order:sent'");
-        $this->db->executeStatement("UPDATE owner_messages SET created_at = NOW() - INTERVAL '10 days', sent_at = NOW() - INTERVAL '9 days' WHERE reference = 'order:recent'");
+        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '8 days' WHERE reference = 'order:old'");
+        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '40 days', sent_at = NOW() - INTERVAL '31 days' WHERE reference = 'order:sent'");
+        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '10 days', sent_at = NOW() - INTERVAL '9 days' WHERE reference = 'order:recent'");
         $this->settings->forget();
         self::assertSame('Not connected to Telegram. Dropped 1 older than 7 days.', $this->job(static fn(): MockResponse => new MockResponse('{"ok":true,"result":{}}'))->run());
         $deleted = IntegrationContainer::get()->get(RetentionCleanup::class)->run();
@@ -376,7 +416,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
     public function testATestMessageIsLoggedAndNeverSentAgainAndLeavesTheStatusAlone(): void
     {
         // Owner, 2026-11-05: "a telegram messages sent log, so I can see what messages you sent and I can check if I got them".
-        $this->db->executeStatement('DELETE FROM owner_messages');
+        $this->db->executeStatement('DELETE FROM telegram_messages');
         $sent = 0;
         $setup = $this->settingsPage(new MockHttpClient(function () use (&$sent): MockResponse {
             if ($this->telegramDown) return new MockResponse('{"ok":false,"description":"Forbidden: bot was blocked by the user"}', ['http_code' => 403]);
@@ -390,7 +430,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
             self::fail('Telegram refused it.');
         } catch (TelegramFailed) {
         }
-        self::assertSame(['all' => 2, 'registration' => 0, 'sale' => 0, 'test' => 2, 'unsent' => 1], $this->messages->logCounts());
+        self::assertSame(['all' => 2, 'sign_in' => 0, 'connected' => 0, 'registration' => 0, 'order' => 0, 'sale' => 0, 'test' => 2, 'unsent' => 1], $this->messages->logCounts());
         self::assertCount(2, $this->messages->logPage('test', 25, 0));
         self::assertCount(1, $this->messages->logPage('unsent', 25, 0));
         self::assertSame([], $this->messages->waiting(30), 'A failed test goes at once or not at all: the job never sends it.');
@@ -528,8 +568,8 @@ final class OwnerMessagesIntegrationTest extends TestCase
         return new CurrentUser($this->admin, Uuid::v4(), 'admin@example.invalid', 'Administrator', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());
     }
 
-    /** @return array<string,mixed> the commerce services, each keeping its messages through the real hook */
-    private function services(string $mode = 'live'): array
+    /** @return array<string,mixed> the commerce services, each keeping its messages through the real hook, and New Order's when $placed */
+    private function services(string $mode = 'live', bool $placed = false): array
     {
         $container = IntegrationContainer::get();
         $records = new CommerceRepository($this->db);
@@ -537,7 +577,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $transitions = $container->get(TransitionService::class);
         $promotions = PromotionFixture::service($this->db, $this->clock);
         $documents = $container->get(FinancialDocuments::class);
-        $orders = new OrderService($records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock, $promotions, $documents, WalletFixture::wallets($this->db, $this->clock));
+        $orders = new OrderService($records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock, $promotions, $documents, WalletFixture::wallets($this->db, $this->clock), ownerMessages: $placed ? $this->owners($mode) : null);
         $access = new AccessService($records, $tx, $transitions, $this->clock);
         $analytics = new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock);
         $fulfilment = new FulfilmentService($records, $transitions, $access, $tx, $orders, $this->clock, new CompanyCreditFulfilment($records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock), $analytics, $promotions, $this->owners($mode));

@@ -9,7 +9,7 @@
 	<input type="hidden"
          id="{{ lk_name }}-value"
          name="{{ lk_name }}"
-         value="{{ lk_selected ? lk_selected.id : '' }}"
+         value="{{ lk_selected ? (lk_by_code|default(false) ? lk_selected.code : lk_selected.id) : '' }}"
          {{ lk_required ? 'required' : '' }}>
 	<p class="lookup-selected" id="{{ lk_name }}-selected" aria-live="polite">
 		{% if lk_selected %}
@@ -28,7 +28,7 @@
          hx-get="{{ lk_base is defined and lk_base ? lk_base : '/admin/lookup' }}/{{ lk_type }}"
          hx-trigger="keyup changed delay:250ms, search"
          hx-target="#{{ lk_name }}-results"
-         hx-vals='{"target": "{{ lk_name }}"}'
+         hx-vals='{"target": "{{ lk_name }}"{% if lk_by_code|default(false) %}, "by": "code"{% endif %}}'
          name="q" {{ ui_field_attrs(props) }}>
 	<div class="lookup-results-panel" id="{{ lk_name }}-results" role="region" aria-live="polite">
 		<p class="help lookup-hint">

@@ -20,6 +20,12 @@ makes categories and tags; the package's prices need COURSE.PRICING.MANAGE and p
 Every step works without JavaScript.
 
 Changelog:
+2026/11/06 SAST
+- The package's bundles on the review, ticked to import for whoever manages bundles (BUNDLE.MANAGE), and on the result.
+- The import is canonical (owner, 2026-11-06): the review lists every difference of a course, a file and a bundle, each
+  a choice of the file's version (the default) or this site's, and the import does what was chosen. Changing prices needs
+  COURSE.PRICING.MANAGE and changing a status COURSE.PUBLISH: without them those stay as they are here.
+- The export's ticks carry course codes, never row ids (owner, 2026-11-06: no row id in any address).
 2026/10/23 SAST
 - Created.
 - The tick buttons submit the form back to the page (a link to the page's own address did not reload it, so Clear the
@@ -35,6 +41,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Course\CataloguePackage;
+use CattoLearning\Course\CourseService;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,7 +54,7 @@ final class AdminCatalogueController extends BaseController
     // The last import's report, shown once on the result page.
     private const REPORT = 'catalogue_import_report';
 
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CataloguePackage $package)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CataloguePackage $package, private readonly CourseService $courses)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -81,7 +88,8 @@ final class AdminCatalogueController extends BaseController
     public function export(): Response
     {
         $user = $this->requirePermission('COURSE.EXPORT');
-        $courseIds = array_values(array_unique(array_filter(array_map('intval', (array) ($_GET['courses'] ?? [])), static fn(int $id): bool => $id > 0)));
+        // The ticked courses by their codes (owner, 2026-11-06: no row id in any address), each turned into its course here.
+        $courseIds = array_values(array_unique(array_filter(array_map(fn(mixed $code): ?int => is_string($code) ? $this->courses->courseIdForCode($code) : null, (array) ($_GET['courses'] ?? [])))));
         if (($_GET['what'] ?? '') === 'categories') {
             $json = $this->package->exportCategoriesAndTags($user->id, $courseIds);
             header('Content-Type: application/json; charset=UTF-8');
@@ -127,6 +135,8 @@ final class AdminCatalogueController extends BaseController
             'plan' => $this->package->plan($key),
             'can_price' => $user->hasPermission('COURSE.PRICING.MANAGE'),
             'can_publish' => $user->hasPermission('COURSE.PUBLISH'),
+            // Bundles are imported by whoever manages them (owner, 2026-11-06).
+            'can_bundle' => $user->hasPermission('BUNDLE.MANAGE'),
         ]), self::PAGE);
     }
 
@@ -137,11 +147,18 @@ final class AdminCatalogueController extends BaseController
         $user = $this->requireImporter();
         $key = $this->posted('key');
         return $this->handle(function () use ($user, $key): void {
+            // Each difference is the file's unless "Keep this site's" was chosen for it (owner, 2026-11-06).
             $report = $this->package->apply($key, [
+                'fingerprint' => $this->posted('fingerprint'),
                 'courses' => array_values(array_map('strval', (array) ($_POST['courses'] ?? []))),
-                'replace' => array_values(array_map('strval', (array) ($_POST['replace'] ?? []))),
-                'prices' => $user->hasPermission('COURSE.PRICING.MANAGE') && $this->posted('prices') === '1',
-                'publish' => $user->hasPermission('COURSE.PUBLISH') && $this->posted('publish') === '1',
+                'keep' => self::kept($_POST['choice'] ?? []),
+                'keep_file_keys' => array_keys(array_filter((array) ($_POST['file_choice'] ?? []), static fn(mixed $choice): bool => $choice === 'site')),
+                'keep_bundles' => self::kept($_POST['bundle_choice'] ?? []),
+                'prices' => $this->posted('prices') === '1',
+                'publish' => $this->posted('publish') === '1',
+                'may_price' => $user->hasPermission('COURSE.PRICING.MANAGE'),
+                'may_publish' => $user->hasPermission('COURSE.PUBLISH'),
+                'bundles' => $user->hasPermission('BUNDLE.MANAGE') ? array_values(array_map('strval', (array) ($_POST['bundles'] ?? []))) : [],
             ], $user->id);
             $_SESSION[self::REPORT] = $report;
             $this->redirect(self::PAGE . '/result');
@@ -172,6 +189,20 @@ final class AdminCatalogueController extends BaseController
             'active_nav' => 'admin',
             'report' => $report,
         ]);
+    }
+
+    /**
+     * The differences kept as this site's, by code: choice[CODE][kind] = site.
+     *
+     * @return array<string,list<string>>
+     */
+    private static function kept(mixed $choices): array
+    {
+        $kept = [];
+        foreach ((array) $choices as $code => $kinds) {
+            foreach ((array) $kinds as $kind => $choice) if ($choice === 'site') $kept[(string) $code][] = (string) $kind;
+        }
+        return $kept;
     }
 
     private function requireAny(): CurrentUser

@@ -27,59 +27,17 @@
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Questions and answers', summary: 'Not answered here? The Help page explains how the site works, and the Terms and Conditions and the Refund Policy hold the rules.'}) }}
 			<div class="cl-faq">
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'buying', eyebrow: 'Buying', icon: icons.buying, heading: 'How do I buy a course?'})} %}{% block body %}
-					<p>Open the course in the <a href="/courses">catalogue</a> and choose Add to cart or Buy now, then check out. You sign in, or register, at checkout.</p>
-					<p>A company account does not buy courses for itself: it asks its company for the course instead.</p>
+				{# The questions are Help\Faq's, which the FAQPage structured data reads too (owner, 2026-11-06), so the two never differ. #}
+				{% for question in faq_questions %}
+				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: question.id, eyebrow: question.eyebrow, icon: icons[question.icon], heading: question.question})} %}{% block body %}
+					{% for paragraph in question.paragraphs %}
+					<p>{{ paragraph|raw }}</p>
+					{% endfor %}
+					{% if question.scale is defined %}
+					{{ ui('data.key-value-list', {items: question.scale}) }}
+					{% endif %}
 				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'promo-codes', eyebrow: 'Buying', icon: icons.buying, heading: 'How do promo codes work?'})} %}{% block body %}
-					<p>Enter a promo code when you review your order at checkout. Some promotions apply themselves in your cart, and the cart says so.</p>
-					<p>One promotion applies to an order. If more than one could, the one that saves you the most applies.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'paying', eyebrow: 'Paying', icon: icons.paying, heading: 'How can I pay?'})} %}{% block body %}
-					<p>With the payment methods shown at checkout. When you pay by EFT, use your account reference as the payment reference. Your order waits until the payment arrives, and an order that is not paid in time is cancelled.</p>
-					<p>No VAT is charged. The price shown is the full price.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'access', eyebrow: 'Access', icon: icons.access, heading: 'When does my course start, and for how long?'})} %}{% block body %}
-					<p>Immediately. Your course starts as soon as your payment is confirmed (for an EFT, when we confirm it has arrived).</p>
-					<p>It stays open for the access period you bought, shown beside the price. A year is 365 days.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'grading', eyebrow: 'Grading', icon: icons.grading, heading: 'How is my result worked out?'})} %}{% block body %}
-					<p>Only assessments count. Reading, watching and downloading do not. Your module assessments together make up half of your result, and the final assessment the other half.</p>
-					<p>Your result is then graded on this scale:</p>
-					{{ ui('data.key-value-list', {items: [
-						{label: 'First Class (A)', value: '75% and above'},
-						{label: 'Second Class (B+)', value: '70% to 74%'},
-						{label: 'Second Class (B)', value: '60% to 69%'},
-						{label: 'Third (C)', value: '50% to 59%'},
-						{label: 'Fail', value: 'Below 50%'},
-					]}) }}
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'assessments', eyebrow: 'Grading', icon: icons.grading, heading: 'When can I take the final assessment?'})} %}{% block body %}
-					<p>The final assessment opens once you have submitted the graded assessments before it. Each assessment tells you how many attempts you have and whether you can practise first.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'certificates', eyebrow: 'Certificates', icon: icons.certificates, heading: 'Do I need to pass to get a certificate?'})} %}{% block body %}
-					<p>No. A certificate shows that you completed the course. You earn it by completing every assessment, whatever your marks. Your marks and grade are on its transcript.</p>
-					<p>You verify your identity once before your first certificate is issued, and the certificate carries your verified name. Nothing about your identity is asked before you buy.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'certificate-privacy', eyebrow: 'Certificates', icon: icons.certificates, heading: 'Who can see my certificate?'})} %}{% block body %}
-					<p>Only you, until you make it public at Account → My Certificates. Then anyone you give its address to can see it. You can make it private again, or give it a new address, at any time.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'refunds', eyebrow: 'Refunds', icon: icons.refunds, heading: 'Can I get a refund?'})} %}{% block body %}
-					<p>A course starts as soon as it is paid for, and a started course cannot be cancelled for a refund. This does not affect your rights if a course is faulty, is not as described or cannot be provided.</p>
-					<p>The <a href="/refunds">Refund Policy</a> explains when a refund is possible and how to ask for one.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'who-can-register', eyebrow: 'Account', icon: icons.account, heading: 'Who can register?'})} %}{% block body %}
-					<p>Adults. You must be 18 or older. You give your date of birth when you register, and a registration for someone under 18 is refused.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'sign-in', eyebrow: 'Account', icon: icons.account, heading: 'How do I sign in?'})} %}{% block body %}
-					<p>Enter your email address on the sign-in page and we email you a link that signs you in. There is no password to remember.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'my-courses', eyebrow: 'Account', icon: icons.account, heading: 'Where do I find my courses and orders?'})} %}{% block body %}
-					<p>Your courses are at Account → My Courses and your orders, invoices and receipts at Account → My Orders.</p>
-				{% endblock %}{% endembed %}
-				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'help', eyebrow: 'Help', icon: icons.account, heading: 'Where can I read more?'})} %}{% block body %}
-					<p>The <a href="/help">Help</a> page explains how the site works. The <a href="/terms">Terms and Conditions</a>, the <a href="/refunds">Refund Policy</a> and the <a href="/privacy">Privacy Policy</a> hold the rules.</p>
-				{% endblock %}{% endembed %}
+				{% endfor %}
 			</div>
 {% endblock %}
 {% endembed %}

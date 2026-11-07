@@ -11,7 +11,7 @@
             <p><strong>Why:</strong> {{ request.customer_reason }}</p>
             <p><strong>Asked for:</strong> {{ request.destination_label }}{% if request.company_id %} · {{ request.quantity }} unused credit(s){% endif %} · <strong>Paid for the line:</strong> {{ request.paid_label }} · <strong>Refund if approved in full:</strong> {{ request.net_label }}{% for line in request.deduction_lines %} · less {{ line }}{% endfor %}</p>
             {% if request.rule_refusals %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Outside the Refund Policy when asked'})} %}{% block body %} {{ request.rule_refusals }} Approving it needs an override reason, kept with the refund and shown only to administrators.{% endblock %}{% endembed %}{% else %}<p class="help">Within the Refund Policy when asked.</p>{% endif %}
-            <p><a href="/admin/commerce/orders/{{ request.order_id }}">Open the order</a></p>
+            <p><a href="{{ order_url(request.order_id) }}">Open the order</a></p>
             {% if can_decide %}
             {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
                 <form action="/admin/commerce/refund-requests/{{ request.id }}/approve" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">

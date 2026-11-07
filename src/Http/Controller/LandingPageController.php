@@ -20,6 +20,9 @@ the preview). It is sent as a picture that may not run anything (a sandbox polic
 Changelog:
 2026/10/09 SAST
 - Created for course marketing landing pages (Phase L).
+2026/11/06 SAST
+- The public page's head adds the course's share picture, X's large card and the same Course structured data as the
+  course's page (Search\PageMetadata::landing); ADMIN's preview keeps its own head.
 */
 
 declare(strict_types=1);
@@ -53,6 +56,7 @@ final class LandingPageController extends BaseController
         private readonly LandingPageAnalytics $analytics,
         private readonly ResourceLibraryService $resources,
         private readonly CourseService $courses,
+        private readonly \CattoLearning\Search\PageMetadata $metadata,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -64,7 +68,7 @@ final class LandingPageController extends BaseController
         $user = $this->currentUser();
         $view = $this->views->build($page, $user, false);
         $this->analytics->viewed($page, $user?->id, $this->analyticsVisitor(), $this->analyticsCampaign(true));
-        return $this->render('landing-page', ['title' => $view['meta']['title'], 'active_nav' => 'catalogue', 'landing' => $view, 'page_meta' => $view['meta'], 'load_catwalk' => self::playsPresentation($view)]);
+        return $this->render('landing-page', ['title' => $view['meta']['title'], 'active_nav' => 'catalogue', 'landing' => $view, 'page_meta' => $this->metadata->landing($view), 'load_catwalk' => self::playsPresentation($view)]);
     }
 
     /**

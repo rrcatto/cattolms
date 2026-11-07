@@ -11,6 +11,11 @@ Description:
 Handles web requests for auth operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/05 SAST
+- Telegram sign-in and two-step sign-in (owner, 2026-11-05, the approved mockup): /login offers Email address or Telegram
+  account as feature cards while Settings offers Telegram, and reads only the chosen one; /login/telegram takes the code in
+  the browser that asked, the same page whether or not anything was sent; /login/two-step and its set-up finish a sign-in
+  waiting for its second step. /auth/consume falls through to registration only for a link that is no sign-in link.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -26,6 +31,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Auth\LoginLinkNotUsableException;
+use CattoLearning\Auth\TwoStep\PendingSignIn;
 use CattoLearning\Auth\UnknownLoginEmailException;
 use CattoLearning\Support\ClientFingerprint;
 use CattoLearning\Support\Countries;
@@ -37,6 +44,11 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class AuthController extends BaseController
 {
+    /** What this browser keeps of a Telegram sign-in it asked for: what was typed, and the row its code is typed against. */
+    private const TELEGRAM_ASKED = 'telegram_sign_in';
+    /** How long the answer to a Telegram sign-in form takes at least, whether or not anything was sent. */
+    private const TELEGRAM_ANSWER_MICROSECONDS = 300000;
+
     /** What a refused registration keeps to fill the form in again: never the ID number. */
     private const DRAFT = ['account_type', 'first_name', 'middle_names', 'last_name', 'company_name', 'country', 'news'];
 
@@ -51,10 +63,14 @@ final class AuthController extends BaseController
         if ($this->currentUser() !== null) {
             $this->redirect($this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')));
         }
+        // Email address or Telegram account, as feature cards, while Telegram is offered (owner, 2026-11-05).
+        $telegram = $this->auth->telegramSignInOffered();
         return $this->render('login', [
             'title' => 'Sign in',
             'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')),
             'email' => (string) ($_GET['email'] ?? ''),
+            'telegram_offered' => $telegram,
+            'sign_in_how' => $telegram && ($_GET['how'] ?? '') === 'telegram' ? 'telegram' : 'email',
         ] + $this->followAsked($_GET['follow'] ?? ''));
     }
 
@@ -103,6 +119,13 @@ final class AuthController extends BaseController
         $email = (string) ($_POST['email'] ?? '');
         $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses'));
         $follow = \CattoLearning\Mailing\FollowIntent::fromText($_POST['follow'] ?? '');
+        // Only the chosen way is read (owner, 2026-11-05). Without JavaScript both fields show, and each button says its way;
+        // Enter in the Telegram field with the Telegram card chosen sends the first button's value, so an empty email field
+        // and a filled Telegram field mean Telegram.
+        $how = (string) ($_POST['how'] ?? 'email');
+        $typed = trim((string) ($_POST['telegram'] ?? ''));
+        if ($how === 'email' && trim($email) === '' && $typed !== '') $how = 'telegram';
+        if ($how === 'telegram' && $this->auth->telegramSignInOffered()) $this->requestTelegram($typed, $returnPath, $follow?->text() ?? '', false);
         // A bot's form, or an address on the refused list: the usual page, and nothing sent (site analytics, owner 2026-11-04).
         if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::SIGN_IN, $_POST, $email) === true) $this->redirect('/login/sent');
         try {
@@ -148,7 +171,154 @@ final class AuthController extends BaseController
     {
         // After a registration on a demo site, the notice that the account will be held (owner, 2026-10-26).
         return $this->render('login-sent', ['title' => 'Check your email',
-            'hold_notice' => isset($_GET['registered']) && $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : '']);
+            'hold_notice' => isset($_GET['registered']) && $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : '',
+            // A sign-in link's own words while Telegram is offered too (the approved mockup).
+            'sign_in_words' => !isset($_GET['registered']) && $this->auth->telegramSignInOffered(),
+            'link_lasts' => \CattoLearning\Support\Duration::ofSeconds(\CattoLearning\Support\Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'))->words()]);
+    }
+
+    /**
+     * Sends a Telegram sign-in message, or nothing, and always goes to the same page (owner, 2026-11-05: tell attackers
+     * nothing): it answers in the same time either way, because the message itself goes after the answer.
+     */
+    private function requestTelegram(string $typed, string $returnPath, string $follow, bool $again): never
+    {
+        $started = hrtime(true);
+        $typed = mb_substr($typed, 0, 254);
+        if ($typed === '') {
+            $this->flash('danger', 'Type your Telegram username, or your account\'s email address.');
+            $this->redirect('/login?how=telegram' . ($follow !== '' ? '&follow=' . rawurlencode($follow) . '&return=' . rawurlencode($returnPath) : ''));
+        }
+        $row = null;
+        // A bot's form, or an address on the refused list: the usual page, and nothing sent (site analytics, owner 2026-11-04).
+        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::SIGN_IN, $_POST, $typed) !== true) {
+            try {
+                $row = $this->auth->requestTelegramLogin($typed, $returnPath, $follow);
+            } catch (\Throwable $fault) {
+                error_log('A Telegram sign-in request failed: ' . $fault::class);
+            }
+        }
+        $_SESSION[self::TELEGRAM_ASKED] = ['who' => $typed, 'row' => $row, 'return_path' => $returnPath, 'follow' => $follow, 'resent' => $again];
+        $spent = intdiv(hrtime(true) - $started, 1000);
+        if ($spent < self::TELEGRAM_ANSWER_MICROSECONDS) usleep(self::TELEGRAM_ANSWER_MICROSECONDS - $spent);
+        $this->redirect('/login/telegram');
+    }
+
+    /** Where a Telegram sign-in's code is typed: the same page whether or not a message went. */
+    #[Route('/login/telegram', name: 'auth_telegram', methods: ['GET'])]
+    public function telegram(): Response
+    {
+        $asked = $_SESSION[self::TELEGRAM_ASKED] ?? null;
+        if (!is_array($asked) || !$this->auth->telegramSignInOffered()) $this->redirect('/login');
+        $resent = (bool) ($asked['resent'] ?? false);
+        $_SESSION[self::TELEGRAM_ASKED]['resent'] = false;
+
+        return $this->render('login-telegram', ['title' => 'Check your Telegram', 'resent' => $resent]);
+    }
+
+    #[Route('/login/telegram', name: 'auth_telegram_code', methods: ['POST'])]
+    public function telegramCode(): Response
+    {
+        $this->requireCsrf();
+        $asked = $_SESSION[self::TELEGRAM_ASKED] ?? null;
+        if (!is_array($asked)) $this->redirect('/login');
+        try {
+            $path = $this->auth->consumeTelegramCode((int) ($asked['row'] ?? 0), (string) ($_POST['code'] ?? ''));
+        } catch (\RuntimeException $refused) {
+            $this->flash('danger', $refused->getMessage());
+            $this->redirect('/login/telegram');
+        }
+        unset($_SESSION[self::TELEGRAM_ASKED]);
+        $this->signedInOrNextStep($path);
+    }
+
+    /** Send a new code: the same as asking again, and the older code stops working. */
+    #[Route('/login/telegram/again', name: 'auth_telegram_again', methods: ['POST'])]
+    public function telegramAgain(): Response
+    {
+        $this->requireCsrf();
+        $asked = $_SESSION[self::TELEGRAM_ASKED] ?? null;
+        if (!is_array($asked) || !$this->auth->telegramSignInOffered()) $this->redirect('/login');
+        $this->requestTelegram((string) ($asked['who'] ?? ''), $this->safeReturnPath((string) ($asked['return_path'] ?? '/account/courses')), (string) ($asked['follow'] ?? ''), true);
+    }
+
+    /** The second step of a sign-in: a code from the authenticator app, or a recovery code (owner, 2026-11-05). */
+    #[Route('/login/two-step', name: 'auth_two_step', methods: ['GET'])]
+    public function twoStep(): Response
+    {
+        $pending = $this->auth->pendingSignIn();
+        if ($pending === null) $this->redirect('/login');
+        if ($pending['set_up']) $this->redirect(PendingSignIn::SETUP_PATH);
+
+        return $this->render('login-two-step', ['title' => 'One more step', 'use_recovery' => ($_GET['use'] ?? '') === 'recovery']);
+    }
+
+    #[Route('/login/two-step', name: 'auth_two_step_code', methods: ['POST'])]
+    public function twoStepCode(): Response
+    {
+        $this->requireCsrf();
+        $recovery = trim((string) ($_POST['recovery'] ?? ''));
+        try {
+            $path = $this->auth->passTwoStep($recovery !== '' ? $recovery : (string) ($_POST['code'] ?? ''));
+        } catch (\RuntimeException $refused) {
+            $this->flash('danger', $refused->getMessage());
+            $this->redirect($this->auth->pendingSignIn() === null ? '/login' : PendingSignIn::PATH . ($recovery !== '' ? '?use=recovery' : ''));
+        }
+        $this->signedInOrNextStep($path);
+    }
+
+    /** Setting two-step up at sign-in, for someone the policy names who has none yet. */
+    #[Route('/login/two-step/setup', name: 'auth_two_step_setup', methods: ['GET'])]
+    public function twoStepSetUp(): Response
+    {
+        $pending = $this->auth->pendingSignIn();
+        if ($pending === null) $this->redirect('/login');
+        if (!$pending['set_up']) $this->redirect(PendingSignIn::PATH);
+
+        return $this->render('login-two-step-setup', ['title' => 'Set up two-step sign-in', 'setup' => $this->auth->twoStepSetUpAtSignIn()]);
+    }
+
+    #[Route('/login/two-step/setup', name: 'auth_two_step_setup_confirm', methods: ['POST'])]
+    public function twoStepSetUpConfirm(): Response
+    {
+        $this->requireCsrf();
+        try {
+            if (!$this->auth->confirmTwoStepAtSignIn((string) ($_POST['code'] ?? ''))) $this->flash('danger', \CattoLearning\Auth\TwoStep\TwoStep::WRONG);
+        } catch (\RuntimeException $refused) {
+            $this->flash('danger', $refused->getMessage());
+            $this->redirect('/login');
+        }
+        $this->redirect(PendingSignIn::SETUP_PATH);
+    }
+
+    #[Route('/login/two-step/setup/kept', name: 'auth_two_step_setup_kept', methods: ['POST'])]
+    public function twoStepSetUpKept(): Response
+    {
+        $this->requireCsrf();
+        try {
+            $path = $this->auth->finishTwoStepAtSignIn();
+        } catch (\RuntimeException $refused) {
+            $this->flash('danger', $refused->getMessage());
+            $this->redirect('/login');
+        }
+        $this->signedInOrNextStep($path);
+    }
+
+    #[Route('/login/two-step/cancel', name: 'auth_two_step_cancel', methods: ['POST'])]
+    public function twoStepCancel(): Response
+    {
+        $this->requireCsrf();
+        $this->auth->cancelPendingSignIn();
+        $this->redirect('/login');
+    }
+
+    /** A sign-in that completed, or one waiting for its second step, which has no session yet. */
+    private function signedInOrNextStep(string $path): never
+    {
+        session_regenerate_id(true);
+        if ($path === PendingSignIn::PATH || $path === PendingSignIn::SETUP_PATH) $this->redirect($path);
+        $this->flash('success', 'You are signed in.');
+        $this->redirect($path);
     }
 
     #[Route('/auth/consume', name: 'auth_consume_head', methods: ['HEAD'])]
@@ -164,13 +334,13 @@ final class AuthController extends BaseController
     {
         $token = (string) ($_GET['token'] ?? '');
         return $this->handle(function () use ($token): void {
+            // Only a link that is no sign-in link is tried as a registration link: any other refusal says its own reason.
             try { $returnPath = $this->auth->consumeLogin($token); }
-            catch (\RuntimeException $loginError) { $returnPath = $this->auth->consumeRegistration($token); }
+            catch (LoginLinkNotUsableException) { $returnPath = $this->auth->consumeRegistration($token); }
             // A demo site's new account waits for approval and is not signed in (owner, 2026-10-21).
             if ($returnPath === \CattoLearning\Auth\AuthService::AWAITING_APPROVAL_PATH) $this->redirect($returnPath);
-            session_regenerate_id(true);
-            $this->flash('success', 'You are signed in.');
-            $this->redirect($returnPath);
+            // Two-step sign-in: no session yet, only the second step (owner, 2026-11-05).
+            $this->signedInOrNextStep($returnPath);
         }, '/login');
     }
 

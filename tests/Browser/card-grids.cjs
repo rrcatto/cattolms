@@ -2,7 +2,7 @@
    course, company ... So ADMIN can choose between list view and grid view. In catalogue ... also offer a choice"), in
    every bundled theme at 1440 and 390px through the theme preview (nothing is activated). Each theme and width starts
    in a fresh browser, so no choice is remembered from the last:
-   - Administration's People, Companies, Course Creators and Courses open as tables, the catalogue as cards;
+   - Administration's People, Companies, Course Creators, Courses and Bundles open as tables, the catalogue as cards;
    - each grid shows whole rows: 5 people or companies, 4 courses to a row at 1440px, never more than 2 at 390px; its
      own page sizes (30, 60, 90 or 24, 48, 96) and its Sort; every picture it asks for arrives;
    - the choice is remembered (the address without it shows the same view), the list comes back when chosen, and the
@@ -34,13 +34,17 @@ const lists = [
   {route: '/admin/companies', name: 'companies', columns: 5, sizes: ['30', '60', '90']},
   {route: '/admin/companies/creators', name: 'company_creators', columns: 5, sizes: ['30', '60', '90']},
   {route: '/admin/courses', name: 'courses', columns: 4, sizes: ['24', '48', '96']},
+  // Administration's bundles, edited in place like the courses (owner, 2026-11-06).
+  {route: '/admin/bundles', name: 'bundles', columns: 4, sizes: ['24', '48', '96']},
 ];
 
 /** What a page shows of a list: cards, rows, cards to the first row, the switch's choice, sizes, Sort, pictures. */
 const facts = () => {
-  const cards = [...document.querySelectorAll('.cl-ui-card, .cl-course-card')];
+  // The list's own cards: the catalogue's bundles above its courses are a row of cards in either view (owner, 2026-11-06,
+  // the approved mockup; bundle-display.cjs checks them), not the list.
+  const cards = [...document.querySelectorAll('.cl-ui-card, .cl-course-card')].filter(c => !c.closest('#catalogue-bundles'));
   const tops = cards.slice(0, 12).map(c => Math.round(c.getBoundingClientRect().top));
-  const grid = document.querySelector('.cl-ui-card-grid, .cl-course-cards');
+  const grid = [...document.querySelectorAll('.cl-ui-card-grid, .cl-course-cards')].find(g => !g.closest('#catalogue-bundles')) || null;
   const wide = grid ? cards.filter(c => c.getBoundingClientRect().right > grid.getBoundingClientRect().right + 1).length : 0;
   // A card's foot, with the line above it, sits at the bottom of the card (owner, 2026-11-03: "It looks ugly being displayed at different places on cards").
   const footLoose = cards.filter(c => { const foot = c.querySelector(':scope > .cl-ui-card-actions, .cl-course-card-foot'); if (!foot) return false; const style = getComputedStyle(c); return c.getBoundingClientRect().bottom - foot.getBoundingClientRect().bottom - parseFloat(style.borderBottomWidth) > (c.classList.contains('cl-course-card') ? parseFloat(getComputedStyle(foot.parentElement).paddingBottom) + 1 : 1); }).length;
@@ -211,9 +215,9 @@ async function cardMenus(page, label, failures) {
     await inPlace('/mailing/subscribers', '#subscribers-view');
     const listing = await context.newPage();
     await listing.goto(`${base}/admin/companies?companies_view=list`, {waitUntil: 'networkidle'});
-    const company = await listing.locator('#companies-view a[href^="/admin/companies/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/companies\/\d+$/.test(href)));
+    const company = await listing.locator('#companies-view a[href^="/admin/companies/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/companies\/[A-Z]{1,3}[0-9]{12,26}[0-9A-Z]$/.test(href)));
     await listing.goto(`${base}/admin/course-items?type=slide_deck`, {waitUntil: 'networkidle'});
-    const presentation = await listing.locator('a[href^="/admin/course-items/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/course-items\/\d+$/.test(href)));
+    const presentation = await listing.locator('a[href^="/admin/course-items/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/course-items\/[a-z0-9-]*[a-z][a-z0-9-]*$/.test(href) && href !== '/admin/course-items/new'));
     await listing.close();
     if (company) { await inPlace(company, '#company_people-view'); await inPlace(company, '#company_courses-view', true); } else failures.push('in place: no company to open');
     if (presentation) await inPlace(presentation, '#slides-view'); else failures.push('in place: no presentation to open');

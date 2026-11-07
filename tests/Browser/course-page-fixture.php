@@ -84,7 +84,7 @@ if ($action === 'create') {
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Course page browser', $admin['email']);
     $default = $container->get(CoursePageLayouts::class)->defaultLayout();
-    $state = ['course_id' => $id, 'slug' => $course['slug'], 'modules' => $modules, 'trailer_node' => $trailer['node'], 'token' => $token,
+    $state = ['course_id' => $id, 'course_code' => (string) $db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $id]), 'slug' => $course['slug'], 'modules' => $modules, 'trailer_part' => (string) $db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $trailer['node']]), 'token' => $token,
         'default_layout_id' => $default['id'], 'default_layout_name' => $default['name'], 'default_layout_blocks' => $default['blocks'], 'admin_id' => $admin['id'],
         'mark' => 'check ' . $fixture->suffix(), 'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));

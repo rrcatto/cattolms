@@ -221,7 +221,7 @@ const friend = 'naledi.khumalo@inbox.test';
             assert.equal(await row.count(), 1, 'the learner is listed');
             assert.match(await row.innerText(), /As they happen/);
             await submit(admin.page, row.locator('a').first());
-            assert.match(admin.page.url(), new RegExp(`/mailing/subscribers/${fixture.learner.id}$`));
+            assert.match(admin.page.url(), new RegExp(`/mailing/subscribers/${fixture.learner.account_reference}$`));
             const lists = admin.page.locator('#lists');
             assert.match(await lists.innerText(), /Pricing case studies/);
             assert.match(await lists.innerText(), new RegExp(course.title));
@@ -236,7 +236,7 @@ const friend = 'naledi.khumalo@inbox.test';
             const plain = await open(chromium, fixture.admin.token, {js: false});
             await plain.page.goto(`${base}/courses/${course.slug}`);
             await Promise.all([plain.page.waitForNavigation(), plain.page.locator('#follow a', {hasText: 'Follow'}).first().click()]);
-            assert.match(plain.page.url(), new RegExp(`/follow/course/${course.id}`));
+            assert.match(plain.page.url(), new RegExp(`/follow/course/${course.code}`));
             assert.ok(await plain.page.locator('input[name="frequency"][value="weekly"]').isChecked());
             await submit(plain.page, plain.page.getByRole('button', {name: `Follow ${course.title}`}));
             assert.match(await flash(plain.page), /You follow it now/);
@@ -285,7 +285,7 @@ const friend = 'naledi.khumalo@inbox.test';
         });
 
         await check('the pages answer at 1440 and 390px in Chromium and Firefox, with one h1 and no sideways scrolling', async () => {
-            const routes = ['/mailing/digest', '/mailing/lists', `/mailing/lists/${listId}`, '/mailing/subscribers', `/mailing/subscribers/${fixture.learner.id}`, '/mailing/settings', '/mailing/automatic', '/mailing/reports', '/mailing/reports?period=all', '/mailing/cattomail', '/account/subscriptions', joinUrl.replace(base, '')];
+            const routes = ['/mailing/digest', '/mailing/lists', `/mailing/lists/${listId}`, '/mailing/subscribers', `/mailing/subscribers/${fixture.learner.account_reference}`, '/mailing/settings', '/mailing/automatic', '/mailing/reports', '/mailing/reports?period=all', '/mailing/cattomail', '/account/subscriptions', joinUrl.replace(base, '')];
             for (const browser of [chromium, firefox]) {
                 for (const width of [1440, 390]) {
                     const view = await open(browser, fixture.admin.token, {width});

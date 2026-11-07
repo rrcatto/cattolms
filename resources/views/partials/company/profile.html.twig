@@ -21,7 +21,7 @@
 			{% endblock %}{% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save company details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
-{% block secondary_actions %}{% if is_platform_administrator|default(false) %}{{ ui('action.link', {label: 'Open its page in Administration', variant: 'secondary', size: 'small', href: '/admin/companies/' ~ company.id, icon: 'action-open'}) }}{% endif %}{% endblock %}
+{% block secondary_actions %}{% if is_platform_administrator|default(false) %}{{ ui('action.link', {label: 'Open its page in Administration', variant: 'secondary', size: 'small', href: company_url(company), icon: 'action-open'}) }}{% endif %}{% endblock %}
 {% endembed %}
 		</form>
 		{% else %}

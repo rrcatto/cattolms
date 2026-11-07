@@ -1,16 +1,14 @@
 {#
-	My Courses (owner, 2026-10-21): one table, and above it a feature card for each of its four lists (Current courses,
-	Completed courses, Favourite courses, Course requests) saying how many each holds. Choosing a card swaps the table
-	in place (htmx into #library-list, the address following the choice); without JavaScript Show opens it. The search
-	field shows only when the chosen list holds five entries or more (LearningService::LIBRARY_SEARCH_FROM), or a
-	search is already narrowing it.
+	My Courses (owner, 2026-10-21): one table, and above it a feature card for each of its lists, Current courses and
+	Completed courses (owner, 2026-11-06: favourites and course requests are pages of their own), saying how many each
+	holds. Choosing a card swaps the table in place (htmx into #library-list, the address following the choice); without
+	JavaScript Show opens it. The search field shows only when the chosen list holds five entries or more
+	(LearningService::LIBRARY_SEARCH_FROM), or a search is already narrowing it.
 #}
 {% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
 {% set list_icons = {
 	current: '<svg ' ~ a ~ '><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/><path d="M15.5 8h2M15.5 11h2M6.5 8h2M6.5 11h2"/></svg>',
 	completed: '<svg ' ~ a ~ '><circle cx="12" cy="9" r="5.5"/><path d="M9.6 9.2l1.7 1.7 3.2-3.4"/><path d="M8.5 13.5 7 21l5-2.5 5 2.5-1.5-7.5"/></svg>',
-	favourites: '<svg ' ~ a ~ '><path d="M12 20.5s-7.5-4.6-8.9-9.4C2.2 7.9 4.3 4.5 7.6 4.5c2 0 3.4 1.1 4.4 2.6 1-1.5 2.4-2.6 4.4-2.6 3.3 0 5.4 3.4 4.5 6.6-1.4 4.8-8.9 9.4-8.9 9.4z"/></svg>',
-	requests: '<svg ' ~ a ~ '><path d="M21 3 10 14"/><path d="M21 3l-6.5 18-4.5-7-7-4.5z"/></svg>',
 } %}
 {% set list_cards = [] %}
 {% for list in library_lists %}
@@ -24,7 +22,7 @@
 		{{ ui('layout.section-head', {heading: 'Your courses', eyebrow: 'My Course Library', summary: 'Choose a list to show it in the table.'}) }}
 		<form class="cl-library-lists" method="get" action="/account/courses" data-choose-submits
 		      hx-get="/account/courses" hx-target="#library-list" hx-select="#library-list" hx-swap="outerHTML" hx-push-url="true">
-			{{ ui('form.picture-choice', {name: 'list', legend: 'Which courses', id: 'library-lists', size: 'small', columns: 4, selected: library_list, items: list_cards}) }}
+			{{ ui('form.picture-choice', {name: 'list', legend: 'Which courses', id: 'library-lists', size: 'small', selected: library_list, items: list_cards}) }}
 			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 		</form>
 		<div id="library-list" data-library-list="{{ library_list }}">
@@ -116,76 +114,11 @@
 
 {% endblock %}
 {% endembed %}
-				{% elseif library_rows and library_list == 'favourites' %}
-					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Course'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Level', wide: true}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
-						</tr>
-
-{% endblock %}
-{% block body %}
-
-						{% for course in library_rows %}
-							<tr>
-								<td>
-									<strong>{{ course.title }}</strong>
-									<div class="small muted">
-										{{ course.summary }}
-									</div>
-								</td>
-								<td class="small">
-									{{ course.level ?: '—' }}
-								</td>
-								<td class="cell-actions">
-									{{ ui('action.link', {label: 'View', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug), icon: 'action-view'}) }}
-								</td>
-							</tr>
-						{% endfor %}
-
-{% endblock %}
-{% endembed %}
-				{% elseif library_rows %}
-					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 58, label: 'Course'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Requested', wide: true}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Status'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
-						</tr>
-
-{% endblock %}
-{% block body %}
-
-						{% for request in library_rows %}
-							<tr>
-								<td>
-									<strong>{{ request.course_title }}</strong>
-								</td>
-								<td class="small">
-									{{ request.requested_at }}
-								</td>
-								<td>
-									{{ ui('feedback.badge', {label: (request.status), tone: request.status=='pending' ? 'warning' : 'info'}) }}
-								</td>
-								<td class="cell-actions">
-									{{ ui('action.link', {label: 'View course', variant: 'secondary', size: 'small', href: '/courses/' ~ (request.slug), icon: 'action-view'}) }}
-								</td>
-							</tr>
-						{% endfor %}
-
-{% endblock %}
-{% endembed %}
 				{% else %}
 					{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
 {% block body %}
 
-						{{ library_search ? 'Nothing in ' ~ list_label|lower ~ ' matches your search.' : {current: 'No current courses.', completed: 'No completed courses yet.', favourites: 'No favourite courses.', requests: 'No course requests.'}[library_list] }}
+						{{ library_search ? 'Nothing in ' ~ list_label|lower ~ ' matches your search.' : {current: 'No current courses.', completed: 'No completed courses yet.'}[library_list] }}
 
 {% endblock %}
 {% endembed %}

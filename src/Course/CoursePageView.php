@@ -21,6 +21,10 @@ Changelog:
 2026/11/01 SAST
 - facts(): what the page's blocks need to know (modules, figures, free preview), counted by the same tally as view(),
   for the layouts' pages (CoursePageLayouts), which say what each course's page leaves out.
+2026/11/06 SAST
+- view() also gives the study time in minutes, for the course's structured data (search engines and AI).
+2026/11/07 SAST
+- The trailer's link opens its part in the free preview by its part name, never its row id (CoursePartAddress).
 */
 
 declare(strict_types=1);
@@ -49,7 +53,7 @@ final class CoursePageView
     /**
      * @param array<string,mixed> $course A public course with its structure (CourseService::publicCourse).
      * @param bool $withTrailer Whether to draw the trailer (a landing page's contents need none).
-     * @return array{modules:list<array{number:int,title:string,time:string,preview:bool}>,parts:list<array{part:string,label:string,icon:string}>,paragraph:string,after:string,total:string,figures:list<array{n:string,label:string}>,free:string,trailer:array<string,mixed>|null}
+     * @return array{modules:list<array{number:int,title:string,time:string,preview:bool}>,parts:list<array{part:string,label:string,icon:string}>,paragraph:string,after:string,total:string,minutes:int,figures:list<array{n:string,label:string}>,free:string,trailer:array<string,mixed>|null}
      */
     public function view(array $course, bool $withTrailer = true): array
     {
@@ -97,6 +101,8 @@ final class CoursePageView
             'after' => $this->after($rows, $moduleOf, $moduleQuestions > 0, $finalQuestions > 0),
             // The whole course's study time, the review and the final with it; the trailer is for visitors.
             'total' => $courseMinutes > 0 ? self::roughly($courseMinutes) : '',
+            // The same in minutes, for the course's structured data (Search\StructuredData::duration words it as total does).
+            'minutes' => max(0, $courseMinutes),
             'figures' => $figures,
             'free' => $free,
             'trailer' => $trailer === null || !$withTrailer ? null : $this->trailer($trailer, $course),
@@ -279,7 +285,7 @@ final class CoursePageView
             'time' => self::roughly(CourseItemService::itemMinutes($row) ?? 0),
             'narrated' => $narrations !== [],
             // Without JavaScript the button opens the trailer in the free preview.
-            'href' => '/courses/' . $slug . '/preview/' . (int) $row['id'] . '/content',
+            'href' => \CattoLearning\Support\Address\CoursePartAddress::preview((string) $course['slug'], $row),
         ];
     }
 }

@@ -179,10 +179,11 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 
 `card-grids.cjs` checks the lists that can be shown as cards (owner, 2026-10-26; UX rule 2.6g) in every bundled theme at
 1440 and 390px through the theme preview, each theme and width in a fresh browser: Administration's People, Companies,
-Course Creators and Courses open as tables and the catalogue as cards; each grid shows whole rows (5 people or
-companies, 4 courses at 1440px, at most 2 at 390px), its own page sizes and its Sort, and every picture it asks for
+Course Creators, Courses and Bundles (since 2026-11-06) open as tables and the catalogue as cards; each grid shows whole rows (5 people or
+companies, 4 courses or bundles at 1440px, at most 2 at 390px), its own page sizes and its Sort, and every picture it asks for
 arrives; the choice is remembered without the address and the list comes back when chosen; the catalogue's list holds on
-a tag's page; every view passes the shared page checks (`page-construction.cjs`); in the first theme every switch changes
+a tag's page (the catalogue's bundle row above its courses is not the list: it stays cards in both views and
+`bundle-display.cjs` checks it); every view passes the shared page checks (`page-construction.cjs`); in the first theme every switch changes
 only its own list without loading the page (Administration's lists, the catalogue, the Company workspace's people,
 Subscribers, a company's people and courses, a presentation's slides) and keeps the focus on the button pressed; and, in
 the first theme, the switch and the Sort work without JavaScript. It uses `section-pages.cjs`'s fixture (below) and writes screenshots and
@@ -380,6 +381,48 @@ every bundled theme at 1440 and 390px without sideways scrolling. The script cre
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
 ```
 
+`bundle-display.cjs` (owner, 2026-11-06: "Bundle mockup is approved"; UX rule 8.8) checks how the site's own bundles
+show beside the courses, changing none of them, in Chromium and Firefox. In every bundled theme at 1440 and 390px (the
+theme preview, as an administrator): the course in the most bundles has, in its Course access card under the buy button,
+one note for each bundle the visitor could buy in BundleService's order (the larger saving first), with its words, its
+Save badge and See the bundle with its icon, nothing out of the card; All courses and the category with the most
+bundles have the "Save with a bundle" row of the Bundles page's cards above the courses, with View all bundles, the
+right cards to a row and none out of the grid, in place of the line about bundles, which a category without bundles
+keeps; the Bundles page's cards say what they save; no sideways scrolling, no inline style and the shared page checks
+(`page-construction.cjs`) everywhere. A company account sees no note and no row. Without JavaScript the notes, the row
+and See the bundle work, and a search (and a later page, where the site has one) has the line instead of the row; with
+it, a search typed in place takes the row away and brings the line, clearing it brings the row back, and a page turned
+in place (where there is a second) does the same, the page never loading again. `bundle-display-fixture.php` makes only
+a company account and an administrator, writes what BundleService says each page should show, and `cleanup` removes
+them and what their browsers recorded. Screenshots go to `/tmp/catto-bundle-display`; `CATTO_BROWSERS`, `CATTO_THEMES`
+and `CATTO_WIDTHS` narrow a run:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/bundle-display-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/bundle-display.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/bundle-display-fixture.php cleanup'
+```
+
+`bundles-round-two.cjs` (owner, 2026-11-06; UX rules 2.6k, 8.8 and 9.6) checks bundle codes, the bundle list edited in
+place, status as cards, a bundle on sale later and Favourites. ADMIN gives a new bundle its code beside its title and
+chooses its status from three cards (Draft, Published, Retired, each with its line), and publishing an empty bundle is
+refused with why; the list shows the code, title, status, price, sale dates and access as columns and finds a bundle by
+its code. In Chromium and Firefox a row is edited in place (code, title, status cards, price and was price, end of sale,
+access period), saved and cancelled without the page loading again, a course's code refused in place with what was typed
+kept; a card of the grid is edited in place too. A bundle whose sale starts in twelve days at 09:30 stays on the Bundles
+page and in the catalogue's row with "On sale from <date>", in the "Also in" note of its course and on its own page with
+the long date and time and no buttons, the old "not on sale yet" message nowhere, and the cart refuses it with the date. A
+learner stars two bundles and a course in place, finds Favourites straight after My Courses in the menu, sees the three
+as cards and as a list, filters Bundles and Courses in place, unstars one in place; My Courses has only its current and
+completed lists and `/account/requests` is not found for a private account; a company account has Course Requests after
+Favourites. Without JavaScript the quick editor's Edit and Save, a star and Favourites' filter with Show work, and the
+list with a row open and Favourites fit a 390px phone. The script makes and removes `bundles-round-two-fixture.php`'s
+records itself (a provider with three courses, an administrator, a bundle on sale now and one later, its learners):
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/bundles-round-two.cjs
+```
+
 ## Certificates
 
 `certificates.cjs` checks certificate designs and certificates: 11 scenarios in Chromium, Firefox,
@@ -488,6 +531,12 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/owner-messages-fixture.php cleanup'
 ```
 
+`telegram-sign-in.cjs` (owner, 2026-11-05, the approved mockup) checks signing in with Telegram and two-step sign-in in Chromium and Firefox, against a stand-in of Telegram (`telegram-sign-in-standin.php`, which its fixture starts inside `env_php_1` after pointing the site at it, so no message reaches the real service): the Sign in page's two feature cards in every bundled theme at 1440 and 390 pixels; Account > Sign-in and security connecting Telegram (the page noticing Start by itself, and I have pressed Start without JavaScript), a test, Disconnect; two-step set up from the QR code read off the screen's pixels with jsQR and a code worked out in the check (RFC 6238), and its recovery codes; the same page for an unknown and a real username, a code that does not work in another browser, a wrong code's words, Send a new code, two-step's step and a recovery code; the link once in another browser and a used link saying what a used email link says; an administrator made to set two-step up first; the person's Sign-in card and Reset two-step; Settings' words and Two-step sign-in; the Telegram log's To column with no code or link in it; and that every message went to the stand-in and the log holds as many messages after as before. It creates and cleans up its own fixture (and switches themes, putting the active one back), so do not run it beside another theme-switching check. `CATTO_SHOTS=<folder>` keeps pictures.
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/telegram-sign-in.cjs
+```
+
 `notice-tones.cjs` (owner, 2026-11-05) checks, in Chromium and Firefox, light and dark, in every theme and on a page where a course is taken, that the success, information, warning and danger notices have clearly different backgrounds and edges and that every word can be read, among the messages at the top, on the page and inside a card. It uses the site notification's fixture below for its ADMIN.
 
 `site-notification.cjs` (owner, 2026-11-05) checks, in Chromium and Firefox, Settings > Site notification straight after Site mode, what it refuses, each kind's own background, icon and readable words measured in every theme and on the pages where a course is taken, the ticks as feature cards, the notification under the demo notice and as wide as it for a visitor on four pages, in every bundled theme and on a phone, off the pages where a course is taken unless ticked, the count's five units, the singular, its ticking, a visitor's wrong clock, a page changing in place and no JavaScript, going away at zero, and unticking and Remove.
@@ -497,6 +546,14 @@ podman exec -u cattotest env_php_1 php tests/Browser/site-notification-fixture.p
 podman cp env_php_1:/tmp/catto-site-notification-state.json /tmp/catto-site-notification-state.json
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/site-notification.cjs
 podman exec -u cattotest env_php_1 php tests/Browser/site-notification-fixture.php cleanup
+```
+
+`structured-data.cjs` (owner, 2026-11-06, search engines and AI) checks, in Chromium on the real site, Settings > Search engines and AI (its three AI crawler choices as feature cards, each code field's link and steps, Make the missing share pictures making every published course's and bundle's), then reads every public page as a visitor (home, catalogue, a category, tags, bundles, Help, FAQ, Contact, the legal pages and every published course, bundle and landing page): every structured data script is valid JSON naming schema.org and its type, each item has what Google and schema.org require and nothing the page does not show (a course's name, prices, level and rating on the page, a trail the theme draws, the FAQ's questions those on the page, a list's courses links on it), Google's rules as far as they can be checked off line (a trail of two steps or more, a course list of three or more, a rating from 1 to 5 with a count, an Offer above zero in a currency, the logo at least 112 pixels, every share picture a 1200 by 630 PNG that answers), and every course, bundle and landing page's Open Graph set and X's large card; then that sign-in, a free preview, Administration and Account carry none, that a saved choice changes robots.txt for the AI crawlers, a code pasted as its meta tag reaches the home page alone, and a demo site's /llms.txt answers not found. It puts the setting back; the share pictures it makes stay.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'SHELL_VERBOSITY=-1 php tests/Browser/structured-data-fixture.php create /tmp/catto-structured-data-state.json' > /tmp/catto-structured-data-state.json
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/structured-data.cjs
+podman exec -u cattotest env_php_1 sh -lc 'SHELL_VERBOSITY=-1 php tests/Browser/structured-data-fixture.php cleanup /tmp/catto-structured-data-state.json'
 ```
 
 `reader-preview.cjs` (owner, 2026-11-01) checks, in Chromium and Firefox, a visitor reading the course's introduction, the paging row on a part, a section page, an assessment's start page and the course page, in the student preview and the public preview (Previous at the left at its own width, Next at the right, Mark complete centred on a part only, above them at 390px), a visitor marking a part complete and unmarking it with the tick and progress bar following, and the end of an assessment (practice's last answer with View my result, a result with nothing beside its report and its way on at the bottom, Next after a graded attempt, the course's result and Course overview after the final), and a visitor's assessment run as a learner's: the start page with practice and graded, one question at a time with the timer, Skip for now and Finish now, a skipped question coming back with its own number, the result with its question report, the part ticked, practice feedback, and a readiness check ending Ready; the toggle and an assessment without JavaScript, and Course Modules: only the section the reader is in open, moving with them, the arrow opening and closing a section by hand and drawn as an arrow, on a phone and without JavaScript too (144 checks). Its fixture makes a published course with a public readiness check, a public first module (a lesson, a summary and an assessment with practice), a second module that is not public and the final assessment, through the authoring service, and removes it all.
@@ -630,13 +687,24 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-parts-fixture.php cleanup'
 ```
 
-`every-page.cjs` follows every link on the site from the home page, the catalogue, Administration, Account and Company, as an ADMIN who also runs a company and as a visitor, at 1440 and 390px, and checks each page with the same tests `section-pages.cjs` applies to the menu pages (`page-construction.cjs`): one h1, only page rows directly in main, no words on the page texture, the first card's edge on the page head's (or its picture's) edge, no sideways scrolling, nothing standing out of a table, no action cut off by its cell; and that no link leads to an error page (a failure names the page the link was on). Pages that differ only in an id are visited twice at most. Home, course landing pages, the course reader and its public preview are built another way on purpose and are not judged. It uses the section pages fixture's session:
+`money-reports.cjs` checks Administration > Credits & Orders > Money Reports (owner, 2026-11-06) in the active theme at 1440 and 390px with the shared page checks, then that the Month changes the page in place with the address following and Back working, that every figure opens its list for the month and Money in is the Money Ledger's Money in, that the PDF and the Excel file download under their names, that the two ticks save as they change (put back as they were), and that without JavaScript Show opens the chosen month. It uses the section pages fixture's session (`CATTO_BROWSER_STATE`); `section-pages.cjs` takes `CATTO_ROUTES=/admin/commerce/reports` to check the page alone in every theme.
+
+`every-page.cjs` follows every link on the site from the home page, the catalogue, Administration, Account and Company, as an ADMIN who also runs a company and as a visitor, at 1440 and 390px, and checks each page with the same tests `section-pages.cjs` applies to the menu pages (`page-construction.cjs`): one h1, only page rows directly in main, no words on the page texture, the first card's edge on the page head's (or its picture's) edge, no sideways scrolling, nothing standing out of a table, no action cut off by its cell; and that no link leads to an error page (a failure names the page the link was on). Pages that differ only in an id or a course code are visited twice at most. Home, course landing pages, the course reader and its public preview are built another way on purpose and are not judged. It uses the section pages fixture's session:
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php create /tmp/catto-section-pages-state.json'
 podman exec env_php_1 cat /tmp/catto-section-pages-state.json > /tmp/catto-section-pages-state.json
 CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/every-page.cjs
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-section-pages-state.json'
+```
+
+`no-row-ids.cjs` (2026-11-06; UX rule 11.4) follows the links twice and reads every address each page can open: its links, form actions and formactions, sources, `hx-get` and `hx-post`, every `data-*-url`, the address the page landed on, and the address each GET form would ask for with each of its named buttons and choices. As a visitor, from the home page, the catalogue and the public pages through the course pages and their public preview, any row id fails: a path segment of digits only, a query value of digits only unless it is a count (`page`, `*_page`, `*_page_size`, `page_size`, `v`, `insert_index`, `reviews_stars`, `month`), an anchor ending in a dash and digits, or a follow carried through signing in by a number. As an ADMIN who also runs a company, from Administration, the Company workspace and Account, only an address naming a course by a number fails (`/admin/courses/12`, the popularity report, the Company workspace's star, Follow, `?course=`, `?course_id=`, `courses[]`, `assign_course`, a course list's `edit=`, `#course-12`, `follow=course:12`). `ALLOWED` names what a visitor may still meet and why (the public preview's part numbers; following a category or a tag by its number), and every entry must still be met, so the list only shrinks. It uses the section pages fixture's session, at its own state path:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php create /tmp/catto-no-row-ids-state.json'
+podman exec env_php_1 cat /tmp/catto-no-row-ids-state.json > /tmp/catto-no-row-ids-state.json
+CATTO_BROWSER_STATE=/tmp/catto-no-row-ids-state.json CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/no-row-ids.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-no-row-ids-state.json'
 ```
 
 `course-file.cjs` opens a course file the site wrote beside its original, in Chromium and Firefox with the network off (owner, 2026-11-03), for its styling and how it works, never its words: the stylesheet rules a browser accepts from the course's CSS tab, the look of the same elements with panels closed and open, the build (progress strip, masthead, coloured word, pills, scale, reset button, results panel), its cover showing, every panel a `<details>`, the same learner through the whole course by the file's own script, every word of every slide and flash card on the screen, and every panel opening without JavaScript. Its fixture writes a made-up course and its file inside a transaction it rolls back, so there is nothing to clean up. A JSON list of `{name, original, file}` as its first argument checks other files, and a pair's `allow` names what an edit on the site has since taken away. `course-file-contents.php`, in `env_php_1`, looks for every word a course holds on the site in its file, for every course or those named, and changes nothing.

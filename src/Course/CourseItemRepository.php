@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\Database;
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 
@@ -75,7 +76,7 @@ final class CourseItemRepository
     /** @return list<array<string,mixed>> */
     public function libraryPlacements(): array
     {
-        return $this->db->fetchAllAssociative('SELECT DISTINCT c.id AS course_id,c.title AS course_title,p.course_item_id FROM course_item_placements p JOIN courses c ON c.id=p.course_id ORDER BY c.title,c.id,p.course_item_id');
+        return $this->db->fetchAllAssociative('SELECT DISTINCT c.id AS course_id, c.code AS course_code,c.title AS course_title,p.course_item_id FROM course_item_placements p JOIN courses c ON c.id=p.course_id ORDER BY c.title,c.id,p.course_item_id');
     }
 
     /** @return list<array<string,mixed>> */
@@ -148,15 +149,15 @@ final class CourseItemRepository
     public function usage(int $itemId, string $key): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT 'placement' AS usage_type,c.id AS course_id,c.title AS course_title,n.id AS node_id,NULL::bigint AS source_item_id,NULL::text AS source_item_title
+            "SELECT 'placement' AS usage_type,c.id AS course_id, c.code AS course_code,c.title AS course_title,n.id AS node_id,NULL::bigint AS source_item_id,NULL::text AS source_item_title
              FROM course_item_placements p JOIN course_structure_nodes n ON n.id=p.node_id JOIN courses c ON c.id=p.course_id WHERE p.course_item_id=:item_id
              UNION ALL
-             SELECT 'embedded',c.id,c.title,n.id,source.id,source.title
+             SELECT 'embedded',c.id,c.code,c.title,n.id,source.id,source.title
              FROM course_item_references r JOIN course_items source ON source.id=r.source_course_item_id
              LEFT JOIN course_item_placements p ON p.course_item_id=source.id LEFT JOIN course_structure_nodes n ON n.id=p.node_id LEFT JOIN courses c ON c.id=p.course_id
              WHERE r.referenced_key=:key
              UNION ALL
-             SELECT 'remediation',c.id,c.title,n.id,source.id,source.title
+             SELECT 'remediation',c.id,c.code,c.title,n.id,source.id,source.title
              FROM assessment_questions q JOIN course_items source ON source.id=q.course_item_id
              LEFT JOIN course_item_placements p ON p.course_item_id=source.id LEFT JOIN course_structure_nodes n ON n.id=p.node_id LEFT JOIN courses c ON c.id=p.course_id
              WHERE q.remediation_item_keys @> jsonb_build_array(CAST(:key AS text)) ORDER BY course_title NULLS LAST,usage_type,source_item_title",
@@ -173,7 +174,7 @@ final class CourseItemRepository
             SELECT source.id FROM uses u JOIN course_items target ON target.id=u.id
             JOIN course_item_references r ON r.referenced_key=target.item_key
             JOIN course_items source ON source.id=r.source_course_item_id WHERE source.item_type='html_lesson'
-        ) SELECT DISTINCT c.id,c.title FROM uses u JOIN course_item_placements p ON p.course_item_id=u.id JOIN courses c ON c.id=p.course_id ORDER BY c.title,c.id", ['item' => $itemId]);
+        ) SELECT DISTINCT c.id,c.code,c.title FROM uses u JOIN course_item_placements p ON p.course_item_id=u.id JOIN courses c ON c.id=p.course_id ORDER BY c.title,c.id", ['item' => $itemId]);
     }
 
     public function deleteItem(int $id): void
@@ -182,17 +183,32 @@ final class CourseItemRepository
     }
 
     /**
-     * The names already taken that start with this one, in lower case: the name itself and any numbered after it
-     * ("... 2", "... 3"), so a free one is found in one query (owner, 2026-10-30: names are never used twice).
+     * The slugs of the names already taken that start with this name's slug: the slug itself and any numbered after it
+     * ("…-2", "…-3"), so a free name is found in one query (owner, 2026-10-30: names are never used twice; 2026-11-06:
+     * a name is its item's address, /admin/course-items/{slug}, so two names with one slug are the same name).
      *
      * @return list<string>
      */
-    public function namesLike(string $name, int $exceptId = 0): array
+    public function slugsLike(string $slug, int $exceptId = 0): array
     {
         return array_map('strval', $this->db->fetchFirstColumn(
-            "SELECT lower(name) FROM course_items WHERE id <> :id AND (lower(name) = lower(:name) OR lower(name) LIKE lower(:prefix) ESCAPE '\\')",
-            ['id' => $exceptId, 'name' => $name, 'prefix' => addcslashes($name, '%_\\') . ' %']
+            "SELECT course_item_slug(name) FROM course_items WHERE id <> :id AND (course_item_slug(name) = :slug OR course_item_slug(name) LIKE :prefix ESCAPE '\\')",
+            ['id' => $exceptId, 'slug' => $slug, 'prefix' => addcslashes($slug, '%_\\') . '-%']
         ));
+    }
+
+    /** The name of another item whose name has this slug, if one has. */
+    public function nameWithSlug(string $slug, int $exceptId = 0): ?string
+    {
+        $name = $this->db->fetchOne('SELECT name FROM course_items WHERE course_item_slug(name) = :slug AND id <> :id', ['slug' => $slug, 'id' => $exceptId]);
+        return is_string($name) ? $name : null;
+    }
+
+    /** An item's name, which its address is made from. */
+    public function name(int $id): ?string
+    {
+        $name = $this->db->fetchOne('SELECT name FROM course_items WHERE id = :id', ['id' => $id]);
+        return is_string($name) ? $name : null;
     }
 
     /** Holds a Course Item's row until the transaction ends, so two changes to one Presentation never cross. */
@@ -284,6 +300,24 @@ final class CourseItemRepository
         return null;
     }
 
+    /**
+     * Each part's name in a course, by its row id.
+     *
+     * @return array<int,string>
+     */
+    public function partNames(int $courseId): array
+    {
+        $names = [];
+        foreach ($this->db->fetchAllAssociative('SELECT id, part_name FROM course_structure_nodes WHERE course_id = :course', ['course' => $courseId]) as $row) { $names[(int) $row['id']] = (string) $row['part_name']; }
+        return $names;
+    }
+
+    /** Gives a part its name: the name is unique within the course, which the database holds it to. */
+    public function renamePart(int $courseId, int $nodeId, string $name): void
+    {
+        $this->db->executeStatement('UPDATE course_structure_nodes SET part_name = :name WHERE id = :id AND course_id = :course', ['name' => $name, 'id' => $nodeId, 'course' => $courseId]);
+    }
+
     public function nextPosition(int $courseId, ?int $parentId): int
     {
         return (int) $this->db->fetchOne(
@@ -292,11 +326,12 @@ final class CourseItemRepository
         );
     }
 
-    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay, bool $publicPreview = false, bool $numbered = false): int
+    /** $partName is the part's name when it is carried in (a course moving between sites), else a provisional one until its place names it. */
+    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay, bool $publicPreview = false, bool $numbered = false, ?string $partName = null): int
     {
         $row = $this->db->fetchAssociative(
-            "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes) VALUES (:public_id,:course,:parent,:position,'section',:delay) RETURNING id",
-            ['public_id' => Uuid::v4(), 'course' => $courseId, 'parent' => $parentId, 'position' => $position, 'delay' => $delay]
+            "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes,part_name) VALUES (:public_id,:course,:parent,:position,'section',:delay,:part) RETURNING id",
+            ['public_id' => Uuid::v4(), 'course' => $courseId, 'parent' => $parentId, 'position' => $position, 'delay' => $delay, 'part' => $partName ?? CoursePartAddress::provisional()]
         );
         $id = (int) ($row['id'] ?? 0);
         $this->db->executeStatement(
@@ -306,12 +341,15 @@ final class CourseItemRepository
         return $id;
     }
 
-    /** @param array<string,mixed> $data */
-    public function createPlacement(int $courseId, int $itemId, ?int $parentId, int $position, array $data): int
+    /**
+     * @param array<string,mixed> $data
+     * @param string|null $partName The part's name when it is carried in, else a provisional one until its place names it.
+     */
+    public function createPlacement(int $courseId, int $itemId, ?int $parentId, int $position, array $data, ?string $partName = null): int
     {
         $row = $this->db->fetchAssociative(
-            "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes) VALUES (:public_id,:course,:parent,:position,'item',:delay) RETURNING id",
-            ['public_id' => Uuid::v4(), 'course' => $courseId, 'parent' => $parentId, 'position' => $position, 'delay' => $data['relative_delay_minutes']]
+            "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes,part_name) VALUES (:public_id,:course,:parent,:position,'item',:delay,:part) RETURNING id",
+            ['public_id' => Uuid::v4(), 'course' => $courseId, 'parent' => $parentId, 'position' => $position, 'delay' => $data['relative_delay_minutes'], 'part' => $partName ?? CoursePartAddress::provisional()]
         );
         $id = (int) ($row['id'] ?? 0);
         $this->db->executeStatement(
@@ -685,13 +723,13 @@ final class CourseItemRepository
      */
     public function resourcePrimaryUsage(int $id): array
     {
-        return $this->db->fetchAllAssociative('SELECT id,item_key,title,item_type FROM course_items WHERE resource_id=:id ORDER BY title,id', ['id' => $id]);
+        return $this->db->fetchAllAssociative('SELECT id,item_key,name,title,item_type FROM course_items WHERE resource_id=:id ORDER BY title,id', ['id' => $id]);
     }
 
     /** @return list<array<string,mixed>> */
     public function resourceUsage(int $id): array
     {
-        return $this->db->fetchAllAssociative("SELECT id,item_key,title,item_type FROM course_items WHERE resource_id=:id OR type_config->>'poster_resource_id'=:text_id OR type_config->>'subtitle_resource_id'=:text_id ORDER BY title,id", ['id' => $id, 'text_id' => (string) $id]);
+        return $this->db->fetchAllAssociative("SELECT id,item_key,name,title,item_type FROM course_items WHERE resource_id=:id OR type_config->>'poster_resource_id'=:text_id OR type_config->>'subtitle_resource_id'=:text_id ORDER BY title,id", ['id' => $id, 'text_id' => (string) $id]);
     }
 
     /** Whether an item's own source contains [course-item:key] for this exact key. */

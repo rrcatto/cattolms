@@ -234,16 +234,75 @@ final class IdentityVerificationIntegrationTest extends TestCase
         return $this->admin ??= $this->fixture->createUser('Identity administrator', 'identity-admin-' . $this->fixture->suffix() . '@example.test');
     }
 
-    private function service(): IdentityVerificationService
+    /** Didit's sandbox mocks its checks and can force a pass, so a live site never takes its result; a demo site does. */
+    public function testALiveSiteIgnoresASandboxResultAndADemoSiteTakesIt(): void
+    {
+        $live = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::LIVE);
+        [, $id] = $this->learner('Thabo Mokoena');
+        $sessionId = Uuid::v4();
+        $this->records->create($id, $sessionId);
+        $approved = ['event_id' => Uuid::v4(), 'webhook_type' => 'status.updated', 'session_id' => $sessionId, 'status' => 'Approved',
+            'vendor_data' => 'x', 'environment' => 'sandbox', 'decision' => IdentityFixture::report('Approved', 'Thabo', 'Mokoena')];
+
+        $this->service($live)->webhook(...$this->signed($approved));
+        self::assertSame('started', $this->records->bySession($sessionId)['status'], 'A sandbox webhook verifies nobody on a live site.');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'identity.sandbox_ignored' AND metadata->>'session_id' = :s", ['s' => (string) $sessionId]), 'It is recorded.');
+
+        [$user, $other] = $this->learner('Naledi Khumalo');
+        $returning = Uuid::v4();
+        $this->records->create($other, $returning);
+        $this->answers = [new MockResponse((string) json_encode(IdentityFixture::report('Approved', 'Naledi', 'Khumalo') + ['session_id' => $returning, 'environment' => 'sandbox']), ['http_code' => 200])];
+        self::assertFalse($this->service($live)->returned($user, $returning)['verified'], 'Nor does a sandbox decision read on the learner\'s return.');
+
+        $this->service($live)->webhook(...$this->signed(['event_id' => Uuid::v4(), 'environment' => 'live'] + $approved));
+        self::assertSame('Thabo Mokoena', $this->records->approved($id)['verified_name'] ?? null, 'A live result is taken on a live site.');
+
+        $this->answers = [new MockResponse((string) json_encode(IdentityFixture::report('Approved', 'Naledi', 'Khumalo') + ['session_id' => $returning, 'environment' => 'sandbox']), ['http_code' => 200])];
+        self::assertTrue($this->service(\CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::DEMO))->returned($user, $returning)['verified'], 'A demo site tests on the sandbox.');
+
+        $wired = (new \ReflectionProperty(IdentityVerificationService::class, 'site'))->getValue(IntegrationContainer::get()->get(IdentityVerificationService::class));
+        self::assertInstanceOf(\CattoLearning\Configuration\SiteMode::class, $wired, 'The site\'s own service knows its mode, so the safeguard runs.');
+    }
+
+    /** Didit's keys say what they are (owner, 2026-11-06): sk_test_ is the sandbox, sk_live_ the live application. */
+    public function testASandboxKeyOnALiveSiteMeansNoVerificationAndADemoSiteTakesEither(): void
+    {
+        $live = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::LIVE);
+        $demo = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::DEMO);
+
+        $_ENV['DIDIT_API_KEY'] = 'sk_test_integration';
+        self::assertSame('sandbox', (new IdentitySettings($live))->keyKind());
+        self::assertFalse((new IdentitySettings($live))->available(), 'A live site with a sandbox key has no verification.');
+        self::assertTrue((new IdentitySettings($live))->sandboxKeyOnLiveSite());
+        self::assertTrue((new IdentitySettings($demo))->available(), 'A demo site tests on the sandbox.');
+        [$user] = $this->learner('Ayanda Zulu');
+        try {
+            $this->service($live, new IdentitySettings($live))->start($user);
+            self::fail('No check starts on a live site with a sandbox key.');
+        } catch (\RuntimeException $refused) {
+            self::assertSame('Identity verification is not available at the moment. Please try again later.', $refused->getMessage());
+        }
+        self::assertSame([], $this->requests, 'Didit is never called.');
+
+        $_ENV['DIDIT_API_KEY'] = 'sk_live_integration';
+        self::assertSame('live', (new IdentitySettings($live))->keyKind());
+        self::assertTrue((new IdentitySettings($live))->available());
+        self::assertTrue((new IdentitySettings($demo))->available(), 'A demo site takes a live key too, and Settings warns that its checks are billed.');
+
+        $wired = (new \ReflectionProperty(IdentitySettings::class, 'site'))->getValue(IntegrationContainer::get()->get(IdentitySettings::class));
+        self::assertInstanceOf(\CattoLearning\Configuration\SiteMode::class, $wired, 'The site\'s own settings know its mode.');
+    }
+
+    private function service(?\CattoLearning\Configuration\SiteMode $site = null, ?IdentitySettings $settings = null): IdentityVerificationService
     {
         $container = IntegrationContainer::get();
         $http = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
             $this->requests[] = ['method' => $method, 'url' => $url, 'body' => (string) ($options['body'] ?? ''), 'headers' => array_map('strtolower', (array) ($options['headers'] ?? []))];
             return array_shift($this->answers) ?? new MockResponse('{}', ['http_code' => 500]);
         });
-        $settings = new IdentitySettings();
+        $settings ??= new IdentitySettings();
         return new IdentityVerificationService($this->records, new DiditClient($http, $settings), $settings, $container->get(CertificateAwards::class),
-            new AuditRepository($this->db), new TransactionManager($this->db), new MockClock());
+            new AuditRepository($this->db), new TransactionManager($this->db), new MockClock(), $site);
     }
 
     /**

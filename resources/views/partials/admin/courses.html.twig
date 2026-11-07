@@ -18,13 +18,13 @@
 					{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Courses'})} %}
 {% block body %}
 						{% for course in courses %}
-							{% if course.id == courses_editing|default(0) %}{% include '@platform/partials/admin/course-card-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/course-card.html.twig' %}{% endif %}
+							{% if course.code == courses_editing|default('') %}{% include '@platform/partials/admin/course-card-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/course-card.html.twig' %}{% endif %}
 						{% endfor %}
 {% endblock %}
 {% endembed %}
 					{% else %}
 					{% set arrange = courses_can_arrange|default(false) %}
-					{% if arrange %}<div class="cl-course-order" data-controller="course-order" data-course-order-csrf-value="{{ csrf }}" data-course-order-before-value="{{ courses_before_page|default(0) }}" data-action="dragstart->course-order#start dragover->course-order#over drop->course-order#drop dragend->course-order#end">
+					{% if arrange %}<div class="cl-course-order" data-controller="course-order" data-course-order-csrf-value="{{ csrf }}" data-course-order-before-value="{{ courses_before_page|default('') }}" data-action="dragstart->course-order#start dragover->course-order#over drop->course-order#drop dragend->course-order#end">
 						<p class="visually-hidden" id="course-order-keys">Drag the handle, or press the up or down arrow, Home or End on it, to move the course in the catalogue.</p>
 						<p class="cl-course-order-status" data-course-order-target="status" role="status" aria-live="polite"></p>{% endif %}
 
@@ -41,7 +41,7 @@
 {% block body %}
 
 								{% for course in courses %}
-									{% if course.id == courses_editing|default(0) %}{% include '@platform/partials/admin/course-row-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/course-row.html.twig' %}{% endif %}
+									{% if course.code == courses_editing|default('') %}{% include '@platform/partials/admin/course-row-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/course-row.html.twig' %}{% endif %}
 								{% endfor %}
 
 {% endblock %}

@@ -126,12 +126,12 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'credit note HTML');
 
         // The customer's and ADMIN's order pages read the order, not the profile.
-        $this->assertShowsAButNotB($this->page($buyer, CommerceController::class, 'order', ['id' => $orderId]), $a, $b, 'customer order page');
-        $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN order page');
+        $this->assertShowsAButNotB($this->page($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]), $a, $b, 'customer order page');
+        $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]), $a, $b, 'ADMIN order page');
         // Deleting the mutable profile cannot leave an issued document incomplete.
         $this->db->executeStatement('DELETE FROM user_billing_profiles WHERE user_id=:id', ['id' => $buyerId]);
         $this->assertShowsAButNotB($this->pdfs->render($invoice)->html, $a, $b, 'invoice HTML with no profile left');
-        $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN order page with no profile left');
+        $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]), $a, $b, 'ADMIN order page with no profile left');
         $this->billing->saveOwn($buyer, $b->toRow());
 
         // A new order is placed with B.
@@ -189,8 +189,8 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $creditNote = $this->onlyDocument($orderId, 'credit_note');
         $this->assertBilling($a, $this->documentBilling($creditNote));
         $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'company credit note HTML');
-        $this->assertShowsAButNotB($this->page($admin, CommerceController::class, 'order', ['id' => $orderId]), $a, $b, 'company order page');
-        $this->assertShowsAButNotB($this->page($this->finance($adminId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN company order page');
+        $this->assertShowsAButNotB($this->page($admin, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]), $a, $b, 'company order page');
+        $this->assertShowsAButNotB($this->page($this->finance($adminId), PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]), $a, $b, 'ADMIN company order page');
         $this->db->executeStatement('DELETE FROM company_billing_profiles WHERE company_id=:id', ['id' => $companyId]);
         $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'company credit note HTML with no profile left');
         $this->billing->saveForCompany($admin, $companyId, $b);

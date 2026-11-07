@@ -22,6 +22,9 @@ search engine kept away never reads that note.
 Changelog:
 2026/10/19 SAST
 - Created.
+2026/11/06 SAST
+- robots.txt names every AI crawler (Search\AiCrawlers) in its own group, let in or kept out as Settings > Search engines
+  and AI chooses (owner, 2026-11-06: every one let in until then), and a live site's names its /llms.txt.
 */
 
 declare(strict_types=1);
@@ -29,6 +32,8 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Configuration\SiteMode;
+use CattoLearning\Search\AiCrawlers;
+use CattoLearning\Search\SearchSettings;
 use CattoLearning\Support\Env;
 use DateTimeImmutable;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -54,6 +59,7 @@ final class Sitemap
         private readonly SiteMode $site,
         private readonly CacheInterface $cache,
         private readonly int $limit = self::LIMIT,
+        private readonly ?SearchSettings $search = null,
     ) {}
 
     /** Whether this site has a sitemap: a live site that knows its own address. */
@@ -91,20 +97,50 @@ final class Sitemap
         });
     }
 
-    /** robots.txt: the crawl rules, and on a live site the full address of its sitemap. */
+    /**
+     * robots.txt: the crawl rules, a group for each AI crawler as Settings > Search engines and AI chooses (AiCrawlers), and
+     * on a live site the full address of its sitemap and of its summary for AI assistants (/llms.txt).
+     */
     public function robots(): string
     {
         $lines = ['# The crawl rules for this site. They ask crawlers to stay out of private and single-use', '# pages; they are not access control.', '', 'User-agent: *'];
-        foreach (self::DISALLOW as $comment => $paths) {
-            $lines[] = $comment;
-            foreach ($paths as $path) $lines[] = 'Disallow: ' . $path;
+        $lines = [...$lines, ...self::privatePaths(), 'Allow: /'];
+        $choice = $this->search?->aiCrawlers() ?? SearchSettings::ALLOW_ALL;
+        $lines[] = '';
+        $lines[] = '# AI crawlers, as Settings > Search engines and AI says: ' . match ($choice) {
+            SearchSettings::BLOCK_ALL => 'none of them may come in.',
+            SearchSettings::SEARCH_ONLY => 'AI search and answer assistants may come in, crawlers that only collect training data may not.',
+            default => 'every one of them may come in.',
+        };
+        $lines[] = '# A crawler named here follows only its own group, so each one that may come in repeats the private paths.';
+        $lines[] = '# The list as of ' . AiCrawlers::CHECKED . ', from each company\'s own documentation.';
+        foreach (AiCrawlers::all() as $token => $crawler) {
+            $lines[] = '';
+            $lines[] = '# ' . $crawler['company'] . ': ' . $crawler['purpose'] . '.';
+            $lines[] = 'User-agent: ' . $token;
+            $lines = AiCrawlers::allowed($crawler['kind'], $choice) ? [...$lines, ...self::privatePaths(false), 'Allow: /'] : [...$lines, 'Disallow: /'];
         }
-        $lines[] = 'Allow: /';
         if ($this->available()) {
             $lines[] = '';
             $lines[] = 'Sitemap: ' . self::base() . '/sitemap.xml';
+            $lines[] = '# A summary of this site for AI assistants, in the llms.txt format (llmstxt.org): ' . self::base() . '/llms.txt';
         }
         return implode("\n", $lines) . "\n";
+    }
+
+    /**
+     * The private paths, each group with its reason as a comment, or the paths alone.
+     *
+     * @return list<string>
+     */
+    private static function privatePaths(bool $comments = true): array
+    {
+        $lines = [];
+        foreach (self::DISALLOW as $comment => $paths) {
+            if ($comments) $lines[] = $comment;
+            foreach ($paths as $path) $lines[] = 'Disallow: ' . $path;
+        }
+        return $lines;
     }
 
     private function urlset(int $offset): string

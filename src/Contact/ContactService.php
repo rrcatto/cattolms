@@ -27,6 +27,10 @@ The contact form (owner, 2026-10-20): one form whose fields follow the reason ch
 - ADMIN lists, opens and marks messages answered (PLATFORM.PERSON.VIEW / MANAGE).
 
 Changelog:
+2026/11/07 SAST
+- The sender and whoever answered are linked by their account references (owner, 2026-11-06).
+- A message's page is at its reference (/admin/messages/MSG-000043), in the list and in the notice emailed to the site,
+  never its row id (owner, 2026-11-06).
 2026/10/20 SAST
 - Created, in place of the name, email, subject and message form that only emailed.
 */
@@ -35,12 +39,14 @@ declare(strict_types=1);
 
 namespace CattoLearning\Contact;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Support\AccountReference;
+use CattoLearning\Support\Address\RecordAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Money;
 use DateTimeImmutable;
@@ -67,7 +73,7 @@ final class ContactService
     /** An order's number as people see it. */
     public static function orderNumber(int $orderId): string
     {
-        return 'CL-' . str_pad((string) $orderId, 8, '0', STR_PAD_LEFT);
+        return \CattoLearning\Commerce\Domain\OrderNumber::format($orderId);
     }
 
     /**
@@ -214,7 +220,7 @@ final class ContactService
         $mail = ['reference' => $kept['reference'], 'reason' => ContactReason::label($reason), 'name' => $name, 'email' => $email,
             'account_reference' => $accountReference ?? '', 'signed_in' => $user !== null, 'order_number' => $orderNumber ?? '',
             'course' => $courseId !== null ? (string) $courses[(string) $courseId]['title'] : '', 'details' => $this->detailLines($reason, $details),
-            'message' => $message, 'admin_url' => rtrim(Env::string('APP_URL'), '/') . '/admin/messages/' . $kept['id']];
+            'message' => $message, 'admin_url' => rtrim(Env::string('APP_URL'), '/') . RecordAddress::message((string) $kept['reference'])];
         try {
             $this->mailer->sendContactMessage($mail);
             $this->messages->markEmailed($kept['id']);
@@ -289,15 +295,15 @@ final class ContactService
         $row['answered'] = $row['answered_at'] !== null;
         $row['status_label'] = $row['answered'] ? 'Answered' : 'New';
         $row['status_tone'] = $row['answered'] ? 'success' : 'warning';
-        $row['href'] = '/admin/messages/' . (int) $row['id'];
+        $row['href'] = RecordAddress::message((string) $row['reference']);
         $row['excerpt'] = mb_strlen((string) $row['message']) > 120 ? rtrim(mb_substr((string) $row['message'], 0, 117)) . '...' : (string) $row['message'];
         // The sender and whoever answered, as data.person's props (owner, 2026-10-21: every person named is linked to their
         // account, with their account reference). A sender without an account is their name alone.
         $row['sender'] = $row['user_id'] !== null
-            ? ['name' => (string) $row['sender_name'], 'reference' => (string) ($row['sender_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['user_id']]
+            ? ['name' => (string) $row['sender_name'], 'reference' => (string) ($row['sender_reference'] ?? ''), 'href' => PersonAddress::admin((string) $row['sender_reference'])]
             : ['name' => (string) $row['sender_name'], 'reference' => '', 'href' => ''];
         $row['answered_by'] = $row['answered_by_user_id'] !== null
-            ? ['name' => (string) ($row['answered_by_name'] ?? '') ?: 'User ' . (int) $row['answered_by_user_id'], 'reference' => (string) ($row['answered_by_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['answered_by_user_id']]
+            ? ['name' => (string) ($row['answered_by_name'] ?? '') ?: 'User ' . (int) $row['answered_by_user_id'], 'reference' => (string) ($row['answered_by_reference'] ?? ''), 'href' => PersonAddress::admin((string) $row['answered_by_reference'])]
             : null;
         return $row;
     }

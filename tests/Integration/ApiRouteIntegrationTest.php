@@ -150,9 +150,12 @@ final class ApiRouteIntegrationTest extends TestCase
         self::assertSame(201, $created->getStatusCode());
         $courseId = (int) $this->json($created)['data']['id'];
         self::assertGreaterThan(0, $courseId);
+        // The API names a course by its code (owner, 2026-11-06: no row id in an address).
+        $code = (string) $this->json($created)['data']['code'];
+        self::assertMatchesRegularExpression('/^(?=.*[A-Z])[A-Z0-9-]+$/', $code);
 
         try {
-            $updated = $this->call('PUT', '/api/v1/admin/courses/' . $courseId, [
+            $updated = $this->call('PUT', '/api/v1/admin/courses/' . $code, [
                 'title' => 'QA Renamed Course',
                 'summary' => 'Renamed through the API.',
                 'description_html' => '<p>Body.</p>',
@@ -163,10 +166,12 @@ final class ApiRouteIntegrationTest extends TestCase
             // A course with no price option cannot be published. The refusal is a validation
             // failure rather than a broken rule, so it is 422 - and it says which requirement was
             // not met, because a client cannot act on "invalid".
-            $refused = $this->call('POST', '/api/v1/admin/courses/' . $courseId . '/status', ['status' => 'published']);
+            $refused = $this->call('POST', '/api/v1/admin/courses/' . $code . '/status', ['status' => 'published']);
             self::assertSame(422, $refused->getStatusCode());
             self::assertSame('invalid_request', $this->json($refused)['error']['code']);
             self::assertStringContainsString('price', strtolower($this->json($refused)['error']['message']));
+            // Its row id names nothing.
+            self::assertSame(404, $this->call('PUT', '/api/v1/admin/courses/' . $courseId, ['title' => 'Nothing'])->getStatusCode());
         } finally {
             $this->db->executeStatement('DELETE FROM courses WHERE id = :id', ['id' => $courseId]);
         }

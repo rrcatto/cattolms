@@ -27,6 +27,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Certificate\CertificateDesignService;
 use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
@@ -55,11 +56,11 @@ final class CourseCertificateController extends BaseController
         parent::__construct($auth, $view, $requests);
     }
 
-    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_certificate', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/certificate', name: 'admin_course_certificate', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function show(): Response
     {
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $course = $this->managedCourse((int) $this->param('id'));
+        $course = $this->managedCourse($this->courseIdFromAddress($this->courses));
         $items = [];
         foreach ($this->designs->designs() as $design) {
             $row = CertificateDesignController::listRow($design);
@@ -75,36 +76,36 @@ final class CourseCertificateController extends BaseController
         ]);
     }
 
-    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_update_certificate', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/certificate', name: 'admin_course_update_certificate', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $courseId = (int) $this->param('id');
-        $this->managedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
+        $courseId = $this->courseIdFromAddress($this->courses);
+        $course = $this->managedCourse($courseId);
+        return $this->handle(function () use ($user, $courseId, $course): void {
             $this->courses->updateCertificateSettings($courseId, $_POST, $user->id);
             $this->flash('success', 'The certificate settings were saved.');
-            $this->redirect('/admin/courses/' . $courseId . '/certificate');
-        }, '/admin/courses/' . $courseId . '/certificate');
+            $this->redirect(CourseAddress::admin($course, '/certificate'));
+        }, CourseAddress::admin($course, '/certificate'));
     }
 
     /** The saved settings drawn for a sample learner. */
-    #[Route('/admin/courses/{id}/certificate/preview.pdf', name: 'admin_course_certificate_preview', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/{code}/certificate/preview.pdf', name: 'admin_course_certificate_preview', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function preview(): Response
     {
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $course = $this->managedCourse((int) $this->param('id'));
+        $course = $this->managedCourse($this->courseIdFromAddress($this->courses));
         return $this->draw($course, (int) $course['certificate_design_id'], (string) ($course['certificate_accreditation'] ?? ''), $user->id);
     }
 
     /** The form as it stands - the chosen design and accreditation line - before it is saved. */
-    #[Route('/admin/courses/{id}/certificate/preview.pdf', name: 'admin_course_certificate_preview_form', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/{code}/certificate/preview.pdf', name: 'admin_course_certificate_preview_form', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function previewForm(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $course = $this->managedCourse((int) $this->param('id'));
+        $course = $this->managedCourse($this->courseIdFromAddress($this->courses));
         return $this->draw($course, (int) $this->posted('certificate_design_id'), mb_substr(trim($this->posted('certificate_accreditation')), 0, 240), $user->id);
     }
 

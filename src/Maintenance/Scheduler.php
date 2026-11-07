@@ -18,6 +18,8 @@ The status of each job, and whether the commerce job has stopped, is read by Set
 and the ADMIN dashboard.
 
 Changelog:
+2026/11/06 SAST
+- Money Reports (owner, 2026-11-06): the money_report job, last month's report on the 1st.
 2026/10/27 SAST
 - The log archive (owner, 2026-10-27), just after midnight; whether a job is due is the job's own rule (isDue).
 2026/10/19 SAST
@@ -50,6 +52,7 @@ final class Scheduler
         private readonly ?\CattoLearning\Course\CourseVideoCheck $videos = null,
         private readonly ?\CattoLearning\SiteAnalytics\SiteProtectionJob $siteProtection = null,
         private readonly ?\CattoLearning\OwnerMessages\OwnerMessageJob $ownerMessages = null,
+        private readonly ?\CattoLearning\Commerce\Application\MoneyReportJob $moneyReports = null,
     ) {}
 
     /**
@@ -94,6 +97,7 @@ final class Scheduler
                 ScheduledJob::VideoCheck => $this->videos?->run() ?? 'Not available here.',
                 ScheduledJob::SiteProtection => $this->siteProtection?->run() ?? 'Not available here.',
                 ScheduledJob::OwnerMessages => $this->ownerMessages?->run() ?? 'Not available here.',
+                ScheduledJob::MoneyReport => $this->moneyReports?->run() ?? 'Not available here.',
             };
         } catch (Throwable $failed) {
             $this->runs->failed($job, $this->now(), $failed->getMessage());

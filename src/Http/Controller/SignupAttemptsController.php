@@ -17,6 +17,8 @@ check found and why it counts, the place of the IP address, the browser, and the
 PLATFORM.PERSON.VIEW.
 
 Changelog:
+2026/11/07 SAST
+- The account an attempt made is linked by its account reference (owner, 2026-11-06).
 2026/10/26 SAST
 - Created.
 */
@@ -123,7 +125,7 @@ final class SignupAttemptsController extends BaseController
             'risk_label' => RiskAssessment::label((string) $attempt['band']),
             'risk_tone' => RiskAssessment::tone((string) $attempt['band']),
             'outcome_label' => $outcome === 'completed' ? (($held === true || $held === 't') ? 'Registered, held' : 'Registered') : (self::OUTCOMES[$outcome] ?? $outcome),
-            'account' => $attempt['user_id'] !== null ? ['name' => (string) ($attempt['user_name'] ?: $attempt['email']), 'href' => '/admin/people/' . (int) $attempt['user_id']] : null,
+            'account' => $attempt['user_id'] !== null ? ['name' => (string) ($attempt['user_name'] ?: $attempt['email']), 'href' => \CattoLearning\Support\Address\PersonAddress::admin((string) $attempt['user_reference'])] : null,
         ];
     }
 

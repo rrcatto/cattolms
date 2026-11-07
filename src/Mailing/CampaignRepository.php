@@ -14,6 +14,8 @@ the courses waiting for the new-course digest and the events cattomail reports. 
 MailingTracker and the digest decide; this only reads and writes.
 
 Changelog:
+2026/11/07 SAST
+- Copies and addresses never emailed carry the person's account reference for the address (owner, 2026-11-06).
 2026/10/26 SAST
 - Created.
 */
@@ -402,7 +404,7 @@ class CampaignRepository
     public function deliveries(int $campaignId, string $status, int $limit, int $offset): array
     {
         return array_map(static fn(array $row): array => self::decodeDelivery($row), $this->db->fetchAllAssociative(
-            "SELECT d.*, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, d.email) AS name
+            "SELECT d.*, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, d.email) AS name, u.account_reference
              FROM mailing_deliveries d LEFT JOIN users u ON u.id = d.user_id
              WHERE d.campaign_id = :c AND (:status = '' OR d.status = :status)
              ORDER BY d.id LIMIT :limit OFFSET :offset",
@@ -512,7 +514,7 @@ class CampaignRepository
     public function suppressions(string $search, int $limit, int $offset): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT x.*, ue.user_id FROM mailing_suppressions x LEFT JOIN user_emails ue ON LOWER(ue.email) = x.email
+            "SELECT x.*, ue.user_id, su.account_reference FROM mailing_suppressions x LEFT JOIN user_emails ue ON LOWER(ue.email) = x.email LEFT JOIN users su ON su.id = ue.user_id
              WHERE (:search = '' OR x.email ILIKE :like) ORDER BY x.created_at DESC LIMIT :limit OFFSET :offset",
             ['search' => $search, 'like' => '%' . addcslashes($search, '%_\\') . '%', 'limit' => $limit, 'offset' => $offset]
         );

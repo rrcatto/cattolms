@@ -66,7 +66,9 @@ final class AccountApprovalIntegrationTest extends TestCase
             if ($admin !== '') {
                 $toAdmin = array_values(array_filter(self::sent($mailer), static fn(array $m): bool => ($m['email'] ?? '') === $admin));
                 self::assertCount(1, $toAdmin, 'ADMIN is told an account is waiting.');
-                self::assertStringContainsString('/admin/people/' . $userId, (string) $toAdmin[0]['body']);
+                // Their page by their account reference, never their row id (owner, 2026-11-06).
+                self::assertStringContainsString('/admin/people/' . $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $userId]), (string) $toAdmin[0]['body']);
+                self::assertStringNotContainsString('/admin/people/' . $userId, (string) $toAdmin[0]['body']);
             }
             // Signing in is refused with the reason, and no link is sent; registering again says the same.
             $mailer->messages = [];

@@ -28,7 +28,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 final class UpdateRepository
 {
     private const COLUMNS = "u.id, u.origin, u.event, u.course_id, u.list_id, u.headline, u.body, u.link_url, u.change_count, u.status, u.release_at, u.released_at,
-        u.status_note, u.created_at, u.updated_at, c.title AS course_title, c.slug AS course_slug,
+        u.status_note, u.created_at, u.updated_at, c.title AS course_title, c.code AS course_code, c.slug AS course_slug,
         CASE l.kind WHEN 'news' THEN 'News and Updates' WHEN 'own' THEN l.name ELSE COALESCE(lc.name, lco.title, lt.name, '') END AS list_name";
     private const JOINS = "LEFT JOIN courses c ON c.id = u.course_id
         LEFT JOIN mailing_lists l ON l.id = u.list_id

@@ -1,4 +1,5 @@
-/* Course Content tree on /admin/courses/{id}/content.
+/* Course Content tree on /admin/courses/{code}/content (a course is its code in an address, owner 2026-11-06: the page
+ * gives this its own address in data-course-content-url-value).
  *
  * The server renders the whole tree open with a ⋯ menu of form posts on every row, so every move
  * works without JavaScript. The shared sortable tree (assets/lib/sortable_tree_controller.js) adds
@@ -22,9 +23,9 @@ import SortableTreeController, { MoveFailed, NODE } from '../lib/sortable_tree_c
 
 export default class extends SortableTreeController {
     static targets = ['insertBody'];
-    static values = { course: Number };
+    static values = { url: String };
 
-    storageKey() { return `catto.admin.course-content.${this.courseValue}.closed`; }
+    storageKey() { return `catto.admin.course-content.${this.urlValue}.closed`; }
 
     messages() {
         return {
@@ -39,7 +40,7 @@ export default class extends SortableTreeController {
         moving.forEach((row) => body.append('node_ids[]', row.dataset.nodeId));
         body.append('parent_node_id', parent);
         body.append('index', index);
-        return { url: `/admin/courses/${this.courseValue}/content/arrange`, body };
+        return { url: `${this.urlValue}/arrange`, body };
     }
 
     // Dragging a selected row takes every selected row; a selected row inside another goes with it.
@@ -102,7 +103,7 @@ export default class extends SortableTreeController {
         if (close) close.click();
         this.clearInsert();
         try {
-            const response = await fetch(`/admin/courses/${this.courseValue}/content/tree`, { headers: { 'HX-Request': 'true' }, credentials: 'same-origin' });
+            const response = await fetch(`${this.urlValue}/tree`, { headers: { 'HX-Request': 'true' }, credentials: 'same-origin' });
             const fresh = response.ok && !response.redirected ? this.treeIn(this.parse(await response.text())) : null;
             if (!fresh) throw new MoveFailed('');
             this.swapTree(fresh);

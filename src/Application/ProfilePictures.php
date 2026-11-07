@@ -19,6 +19,8 @@ private cache: a new upload or a new avatar is a new address.
 Architectural boundary: application service. SQL in UserProfileRepository; the drawing in DrawnAvatar.
 
 Changelog:
+2026/11/07 SAST
+- A picture's address names its person by their account reference (owner, 2026-11-06).
 2026/10/26 SAST
 - Created.
 */
@@ -27,6 +29,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\View\Artwork\DrawnAvatar;
@@ -61,17 +64,19 @@ final class ProfilePictures
 
     /**
      * Each person row with the address of their picture ("picture_url": Administration's, or the Company workspace's
-     * with its prefix and suffix), in one query for the page.
+     * when $workspace is 'company'), by their account reference (owner, 2026-11-06: no row id in an address), in one query
+     * for the page. Each row holds the person's id and account_reference.
      *
      * @param list<array<string,mixed>> $rows
      * @return list<array<string,mixed>>
      */
-    public function withPictures(array $rows, string $prefix = '/admin/people/', string $suffix = '/profile-image'): array
+    public function withPictures(array $rows, string $workspace = 'admin'): array
     {
         $states = $this->profiles->pictureStates(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $rows));
         foreach ($rows as $index => $row) {
             $state = $states[(int) ($row['id'] ?? 0)] ?? null;
-            $rows[$index]['picture_url'] = $state === null ? '' : $prefix . (int) $row['id'] . $suffix . '?v=' . self::versionOf($state);
+            $version = $state === null ? '' : '?v=' . self::versionOf($state);
+            $rows[$index]['picture_url'] = $state === null ? '' : ($workspace === 'company' ? PersonAddress::company($row, '/picture' . $version) : PersonAddress::admin($row, '/profile-image' . $version));
             $rows[$index]['picture_drawn'] = $state !== null && !$state['uploaded'];
         }
 

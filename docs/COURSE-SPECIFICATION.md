@@ -1,6 +1,10 @@
-# CattoLMS Course Specification 4.9
+# CattoLMS Course Specification 4.11
 
-**Version 4.9** · 5 November 2026, 07:37 SAST · Authored by Claude Opus 5.5 · Replaces version 4.8 (5 November 2026, 07:16 SAST), version 4.7 (5 November 2026, 03:45 SAST), version 4.6 (3 November 2026, 02:32 SAST), version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+**Version 4.11** · 7 November 2026, 02:30 SAST · Authored by Claude Opus 5.5 · Replaces version 4.10 (5 November 2026, 20:30 SAST), version 4.9 (5 November 2026, 07:37 SAST), version 4.8 (5 November 2026, 07:16 SAST), version 4.7 (5 November 2026, 03:45 SAST), version 4.6 (3 November 2026, 02:32 SAST), version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+
+**New in 4.11:** the names of a course's parts, `cattolms:part-names` (section 6.6), which CattoLMS writes so that a course replaced from its own file keeps every part's address. A course written by hand leaves it out.
+
+**New in 4.10:** what to call the file (section 3).
 
 **New in 4.9:** the whole course's study time, `cattolms:study-hours` (section 6.5), which the course's page shows.
 
@@ -85,7 +89,7 @@ Every person who takes the course should come away knowing more, sure they got t
 2. **Build the frame first:** the head with the whole stylesheet, the masthead, the introduction, the script for the file on its own (section 12), and the data declarations, empty.
 3. **One module at a time.** Write its HTML and add its entries to `QUIZ`, `PRESENTATIONS` and `FLASHCARDS`. Open the file in a browser and check the module works before starting the next. A long course can be written over several turns, adding a module to the same file each time.
 4. **The final assessment last**, so it can draw on every module.
-5. **Check** against section 13, then hand over the one file.
+5. **Check** against section 13, then hand over the one file, named `YYYYMMDD-HHMM-CODE-title.html`: the date and time you finish it, the course's code, and its title in small letters joined by hyphens, as `20261105-2030-GDN-101-growing-vegetables-in-small-spaces.html`.
 
 ## 4. The file at a glance
 
@@ -277,6 +281,18 @@ Say in the file's head how many hours the whole course takes, including the prac
 ```
 
 A course of ten modules at about 15 hours a module is 150. Each module is shown its equal share. Without it the page adds up the parts, which counts only reading and watching and so reads far lower. Make it agree with what the introduction and the course preview say.
+
+### 6.6 The names of the course's parts (written by CattoLMS)
+
+On the site each part of a course has a short name that is its address, such as `/learn/growing-vegetables-in-small-spaces/module-1-presentation`. CattoLMS names a part after its place when it is placed: a module is `module-1`, a part in it `module-1-presentation`, `module-1-lesson` and so on, and the final assessment its title, `integrated-final-assessment`. A part keeps its name when it moves, so a bookmark goes on working.
+
+A file written to this specification needs nothing for this: importing it names every part after its place. When CattoLMS writes a course out as its file, it adds one line to the head for the parts whose names their places would not give them now, because they moved or were added later, each as the name its place gives and its own name:
+
+```html
+<meta name="cattolms:part-names" content="module-1=getting-started module-1-presentation=what-you-will-learn">
+```
+
+Importing the file to replace the course gives those parts their own names again, so every part keeps its address. Leave the line as CattoLMS wrote it, or leave it out of a course you write.
 
 ## 7. The introduction
 

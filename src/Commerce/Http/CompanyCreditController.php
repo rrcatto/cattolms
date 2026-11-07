@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Http;
 
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
@@ -120,7 +121,7 @@ final class CompanyCreditController extends BaseController
                 ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes',($_POST['use_wallet'] ?? '') === 'yes');
             $this->maintenance->deliverInvoices(1);
             $this->maintenance->deliverCompanyCourseNotices(2);
-            $this->redirect('/account/orders/'.$id);
+            $this->redirect(OrderAddress::buyer($id));
         },'/company/credits/checkout');
     }
 }

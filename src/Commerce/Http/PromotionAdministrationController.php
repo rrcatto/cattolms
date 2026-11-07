@@ -11,6 +11,8 @@ use CattoLearning\Commerce\Domain\Promotion;
 use CattoLearning\Commerce\Domain\OrderTotals;
 use CattoLearning\Commerce\Infrastructure\PromotionRepository;
 use CattoLearning\Http\Controller\BaseController;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CatalogueAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
@@ -23,6 +25,10 @@ use Symfony\Component\Routing\Attribute\Route;
  * Promotions in Administration: the list with its search and status filter, the editor, usage, and
  * activation. A save that fails keeps what was entered: the submitted fields wait in the session
  * draft for the editor to show them again with the reason.
+ *
+ * A promotion is named by its code in every address (owner, 2026-11-06: "a recogniseable code is better"):
+ * /admin/promotions/SUMMER25 and the forms beneath it. The code is turned into the row id once
+ * (AddressKeyRepository::promotion), and a save that changes the code comes back to the new one.
  */
 final class PromotionAdministrationController extends BaseController
 {
@@ -35,6 +41,7 @@ final class PromotionAdministrationController extends BaseController
         RequestStack $requests,
         private readonly PromotionAdministrationService $administration,
         private readonly PromotionRepository $promotions,
+        private readonly AddressKeyRepository $keys,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -84,40 +91,41 @@ final class PromotionAdministrationController extends BaseController
             return $this->keepDraft('new', $failed, self::BASE . '/new');
         }
         $this->flash('success', 'The promotion was created.');
-        $this->redirect(self::BASE . '/' . $id);
+        $this->redirect($this->address($id));
     }
 
-    #[Route('/admin/promotions/{id}', name: 'admin_promotion', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/promotions/{code}', name: 'admin_promotion', requirements: ['code' => CatalogueAddress::PROMOTION], methods: ['GET'])]
     public function show(): Response
     {
         $this->requirePermission('PLATFORM.PROMOTION.VIEW');
-        $promotion = $this->promotions->find((int) $this->param('id')) ?? throw $this->notFound('This promotion does not exist.');
+        $promotion = $this->promotions->find($this->promotionId()) ?? throw $this->notFound('This promotion does not exist.');
         return $this->editor($promotion);
     }
 
-    #[Route('/admin/promotions/{id}', name: 'admin_promotion_update', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/promotions/{code}', name: 'admin_promotion_update', requirements: ['code' => CatalogueAddress::PROMOTION], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.PROMOTION.MANAGE');
-        $id = (int) $this->param('id');
+        $id = $this->promotionId();
         try {
             $this->administration->update($actor, $id, $_POST);
         } catch (RuntimeException $failed) {
-            return $this->keepDraft((string) $id, $failed, self::BASE . '/' . $id);
+            return $this->keepDraft((string) $id, $failed, $this->address($id));
         }
         $this->flash('success', 'The promotion was saved. Orders already placed keep the promotion as it was when they were placed.');
-        $this->redirect(self::BASE . '/' . $id);
+        // The code may have changed: back to the promotion at its code now.
+        $this->redirect($this->address($id));
     }
 
-    #[Route('/admin/promotions/{id}/status', name: 'admin_promotion_status', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/promotions/{code}/status', name: 'admin_promotion_status', requirements: ['code' => CatalogueAddress::PROMOTION], methods: ['POST'])]
     public function status(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.PROMOTION.MANAGE');
-        $id = (int) $this->param('id');
+        $id = $this->promotionId();
         $return = (string) ($_POST['return'] ?? '');
-        $return = str_starts_with($return, self::BASE) ? $return : self::BASE . '/' . $id;
+        $return = str_starts_with($return, self::BASE) ? $return : $this->address($id);
         return $this->handle(function () use ($actor, $id): void {
             $active = ($_POST['active'] ?? '') === '1';
             $changed = $this->administration->setActive($actor, $id, $active);
@@ -126,17 +134,31 @@ final class PromotionAdministrationController extends BaseController
         }, $return);
     }
 
-    #[Route('/admin/promotions/{id}/delete', name: 'admin_promotion_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/promotions/{code}/delete', name: 'admin_promotion_delete', requirements: ['code' => CatalogueAddress::PROMOTION], methods: ['POST'])]
     public function delete(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.PROMOTION.MANAGE');
-        $id = (int) $this->param('id');
+        $id = $this->promotionId();
+        $back = $this->address($id);
         return $this->handle(function () use ($actor, $id): void {
             $this->administration->delete($actor, $id);
             $this->flash('success', 'The promotion was deleted.');
             $this->redirect(self::BASE);
-        }, self::BASE . '/' . $id);
+        }, $back);
+    }
+
+    /** The promotion the address names by its code, as its row id; a code no promotion has is not found. */
+    private function promotionId(): int
+    {
+        return $this->keys->promotion($this->param('code')) ?? throw $this->notFound('This promotion does not exist.');
+    }
+
+    /** The promotion's page, at its code as it is now. */
+    private function address(int $id): string
+    {
+        $promotion = $this->promotions->find($id) ?? throw $this->notFound('This promotion does not exist.');
+        return CatalogueAddress::promotion($promotion->code);
     }
 
     private function editor(?Promotion $promotion): Response
@@ -162,7 +184,7 @@ final class PromotionAdministrationController extends BaseController
             $orders = [];
             foreach ($this->promotions->orders($promotion->id, $pagination->pageSize, $pagination->offset) as $order) {
                 $orders[] = $order + [
-                    'number' => 'CL-' . str_pad((string) $order['id'], 8, '0', STR_PAD_LEFT),
+                    'number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $order['id']),
                     'total_label' => Money::strictMinorUnits((int) $order['total_minor'], (string) $order['currency'])->format(),
                     'discount_label' => OrderTotals::negative((int) $order['discount_minor'], (string) $order['currency']),
                 ];
@@ -170,7 +192,7 @@ final class PromotionAdministrationController extends BaseController
             $data['usage'] = $summary + [
                 'discount_label' => Money::strictMinorUnits($summary['discount_minor'], Money::platformCurrency())->format(),
                 'orders' => $orders,
-                'pagination' => PlatformAdministrationService::paginationPayload('usage', $pagination, self::BASE . '/' . $promotion->id, 'Orders with this promotion'),
+                'pagination' => PlatformAdministrationService::paginationPayload('usage', $pagination, CatalogueAddress::promotion($promotion->code), 'Orders with this promotion'),
                 'deletable' => $this->promotions->orderCount($promotion->id) === 0,
             ];
         }

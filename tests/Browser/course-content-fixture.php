@@ -54,7 +54,7 @@ if ($command === 'create') {
     }
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Course Content tree browser', $email);
-    $state = ['user' => $user, 'email' => $email, 'token' => $token, 'company' => $company['id'], 'course' => $course, 'items' => $itemIds, 'titles' => $titles, 'scrub' => $fixture->seeds()];
+    $state = ['user' => $user, 'email' => $email, 'token' => $token, 'company' => $company['id'], 'course' => $course, 'course_code' => $made['code'], 'items' => $itemIds, 'titles' => $titles, 'scrub' => $fixture->seeds()];
     $state['nodes'] = $build($state);
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);

@@ -150,7 +150,7 @@ async function saveCompanyBilling(page, data) {
         await page.locator('input[name=accept_terms]').check();
         await page.locator('input[name=accept_start]').check();
         await page.getByRole('button', {name: 'Place my order'}).click();
-        await page.waitForURL(/\/account\/orders\/\d+/);
+        await page.waitForURL(/\/account\/orders\/CL-\d{8}/);
         const orderUrl = page.url();
         assert.deepEqual(await billedTo(page), ['Lerato Dlamini', 'Dlamini & Associates', '14 Corrected Avenue', 'Suite 4', 'Brooklyn', 'Pretoria 0181', 'Gauteng', 'South Africa', 'Tax/VAT number: 4000000001'], 'the order shows the billing it was placed with');
         await page.goto(`${base}/account/billing`);
@@ -186,7 +186,7 @@ async function saveCompanyBilling(page, data) {
         await page.locator('#method-token').selectOption('demo_success');
         await page.locator('input[name=accept_terms]').check();
         await page.getByRole('button', {name: 'Place company order'}).click();
-        await page.waitForURL(/\/account\/orders\/\d+/);
+        await page.waitForURL(/\/account\/orders\/CL-\d{8}/);
         assert.deepEqual(await billedTo(page), [companyA(state).billing_name, '2 Corrected Quay', 'Foreshore', 'Cape Town 8001', 'Western Cape', 'South Africa', 'Tax/VAT number: 4999999999'], 'the company order is billed to the company as placed');
         await page.goto(`${base}/company/billing`);
         assert.equal(await page.locator('#company-billing-address-line-1').inputValue(), '2 Corrected Quay', 'the correction updated the company’s billing details');

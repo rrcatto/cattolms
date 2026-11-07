@@ -32,8 +32,18 @@ CourseService and the course repository, as ADMIN does on the course's pages:
 
 relate() adds the block's related courses that are on the site; a relation is both courses', so it only adds. The
 status is the package's business: a catalogue import publishes new courses that were published where they came from.
+changes(), apply() and relate() are what the Import HTML or JSON course page applies to the one course it imports.
+
+The catalogue import is canonical (owner, 2026-11-06: "By default, what is in the import file wins"), so for a course
+already here it uses differences(), which says every way the course differs from the block, each a kind with words
+("Category: Business › Finance → Business › Accounting"), applyChosen(), which takes the file's version of the kinds
+chosen (the category moved, its path made when missing; the tags exactly; the price options on sale made the file's in
+place; the cover, position and page layout), and replaceRelated(), which makes its related courses the file's among
+the package's own courses. Nothing replaced is kept.
 
 Changelog:
+2026/11/06 SAST
+- differences(), applyChosen(), replaceRelated() and ensureCategoryPath() for the canonical catalogue import.
 2026/10/23 SAST
 - Created with the catalogue package.
 2026/10/30 SAST
@@ -236,6 +246,316 @@ final class CourseCatalogueSettings
         $slugs = array_map(fn(int $id): string => (string) ($this->repository->findById($id)['slug'] ?? ''), array_merge($current, $added));
         $this->courses->setRelatedCoursesBySlug($courseId, $slugs);
         return count($added);
+    }
+
+    /**
+     * What the file would change on a course already here, for the canonical catalogue import (owner, 2026-11-06:
+     * "By default, what is in the import file wins"): each difference by its kind, in words saying this site's and then
+     * the file's, and a problem when the file's cannot be taken here. Empty when the course is as the file has it.
+     *
+     *   category     the path of names, made by the import when the site lacks it
+     *   tags         exactly the file's
+     *   prices       the price options on sale (an option this site has stopped selling is not a price)
+     *   cover        when the file has one
+     *   position     its place in the catalogue
+     *   page_layout  the default layout, one of the layouts by name, or its custom layout
+     *   related      among the package's own courses (a relation is the pair's: either file naming the other keeps
+     *                it); the package says nothing of a course it does not hold
+     *   status       draft, published, retired or archived
+     *
+     * @param array<string,mixed> $course a course row
+     * @param array<string,mixed> $block the course package's catalogue block
+     * @param array<string,list<string>> $packageRelated by the code of each of the package's courses, the codes its file relates it to
+     * @param list<string> $packagePaths the category paths the package's catalogue.json makes
+     * @return list<array{kind:string,words:string,problem:?string}>
+     */
+    public function differences(array $course, array $block, array $packageRelated, array $packagePaths): array
+    {
+        $courseId = (int) $course['id'];
+        $found = [];
+        $paths = $this->categoryPaths();
+        if (array_key_exists('category', $block)) {
+            $file = trim((string) $block['category']);
+            $here = $course['category_id'] === null ? '' : ($paths[(int) $course['category_id']] ?? '');
+            if ($file !== $here) {
+                $made = $file !== '' && !in_array($file, $paths, true);
+                $found[] = ['kind' => 'category', 'words' => 'Category: ' . ($here === '' ? 'Uncategorised' : $here) . ' → ' . ($file === '' ? 'Uncategorised' : $file) . ($made ? ' (made by this import)' : ''),
+                    'problem' => $made ? $this->categoryPathProblem($file, $packagePaths) : null];
+            }
+        }
+        if (array_key_exists('tags', $block)) {
+            $file = self::names($block['tags']);
+            $here = $this->tagNames($courseId);
+            $adds = array_values(array_diff($file, $here));
+            $removes = array_values(array_diff($here, $file));
+            if ($adds !== [] || $removes !== []) {
+                $found[] = ['kind' => 'tags', 'words' => 'Tags: ' . implode(', ', array_filter([$adds === [] ? '' : 'adds ' . implode(', ', $adds), $removes === [] ? '' : 'removes ' . implode(', ', $removes)])), 'problem' => null];
+            }
+        }
+        if (array_key_exists('prices', $block)) {
+            $file = self::onSale(self::prices($block));
+            $here = $this->sitePrices($courseId);
+            if ($file !== $here) {
+                $words = static fn(array $list): string => $list === [] ? 'none' : implode(', ', array_map(self::priceLine(...), $list));
+                $found[] = ['kind' => 'prices', 'words' => (count($file) === 1 && count($here) === 1 ? 'Price: ' : 'Prices: ') . $words($here) . ' → ' . $words($file), 'problem' => null];
+            }
+        }
+        $cover = self::cover($block['cover'] ?? '', (string) $course['slug']);
+        if ($cover !== null && $cover !== (string) ($course['cover_svg'] ?? '')) $found[] = ['kind' => 'cover', 'words' => 'Cover picture: the file\'s is different', 'problem' => null];
+        if (array_key_exists('position', $block)) {
+            $position = CourseService::cataloguePosition($block['position']);
+            $current = $course['catalogue_position'] === null ? null : (int) $course['catalogue_position'];
+            if ($position !== $current) $found[] = ['kind' => 'position', 'words' => 'Position in the catalogue: ' . ($current ?? 'none') . ' → ' . ($position ?? 'none'), 'problem' => null];
+        }
+        $layout = self::pageLayout($block);
+        if ($layout !== false && !$this->usesLayout($courseId, $layout)) {
+            $uses = $this->pageLayouts->forCourse($courseId);
+            $here = match ($uses['choice']) { 'custom' => 'custom', 'layout' => (string) ($uses['layout']['name'] ?? 'one of the layouts'), default => 'default' };
+            $file = substr($this->pageLayoutWords($layout), strlen('Page layout: '));
+            if ($file === $here) $file = 'the file\'s ' . $file . ' layout';
+            $found[] = ['kind' => 'page_layout', 'words' => 'Page layout: ' . $here . ' → ' . $file, 'problem' => null];
+        }
+        [$adds, $removes] = $this->relatedChange($courseId, $block, $packageRelated);
+        if ($adds !== [] || $removes !== []) {
+            $found[] = ['kind' => 'related', 'words' => 'Related courses: ' . implode(', ', array_filter([$adds === [] ? '' : 'adds ' . implode(', ', $adds), $removes === [] ? '' : 'removes ' . implode(', ', $removes)])), 'problem' => null];
+        }
+        $status = (string) ($block['status'] ?? '');
+        if (in_array($status, ['draft', 'published', 'retired', 'archived'], true) && $status !== (string) $course['status']) {
+            $found[] = ['kind' => 'status', 'words' => 'Status: ' . $course['status'] . ' → ' . $status, 'problem' => null];
+        }
+        return $found;
+    }
+
+    /**
+     * Puts the file's settings of these kinds on a course already here (the related courses are replaceRelated()'s
+     * and the status the package's, both once every course is in), saying what was done. Nothing replaced is kept.
+     *
+     * @param array<string,mixed> $block
+     * @param list<string> $kinds the differences chosen to take from the file
+     * @return list<string>
+     */
+    public function applyChosen(int $courseId, array $block, array $kinds, int $actor): array
+    {
+        $course = $this->repository->findById($courseId) ?? throw new InvalidArgumentException('The course does not exist.');
+        $done = [];
+        if (in_array('category', $kinds, true) && array_key_exists('category', $block)) {
+            $path = trim((string) $block['category']);
+            $this->repository->setCourseCategory($courseId, $path === '' ? null : $this->ensureCategoryPath($path, $actor));
+            $done[] = 'Category: ' . ($path === '' ? 'Uncategorised' : $path);
+        }
+        if (in_array('tags', $kinds, true) && array_key_exists('tags', $block)) {
+            $tags = self::names($block['tags']);
+            foreach ($tags as $name) {
+                if ($this->repository->tagBySlug(Slug::from($name)) === null) $this->courses->createTag(['name' => $name], $actor);
+            }
+            $this->courses->setCourseTagsByName($courseId, $tags, $actor);
+            $done[] = 'Tags: ' . ($tags === [] ? 'none' : implode(', ', $tags));
+        }
+        if (in_array('prices', $kinds, true) && array_key_exists('prices', $block)) {
+            $this->replacePrices($courseId, self::prices($block), $actor);
+            $onSale = self::onSale(self::prices($block));
+            $done[] = 'Prices: ' . ($onSale === [] ? 'none' : implode(', ', array_map(self::priceLine(...), $onSale)));
+        }
+        $cover = self::cover($block['cover'] ?? '', (string) $course['slug']);
+        if (in_array('cover', $kinds, true) && $cover !== null && $cover !== (string) ($course['cover_svg'] ?? '')) {
+            $this->courses->setCourseCover($courseId, $cover, $actor);
+            $done[] = 'Cover picture';
+        }
+        if (in_array('position', $kinds, true) && array_key_exists('position', $block)) {
+            $position = CourseService::cataloguePosition($block['position']);
+            $this->repository->setCataloguePosition($courseId, $position);
+            $done[] = 'Position in the catalogue: ' . ($position ?? 'none');
+        }
+        $layout = self::pageLayout($block);
+        if (in_array('page_layout', $kinds, true) && $layout !== false && !$this->usesLayout($courseId, $layout)) {
+            $done[] = $this->pageLayoutWords($layout);
+            $layoutId = null;
+            if ($layout['choice'] === 'layout') {
+                $layoutId = $this->layoutRepository->findByName($layout['name'])['id']
+                    ?? $this->pageLayouts->create($layout['name'], $layout['purpose'], $layout['blocks'], $actor);
+            }
+            $this->pageLayouts->choose($courseId, $layout['choice'], $layoutId, $layout['choice'] === 'custom' ? $layout['blocks'] : null, $actor);
+        }
+        return $done;
+    }
+
+    /**
+     * The course's related courses made the file's, among the package's own courses (owner, 2026-11-06: related courses
+     * are replaced, not only added): a relation to a course the package does not hold is the file's business only when
+     * the file names it. A relation is both courses', so the other course's list changes with it. Null when nothing
+     * changed, else the words.
+     *
+     * @param array<string,mixed> $block
+     * @param array<string,list<string>> $packageRelated
+     */
+    public function replaceRelated(int $courseId, array $block, array $packageRelated): ?string
+    {
+        [$adds, $removes] = $this->relatedChange($courseId, $block, $packageRelated);
+        if ($adds === [] && $removes === []) return null;
+        $keep = [];
+        foreach ($this->repository->relatedCourseIds($courseId) as $otherId) {
+            $code = (string) ($this->repository->findById($otherId)['code'] ?? '');
+            if (!in_array($code, $removes, true)) $keep[] = $otherId;
+        }
+        foreach ($adds as $code) {
+            $other = $this->repository->findByCode($code);
+            if ($other !== null) $keep[] = (int) $other['id'];
+        }
+        $this->repository->replaceRelatedCourses($courseId, $keep);
+        return 'Related courses: ' . implode(', ', array_filter([$adds === [] ? '' : 'adds ' . implode(', ', $adds), $removes === [] ? '' : 'removes ' . implode(', ', $removes)]));
+    }
+
+    /**
+     * The category at this path of names, each missing level made in its place (the canonical import, owner
+     * 2026-11-06: "create the path if missing"). A level that cannot be made (its name or address is another
+     * category's) is refused with why.
+     */
+    public function ensureCategoryPath(string $path, int $actor): int
+    {
+        $parent = null;
+        $prefix = '';
+        foreach (self::segments($path) as $name) {
+            $prefix = $prefix === '' ? $name : $prefix . self::SEPARATOR . $name;
+            $found = array_search($prefix, $this->categoryPaths(), true);
+            $parent = $found !== false ? (int) $found : (int) $this->courses->createCategory(['name' => $name], $actor, $parent)['id'];
+        }
+        return $parent ?? throw new InvalidArgumentException('A course\'s category is a path of names.');
+    }
+
+    /**
+     * Why the file's category path cannot be made here, or null: the package's catalogue.json makes the paths it holds;
+     * any other missing level is made by name, so a name or address another category already has stops it.
+     *
+     * @param list<string> $packagePaths
+     */
+    private function categoryPathProblem(string $path, array $packagePaths): ?string
+    {
+        $segments = self::segments($path);
+        if (count($segments) > 3) return 'It has more than three levels, which this site cannot hold.';
+        $paths = $this->categoryPaths();
+        $prefix = '';
+        foreach ($segments as $name) {
+            $prefix = $prefix === '' ? $name : $prefix . self::SEPARATOR . $name;
+            if (in_array($prefix, $paths, true) || in_array($prefix, $packagePaths, true)) continue;
+            $taken = $this->repository->categoryByName($name) ?? $this->repository->categoryBySlug(Slug::from($name));
+            if ($taken !== null) return 'A category called ' . $taken['name'] . ' is elsewhere on this site (' . ($paths[(int) $taken['id']] ?? $taken['name']) . '), so ' . $prefix . ' cannot be made.';
+        }
+        return null;
+    }
+
+    /** @return list<string> the names in a category path */
+    private static function segments(string $path): array
+    {
+        return array_values(array_filter(array_map('trim', explode(trim(self::SEPARATOR), $path)), static fn(string $name): bool => $name !== ''));
+    }
+
+    /**
+     * The related courses the file would add and take away, by code: it adds each it names that is here or in the
+     * package, and each course of the package whose own file names this one (a relation is both courses'); it takes
+     * away a relation to a course of the package that neither file names.
+     *
+     * @param array<string,mixed> $block
+     * @param array<string,list<string>> $packageRelated
+     * @return array{0:list<string>,1:list<string>}
+     */
+    private function relatedChange(int $courseId, array $block, array $packageRelated): array
+    {
+        if (!array_key_exists('related', $block)) return [[], []];
+        $self = (string) ($this->repository->findById($courseId)['code'] ?? '');
+        $packageCodes = array_map('strval', array_keys($packageRelated));
+        $named = (array) $block['related'];
+        foreach ($packageRelated as $other => $theirs) if (in_array($self, $theirs, true)) $named[] = (string) $other;
+        $file = [];
+        foreach ($named as $code) {
+            if (!is_string($code) || !CourseCode::isValid($code)) continue;
+            $code = CourseCode::normalise($code);
+            if ($code !== $self && ($this->repository->findByCode($code) !== null || in_array($code, $packageCodes, true))) $file[] = $code;
+        }
+        $here = [];
+        foreach ($this->repository->relatedCourseIds($courseId) as $otherId) $here[] = (string) ($this->repository->findById($otherId)['code'] ?? '');
+        $adds = array_values(array_unique(array_diff($file, $here)));
+        $removes = array_values(array_filter($here, static fn(string $code): bool => in_array($code, $packageCodes, true) && !in_array($code, $file, true)));
+        sort($adds);
+        sort($removes);
+        return [$adds, $removes];
+    }
+
+    /**
+     * The site's price options on sale, as the file's are compared: period, price, was price, currency, label and
+     * which is the default.
+     *
+     * @return list<array{seconds:int,price:int,was:?int,currency:string,label:string,default:bool}>
+     */
+    private function sitePrices(int $courseId): array
+    {
+        return array_map(static fn(array $variant): array => ['seconds' => (int) $variant['access_period_seconds'], 'price' => (int) $variant['price_minor_units'],
+            'was' => $variant['was_price_minor_units'] === null ? null : (int) $variant['was_price_minor_units'], 'currency' => (string) $variant['currency_code'],
+            'label' => (string) ($variant['label'] ?? ''), 'default' => (bool) $variant['is_default']], $this->repository->priceVariants($courseId, true));
+    }
+
+    /**
+     * The file's price options on sale, in the shape sitePrices() gives: the default the last one marked, as the
+     * price form leaves it, or the first.
+     *
+     * @param list<array{period:int,unit:string,price:string,was_price:?string,currency:string,label:string,active:bool,default:bool}> $prices
+     * @return list<array{seconds:int,price:int,was:?int,currency:string,label:string,default:bool}>
+     */
+    private static function onSale(array $prices): array
+    {
+        $list = [];
+        $default = null;
+        foreach (array_values(array_filter($prices, static fn(array $price): bool => $price['active'])) as $index => $price) {
+            $minor = static fn(string $amount): int => Money::ofMajorUnits(trim(str_replace([',', ' '], '', $amount)), $price['currency'])->minorUnits;
+            $list[] = ['seconds' => AccessPeriod::fromInput($price['period'], $price['unit']), 'price' => $minor($price['price']),
+                'was' => $price['was_price'] === null ? null : $minor($price['was_price']), 'currency' => $price['currency'], 'label' => mb_substr(trim($price['label']), 0, 120), 'default' => false];
+            if ($price['default']) $default = $index;
+        }
+        if ($list !== []) $list[$default ?? 0]['default'] = true;
+        return $list;
+    }
+
+    /**
+     * Makes the course's price options on sale the file's (owner, 2026-11-06: "replace the site's price options with
+     * the file's"): each one here is changed in place to the file's in the same place, the file's others added, and the
+     * rest removed. One that was sold cannot go, for its orders, so it is taken off sale; one in a cart being filled
+     * leaves that cart. Orders keep the prices they were placed at.
+     *
+     * @param list<array{period:int,unit:string,price:string,was_price:?string,currency:string,label:string,active:bool,default:bool}> $prices
+     */
+    private function replacePrices(int $courseId, array $prices, int $actor): void
+    {
+        $file = array_values(array_filter($prices, static fn(array $price): bool => $price['active']));
+        $wanted = self::onSale($prices);
+        $here = $this->repository->priceVariants($courseId, true);
+        $ids = [];
+        foreach ($file as $index => $price) {
+            $input = ['access_period_value' => (string) $price['period'], 'access_period_unit' => $price['unit'], 'price' => $price['price'], 'was_price' => (string) ($price['was_price'] ?? ''),
+                'currency_code' => $price['currency'], 'label' => $price['label'], 'is_active' => '1'];
+            if (isset($here[$index])) {
+                $this->courses->updatePriceVariant($courseId, (int) $here[$index]['id'], $input, $actor);
+                $ids[] = (int) $here[$index]['id'];
+            } else {
+                $ids[] = $this->courses->createPriceVariant($courseId, $input, $actor);
+            }
+        }
+        foreach ($wanted as $index => $price) {
+            if ($price['default'] && isset($ids[$index])) $this->courses->setDefaultPriceVariant($courseId, $ids[$index], $actor);
+        }
+        foreach (array_slice($here, count($file)) as $variant) {
+            $this->repository->dropOpenCartLinesForVariant((int) $variant['id']);
+            $this->courses->deletePriceVariant($courseId, (int) $variant['id'], $actor);
+        }
+    }
+
+    /**
+     * "R 1 200,00 (was R 1 800,00) for 1 year" for a price option as sitePrices() and onSale() give it.
+     *
+     * @param array{seconds:int,price:int,was:?int,currency:string} $price
+     */
+    private static function priceLine(array $price): string
+    {
+        $money = static fn(int $minor): string => Money::strictMinorUnits($minor, $price['currency'])->format();
+        return $money($price['price']) . ($price['was'] !== null ? ' (was ' . $money($price['was']) . ')' : '') . ' for ' . AccessPeriod::label($price['seconds']);
     }
 
     /**

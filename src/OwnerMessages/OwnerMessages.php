@@ -78,6 +78,26 @@ class OwnerMessages
         });
     }
 
+    /**
+     * An order is placed, before it is paid (owner, 2026-11-06: "I would also like to receive a notification when an order is
+     * placed"), once, whichever checkout placed it.
+     *
+     * @param array<string,mixed> $order
+     * @param list<array<string,mixed>> $items
+     */
+    public function orderPlaced(array $order, array $items, string $method): void
+    {
+        $this->messages->guarded(function () use ($order, $items, $method): void {
+            if (!$this->settings->saved()['on_order'] || !$this->settings->connected()) return;
+            $buyer = $this->messages->primaryEmail((int) ($order['purchaser_user_id'] ?? 0));
+            if ($buyer === null || self::invented($buyer)) return;
+            $id = (int) $order['id'];
+            $words = 'New order: Order ' . MoneyRecords::orderNumber($id) . ', ' . self::bought($items) . ', ' . self::amount((int) $order['total_minor'], (string) $order['currency'])
+                . ', ' . self::toPay($method, (int) $order['total_minor']);
+            $this->messages->record('placed:' . $id, 'order', $this->worded($words));
+        });
+    }
+
     /** Whether an address is one nobody real has: invented by Seed Database, or reserved for testing. */
     public static function invented(string $email): bool
     {
@@ -124,11 +144,34 @@ class OwnerMessages
         return 'paid by ' . implode(' and ', $words);
     }
 
+    /** How an order just placed is to be paid, by the method chosen at checkout. */
+    private static function toPay(string $method, int $total): string
+    {
+        if ($total === 0) return 'covered by a promotion';
+
+        return match ($method) { 'eft' => 'to be paid by EFT', 'wallet' => 'paid from wallet credit', 'dummy' => 'by simulated card', default => 'by card' };
+    }
+
     /** A demo site says so, as its emails do, and every message ends with the site it came from. */
     public function worded(string $words): string
     {
         $domain = trim(Env::string('APP_DOMAIN'));
 
-        return ($this->site->isDemo() ? '[DEMO] ' : '') . $words . ($domain !== '' ? ' (' . $domain . ')' : '');
+        return $this->demo() . $words . ($domain !== '' ? ' (' . $domain . ')' : '');
+    }
+
+    /** What a message to a person begins with: [DEMO] on a demo site, as its emails do. */
+    public function demo(): string
+    {
+        return $this->site->isDemo() ? '[DEMO] ' : '';
+    }
+
+    /** The site's name in a message: its domain, or its address's host. */
+    public static function domain(): string
+    {
+        $domain = trim(Env::string('APP_DOMAIN'));
+        if ($domain === '') $domain = (string) parse_url(Env::string('APP_URL'), PHP_URL_HOST);
+
+        return $domain !== '' ? $domain : 'this site';
     }
 }

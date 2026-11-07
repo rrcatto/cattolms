@@ -3,12 +3,14 @@
 	first time, when a window asks how the person would like their updates, weekly chosen (owner, 2026-10-28, round two 4C).
 	Signed out, a window says an account is needed first, with "Yes, create an account" and "No, I changed my mind" (owner,
 	2026-10-28); the follow is carried out once they have signed in. Without JavaScript either window's link opens the same
-	words on a page. fb: {kind, id, name, following, signed_in, return, choose_how, how}.
+	words on a page. fb: {kind, id, name, following, signed_in, return, choose_how, how, href, intent}: href (Follow's page)
+	and intent (what is carried through signing in) name a course by its code and a category or a tag by its slug
+	(owner, 2026-11-06: no row id in an address); id is posted only, never in an address.
 #}
 <div class="cl-follow" id="follow">
 	{% if fb.signed_in and fb.choose_how|default(false) and not fb.following %}
 		{% set fb_window = 'follow-how-' ~ fb.kind ~ '-' ~ fb.id %}
-		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: '/follow/' ~ fb.kind ~ '/' ~ fb.id ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add', title: 'Get news about ' ~ fb.name ~ ' by email.'}) }}
+		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: fb.href ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add', title: 'Get news about ' ~ fb.name ~ ' by email.'}) }}
 		<p class="small cl-follow-note">{{ fb.kind == 'course' ? 'Follow for the updates written about this course.' : 'Follow to hear about new courses here.' }}</p>
 		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: fb_window, title: 'Follow ' ~ fb.name, action: '/account/follow'})} %}
 		{% block modal_body %}
@@ -40,9 +42,9 @@
 	{% else %}
 		{# Following needs an account (owner, 2026-10-28, decision 8B: "pop up a modal window which explains this, and let them
 		   choose YES, create an account or NO, I changed my mind"). Without JavaScript the link opens the same words on a page. #}
-		{% set fb_to = fb.kind ~ ':' ~ fb.id %}
+		{% set fb_to = fb.intent %}
 		{% set fb_window = 'follow-' ~ fb.kind ~ '-' ~ fb.id %}
-		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: '/follow/' ~ fb.kind ~ '/' ~ fb.id ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add'}) }}
+		{{ ui('action.link', {label: 'Follow', variant: 'secondary', size: 'small', href: fb.href ~ '?return=' ~ fb.return|url_encode, modal: fb_window, icon: 'action-add'}) }}
 		<p class="small cl-follow-note">Follow it to hear about it by email. You need an account first.</p>
 		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: fb_window, title: 'Create an account to follow ' ~ fb.name})} %}
 		{% block modal_body %}

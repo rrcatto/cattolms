@@ -82,6 +82,37 @@ final class SocialPlatform
         return self::CATALOGUE[$platform]['home'] ?? '';
     }
 
+    /** The platforms the site footer shows a mark for, in its order. */
+    public const FOOTER = ['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'];
+
+    /**
+     * The site footer's marks (footer_social): each platform's profile address where the installation sets one, else its
+     * home page (owner, 2026/10/17).
+     *
+     * @param array<array-key,mixed> $configured platform => profile address
+     * @return list<array{key:string,label:string,href:string}>
+     */
+    public static function footerMarks(array $configured): array
+    {
+        $marks = [];
+        foreach (self::FOOTER as $key) {
+            $marks[] = ['key' => $key, 'label' => self::label($key), 'href' => trim((string) ($configured[$key] ?? '')) ?: self::home($key)];
+        }
+        return $marks;
+    }
+
+    /**
+     * The footer's marks that link to the site's own profiles, not a platform's home page: what the home page's
+     * Organization names as its social profiles (sameAs; owner, 2026-11-06).
+     *
+     * @param array<array-key,mixed> $configured platform => profile address
+     * @return list<string>
+     */
+    public static function profiles(array $configured): array
+    {
+        return array_values(array_filter(array_map(static fn(array $mark): string => $mark['href'] !== self::home($mark['key']) ? $mark['href'] : '', self::footerMarks($configured))));
+    }
+
     /**
      * The catalogue as a view model, with each platform's current value filled in.
      *

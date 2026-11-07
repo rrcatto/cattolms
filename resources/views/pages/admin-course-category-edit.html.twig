@@ -13,7 +13,7 @@
 				<h2 class="h4">
 					Category details
 				</h2>
-				<form action="/admin/courses/categories/{{ category.id }}" method="post" enctype="multipart/form-data" class="vstack gap-5">
+				<form action="{{ category_admin_url(category) }}" method="post" enctype="multipart/form-data" class="vstack gap-5">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-category-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
@@ -22,7 +22,7 @@
 
 {% endblock %}
 {% endembed %}
-					<p class="cl-category-edit-place">{{ category.level == 1 ? 'Main category' : (category.level == 2 ? 'Subcategory' : 'Sub-subcategory') }}: <strong>{{ category_path }}</strong>. To move it, drag it in the <a href="{{ tree_href }}">category tree</a> or use <a href="/admin/courses/categories/{{ category.id }}/move-into">Move into…</a>.</p>
+					<p class="cl-category-edit-place">{{ category.level == 1 ? 'Main category' : (category.level == 2 ? 'Subcategory' : 'Sub-subcategory') }}: <strong>{{ category_path }}</strong>. To move it, drag it in the <a href="{{ tree_href }}">category tree</a> or use <a href="{{ category_admin_url(category, '/move-into') }}">Move into…</a>.</p>
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', full_width: false, for: 'field-admin-course-category-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
@@ -50,7 +50,7 @@
 {% endblock %}
 {% endembed %}
 		{# The category's icon (owner, 2026-10-20): shown in the category picker, the catalogue and the tree. #}
-		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: category.icon_svg|default(''), ic_kind: 'category', ic_choice: icon_choice, ic_save: '/admin/courses/categories/' ~ category.id ~ '/icon'} %}
+		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: category.icon_svg|default(''), ic_kind: 'category', ic_choice: icon_choice, ic_save: category_admin_url(category, '/icon')} %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}
 {% block surface_body %}
 
@@ -67,7 +67,7 @@
 						<p>
 							This category is in use. Choose another category and all {{ category.course_count }} course{{ category.course_count==1 ? '' : 's' }} will be reassigned before deletion.
 						</p>
-						<form action="/admin/courses/categories/{{ category.id }}/delete" method="post">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
+						<form action="{{ category_admin_url(category, '/delete') }}" method="post">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
 {% block body %}
 
 							<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -81,7 +81,7 @@
 						<p>
 							No courses use this category, so it can be removed directly.
 						</p>
-						<form action="/admin/courses/categories/{{ category.id }}/delete" method="post">
+						<form action="{{ category_admin_url(category, '/delete') }}" method="post">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							{{ ui('action.button', {label: 'Delete category', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this unused course category?', icon: 'action-remove'}) }}
 						</form>

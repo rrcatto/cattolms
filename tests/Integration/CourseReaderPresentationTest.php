@@ -114,7 +114,7 @@ final class CourseReaderPresentationTest extends TestCase
     /** Only the section the reader is in starts open in the sidebar (owner, 2026-11-02), and the browser does the rest. */
     public function testOnlyTheCurrentSectionStartsOpenInTheOutline(): void
     {
-        $page = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        $page = $this->page('/learn/' . $this->slug . '/' . $this->part('lesson'));
         $week = $this->outlineEntry($page, $this->nodes['week']);
         $group = $this->element($week->parentNode);
         self::assertSame('summary', $week->nodeName, 'A section with parts is the heading of a panel.');
@@ -132,15 +132,15 @@ final class CourseReaderPresentationTest extends TestCase
         $saved = [$_SERVER, $_SESSION['csrf'] ?? null];
         $_SESSION['csrf'] = str_repeat('m', 64);
         $form = ['csrf' => $_SESSION['csrf'], 'completed' => '1'];
-        $learner = '/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/complete';
-        $visitor = '/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/complete';
+        $learner = '/learn/' . $this->slug . '/' . $this->part('lesson') . '/complete';
+        $visitor = '/courses/' . $this->slug . '/preview/' . $this->part('lesson') . '/complete';
         $done = fn(): int => (int) $this->db->fetchOne('SELECT count(*) FROM course_part_completions c JOIN course_enrolments e ON e.id = c.enrolment_id WHERE e.user_id = :user AND e.course_id = :course', ['user' => $this->learner, 'course' => $this->course]);
         try {
             // Without JavaScript the plain form comes back to the buttons.
             unset($_SERVER['HTTP_HX_REQUEST']);
             $plain = $this->post($learner, $form);
             self::assertSame(303, $plain->getStatusCode());
-            self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content#cl-course-item-paging', $plain->headers->get('Location'));
+            self::assertSame('/learn/' . $this->slug . '/' . $this->part('lesson') . '#cl-course-item-paging', $plain->headers->get('Location'));
             self::assertSame(1, $done());
             $this->post($learner, ['completed' => '0'] + $form);
             self::assertSame(0, $done());
@@ -154,16 +154,16 @@ final class CourseReaderPresentationTest extends TestCase
             self::assertStringContainsString('class="cl-course-item-complete is-done"', $html);
             self::assertStringContainsString('name="completed" value="0"', $html, 'Pressed again, it unticks.');
             self::assertStringContainsString('Completed', $html);
-            foreach (['#cl-course-reader-progress', '#cl-outline-row-' . $this->nodes['lesson'], '#cl-outline-row-' . $this->nodes['week']] as $target) {
+            foreach (['#cl-course-reader-progress', '#cl-outline-row-' . $this->part('lesson'), '#cl-outline-row-' . $this->part('week')] as $target) {
                 self::assertStringContainsString('<hx-partial hx-target="' . $target . '" hx-swap="outerHTML">', $html);
             }
-            self::assertStringNotContainsString('#cl-outline-row-' . $this->nodes['pack'], $html, 'A row the tick did not change stays as it is.');
-            self::assertStringContainsString('<summary id="cl-outline-row-' . $this->nodes['week'] . '"', $html, 'A section stays the heading of its panel.');
+            self::assertStringNotContainsString('#cl-outline-row-' . $this->part('pack'), $html, 'A row the tick did not change stays as it is.');
+            self::assertStringContainsString('<summary id="cl-outline-row-' . $this->part('week') . '"', $html, 'A section stays the heading of its panel.');
             self::assertStringContainsString('1 of', $html);
             self::assertSame(1, $done());
 
             // Whatever cannot be swapped in reloads the page: a refusal, an expired form, a signed-out reader.
-            $week = $this->post('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/complete', $form);
+            $week = $this->post('/learn/' . $this->slug . '/' . $this->part('week') . '/complete', $form);
             self::assertSame(['true', ''], [$week->headers->get('HX-Refresh'), (string) $week->getContent()], 'A section cannot be ticked by hand.');
             $expired = $this->post($learner, ['csrf' => 'expired', 'completed' => '0']);
             self::assertSame(['true', ''], [$expired->headers->get('HX-Refresh'), (string) $expired->getContent()]);
@@ -184,8 +184,8 @@ final class CourseReaderPresentationTest extends TestCase
             self::assertStringNotContainsString('<html', $public);
             self::assertStringContainsString('class="cl-course-item-complete is-done"', $public);
             self::assertStringContainsString('action="' . $visitor . '"', $public);
-            self::assertStringContainsString('<hx-partial hx-target="#cl-outline-row-' . $this->nodes['lesson'] . '" hx-swap="outerHTML">', $public);
-            self::assertStringContainsString('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content', $public, 'Its rows stay in the public preview.');
+            self::assertStringContainsString('<hx-partial hx-target="#cl-outline-row-' . $this->part('lesson') . '" hx-swap="outerHTML">', $public);
+            self::assertStringContainsString('/courses/' . $this->slug . '/preview/' . $this->part('lesson'), $public, 'Its rows stay in the public preview.');
             self::assertTrue($_SESSION['public_preview_done'][$this->course][$this->nodes['lesson']] ?? false);
             self::assertSame(1, $done(), 'A visitor\'s tick is kept in their session, never on a record.');
             self::assertSame(['true', ''], (function () use ($visitor): array { $r = $this->post($visitor, ['csrf' => 'expired', 'completed' => '0']); return [$r->headers->get('HX-Refresh'), (string) $r->getContent()]; })());
@@ -200,7 +200,7 @@ final class CourseReaderPresentationTest extends TestCase
 
     public function testSectionsAreLabelledAndStyledInTheCourseModulesOutline(): void
     {
-        $page = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        $page = $this->page('/learn/' . $this->slug . '/' . $this->part('lesson'));
         $week = $this->outlineEntry($page, $this->nodes['week']);
         self::assertSame(['cl-course-depth-1', 'cl-course-outline-item', 'cl-course-outline-section'], $this->classes($week), 'A section keeps its depth class and gains the section hook.');
         self::assertSame('Section: Week one', trim($page->query('./a', $week)->item(0)->textContent ?? ''), 'A section with an introduction is a link.');
@@ -217,25 +217,25 @@ final class CourseReaderPresentationTest extends TestCase
 
     public function testTheLearnerSeesTheDownloadDescriptionOnceInsideItsCardWithThePrimaryAction(): void
     {
-        $page = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content');
+        $page = $this->page('/learn/' . $this->slug . '/' . $this->part('pack'));
         $html = $page->document->saveHTML() ?: '';
         self::assertSame(1, substr_count($html, self::DESCRIPTION), 'The description appears exactly once.');
         self::assertSame(1, $page->query('//section[contains(concat(" ", @class, " "), " cl-course-item-download ")]//p[normalize-space()="' . self::DESCRIPTION . '"]')->length, 'It is inside the bordered download card.');
         self::assertMatchesRegularExpression('/^pack-' . $this->suffix . '\.zip · ZIP archive · \d+ bytes$/u', trim($page->query('//p[contains(@class, "cl-course-item-download-meta")]')->item(0)->textContent ?? ''), 'Filename, type and size remain.');
         $download = $this->element($page->query('//section[contains(@class, "cl-course-item-download")]//a[@download]')->item(0), 'A started learner can download.');
         self::assertSame(CourseItemRenderer::DOWNLOAD_ACTION_CLASSES, $download->getAttribute('class'));
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/download/reader-pack-' . $this->suffix, $download->getAttribute('href'));
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('pack') . '/download/reader-pack-' . $this->suffix, $download->getAttribute('href'));
         $paging = $page->query('//nav[contains(@class, "cl-course-item-paging")]//a');
         self::assertSame(2, $paging->length, 'Previous and Next remain.');
         foreach ($paging as $link) {
             self::assertSame('cl-ui-action cl-ui-action--primary cl-ui-action--normal', $this->element($link)->getAttribute('class'));
         }
-        self::assertStringEndsWith('/item/' . $this->nodes['lesson'] . '/content', $this->element($paging->item(0))->getAttribute('href'));
+        self::assertStringEndsWith('/' . $this->part('lesson'), $this->element($paging->item(0))->getAttribute('href'));
     }
 
     public function testALessonDescriptionStillAppearsOnceAboveItsContent(): void
     {
-        $html = $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content')->document->saveHTML() ?: '';
+        $html = $this->page('/learn/' . $this->slug . '/' . $this->part('lesson'))->document->saveHTML() ?: '';
         self::assertSame(1, substr_count($html, 'Lesson summary.'));
         self::assertMatchesRegularExpression('~<div class="cl-course-item-description"><p>Lesson summary\.</p></div><p>Lesson body\.</p>~', $html);
     }
@@ -243,58 +243,58 @@ final class CourseReaderPresentationTest extends TestCase
     public function testThePublicPreviewShowsTheSameSingleDescriptionAndNoDownloadLink(): void
     {
         $_COOKIE = $this->cookies;
-        $page = $this->page('/courses/' . $this->slug . '/preview/' . $this->nodes['pack'] . '/content');
+        $page = $this->page('/courses/' . $this->slug . '/preview/' . $this->part('pack'));
         $html = $page->document->saveHTML() ?: '';
         self::assertSame(1, substr_count($html, self::DESCRIPTION));
         self::assertSame(1, $page->query('//section[contains(@class, "cl-course-item-download")]//p[normalize-space()="' . self::DESCRIPTION . '"]')->length);
         self::assertSame(0, $page->query('//section[contains(@class, "cl-course-item-download")]//a')->length, 'No download link in a public preview.');
         self::assertStringContainsString('Available to download after you start the course.', $html);
-        $lesson = $this->page('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content')->document->saveHTML() ?: '';
+        $lesson = $this->page('/courses/' . $this->slug . '/preview/' . $this->part('lesson'))->document->saveHTML() ?: '';
         self::assertSame(1, substr_count($lesson, 'Lesson summary.'), 'Preview and learner mode present descriptions the same way.');
     }
 
     public function testNextAndPreviousStopAtSectionsEverywhereTheLearnerReads(): void
     {
-        $assessment = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix);
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['later'] . '/content', $assessment['Next'] ?? null, "An assessment's Next goes to the following section with a page, skipping a heading-only section.");
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content', $assessment['Previous'] ?? null);
-        $pack = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix, $pack['Next'] ?? null);
-        $lesson = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content', $lesson['Previous'] ?? null, "A content page's Previous goes to its section.");
-        $week = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content', $week['Next'] ?? null, "A section's Next goes to its first row.");
+        $assessment = $this->paging('/learn/' . $this->slug . '/' . $this->part('quiz') . '/assessment/reader-quiz-' . $this->suffix);
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('later'), $assessment['Next'] ?? null, "An assessment's Next goes to the following section with a page, skipping a heading-only section.");
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('pack'), $assessment['Previous'] ?? null);
+        $pack = $this->paging('/learn/' . $this->slug . '/' . $this->part('pack'));
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('quiz') . '/assessment/reader-quiz-' . $this->suffix, $pack['Next'] ?? null);
+        $lesson = $this->paging('/learn/' . $this->slug . '/' . $this->part('lesson'));
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('week'), $lesson['Previous'] ?? null, "A content page's Previous goes to its section.");
+        $week = $this->paging('/learn/' . $this->slug . '/' . $this->part('week'));
+        self::assertSame('/learn/' . $this->slug . '/' . $this->part('lesson'), $week['Next'] ?? null, "A section's Next goes to its first row.");
     }
 
     public function testASectionAppearsInThePublicPreviewOnlyWhenMarkedPublic(): void
     {
         $_COOKIE = $this->cookies;
         $base = '/courses/' . $this->slug . '/preview/';
-        $pack = $this->page($base . $this->nodes['pack'] . '/content');
+        $pack = $this->page($base . $this->part('pack'));
         self::assertSame(0, $pack->query('//nav[contains(@class, "cl-course-outline")]//*[starts-with(normalize-space(), "Section:")]')->length, 'Sections are not public by default.');
-        self::assertSame(404, $this->send($base . $this->nodes['week'] . '/content')->getStatusCode());
-        $lesson = $this->paging($base . $this->nodes['lesson'] . '/content');
+        self::assertSame(404, $this->send($base . $this->part('week'))->getStatusCode());
+        $lesson = $this->paging($base . $this->part('lesson'));
         self::assertArrayNotHasKey('Previous', $lesson);
 
         $this->items->updateSection($this->course, $this->nodes['week'], ['title' => 'Week one', 'introduction_html' => '<p>Welcome to week one.</p>', 'show_outline' => '1', 'public_preview' => '1'], $this->owner);
-        $section = $this->page($base . $this->nodes['week'] . '/content');
+        $section = $this->page($base . $this->part('week'));
         $html = $section->document->saveHTML() ?: '';
         self::assertStringContainsString('Welcome to week one.', $html, 'A public section opens with its introduction.');
         self::assertSame('Week one', trim($section->query('//article//h1')->item(0)->textContent ?? ''));
         self::assertSame(['Lesson', 'Precedent pack'], array_map(static fn(\DOMNode $li): string => trim($li->textContent), iterator_to_array($section->query('//article//ol/li'))), 'Its outline lists only what the public may see.');
         $link = $section->query('//nav[contains(@class, "cl-course-outline")]//a[normalize-space()="Section: Week one"]')->item(0);
         self::assertInstanceOf(\DOMElement::class, $link, 'The public outline shows and links the section.');
-        self::assertSame($base . $this->nodes['week'] . '/content', $link->getAttribute('href'));
-        self::assertSame($base . $this->nodes['lesson'] . '/content', $this->paging($base . $this->nodes['week'] . '/content')['Next'] ?? null);
-        self::assertSame($base . $this->nodes['week'] . '/content', $this->paging($base . $this->nodes['lesson'] . '/content')['Previous'] ?? null, 'Previous and Next include the public section.');
-        self::assertSame(404, $this->send($base . $this->nodes['later'] . '/content')->getStatusCode(), 'A section not marked public stays out.');
+        self::assertSame($base . $this->part('week'), $link->getAttribute('href'));
+        self::assertSame($base . $this->part('lesson'), $this->paging($base . $this->part('week'))['Next'] ?? null);
+        self::assertSame($base . $this->part('week'), $this->paging($base . $this->part('lesson'))['Previous'] ?? null, 'Previous and Next include the public section.');
+        self::assertSame(404, $this->send($base . $this->part('later'))->getStatusCode(), 'A section not marked public stays out.');
         self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $this->nodes['week']]));
     }
 
     public function testCourseViewsAreRecordedWithTheirSourceAndViewer(): void
     {
         $this->page('/learn/' . $this->slug);
-        $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        $this->page('/learn/' . $this->slug . '/' . $this->part('lesson'));
         $views = $this->views();
         self::assertSame(['learner_reader', 'learner_reader'], array_column($views, 'source'));
         self::assertSame([$this->learner, $this->learner], array_map('intval', array_column($views, 'user_id')), 'A signed-in learner is associated by id.');
@@ -395,6 +395,12 @@ final class CourseReaderPresentationTest extends TestCase
             $kernel->shutdown();
             $_GET = [];
         }
+    }
+
+    /** A part's name in the reader's and the preview's addresses (owner, 2026-11-06: no row id in an address). */
+    private function part(string $key): string
+    {
+        return (string) $this->db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id=:id', ['id' => $this->nodes[$key]]);
     }
 
     private function outlineEntry(DOMXPath $page, int $node): \DOMElement

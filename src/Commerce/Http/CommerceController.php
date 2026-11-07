@@ -10,6 +10,8 @@ use CattoLearning\Commerce\Application\{BillingProfileService,OrderService,Payme
 use CattoLearning\Commerce\Domain\{BillingDetails,OrderTotals,PromotionRejected};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Http\Controller\BaseController;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\{Csrf,Money,Pagination,Uuid};
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\{RequestStack,Response};
@@ -31,8 +33,18 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
         private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
         private readonly \CattoLearning\Commerce\Application\RefundRequestService $refundRequests,
-        private readonly \CattoLearning\Mailing\MailingConsents $mailing)
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing,
+        private readonly AddressKeyRepository $keys)
     { parent::__construct($auth,$view,$requests); }
+
+    /**
+     * The order an address names by its number (CL-00000689, owner 2026-11-06: no row id in an address): its row id, or
+     * not found, as for an order that is not the reader's.
+     */
+    private function orderFromAddress(): int
+    {
+        return $this->keys->order($this->param('number')) ?? throw $this->notFound(OrderService::NOT_YOURS);
+    }
 
     private function csrf(): void
     {
@@ -63,7 +75,7 @@ final class CommerceController extends BaseController
                 $this->administration->requestCourse($actor->id,(int)$offer['course_id'],(int)$offer['access_period_seconds'],'');
                 $this->landingClicked($landing, 'request', $id);
                 $this->flash('success','Your course request was sent to your company administrator.');
-                $this->redirect('/account/courses?list=requests');
+                $this->redirect('/account/requests');
             }
             $this->carts->change($id);
             $this->landingClicked($landing, $this->posted('action') === 'buy_now' ? 'buy_now' : 'add', $id);
@@ -219,7 +231,7 @@ final class CommerceController extends BaseController
             if ($this->posted('news') === '1') $this->mailing->subscribe($actor->id, 'news', null, 'checkout');
             foreach (array_unique(array_map('intval', (array) ($_POST['follow_course'] ?? []))) as $courseId) if ($courseId > 0) $this->mailing->subscribe($actor->id, 'course', $courseId, 'checkout');
             $this->maintenance->deliverInvoices(1);
-            $this->redirect($id === null ? '/account/courses' : '/account/orders/'.$id);
+            $this->redirect($id === null ? '/account/courses' : OrderAddress::buyer($id));
         }, '/checkout/review');
     }
 
@@ -242,23 +254,23 @@ final class CommerceController extends BaseController
      * same invoice or receipt, in Administration, where it is managed; anyone else finds no such order in their account.
      * The buyer's own page is never shown to anyone else, since its buttons act as the buyer.
      */
-    private function sendElsewhereIfNotTheirs(CurrentUser $actor, int $orderId, ?int $documentId = null): void
+    private function sendElsewhereIfNotTheirs(CurrentUser $actor, int $orderId, ?string $documentNumber = null): void
     {
         $purchaser = $this->orders->purchaser($orderId);
         if ($purchaser !== null && $purchaser['id'] === $actor->id) return;
         // A company's order opens for any of its Company Administrators (owner, 2026-10-26).
         if ($purchaser !== null && $this->orders->mayOpen($actor, $this->records->order($orderId))) return;
         if ($purchaser !== null && $actor->hasPermission('PLATFORM.ORDER.VIEW')) {
-            if ($documentId === null) $this->flash('info', 'This is ' . $purchaser['name'] . '\'s order. It opens here in Administration, where you manage it.');
-            $this->redirect('/admin/commerce/orders/' . $orderId . ($documentId === null ? '' : '/documents/' . $documentId));
+            if ($documentNumber === null) $this->flash('info', 'This is ' . $purchaser['name'] . '\'s order. It opens here in Administration, where you manage it.');
+            $this->redirect($documentNumber === null ? OrderAddress::admin($orderId) : OrderAddress::document('admin', $orderId, $documentNumber));
         }
         throw $this->notFound(OrderService::NOT_YOURS);
     }
 
-    #[Route('/account/orders/{id}',name:'commerce_order',requirements:['id'=>'[0-9]+'],methods:['GET'])]
+    #[Route('/account/orders/{number}',name:'commerce_order',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['GET'])]
     public function order(): Response
     {
-        $id=(int)$this->param('id');
+        $id=$this->orderFromAddress();
         $this->sendElsewhereIfNotTheirs($this->requireUser(),$id);
         $actor=$this->requirePermission('COMMERCE.ORDER.VIEW');
         $order=$this->orders->view($actor,$id);
@@ -278,54 +290,59 @@ final class CommerceController extends BaseController
         unset($line);
         $reference=$order['company_id']!==null ? $this->records->companyAccountReference((int)$order['company_id']) : $this->records->userAccountReference($actor->id);
         $due=$this->records->dueAmount($id);
-        return $this->render('commerce-order',['title'=>'Order '.$id,'account_reference'=>\CattoLearning\Support\AccountReference::format($reference),
+        return $this->render('commerce-order',['title'=>'Order '.OrderAddress::number($id),'account_reference'=>\CattoLearning\Support\AccountReference::format($reference),
             'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'payment_options'=>$this->orders->paymentMethods()->checkoutOptions()]);
     }
 
-    #[Route('/account/orders/{id}/refund-request',name:'commerce_refund_request',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    #[Route('/account/orders/{number}/refund-request',name:'commerce_refund_request',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['POST'])]
     public function refundRequest(): Response
     {
-        $actor=$this->requireUser();$this->csrf();$id=(int)$this->param('id');
+        $actor=$this->requireUser();$this->csrf();$id=$this->orderFromAddress();
         return $this->handle(function() use($actor,$id): void {
             $order=$this->records->order($id);
             // The services check the permission: COMMERCE.REFUND.REQUEST for a learner, COMPANY.CREDIT.MANAGE for credits.
             if ($order['company_id']!==null) $this->refundRequests->requestForCompany($actor,(int)$order['company_id'],$id,(int)$this->posted('item_id'),(int)$this->posted('quantity'),$this->posted('reason'));
             else $this->refundRequests->requestForOwnOrder($actor,$id,(int)$this->posted('item_id'),$this->posted('destination')==='money_back'?'money_back':'wallet',$this->posted('reason'));
             $this->flash('success','Your refund request was sent. You will see the decision on this order.');
-            $this->redirect('/account/orders/'.$id);
-        },'/account/orders/'.$id);
+            $this->redirect(OrderAddress::buyer($id));
+        },OrderAddress::buyer($id));
     }
 
     #[Route('/account/refund-requests/{id}/withdraw',name:'commerce_refund_request_withdraw',requirements:['id'=>'[0-9]+'],methods:['POST'])]
     public function withdrawRefundRequest(): Response
     {
         $actor=$this->requirePermission('COMMERCE.REFUND.REQUEST');$this->csrf();
-        $order=(int)$this->posted('order_id');
-        return $this->handle(function() use($actor,$order): void {
+        // The order the request is about, posted by its number: the form's way back to it.
+        $order=$this->keys->order($this->posted('order_number'));
+        $back=$order===null ? '/account/orders' : OrderAddress::buyer($order);
+        return $this->handle(function() use($actor,$back): void {
             $this->refundRequests->withdraw($actor,(int)$this->param('id'));
             $this->flash('success','Your refund request was withdrawn.');
-            $this->redirect('/account/orders/'.$order);
-        },'/account/orders/'.$order);
+            $this->redirect($back);
+        },$back);
     }
 
-    #[Route('/account/orders/{id}/pay',name:'commerce_pay',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    #[Route('/account/orders/{number}/pay',name:'commerce_pay',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['POST'])]
     public function pay(): Response
     {
-        $actor=$this->requirePermission('COMMERCE.CHECKOUT.START');$this->csrf();$id=(int)$this->param('id');
+        $actor=$this->requirePermission('COMMERCE.CHECKOUT.START');$this->csrf();$id=$this->orderFromAddress();
         return $this->handle(function() use($actor,$id): void {
             $this->checkout->retry($actor,$id,$this->posted('payment_key'),$this->posted('payment_method'),$this->posted('method_token'));
-            $this->redirect('/account/orders/'.$id);
-        },'/account/orders/'.$id);
+            $this->redirect(OrderAddress::buyer($id));
+        },OrderAddress::buyer($id));
     }
 
-    #[Route('/account/orders/{id}/documents/{document}',name:'commerce_document',requirements:['id'=>'[0-9]+','document'=>'[0-9]+'],methods:['GET'])]
+    #[Route('/account/orders/{number}/documents/{document}',name:'commerce_document',requirements:['number'=>OrderAddress::REQUIREMENT,'document'=>OrderAddress::DOCUMENT_REQUIREMENT],methods:['GET'])]
     public function document(): Response
     {
-        $this->sendElsewhereIfNotTheirs($this->requireUser(),(int)$this->param('id'),(int)$this->param('document'));
-        $order=$this->orders->view($this->requirePermission('COMMERCE.ORDER.VIEW'),(int)$this->param('id'));
+        // The order by its number and the document by its own (INV-00000044), which must be the order's.
+        $id=$this->orderFromAddress();
+        $this->sendElsewhereIfNotTheirs($this->requireUser(),$id,$this->param('document'));
+        $documentId=$this->keys->document($id,$this->param('document')) ?? throw $this->notFound('Document not found.');
+        $order=$this->orders->view($this->requirePermission('COMMERCE.ORDER.VIEW'),$id);
         foreach($order['documents'] as $document) {
-            if ((int)$document['id']!==(int)$this->param('document')) continue;
+            if ((int)$document['id']!==$documentId) continue;
             $bytes = $this->documents->pdf($document);
             $disposition = $this->request()->query->get('download') === '1' ? 'attachment' : 'inline';
             return new Response($bytes, 200, ['Content-Type'=>'application/pdf', 'Content-Disposition'=>$disposition.'; filename="'.$document['number'].'.pdf"', 'Cache-Control'=>'private, no-store', 'X-Content-Type-Options'=>'nosniff']);

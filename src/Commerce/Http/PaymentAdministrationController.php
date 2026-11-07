@@ -16,6 +16,10 @@ use CattoLearning\Commerce\Wallet\WalletOwner;
 use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Support\AccountReference;
 use CattoLearning\Http\Controller\BaseController;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\OrderAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use CattoLearning\View\ThemeRenderer;
@@ -32,8 +36,15 @@ final class PaymentAdministrationController extends BaseController
         private readonly RefundAdministrationService $refunds, private readonly FinancialDocuments $financialDocuments,
         private readonly WalletService $wallets, private readonly CommerceSettings $settings,
         private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
-        private readonly \CattoLearning\Commerce\Application\OrderStory $story)
+        private readonly \CattoLearning\Commerce\Application\OrderStory $story,
+        private readonly AddressKeyRepository $keys)
     { parent::__construct($auth,$view,$requests); }
+
+    /** The order an address names by its number (CL-00000689, owner 2026-11-06: no row id in an address). */
+    private function orderFromAddress(): int
+    {
+        return $this->keys->order($this->param('number')) ?? throw $this->notFound('We could not find that order.');
+    }
 
     #[Route('/admin/commerce/orders',name:'admin_commerce_orders',methods:['GET'])]
     public function orders(): Response
@@ -42,11 +53,11 @@ final class PaymentAdministrationController extends BaseController
         return $this->render('admin-commerce-orders',['title'=>'Orders & Payments','active_nav'=>'admin']+$this->money->orders($this->request()->query->all()));
     }
 
-    #[Route('/admin/commerce/orders/{id}',name:'admin_commerce_order',requirements:['id'=>'[0-9]+'],methods:['GET'])]
+    #[Route('/admin/commerce/orders/{number}',name:'admin_commerce_order',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['GET'])]
     public function order(): Response
     {
         $actor=$this->requirePermission('PLATFORM.ORDER.VIEW');
-        $id=(int)$this->param('id');
+        $id=$this->orderFromAddress();
         $order=$this->records->order($id);
         $snapshot=CommerceRepository::decode((string)$order['snapshot']);
         $items=$this->records->items($id);
@@ -110,14 +121,14 @@ final class PaymentAdministrationController extends BaseController
             'credit_note'=>$actor->hasPermission('PLATFORM.REFUND.VIEW'),
             default=>true,
         }));
-        return $this->render('admin-commerce-order',['title'=>'Order CL-'.str_pad((string)$id,8,'0',STR_PAD_LEFT),'active_nav'=>'admin',
+        return $this->render('admin-commerce-order',['title'=>'Order '.OrderAddress::number($id),'active_nav'=>'admin',
             // The page opens with what happened, in plain English (owner, 2026-10-18).
             'story'=>$this->story->tell($id,AccountReference::format($reference)),
             'today'=>(new \DateTimeImmutable('now',new \DateTimeZone(date_default_timezone_get())))->format('Y-m-d'),
             'order'=>$order,'snapshot'=>$snapshot,'totals'=>OrderTotals::forSnapshot($snapshot),'promotion_eligible_label'=>is_array($snapshot['promotion'] ?? null) ? Money::strictMinorUnits((int)$snapshot['promotion']['eligible_minor'],(string)$order['currency'])->format() : null,'billing_lines'=>BillingDetails::fromSnapshot((array)($snapshot['billing'] ?? []))->documentLines(),'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'wallet_balance_label'=>$actor->hasPermission('PLATFORM.WALLET.VIEW') ? Money::ofMinorUnits($this->wallets->balance($owner,(string)$order['currency']),(string)$order['currency'])->format() : null,
-            'wallet_href'=>'/admin/wallets/'.($owner->isCompany() ? 'company/'.$owner->companyId : 'person/'.$owner->userId),
+            'wallet_href'=>$owner->isCompany() ? CompanyAddress::to('wallet',$reference) : PersonAddress::to('wallet',$reference),
             'account_reference'=>AccountReference::format($reference),
             // The buyer as a person: the name and email the order was placed under, their account reference and their account (owner, 2026-10-21).
             'purchaser'=>\CattoLearning\Commerce\Application\MoneyRecords::person((int)$order['purchaser_user_id'],(string)($snapshot['purchaser_name'] ?? ''),$this->records->userAccountReference((int)$order['purchaser_user_id']),(string)($snapshot['purchaser_email'] ?? '')),
@@ -129,33 +140,33 @@ final class PaymentAdministrationController extends BaseController
             'confirmation_key'=>Uuid::v4()]);
     }
 
-    #[Route('/admin/commerce/orders/{id}/confirm-bank',name:'admin_commerce_confirm_bank',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    #[Route('/admin/commerce/orders/{number}/confirm-bank',name:'admin_commerce_confirm_bank',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['POST'])]
     public function confirmBank(): Response
     {
-        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.PAYMENT.MANAGE'); $id=(int)$this->param('id');
+        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.PAYMENT.MANAGE'); $id=$this->orderFromAddress();
         return $this->handle(function () use ($actor,$id): void {
             $amount=EftForm::amount($this->posted('amount'));
             $this->payments->confirmBank($actor,$id,$this->posted('request_key'),$amount,EftForm::receivedAt($this->posted('received_on'),$this->posted('received_time')),$this->posted('bank_reference'),$this->posted('reason'));
             $this->flash('success','The EFT payment is recorded.');
-            $this->redirect('/admin/commerce/orders/'.$id);
-        },'/admin/commerce/orders/'.$id);
+            $this->redirect(OrderAddress::admin($id));
+        },OrderAddress::admin($id));
     }
 
-    #[Route('/admin/commerce/orders/{id}/release-review',name:'admin_commerce_release_review',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    #[Route('/admin/commerce/orders/{number}/release-review',name:'admin_commerce_release_review',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['POST'])]
     public function releaseReview(): Response
     {
-        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.PAYMENT.RECONCILE'); $id=(int)$this->param('id');
+        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.PAYMENT.RECONCILE'); $id=$this->orderFromAddress();
         return $this->handle(function () use ($actor,$id): void {
             $this->payments->releasePaidReview($actor,$id,$this->posted('reason'));
             $this->flash('success','The paid order was released and fulfilled.');
-            $this->redirect('/admin/commerce/orders/'.$id);
-        },'/admin/commerce/orders/'.$id);
+            $this->redirect(OrderAddress::admin($id));
+        },OrderAddress::admin($id));
     }
 
-    #[Route('/admin/commerce/orders/{id}/refund',name:'admin_commerce_refund',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    #[Route('/admin/commerce/orders/{number}/refund',name:'admin_commerce_refund',requirements:['number'=>OrderAddress::REQUIREMENT],methods:['POST'])]
     public function refund(): Response
     {
-        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=(int)$this->param('id');
+        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=$this->orderFromAddress();
         return $this->handle(function () use ($actor,$id): void {
             $amount=$this->posted('amount')==='' ? 0 : EftForm::amount($this->posted('amount'));
             $destination=$this->posted('destination')==='money_back' ? 'money_back' : 'wallet';
@@ -164,8 +175,8 @@ final class PaymentAdministrationController extends BaseController
             $open=$this->records->openRefundRequestForItem((int)$this->posted('item_id'));
             $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination,$open===null ? null : (int)$open['id']);
             $this->flash('success',$destination==='money_back' ? 'Refund approved and documented with a credit note. Pay it as shown under Approved refunds, then record its reference.' : 'Refund approved, credited to the wallet and documented with a credit note.');
-            $this->redirect('/admin/commerce/orders/'.$id);
-        },'/admin/commerce/orders/'.$id);
+            $this->redirect(OrderAddress::admin($id));
+        },OrderAddress::admin($id));
     }
 
     #[Route('/admin/commerce/refunds/{id}/payout',name:'admin_commerce_refund_payout',requirements:['id'=>'[0-9]+'],methods:['POST'])]
@@ -173,7 +184,7 @@ final class PaymentAdministrationController extends BaseController
     {
         $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=(int)$this->param('id');
         $refund=$this->records->refund($id) ?? throw $this->notFound('Refund not found.');
-        $back='/admin/commerce/orders/'.(int)$refund['order_id'];
+        $back=OrderAddress::admin((int)$refund['order_id']);
         return $this->handle(function () use ($actor,$id,$back): void {
             $this->refunds->recordPayout($actor,$id,$this->posted('paid_on'),$this->posted('reference'));
             $this->flash('success','The refund payment and its reference are recorded.');
@@ -198,12 +209,15 @@ final class PaymentAdministrationController extends BaseController
         return implode('; ',$parts).'.';
     }
 
-    #[Route('/admin/commerce/orders/{id}/documents/{document}',name:'admin_commerce_document',requirements:['id'=>'[0-9]+','document'=>'[0-9]+'],methods:['GET'])]
+    #[Route('/admin/commerce/orders/{number}/documents/{document}',name:'admin_commerce_document',requirements:['number'=>OrderAddress::REQUIREMENT,'document'=>OrderAddress::DOCUMENT_REQUIREMENT],methods:['GET'])]
     public function document(): Response
     {
         $actor=$this->requirePermission('PLATFORM.ORDER.VIEW');
-        foreach ($this->records->documents((int)$this->param('id')) as $document) {
-            if ((int)$document['id']!==(int)$this->param('document')) continue;
+        // The order by its number and the document by its own (INV-00000044), which must be the order's.
+        $id=$this->orderFromAddress();
+        $documentId=$this->keys->document($id,$this->param('document')) ?? throw $this->notFound('Document not found.');
+        foreach ($this->records->documents($id) as $document) {
+            if ((int)$document['id']!==$documentId) continue;
             if ($document['kind']==='receipt' && !$actor->hasPermission('PLATFORM.PAYMENT.VIEW')) throw $this->notFound('Document not found.');
             if ($document['kind']==='credit_note' && !$actor->hasPermission('PLATFORM.REFUND.VIEW')) throw $this->notFound('Document not found.');
             $disposition=$this->request()->query->get('download')==='1'?'attachment':'inline';

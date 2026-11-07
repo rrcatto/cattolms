@@ -6,12 +6,13 @@ To run the site in rootless Podman containers instead (its own user, the code re
 
 ## What the server needs
 
-- **PHP 8.5.12 or later** (8.5.12 fixes two remote code execution flaws, CVE-2026-109618 and CVE-2026-109619; the installer refuses anything earlier), with its command line and PHP-FPM, and these extensions: dom, fileinfo, gd, json, mbstring, openssl, pdo, pdo_pgsql and zip. intl is recommended, for money and dates in your locale.
+- **PHP 8.5.12 or later** (8.5.12 fixes two remote code execution flaws, CVE-2026-109618 and CVE-2026-109619; the installer refuses anything earlier), with its command line and PHP-FPM, and these extensions: dom, fileinfo, gd, json, libxml, mbstring, openssl, pdo, pdo_pgsql, xmlreader and zip (libxml and xmlreader come with php8.5-xml; the Excel money reports need them). intl is recommended, for money and dates in your locale.
 - **Composer** (https://getcomposer.org) and **Git**.
 - **PostgreSQL 13 or later**, on the same server or elsewhere.
   - When it runs on the same server, the script can create the site's database user and database for you.
   - Otherwise, create them first.
 - **cron**, for the scheduler.
+- **rsvg-convert** (`apt install librsvg2-bin`, LGPL-2.1-or-later), recommended: it draws the share pictures social sites show for courses and bundles. Without it the pages have none, and Settings says so.
 - **A web server** (nginx, or Apache with PHP-FPM) that:
   - serves the site's `public_html` over HTTPS;
   - runs PHP-FPM as the site's Linux user;
@@ -56,7 +57,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 1.0.9` | Install this version. The default is the newest release. |
+| `--version 1.1.0` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -88,8 +89,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  1.0.9/                    the code of each installed version (root)
-  current -> 1.0.9          the version the site runs
+  1.1.0/                    the code of each installed version (root)
+  current -> 1.1.0          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

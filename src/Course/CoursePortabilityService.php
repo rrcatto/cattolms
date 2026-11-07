@@ -11,6 +11,13 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/11/07 SAST
+- The single-course import's canonical rules (CataloguePackage::reviewCourseFile and importCourseFile drive it):
+  commitImport() can leave a course's catalogue settings to the review's choices ($withCatalogue); a course replaced
+  from an HTML file keeps what the file does not state (statedByHtml(): its address, access period, certificate switch,
+  level and style) and what is open before buying, part by part; a replaced course has the frame of the file just
+  imported or none, never one left from an earlier file; a file whose content is a course here is refused with the code
+  that updates it. discardImport(), stagedFile() and analyseCourseHtml() serve the review.
 2026/11/01 SAST
 - A course is written as one HTML file (owner, 2026-11-01: one specification document, docs/COURSE-SPECIFICATION.md):
   the zip course package 3.0 is no longer read; an HTML course's presentations and flash cards become parts beneath its
@@ -180,23 +187,41 @@ final class CoursePortabilityService
     /**
      * Imports a staged course file. $code is the course code the review gives it (owner, 2026-10-23); empty takes the
      * file's own, else one suggested from the title. A 2.1 package's catalogue settings follow (its tags, cover,
-     * position and related courses, and its prices for a new course only), and an HTML course's cover; the course stays a
-     * draft.
+     * position and related courses, and its prices for a new course only), and an HTML course's cover, unless
+     * $withCatalogue is false (the canonical import, CataloguePackage::importCourseFile, gives a course already here
+     * only the differences its review took); the course stays a draft, and a replaced course keeps its status.
+     *
+     * A course replaced from an HTML file keeps what the file does not state (owner, 2026-11-07, the single-course import's
+     * canonical rules: "Where the file is silent, the site's value stays"): its address, access period, certificate
+     * switch, level and course style, and what is open before buying, part by part (an HTML file never says which parts
+     * a visitor may open).
      */
-    public function commitImport(string $key, int $categoryId, int $userId, ?int $replaceCourseId = null, string $code = ''): int
+    public function commitImport(string $key, int $categoryId, int $userId, ?int $replaceCourseId = null, string $code = '', bool $withCatalogue = true): int
     {
         // Checked again at commit rather than trusting the staging call: staging writes a file to
         // disk and the key travels through the browser, so this is the point that actually creates
         // the course.
         $this->refuseSeedImporter($userId);
         $analysis = $this->reanalyseImport($key);
+        $html = ($this->staged($key)[1]['extension'] ?? '') === 'html';
+        $analysis['arrange_after_import'] = $html;
+        $open = [];
+        if ($html && $replaceCourseId !== null) {
+            $analysis['course'] = self::statedByHtml((array) ($analysis['course'] ?? []));
+            $open = $this->portability->openPartNames($replaceCourseId);
+        }
         $courseId = $this->importChecked($analysis, $categoryId, $userId, $replaceCourseId, $code);
         // An HTML course arrives in the older shape, one lesson per module: it is arranged into module sections at once
         // (course structure, owner 2026-10-28).
         if ($this->restructurer !== null && ($this->staged($key)[1]['extension'] ?? '') === 'html' && $this->restructurer->needsArranging($courseId)) {
-            $this->restructurer->arrange($courseId, $userId);
+            $this->restructurer->arrange($courseId, $userId, (array) ($analysis['part_names'] ?? []));
         }
-        if (is_array($analysis['catalogue'] ?? null)) {
+        // Every part has its name by now (an arrangement names those it made); any left is named here, a course file's own
+        // names first (specification 6.6), so a course replaced from its file keeps its addresses.
+        $this->courseItems->nameParts($courseId, null, (array) ($analysis['part_names'] ?? []));
+        // What was open before buying is open again, each part by its name (which a replace keeps).
+        if ($open !== []) $this->portability->openParts($courseId, $open);
+        if ($withCatalogue && is_array($analysis['catalogue'] ?? null)) {
             // The category is the one the review chose, already given; the rest of the package's settings follow.
             $settings = array_diff_key($analysis['catalogue'], ['category' => true]);
             $this->catalogue->apply($courseId, $settings, $userId, $replaceCourseId === null);
@@ -204,10 +229,55 @@ final class CoursePortabilityService
         }
         // A course arriving with no position takes the next free number in its code's range (owner, 2026-11-01).
         $this->positions?->fill($courseId, $userId);
+        $this->discardImport($key);
+        return $courseId;
+    }
+
+    /** Forgets a staged course file: after its import, or when the review's choices replaced nothing of it. */
+    public function discardImport(string $key): void
+    {
         [$path] = $this->staged($key);
         @unlink($path);
         @unlink($this->storageRoot . '/imports/' . $key . '.meta.json');
-        return $courseId;
+    }
+
+    /**
+     * A staged course file as it was uploaded: its path, whether it is HTML or JSON, and its name.
+     *
+     * @return array{path:string,extension:string,original_filename:string}
+     */
+    public function stagedFile(string $key): array
+    {
+        [$path, $metadata] = $this->staged($key);
+        return ['path' => $path, 'extension' => (string) ($metadata['extension'] ?? 'html'), 'original_filename' => (string) ($metadata['original_filename'] ?? '')];
+    }
+
+    /**
+     * An HTML course file read as an import reads it, without staging it: the canonical import reads the course on the
+     * site this way, through its own course file, to compare like with like.
+     *
+     * @return array<string,mixed>
+     */
+    public function analyseCourseHtml(string $html, string $name): array
+    {
+        return $this->courseComponentAnalysis($this->htmlImporter->analyse($html, $name));
+    }
+
+    /**
+     * What an HTML course file states of its course (specification 4.11): its code, title, subtitle, summary, description,
+     * introduction, styling and first module's number, its study time and level when it gives them. The importer fills
+     * the rest (an address from the title, a year's access, a certificate, the standard style) only so a new course
+     * has them; a course already here keeps its own.
+     *
+     * @param array<string,mixed> $course
+     * @return array<string,mixed>
+     */
+    public static function statedByHtml(array $course): array
+    {
+        unset($course['slug'], $course['default_access_period_seconds'], $course['certificate_enabled'], $course['course_style_key'], $course['module_weight'], $course['final_weight']);
+        if (trim((string) ($course['level'] ?? '')) === '') unset($course['level']);
+        if (($course['estimated_minutes'] ?? null) === null) unset($course['estimated_minutes']);
+        return $course;
     }
 
     /**
@@ -248,14 +318,16 @@ final class CoursePortabilityService
         if ((array) ($analysis['key_conflicts'] ?? []) !== []) {
             $existing = $replaceCourseId === null ? $this->courseHoldingConflicts($analysis) : null;
             if ($existing !== null) {
-                throw new InvalidArgumentException('This course is already on the site as “' . (string) ($this->requireRealCourse($existing)['title'] ?? '') . '”. To update it, choose it under Replace existing course shell and import again.');
+                $holder = $this->requireRealCourse($existing);
+                throw new InvalidArgumentException('This course is already on the site as “' . (string) ($holder['title'] ?? '') . '” (' . (string) ($holder['code'] ?? '') . '). An import knows a course by its code alone: give the file the code ' . (string) ($holder['code'] ?? '') . ' and import it again to update that course.');
             }
             throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts']));
         }
         $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId, $code);
-        // The file's own build travels with it (2026-11-03), so its course file looks and works as the file did.
-        if (array_key_exists('file_frame', $analysis)) {
-            $this->portability->saveFileFrame($courseId, is_array($analysis['file_frame']) ? $analysis['file_frame'] : null);
+        // The file's own build travels with it (2026-11-03), so its course file looks and works as the file did. A course
+        // replaced from a file has that file's frame or none, never one left from an earlier file (2026-11-07).
+        if ($replaceCourseId !== null || is_array($analysis['file_frame'] ?? null)) {
+            $this->portability->saveFileFrame($courseId, is_array($analysis['file_frame'] ?? null) ? $analysis['file_frame'] : null);
         }
         // The number of its first module travels with it (2026-10-29).
         if (array_key_exists('first_module_number', (array) ($analysis['course'] ?? []))) {
@@ -275,12 +347,15 @@ final class CoursePortabilityService
         $input = trim($chosen) !== '' ? $chosen : (string) ($analysis['course']['code'] ?? '');
         if (trim($input) === '' && $replaceCourseId !== null) $input = (string) ($this->requireCourse($replaceCourseId)['code'] ?? '');
         $code = trim($input) === ''
-            ? CourseCode::suggest((string) ($analysis['course']['title'] ?? 'Course'), fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null)
+            ? CourseCode::suggest((string) ($analysis['course']['title'] ?? 'Course'), fn(string $candidate): bool => $this->courses->codeInUse($candidate))
             : CourseCode::validate($input);
         $holder = $this->courses->findByCode($code);
         if ($holder !== null && (int) $holder['id'] !== $replaceCourseId) {
             throw new InvalidArgumentException('Another course already has the code ' . $code . ': ' . $holder['title'] . '. Each course has a code of its own.');
         }
+        // A code names one course or one bundle (owner, 2026-11-06).
+        $bundle = $this->courses->bundleWithCode($code);
+        if ($bundle !== null) throw new InvalidArgumentException('The code ' . $code . ' is a bundle\'s: ' . $bundle['title'] . '. A code names one course or one bundle, so give the course a code of its own.');
         return $code;
     }
 
@@ -342,7 +417,9 @@ final class CoursePortabilityService
         $rows = $this->courseItemRecords->structure($courseId); $byNode = []; foreach ($rows as $row) { $byNode[(int) $row['id']] = (string) $row['public_id']; }
         $courseItems = []; $resources = []; $structure = [];
         foreach ($rows as $row) {
-            $node = ['node_key' => (string) $row['public_id'], 'parent_node_key' => $row['parent_node_id'] === null ? null : ($byNode[(int) $row['parent_node_id']] ?? null), 'position' => (int) $row['position'], 'node_type' => (string) $row['node_type'], 'relative_delay_minutes' => (int) $row['relative_delay_minutes']];
+            $node = ['node_key' => (string) $row['public_id'], 'parent_node_key' => $row['parent_node_id'] === null ? null : ($byNode[(int) $row['parent_node_id']] ?? null), 'position' => (int) $row['position'], 'node_type' => (string) $row['node_type'], 'relative_delay_minutes' => (int) $row['relative_delay_minutes'],
+                // Its name in the reader's addresses (/learn/{slug}/{part}), so a course moved or replaced keeps them.
+                'part_name' => (string) $row['part_name']];
             if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline'], 'public_preview' => (bool) $row['public_preview'], 'numbered' => (bool) ($row['numbered'] ?? false)]; }
             else {
                 $key = (string) $row['item_key']; $node += ['item_key' => $key, 'display_title_override' => $row['display_title_override'], 'display_description_override' => $row['display_description_override'], 'public_preview' => (bool) $row['public_preview'], 'assessment_role' => (string) $row['assessment_role']];
@@ -397,6 +474,17 @@ final class CoursePortabilityService
             // Its place in the catalogue (owner, 2026-10-23): category, tags, cover, position, related courses, prices, status.
             'catalogue' => $this->catalogue->export($courseId),
         ];
+    }
+
+    /**
+     * The part names a course file carries: those not the ones the parts' places would give them (CourseItemService::
+     * movedPartNames).
+     *
+     * @return array<string,string>
+     */
+    public function movedPartNames(int $courseId): array
+    {
+        return $this->courseItems->movedPartNames($courseId);
     }
 
     /**
@@ -535,12 +623,17 @@ final class CoursePortabilityService
             foreach ((array) ($analysis['structure'] ?? []) as $placement) {
                 if (!is_array($placement)) { continue; }
                 $placement['parent_node_id'] = empty($placement['parent_node_key']) ? null : ($createdNodes[(string) $placement['parent_node_key']] ?? throw new InvalidArgumentException('The import structure parent must appear before its children.'));
+                // A part keeps the name it brings (part_name), so its addresses survive the move; the rest are named
+                // after their places once the whole course is in (below, or by the arrangement that follows).
+                $placement['name_part_later'] = true;
                 if (($placement['node_type'] ?? 'item') === 'section') { $nodeId = $this->courseItems->addSection($courseId, $placement, $userId); }
                 else { if (!isset($created[(string) ($placement['item_key'] ?? '')])) { throw new InvalidArgumentException('The import structure references an undefined Course Item key.'); } $nodeId = $this->courseItems->addExisting($courseId, $created[(string) $placement['item_key']], $placement, $userId); }
                 if (!empty($placement['node_key'])) { $createdNodes[(string) $placement['node_key']] = $nodeId; }
             }
             // Items that came without a name are named after their places in the course (owner, 2026-10-30).
             $this->courseItems->nameFromPlacements($courseId, array_values(array_diff_key($created, $carried)));
+            // An HTML course in the older shape is arranged into modules next, which names its parts from where they then sit.
+            if (empty($analysis['arrange_after_import'])) { $this->courseItems->nameParts($courseId); }
             $bands = (array) ($analysis['grade_bands'] ?? []);
             if ($bands !== []) {
                 $this->courses->replaceGradeBands($courseId, $bands);
@@ -683,7 +776,7 @@ final class CoursePortabilityService
                 if (!is_array($item)) { continue; } $itemKey = (string) ($item['item_key'] ?? '');
                 if ($itemKey === '' || isset($seen[$itemKey])) { $conflicts[] = 'The import contains a duplicate or empty Course Item key: ' . ($itemKey ?: '(empty)') . '.'; }
                 elseif ($this->courseItemRecords->itemByKey($itemKey) !== null) { $conflicts[] = 'Course Item key already exists: ' . $itemKey . '. Resolve the collision before importing.'; }
-                if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $itemKey) !== 1) { $conflicts[] = 'Invalid Course Item key: ' . $itemKey . '.'; }
+                if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $itemKey) !== 1 || preg_match('/[a-zA-Z]/', $itemKey) !== 1) { $conflicts[] = 'Invalid Course Item key: ' . $itemKey . ' (a key holds at least one letter).'; }
                 if (!in_array((string) ($item['item_type'] ?? ''), CourseItemService::TYPES, true)) { $conflicts[] = 'Unsupported Course Item type for ' . $itemKey . '.'; }
                 if (trim((string) ($item['title'] ?? '')) === '') { $conflicts[] = 'Course Item ' . $itemKey . ' needs a title.'; }
                 $resourcePublicId = trim((string) ($item['resource_public_id'] ?? ''));
@@ -794,9 +887,16 @@ final class CoursePortabilityService
      * @param array<string,mixed> $assessment
      * @return array<string,mixed>
      */
+    /**
+     * An assessment the file marks data-assessment-required="false" (a review or module that does not count, specification
+     * section 10) comes in as practice: a placement left as content would otherwise be made graded, and it counted (2026-11-06).
+     *
+     * @param array<string,mixed> $assessment
+     * @return array<string,mixed>
+     */
     private function importAssessmentItem(array $assessment, string $key, string $type): array
     {
-        return ['item_key' => $key, 'item_type' => $type, 'title' => (string) ($assessment['title'] ?? ucfirst($type)), 'description_html' => '', 'content_source' => '', 'type_config' => [], 'resource_id' => null, 'instructions_html' => (string) ($assessment['instructions_html'] ?? ''), 'result_pass_html' => (string) ($assessment['result_pass_html'] ?? ''), 'result_fail_html' => (string) ($assessment['result_fail_html'] ?? ''), 'pass_mark' => $assessment['pass_mark'] ?? 50, 'practice' => false, 'practice_enabled' => $assessment['practice_enabled'] ?? false, 'practice_pool_mode' => $assessment['practice_pool_mode'] ?? 'both', 'practice_question_count' => $assessment['practice_question_count'] ?? 5, 'graded_question_count' => $assessment['graded_question_count'] ?? max(1, count((array) ($assessment['questions'] ?? []))), 'maximum_attempts' => $assessment['maximum_attempts'] ?? null, 'time_limit_seconds' => $assessment['time_limit_seconds'] ?? 1800, 'score_policy' => $assessment['score_policy'] ?? 'highest', 'randomise_questions' => $assessment['randomise_questions'] ?? false, 'randomise_options' => $assessment['randomise_options'] ?? false, 'negative_marking' => $assessment['negative_marking'] ?? false, 'questions' => (array) ($assessment['questions'] ?? [])];
+        return ['item_key' => $key, 'item_type' => $type, 'title' => (string) ($assessment['title'] ?? ucfirst($type)), 'description_html' => '', 'content_source' => '', 'type_config' => [], 'resource_id' => null, 'instructions_html' => (string) ($assessment['instructions_html'] ?? ''), 'result_pass_html' => (string) ($assessment['result_pass_html'] ?? ''), 'result_fail_html' => (string) ($assessment['result_fail_html'] ?? ''), 'pass_mark' => $assessment['pass_mark'] ?? 50, 'practice' => $type === 'assessment' && ($assessment['required'] ?? true) === false, 'practice_enabled' => $assessment['practice_enabled'] ?? false, 'practice_pool_mode' => $assessment['practice_pool_mode'] ?? 'both', 'practice_question_count' => $assessment['practice_question_count'] ?? 5, 'graded_question_count' => $assessment['graded_question_count'] ?? max(1, count((array) ($assessment['questions'] ?? []))), 'maximum_attempts' => $assessment['maximum_attempts'] ?? null, 'time_limit_seconds' => $assessment['time_limit_seconds'] ?? 1800, 'score_policy' => $assessment['score_policy'] ?? 'highest', 'randomise_questions' => $assessment['randomise_questions'] ?? false, 'randomise_options' => $assessment['randomise_options'] ?? false, 'negative_marking' => $assessment['negative_marking'] ?? false, 'questions' => (array) ($assessment['questions'] ?? [])];
     }
 
     private function requireDirectory(string $directory): void

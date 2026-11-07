@@ -35,9 +35,9 @@
 			{% if subscribers and subscribers_view == 'grid' %}
 			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'Subscribers'})} %}{% block body %}
 				{% for row in subscribers %}
-				{% embed ui_template('data.card') with {props: ui_props('data.card', {title: row.name, href: '/mailing/subscribers/' ~ row.user_id, picture: 'round'})} %}
+				{% embed ui_template('data.card') with {props: ui_props('data.card', {title: row.name, href: person_to('subscriber', row), picture: 'round'})} %}
 				{% block picture %}{% if row.picture_url|default('') %}<img src="{{ row.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
-				{% block title %}{{ ui('data.person', {name: row.name, href: '/mailing/subscribers/' ~ row.user_id}) }}{% endblock %}
+				{% block title %}{{ ui('data.person', {name: row.name, href: person_to('subscriber', row)}) }}{% endblock %}
 				{% block details %}
 					<p class="cl-ui-card-line">{{ row.email }}</p>
 					<div class="role-list">
@@ -54,7 +54,7 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Subscribers'})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Name'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Lists'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'How'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Joined'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Last opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: ''}} %}</tr>{% endblock %}
 			{% block body %}{% for row in subscribers %}<tr>
-				<td class="cell-text">{{ ui('data.person', {name: row.name, href: '/mailing/subscribers/' ~ row.user_id}) }}</td>
+				<td class="cell-text">{{ ui('data.person', {name: row.name, href: person_to('subscriber', row)}) }}</td>
 				<td class="cell-text">{{ row.email }}{% if row.never_emailed %} {{ ui('feedback.badge', {label: 'Never emailed', tone: 'danger'}) }}{% endif %}</td>
 				<td>{{ row.lists }}</td>
 				<td>{{ row.delivery == 'instant' ? 'As they happen' : (row.frequency == 'daily' ? 'Daily digest' : (row.frequency == 'monthly' ? 'Monthly digest' : 'Weekly digest')) }}</td>

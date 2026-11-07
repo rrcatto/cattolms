@@ -16,7 +16,7 @@ use Doctrine\DBAL\Exception\{DriverException,ForeignKeyConstraintViolationExcept
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\{AccessDeniedHttpException, NotFoundHttpException};
 
 /**
  * ADMIN promotion management on the real services and controller: creating, editing, activating and
@@ -79,7 +79,8 @@ final class PromotionAdministrationIntegrationTest extends TestCase
     public function testEveryMistakeInTheEditorIsExplained(): void
     {
         $cases = [
-            'Use 3 to 40 letters, digits, hyphens or underscores for the code, starting with a letter or digit.' => ['code' => 'no spaces'],
+            'Use 3 to 40 letters, digits, hyphens or underscores for the code, starting with a letter or digit and holding at least one letter.' => ['code' => 'no spaces'],
+            'Use 3 to 40 letters, digits, hyphens or underscores for the code, starting with a letter or digit and holding at least one letter. ' => ['code' => '20261107'],
             'Give the promotion a name of at most 120 characters.' => ['name' => ''],
             'Enter a percentage greater than 0 and no more than 100, such as 10 or 12.5.' => ['discount_value' => '0'],
             'Enter a percentage greater than 0 and no more than 100, such as 10 or 12.5.' . ' ' => ['discount_value' => '100.01'],
@@ -205,23 +206,42 @@ final class PromotionAdministrationIntegrationTest extends TestCase
         $code = $this->code('SHOW');
         $id = $this->administration->create($this->admin, $this->input(['code' => $code, 'maximum_total_uses' => '10']));
         $orderId = $this->placeWith($code);
-        $page = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'show', ['id' => (string) $id]);
+        $page = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'show', ['code' => $code]);
         self::assertSame(200, $page['status']);
-        foreach (['CL-' . str_pad((string) $orderId, 8, '0', STR_PAD_LEFT), 'Not paid yet', 'Orders were placed with this promotion', 'Unpaid orders', 'Limit 10 uses', 'action="/admin/promotions/' . $id . '/status"'] as $shown) {
+        foreach (['CL-' . str_pad((string) $orderId, 8, '0', STR_PAD_LEFT), 'Not paid yet', 'Orders were placed with this promotion', 'Unpaid orders', 'Limit 10 uses', 'action="/admin/promotions/' . $code . '/status"'] as $shown) {
             self::assertStringContainsString($shown, $page['body']);
         }
         self::assertStringNotContainsString('/delete"', $page['body'], 'No delete for a used promotion.');
 
-        $failed = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'update', ['id' => (string) $id], ['csrf' => $_SESSION['csrf']] + $this->input(['code' => $code, 'name' => 'Corrected name', 'discount_value' => '150']));
-        self::assertSame('/admin/promotions/' . $id, $failed['location']);
+        $failed = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'update', ['code' => $code], ['csrf' => $_SESSION['csrf']] + $this->input(['code' => $code, 'name' => 'Corrected name', 'discount_value' => '150']));
+        self::assertSame('/admin/promotions/' . $code, $failed['location']);
         self::assertSame('Enter a percentage greater than 0 and no more than 100, such as 10 or 12.5.', end($_SESSION['flash'])['message']);
-        $again = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'show', ['id' => (string) $id]);
+        $again = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'show', ['code' => $code]);
         self::assertStringContainsString('value="Corrected name"', $again['body'], 'The entered values are shown again to correct.');
         self::assertStringContainsString('value="150"', $again['body']);
         self::assertSame('Test promotion', $this->promotions->find($id)?->name, 'Nothing was saved.');
 
-        $created = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'store', [], ['csrf' => $_SESSION['csrf']] + $this->input(['code' => $this->code('NEW')]));
-        self::assertMatchesRegularExpression('#^/admin/promotions/\d+$#', (string) $created['location']);
+        $newCode = $this->code('NEW');
+        $created = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'store', [], ['csrf' => $_SESSION['csrf']] + $this->input(['code' => $newCode]));
+        self::assertSame('/admin/promotions/' . $newCode, (string) $created['location'], 'A new promotion opens at its code.');
+        // Renaming the code moves the promotion's address with it; the old code, the row id and a near miss name nothing.
+        $renamed = $this->code('MOVED');
+        $saved = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'update', ['code' => $code], ['csrf' => $_SESSION['csrf']] + $this->input(['code' => $renamed]));
+        self::assertSame('/admin/promotions/' . $renamed, $saved['location']);
+        foreach ([$code, (string) $id, strtolower($renamed), $renamed . 'X'] as $gone) {
+            try {
+                InProcessPage::run($this->admin, PromotionAdministrationController::class, 'show', ['code' => $gone]);
+                self::fail($gone . ' names no promotion.');
+            } catch (NotFoundHttpException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        try {
+            $this->administration->create($this->admin, $this->input(['code' => '2026' . random_int(100, 999)]));
+            self::fail('A code of digits alone would look like a row id.');
+        } catch (RuntimeException $refused) {
+            self::assertStringContainsString('holding at least one letter', $refused->getMessage());
+        }
         $new = InProcessPage::run($this->admin, PromotionAdministrationController::class, 'create');
         self::assertStringContainsString('Create promotion', $new['body']);
         self::assertStringContainsString('name="add_course_id"', $new['body'], 'Selected courses are chosen with the course lookup.');
@@ -232,7 +252,8 @@ final class PromotionAdministrationIntegrationTest extends TestCase
         $id = $this->administration->create($this->admin, $this->input());
         $learner = new CurrentUser($this->admin->id, Uuid::v4(), 'learner@example.test', 'Learner', ['STUDENT'], ['COMMERCE.CHECKOUT.START', 'PLATFORM.ORDER.VIEW'], Uuid::v4());
         $viewer = new CurrentUser($this->admin->id, Uuid::v4(), 'viewer@example.test', 'Viewer', ['STUDENT'], ['PLATFORM.PROMOTION.VIEW'], Uuid::v4());
-        foreach (['index' => [], 'show' => ['id' => (string) $id], 'create' => []] as $method => $attributes) {
+        $code = (string) $this->promotions->find($id)?->code;
+        foreach (['index' => [], 'show' => ['code' => $code], 'create' => []] as $method => $attributes) {
             try {
                 InProcessPage::run($learner, PromotionAdministrationController::class, $method, $attributes);
                 self::fail($method . ' must be refused without the promotion permissions.');
@@ -240,9 +261,9 @@ final class PromotionAdministrationIntegrationTest extends TestCase
                 $this->addToAssertionCount(1);
             }
         }
-        $readOnly = InProcessPage::run($viewer, PromotionAdministrationController::class, 'show', ['id' => (string) $id]);
+        $readOnly = InProcessPage::run($viewer, PromotionAdministrationController::class, 'show', ['code' => $code]);
         self::assertSame(200, $readOnly['status']);
-        self::assertStringNotContainsString('<form action="/admin/promotions/' . $id . '"', $readOnly['body'], 'Viewing is not editing.');
+        self::assertStringNotContainsString('<form action="/admin/promotions/' . $code . '"', $readOnly['body'], 'Viewing is not editing.');
         foreach (['create' => fn() => $this->administration->create($viewer, $this->input()), 'deactivate' => fn() => $this->administration->setActive($viewer, $id, false), 'delete' => fn() => $this->administration->delete($viewer, $id)] as $what => $attempt) {
             try {
                 $attempt();

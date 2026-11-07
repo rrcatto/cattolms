@@ -11,6 +11,8 @@ Description:
 Handles web requests for base operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/07 SAST
+- personIdFromAddress() and companyIdFromAddress(): a person or company named by its account reference, once.
 2026/10/24 SAST
 - requireCsrf() refuses a missing or expired token with a 400, not a 500.
 2026/10/23 SAST
@@ -92,6 +94,30 @@ abstract class BaseController
     protected function param(string $name, string $default = ''): string
     {
         return (string) ($this->request()->attributes->get($name) ?? $default);
+    }
+
+    /**
+     * The row id of the course the address names by its code (owner, 2026-11-06: no row id in any address; a course is
+     * its code, Course\CourseAddress). Turned into the id once, here; a code that names no course is not found.
+     */
+    protected function courseIdFromAddress(\CattoLearning\Course\CourseService $courses, string $name = 'code'): int
+    {
+        return $courses->courseIdForCode($this->param($name)) ?? throw $this->notFound('We could not find that course.');
+    }
+
+    /**
+     * The row id of the person the address names by their account reference, as the site stores it (owner, 2026-11-06:
+     * "a recogniseable code is better"; Support\Address\PersonAddress). A reference that names nobody is not found.
+     */
+    protected function personIdFromAddress(\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys, string $name = 'reference'): int
+    {
+        return $keys->person($this->param($name)) ?? throw $this->notFound('We could not find that person.');
+    }
+
+    /** The row id of the company the address names by its account reference (Support\Address\CompanyAddress), or not found. */
+    protected function companyIdFromAddress(\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys, string $name = 'reference'): int
+    {
+        return $keys->company($this->param($name)) ?? throw $this->notFound('We could not find that company.');
     }
 
     /** One posted field. */

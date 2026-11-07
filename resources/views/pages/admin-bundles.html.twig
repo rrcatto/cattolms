@@ -3,25 +3,31 @@
 {% set ph_kicker = 'Administration' %}{% set ph_title = 'Bundles' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New bundle', variant: 'primary', href: '/admin/bundles/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Several published courses sold together for one bundle price. A bundle is not a course: each of its courses is granted to the buyer as an ordinary course purchase, and an order keeps the bundle exactly as it was sold.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-{{ ui('layout.section-head', {heading: 'All bundles', eyebrow: 'Bundles', summary: 'Every bundle with its status, courses, price and sales.'}) }}
+{{ ui('layout.section-head', {heading: 'All bundles', eyebrow: 'Bundles', summary: 'Every bundle with its code, status, price, sale dates, access, courses and sales. The pencil edits a bundle here, as the course list does.'}) }}
 <nav class="cl-filter-chips" aria-label="Filter by status">
 {% for chip in status_filters %}<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>{% endfor %}
 </nav>
-{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'bundles', pagination: bundles_pagination, search: {ds_name: 'bundles', ds_label: 'Search titles and web addresses', ds_value: bundles_search, ds_action: '/admin/bundles'}})} %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'bundles', pagination: bundles_pagination, search: {ds_name: 'bundles', ds_label: 'Search codes, titles and web addresses', ds_value: bundles_search, ds_action: '/admin/bundles'}})} %}
+{% block toolbar %}{% if bundles_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: bundles_view_switch} %}{% if bundles_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'bundles', gs_headers: bundles_sort_headers, gs_pager: bundles_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
-{% if bundles %}
-{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bundles', density: 'compact'})} %}
-{% block header %}<tr><th scope="col">Bundle</th><th scope="col">Status</th><th scope="col">Courses</th><th scope="col">Price</th><th scope="col">Access</th><th scope="col">Sales</th></tr>{% endblock %}
+{% if bundles and bundles_view == 'grid' %}
+{# The bundles as cards, 4 to a row (Support\ListView): the cover, code, price, status, sale dates and access; Manage and the pencil. #}
+{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Bundles'})} %}
 {% block body %}
-{% for row in bundles %}
-<tr>
-	<td><a href="/admin/bundles/{{ row.id }}"><strong>{{ row.title }}</strong></a><br><small>/bundles/{{ row.slug }}</small></td>
-	<td>{% include '@platform/partials/bundle-status.html.twig' with {status: row.status, on_sale: row.offer_active} %}</td>
-	<td>{{ row.course_count }}</td>
-	<td>{{ row.price_label ?? 'No price yet' }}</td>
-	<td>{{ row.access_label ?? '—' }}</td>
-	<td>{{ row.sales }}</td>
-</tr>
+	{% for bundle in bundles %}
+		{% if bundle.id == bundles_editing %}{% include '@platform/partials/admin/bundle-card-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/bundle-card.html.twig' %}{% endif %}
+	{% endfor %}
+{% endblock %}
+{% endembed %}
+{% elseif bundles %}
+{# The owner's columns where they fit (2026-11-06): code, title, status, price, on sale from and until, access; then its courses and sales. #}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bundles', density: 'compact'})} %}
+{% block header %}<tr>
+	{% for sh in bundles_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: bundles_region, sort_results: bundles_results} %}{% endfor %}
+</tr>{% endblock %}
+{% block body %}
+{% for bundle in bundles %}
+	{% if bundle.id == bundles_editing %}{% include '@platform/partials/admin/bundle-row-edit.html.twig' %}{% else %}{% include '@platform/partials/admin/bundle-row.html.twig' %}{% endif %}
 {% endfor %}
 {% endblock %}
 {% endembed %}

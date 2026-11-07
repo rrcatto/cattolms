@@ -43,7 +43,7 @@ if ($action === 'create') {
     $courses = [];
     foreach (['a' => 12345, 'b' => 5000] as $key => $price) {
         $made = $fixture->course($provider['founder']['id'], $company, 'published');
-        $courses[$key] = ['id' => $made['id'], 'slug' => $made['slug'], 'title' => $made['title'], 'variant' => $fixture->createPriceVariant($made['id'], $provider['founder']['id'], 2592000, $price, true)];
+        $courses[$key] = ['id' => $made['id'], 'code' => $made['code'], 'slug' => $made['slug'], 'title' => $made['title'], 'variant' => $fixture->createPriceVariant($made['id'], $provider['founder']['id'], 2592000, $price, true)];
     }
     $admin = $fixture->person('ADMIN');
     $promotions = new PromotionRepository($db);

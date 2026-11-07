@@ -11,6 +11,8 @@ Description:
 Provides mail infrastructure for Symfony Mailer, resolving the effective SMTP transport and sender identity from administrator-managed database settings with .env fallback at send time.
 
 Changelog:
+2026/11/06 SAST
+- sendMoneyReport(): last month's money report with its PDF and Excel file, each attached as its own kind of file.
 2026/10/26 SAST
 - A link's lifetime is worded by Support\Duration, the one way lengths of time are stated (owner, 2026-10-26):
   "30 minutes", "1 day".
@@ -348,6 +350,27 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendMoneyReport(string $email, array $report, array $files): void
+    {
+        $html = '';
+        $text = '';
+        foreach ($report['lines'] as $line) {
+            $html .= '<tr><td>' . $this->escape($line['label']) . ($line['note'] !== '' ? '<br><small>' . $this->escape($line['note']) . '</small>' : '') . '</td><td style="text-align:right;white-space:nowrap"><strong>' . $this->escape($line['value']) . '</strong></td></tr>';
+            $text .= '- ' . $line['label'] . ': ' . $line['value'] . ($line['note'] !== '' ? ' (' . $line['note'] . ')' : '') . "\n";
+        }
+        $attached = 'The report is attached as a PDF and as an Excel file: ' . implode(' and ', array_keys($files)) . '.';
+        $this->send(
+            $email,
+            'Money report, ' . $report['month'],
+            '<p>Your money report for ' . $this->escape($report['month']) . '.</p>'
+            . ($report['no_sales'] !== '' ? '<p><strong>' . $this->escape($report['no_sales']) . '</strong></p>' : '')
+            . '<table cellpadding="4" style="border-collapse:collapse">' . $html . '</table>'
+            . '<p>' . $this->escape($attached) . '</p><p><a href="' . $this->escape($report['url']) . '">Open the report on the site</a></p>',
+            "Your money report for {$report['month']}.\n\n" . ($report['no_sales'] !== '' ? $report['no_sales'] . "\n\n" : '') . $text . "\n{$attached}\n\nOpen the report on the site: {$report['url']}",
+            attachments: $files
+        );
+    }
+
     public function sendTestMessage(string $email): void
     {
         $appName = $this->settings->platformName();
@@ -359,7 +382,7 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
-    /** @param array<string,string> $attachments file name => PDF, beside the one $attachment */
+    /** @param array<string,string> $attachments file name => its bytes (a PDF, or an Excel file by its .xlsx name), beside the one $attachment */
     private function send(
         string $to,
         string $subject,
@@ -400,7 +423,9 @@ class SymfonyMailerAdapter implements MailerInterface
             $message->replyTo($configuration['reply_to']);
         }
         if ($attachment !== null) $message->attach($attachment, $attachmentName, 'application/pdf');
-        foreach ($attachments as $name => $bytes) $message->attach($bytes, (string) $name, 'application/pdf');
+        foreach ($attachments as $name => $bytes) {
+            $message->attach($bytes, (string) $name, str_ends_with(strtolower((string) $name), '.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf');
+        }
         $mailer->send($message);
     }
 

@@ -24,7 +24,8 @@ final class BundleRulesTest extends TestCase
         foreach ([
             'This bundle is not available.' => [['status' => 'draft'], $courses],
             'This bundle is no longer sold.' => [['status' => 'retired'], $courses],
-            'This bundle is not on sale yet.' => [['available_from' => '2026-10-07T12:00:01+02:00'], $courses],
+            // When it can be bought, never "not on sale yet" (owner, 2026-11-06: "show me WHEN the bundle will be available to purchase").
+            'This bundle can be bought from Wednesday 7 October 2026 at 12:00.' => [['available_from' => '2026-10-07T12:00:01+02:00'], $courses],
             'This bundle is no longer on sale.' => [['available_until' => self::NOW], $courses],
             'This bundle is not available for purchase at the moment.' => [['offer_active' => false], $courses],
             'This bundle is not available for purchase at the moment. ' => [[], [['status' => 'published']]],
@@ -33,6 +34,37 @@ final class BundleRulesTest extends TestCase
             self::assertSame(trim($message), $this->reason($overrides, $members), $message);
         }
         self::assertNull($this->reason(['available_from' => self::NOW, 'available_until' => '2026-10-07T12:00:01+02:00'], $courses), 'The sales window starts inclusive and ends exclusive.');
+    }
+
+    public function testABundleWhoseSaleStartsLaterIsShownWithWhen(): void
+    {
+        $courses = [['status' => 'published'], ['status' => 'published']];
+        $later = static fn(array $overrides, array $members = []): ?DateTimeImmutable => BundleRules::startsLater($overrides + ['status' => 'published', 'available_from' => '2026-12-01T00:00:00+02:00', 'available_until' => null, 'offer_active' => true, 'price_minor_units' => 120000], $members ?: $courses, new DateTimeImmutable(self::NOW));
+        self::assertSame('2026-12-01T00:00:00+02:00', $later([])?->format(DATE_ATOM), 'Published, priced, on sale, its courses published: only its start keeps it from being bought.');
+        self::assertNull($later(['available_from' => self::NOW]), 'A sale that has started is not later.');
+        self::assertNull($later(['available_from' => null]), 'No start: nothing to wait for.');
+        foreach ([['status' => 'draft'], ['status' => 'retired'], ['offer_active' => false], ['price_minor_units' => 0], ['available_until' => '2026-11-30T00:00:00+02:00']] as $other) {
+            self::assertNull($later($other), 'Something else stops it, so it is not shown: ' . json_encode($other));
+        }
+        self::assertNull($later([], [['status' => 'published'], ['status' => 'draft']]), 'A course that is not published keeps it off sale.');
+
+        $zone = date_default_timezone_get();
+        date_default_timezone_set('Africa/Johannesburg');
+        try {
+            self::assertSame('Tuesday 1 December 2026', BundleRules::saleDate('2026-12-01T00:00:00+02:00'), 'Midnight: the day alone.');
+            self::assertSame('Monday 16 November 2026 at 08:00', BundleRules::saleDate('2026-11-16T06:00:00+00:00'), 'Another time: with the time, in the site\'s time zone.');
+            self::assertSame('16 Nov 2026', BundleRules::saleDate('2026-11-16T08:00:00+02:00', true), 'The short form for a card or a note.');
+        } finally {
+            date_default_timezone_set($zone);
+        }
+    }
+
+    public function testABundleCodeIsSuggestedFromItsTitleAndNeverTaken(): void
+    {
+        self::assertSame('BDL-POS', BundleRules::suggestCode('Professional Office Skills', static fn(string $code): bool => false));
+        self::assertSame('BDL-POS-2', BundleRules::suggestCode('Professional Office Skills', static fn(string $code): bool => $code === 'BDL-POS'), 'Taken: the next free one.');
+        self::assertSame('BDL-GDP', BundleRules::suggestCode('Garden Design: All the Parts', static fn(string $code): bool => false), 'Small words are left out.');
+        self::assertSame('BDL-BUNDLE', BundleRules::suggestCode('—', static fn(string $code): bool => false));
     }
 
     public function testASlugIsMadeFromTheTitle(): void

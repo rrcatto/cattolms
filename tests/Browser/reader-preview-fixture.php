@@ -63,10 +63,12 @@ if ($action === 'create') {
     $fixture->createQuestion($final['item'], 1);
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Reader preview browser', $admin['email']);
-    $state = ['token' => $token, 'course_id' => $id, 'slug' => $course['slug'],
-        'readiness_node' => $readiness['node'], 'readiness_key' => $key . '-readiness', 'module' => $module, 'lesson_node' => $lesson['node'], 'summary_node' => $summary['node'],
-        'assessment_node' => $assessment['node'], 'assessment_key' => $key . '-assessment', 'second_module' => $second, 'second_lesson_node' => $secondLesson['node'],
-        'final_node' => $final['node'], 'final_key' => $key . '-final', 'scrub' => $fixture->seeds()];
+    // Each part by its name, as its addresses name it (owner, 2026-11-06: no row id in an address).
+    $part = static fn(int $node): string => (string) $db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $node]);
+    $state = ['token' => $token, 'course_id' => $id, 'course_code' => (string) $db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $id]), 'slug' => $course['slug'],
+        'readiness_node' => $part($readiness['node']), 'readiness_key' => $key . '-readiness', 'module' => $part($module), 'lesson_node' => $part($lesson['node']), 'summary_node' => $part($summary['node']),
+        'assessment_node' => $part($assessment['node']), 'assessment_key' => $key . '-assessment', 'second_module' => $part($second), 'second_lesson_node' => $part($secondLesson['node']),
+        'final_node' => $part($final['node']), 'final_key' => $key . '-final', 'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo json_encode(['course' => $id, 'slug' => $course['slug']]), PHP_EOL;

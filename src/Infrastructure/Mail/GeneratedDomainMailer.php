@@ -211,6 +211,12 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendOrderCancelled($this->router->deliveryAddress($email), $order);
     }
 
+    public function sendMoneyReport(string $email, array $report, array $files): void
+    {
+        if ($this->holds('money_report', $email, '')) return;
+        $this->mailer->sendMoneyReport($this->router->deliveryAddress($email), $report, $files);
+    }
+
     public function sendInvoice(string $email, string $number, string $pdf): void
     {
         if ($this->holds('invoice', $email, '')) return;

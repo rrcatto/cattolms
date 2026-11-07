@@ -25,7 +25,7 @@ const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-parts-state.json'));
 const results = [];
 const check = (name, ok, detail = '') => { results.push({name, ok: !!ok, detail}); if (!ok) console.log('FAIL', name, detail); };
-const learn = (node, suffix = 'content') => `${base}/learn/${state.slug}/item/${node}/${suffix}?preview=1`;
+const learn = (part, suffix = '') => `${base}/learn/${state.slug}/${part}${suffix ? '/' + suffix : ''}?preview=1`;
 
 async function session(browser, options = {}) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, ...options});
@@ -34,7 +34,7 @@ async function session(browser, options = {}) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_id}/preview`, {waitUntil: 'networkidle'});
+    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();
@@ -77,7 +77,7 @@ async function reader(browserType, name, width) {
     await page.locator('.cw-btn', {hasText: 'Contents'}).first().click();
     await page.locator('.cw-contents button').nth(3).click();
     check(`${at}: Contents jumps to a slide`, (await page.locator('.cw-counter').first().innerText()) === '4 / 4');
-    check(`${at}: Continue leads to the next part`, (await page.locator('.cw-current a.cw-action').getAttribute('href')).includes('/content'));
+    check(`${at}: Continue leads to the next part`, new RegExp(`^/learn/${state.slug}/[a-z0-9-]+(\\?|$)`).test(await page.locator('.cw-current a.cw-action').getAttribute('href')));
     check(`${at}: nothing scrolls sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     check(`${at}: the reader offers no PDF of a presentation`, await page.locator('.cl-course-item-pdf').count() === 0);
     const player = await page.evaluate(() => {
@@ -132,7 +132,7 @@ async function reader(browserType, name, width) {
     const scrolls = await list.evaluate((nav) => nav.scrollHeight > nav.clientHeight + 20);
     await list.evaluate((nav) => { nav.scrollTop = nav.scrollHeight; });
     const kept = await list.evaluate((nav) => nav.scrollTop);
-    await Promise.all([page.waitForNavigation(), list.locator('.cl-course-outline-group[open] a[href*="/content"]').last().click()]);
+    await Promise.all([page.waitForNavigation(), list.locator(`.cl-course-outline-group[open] a[href*="/learn/${state.slug}/"]`).last().click()]);
     await page.waitForLoadState('networkidle');
     const back = await list.evaluate((nav) => nav.scrollTop);
     check(`${at}: the Course Modules list keeps its place from page to page`, scrolls && kept > 0 && Math.abs(back - kept) <= 2, `${kept} then ${back}${scrolls ? '' : ' (the list did not scroll)'}`);
@@ -159,7 +159,7 @@ async function courseFile(browserType, name) {
     // (CourseFileIntegrationTest).
     const browser = await browserType.launch();
     const context = await session(browser);
-    const response = await context.request.get(`${base}/admin/courses/${state.course_id}/course-file`);
+    const response = await context.request.get(`${base}/admin/courses/${state.course_code}/course-file`);
     const html = await response.text();
     check(`${name} course file: downloaded`, response.status() === 200 && /attachment; filename=".+\.html"/.test(response.headers()['content-disposition'] || ''), response.status());
     check(`${name} course file: in the specification's form`, /<meta name="cattolms:course-code" content="[A-Z0-9-]+">/.test(html) && html.includes('<section class="module" id="mod-m1"'));
@@ -201,7 +201,7 @@ async function narration() {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`${base}/admin/course-items/${state.presentation_item}`, {waitUntil: 'networkidle'});
+  await page.goto(`${base}${state.presentation_url}`, {waitUntil: 'networkidle'});
   await page.locator('#presentation-slide-list .cl-tree-node').first().getByRole('link', {name: /^Edit/}).click();
   await page.waitForLoadState('networkidle');
   await page.locator('#narration-record').click();

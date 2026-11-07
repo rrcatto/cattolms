@@ -2,10 +2,10 @@
 	One course's card in Administration > Courses' grid (shown in the grid, and drawn again after it is edited in place,
 	owner 2026-11-01). Variables as course-row.html.twig.
 #}
-							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: '/admin/courses/' ~ course.id, picture: 'wide'})} %}
+							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: course_admin_url(course), picture: 'wide'})} %}
 {% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
 {% block details %}
-								<span id="course-{{ course.id }}" class="cl-course-anchor"{% if course_saved|default(false) %} data-course-saved{% endif %}></span>
+								<span id="{{ course_anchor(course) }}" class="cl-course-anchor"{% if course_saved|default(false) %} data-course-saved{% endif %}></span>
 								<p class="cl-ui-card-line"><code class="cl-course-code">{{ course.code }}</code></p>
 								{% if course.price %}<p class="cl-ui-card-line"><strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %} <span class="cl-ui-card-quiet">· {{ course.price.period_label }}</span></p>{% endif %}
 								<div class="role-list">
@@ -15,19 +15,19 @@
 								<p class="cl-ui-card-line cl-ui-card-quiet">{{ course.learner_count }} {{ course.learner_count == 1 ? 'learner' : 'learners' }} · Updated {{ course.updated_at }}</p>
 {% endblock %}
 {% block actions %}
-								{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id, icon: 'action-manage'}) }}
-								{% if courses_quick_edit|default(false) %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ course.title ~ ' here', title: 'Edit the code, title, price and category here', icon: 'action-edit', icon_only: true, variant: 'secondary', size: 'small', href: courses_list_href ~ 'edit=' ~ course.id ~ '#course-' ~ course.id, get: '/admin/courses/' ~ course.id ~ '/row?mode=edit&view=grid', target: 'closest li', swap: 'outerHTML'}) }}{% endif %}
+								{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: course_admin_url(course), icon: 'action-manage'}) }}
+								{% if courses_quick_edit|default(false) %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ course.title ~ ' here', title: 'Edit the code, title, price and category here', icon: 'action-edit', icon_only: true, variant: 'secondary', size: 'small', href: courses_list_href ~ 'edit=' ~ course.code|url_encode ~ '#' ~ course_anchor(course), get: course_admin_url(course, '/row?mode=edit&view=grid'), target: 'closest li', swap: 'outerHTML'}) }}{% endif %}
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'More for ' ~ course.title})} %}
 {% block body %}
-									{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview', icon: 'action-preview'}) }}
-									{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
+									{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: course_admin_url(course, '/preview'), icon: 'action-preview'}) }}
+									{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: course_admin_url(course, '/export'), icon: 'action-export'}) }}
 									{% if can_delete_courses %}
-										<form action="/admin/courses/{{ course.id }}/reset" method="post">
+										<form action="{{ course_admin_url(course, '/reset') }}" method="post">
 											<input type="hidden" name="csrf" value="{{ csrf }}">
 											{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'submit', confirm: 'Reset ' ~ (course.title) ~ '? This removes all course content and learner test data but keeps the empty course shell for re-import.', icon: 'action-reset'}) }}
 										</form>
 										{% if not course.bought_lines %}
-										<form action="/admin/courses/{{ course.id }}/delete" method="post">
+										<form action="{{ course_admin_url(course, '/delete') }}" method="post">
 											<input type="hidden" name="csrf" value="{{ csrf }}">
 											{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Permanently delete ' ~ (course.title) ~ ' and all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}
 										</form>

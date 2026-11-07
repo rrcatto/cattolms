@@ -11,6 +11,8 @@ Description:
 Implements Catto Learning business and application logic for course operations.
 
 Changelog:
+2026/11/06 SAST
+- A course's share picture (Search\SharePictures) is drawn when it is created and whenever its cover is saved or imported.
 2026/10/23 SAST
 - Course codes (owner, 2026-10-23): every course saved has a code, the one typed (tidied, checked, its own) or one
   suggested from the title (courseCode(), suggestCourseCode()).
@@ -92,6 +94,9 @@ use RuntimeException;
 /** Coordinates course application operations and builds presentation data without rendering HTML. */
 final class CourseService
 {
+    /** Words in the categories' addresses that no category's address may be (owner, 2026-11-06). */
+    public const RESERVED_CATEGORY_SLUGS = ['new', 'inline', 'field'];
+
     /** The icon of a category that has none of its own, on the catalogue's category cards. */
     public const CATEGORY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>';
 
@@ -118,8 +123,19 @@ final class CourseService
         private readonly CertificateDesignRepository $certificateDesigns,
         private readonly CategoryHierarchyService $categoryHierarchy,
         private readonly \CattoLearning\View\Artwork\IconLibrary $icons = new \CattoLearning\View\Artwork\IconLibrary(),
-        private readonly ?CataloguePositions $positions = null
+        private readonly ?CataloguePositions $positions = null,
+        private readonly ?\CattoLearning\Search\SharePictures $sharePictures = null
     ) {
+    }
+
+    /**
+     * Draws the PNG of the course's cover that its page is shared with (owner, 2026-11-06: made when a cover is saved, never
+     * on a request). It never stops a save: a server without rsvg-convert draws nothing until Settings makes the missing ones.
+     */
+    private function drawSharePicture(int $courseId): void
+    {
+        $cover = (string) ($this->courses->findById($courseId)['cover_svg'] ?? '');
+        if ($cover !== '') $this->sharePictures?->make($cover);
     }
 
     /**
@@ -270,7 +286,7 @@ final class CourseService
             throw new InvalidArgumentException('A tag needs a name.');
         }
 
-        $slug = Slug::from($name);
+        $slug = self::tagSlug($name);
         if ($this->courses->tagBySlug($slug) !== null) {
             throw new InvalidArgumentException('The tag “' . $name . '” already exists.');
         }
@@ -284,6 +300,19 @@ final class CourseService
         $this->audit->record($actorUserId, 'course.tag.created', ['tag_id' => $id, 'name' => $name]);
 
         return $this->tag($id);
+    }
+
+    /**
+     * A tag's slug, from its name: Administration names a tag by it (/admin/courses/tags/raised-beds, 2026-11-07), so
+     * it holds a letter.
+     */
+    private static function tagSlug(string $name): string
+    {
+        $slug = Slug::from($name);
+        if (preg_match('/[a-z]/', $slug) !== 1) {
+            throw new InvalidArgumentException('A tag\'s name needs at least one letter, because the name is also its address.');
+        }
+        return $slug;
     }
 
     /** A tag's icon replaced: chosen from the icon library or uploaded (owner, 2026-10-20). */
@@ -312,7 +341,7 @@ final class CourseService
             throw new InvalidArgumentException('A tag needs a name.');
         }
 
-        $slug = Slug::from($name);
+        $slug = self::tagSlug($name);
         $clash = $this->courses->tagBySlug($slug);
         if ($clash !== null && (int) $clash['id'] !== $id) {
             throw new InvalidArgumentException('Another tag already uses the name “' . $name . '”.');
@@ -356,7 +385,7 @@ final class CourseService
      * (owner, 2026-10-20): each with its icon (a plain one when it has none), name and description.
      *
      * @param array<string,mixed>|null $category
-     * @return array{trail:list<array{label:string,href:string,current:bool}>,label:string,subcategories:list<array{id:int,label:string,href:string,count:int,icon:string,description:string}>}
+     * @return array{trail:list<array{label:string,href:string,current:bool}>,label:string,subcategories:list<array{id:int,slug:string,label:string,href:string,count:int,icon:string,description:string}>}
      */
     public function categoryNavigation(?array $category): array
     {
@@ -370,6 +399,8 @@ final class CourseService
         }
         $subcategories = array_map(static fn(array $row): array => [
             'id' => (int) $row['id'],
+            // A card chooses by the category's address, never its number (owner, 2026-11-06: public addresses carry names).
+            'slug' => (string) $row['slug'],
             'label' => (string) $row['name'],
             'href' => '/courses/category/' . rawurlencode((string) $row['slug']),
             'count' => (int) $row['descendant_course_count'],
@@ -389,8 +420,10 @@ final class CourseService
     public function catalogueCategoryPicker(?array $selected): array
     {
         return [
-            'items' => [['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], ...$this->nestedCategoryItems(3)],
-            'selected' => $selected === null ? '' : (string) $selected['id'],
+            // Each category by its address (owner, 2026-11-06: a public page's address carries the category's name, for
+            // search engines, never its number), so choosing one opens /courses/category/{slug}.
+            'items' => [['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], ...$this->nestedCategoryItems(3, null, true)],
+            'selected' => $selected === null ? '' : (string) $selected['slug'],
         ];
     }
 
@@ -440,7 +473,7 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    private function nestedCategoryItems(int $maxDepth, ?int $excludedId = null): array
+    private function nestedCategoryItems(int $maxDepth, ?int $excludedId = null, bool $bySlug = false): array
     {
         $nodes = [];
         $roots = [];
@@ -452,7 +485,7 @@ final class CourseService
                 continue;
             }
             $path = ($parent !== null ? $nodes[$parent]['path'] . ' › ' : '') . (string) $category['name'];
-            $nodes[$id] = ['value' => (string) $id, 'label' => (string) $category['name'], 'depth' => $depth, 'path' => $path, 'icon' => (string) ($category['icon_svg'] ?? ''), 'children' => [], 'parent' => $parent];
+            $nodes[$id] = ['value' => $bySlug ? (string) $category['slug'] : (string) $id, 'label' => (string) $category['name'], 'depth' => $depth, 'path' => $path, 'icon' => (string) ($category['icon_svg'] ?? ''), 'children' => [], 'parent' => $parent];
             if ($parent === null) {
                 $roots[] = $id;
             } else {
@@ -1075,6 +1108,7 @@ final class CourseService
         });
 
         $this->audit->record($userId, 'course.created', ['course_id' => $courseId]);
+        $this->drawSharePicture($courseId);
 
         return $courseId;
     }
@@ -1106,6 +1140,7 @@ final class CourseService
             if ($firstModule !== null) $this->courses->setFirstModuleNumber($courseId, $firstModule);
             if ($relatedIds !== null) $this->courses->replaceRelatedCourses($courseId, $relatedIds);
         });
+        if ($coverSvg !== null) $this->drawSharePicture($courseId);
         $extra = ($tagIds === null ? [] : ['tag_ids' => $tagIds]) + ($coverSvg === null ? [] : ['cover_replaced' => true]) + ($positioned ? ['catalogue_position' => $position] : []) + ($firstModule === null ? [] : ['first_module_number' => $firstModule])
             + ($relatedIds === null ? [] : ['related_course_ids' => $relatedIds]);
         $this->courses->recordHistory($courseId, $userId, 'course.updated', 'course', $courseId, 'Course details updated.', $data + $extra);
@@ -1299,6 +1334,7 @@ final class CourseService
     {
         $this->courses->setCourseCover($courseId, $coverSvg);
         $this->audit->record($userId, 'course.updated', ['course_id' => $courseId, 'cover_replaced' => true]);
+        $this->drawSharePicture($courseId);
     }
 
     /**
@@ -1834,6 +1870,15 @@ final class CourseService
         }
         $slugInput = trim((string) ($input['slug'] ?? $input['category_slug'] ?? ''));
         $slug = $slugInput !== '' ? Slug::validate($slugInput) : Slug::from($name);
+        // A category's page is /courses/category/{slug} and its Administration pages /admin/courses/categories/{...}, where
+        // new, inline and field are fixed words (owner, 2026-11-06): no category may be called by one of them.
+        if (in_array($slug, self::RESERVED_CATEGORY_SLUGS, true)) {
+            throw new InvalidArgumentException('A category cannot have the address "' . $slug . '": it is a word the site uses in its addresses. Give it another address.');
+        }
+        // Administration names a category by its slug (/admin/courses/categories/garden-design, 2026-11-07), so it holds a letter.
+        if (preg_match('/[a-z]/', $slug) !== 1) {
+            throw new InvalidArgumentException('A category\'s address needs at least one letter, so "' . $slug . '" cannot be one. Give it another address.');
+        }
         $duplicate = $this->courses->categoryBySlug($slug);
         if ($duplicate !== null && (int) $duplicate['id'] !== (int) $existingCategoryId) {
             throw new InvalidArgumentException('Another course category already uses the slug "' . $slug . '".');
@@ -1858,18 +1903,36 @@ final class CourseService
      */
     public function courseCode(string $input, string $title, int $courseId = 0): string
     {
-        $code = trim($input) === '' ? CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null) : CourseCode::validate($input);
+        $code = trim($input) === '' ? CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->codeInUse($candidate)) : CourseCode::validate($input);
         $holder = $this->courses->findByCode($code);
         if ($holder !== null && (int) $holder['id'] !== $courseId) {
             throw new InvalidArgumentException('Another course already has the code ' . $code . ': ' . $holder['title'] . '. Each course has a code of its own.');
         }
+        // A code names one course or one bundle (owner, 2026-11-06).
+        $bundle = $this->courses->bundleWithCode($code);
+        if ($bundle !== null) throw new InvalidArgumentException('The code ' . $code . ' is a bundle\'s: ' . $bundle['title'] . '. A code names one course or one bundle, so give the course a code of its own.');
         return $code;
+    }
+
+    /**
+     * The row id of the course an address names by its code (owner, 2026-11-06: no row id in any address), or null.
+     * Controllers turn the code into the id once; everything after works on the id.
+     */
+    public function courseIdForCode(string $code): ?int
+    {
+        return $this->courses->idForCode($code);
+    }
+
+    /** A course's code from its row id, for an address made where only the id is at hand. */
+    public function courseCodeForId(int $courseId): ?string
+    {
+        return $this->courses->codeForId($courseId);
     }
 
     /** A free code to offer for a course with this title. */
     public function suggestCourseCode(string $title): string
     {
-        return CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null);
+        return CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->codeInUse($candidate));
     }
 
     /**

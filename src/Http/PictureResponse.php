@@ -16,6 +16,8 @@ can load nothing.
 Changelog:
 2026/10/26 SAST
 - Created with the drawn avatars.
+2026/11/06 SAST
+- A public picture (a course's or bundle's share picture, Search\SharePictures) may be cached by anyone.
 */
 
 declare(strict_types=1);
@@ -26,12 +28,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class PictureResponse
 {
-    public static function of(string $bytes, string $mimeType): Response
+    /** $public: a picture anyone may cache, such as a course's share picture, rather than one account's. */
+    public static function of(string $bytes, string $mimeType, bool $public = false): Response
     {
         $headers = [
             'Content-Type' => $mimeType,
             'Content-Length' => (string) strlen($bytes),
-            'Cache-Control' => 'private, max-age=604800, immutable',
+            'Cache-Control' => ($public ? 'public' : 'private') . ', max-age=604800, immutable',
             'X-Content-Type-Options' => 'nosniff',
         ];
         if ($mimeType === 'image/svg+xml') {

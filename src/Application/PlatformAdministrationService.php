@@ -11,6 +11,9 @@ Description:
 Implements Catto Learning business and application logic for platform administration operations.
 
 Changelog:
+2026/11/07 SAST
+- The Activity filter names the person and the company by their account references (?actor=, ?company=), and
+  people and companies are linked by them (owner, 2026-11-06: no row id in an address).
 2026/11/01 SAST
 - An enrolment's progress counts every part the learner has done, not only the assessments (owner, 2026-11-01, 2A).
 2026/10/26 SAST
@@ -115,6 +118,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Configuration\RuntimeSettings;
@@ -144,6 +148,12 @@ use RuntimeException;
 
 final class PlatformAdministrationService
 {
+    /** @var array<int,string> Course codes the Activity log's links have looked up, by row id. */
+    private array $activityCourseCodes = [];
+
+    /** @var array<string,array<int,string>> Bundle and promotion codes and certificate numbers the Activity log's links have looked up. */
+    private array $activityKeys = [];
+
     /** An administrator never locks themselves out (owner, 2026-10-25): another administrator can do either. */
     public const OWN_ACCOUNT_DISABLE = 'You cannot disable your own account. Another administrator can.';
     public const OWN_COMPANY_ADMIN_ROLE = 'You cannot remove your own Company Administrator role. Another Company Administrator can.';
@@ -468,7 +478,9 @@ final class PlatformAdministrationService
         private readonly ?\CattoLearning\Company\CompanyService $companyRule = null,
         private readonly ?\CattoLearning\Auth\IdNumbers $idNumbers = null,
         private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSetup $ownerMessages = null
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSetup $ownerMessages = null,
+        private readonly ?\CattoLearning\Search\SearchEnginesAdministration $searchEngines = null,
+        private readonly ?\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys = null
     ) {
     }
 
@@ -489,12 +501,29 @@ final class PlatformAdministrationService
             'from' => trim((string) ($request['from'] ?? '')),
             'to' => trim((string) ($request['to'] ?? '')),
             'family' => trim((string) ($request['family'] ?? '')),
-            'actor_id' => max(0, (int) ($request['actor_id'] ?? 0)),
-            'course_id' => max(0, (int) ($request['course_id'] ?? 0)),
-            'company_id' => max(0, (int) ($request['company_id'] ?? 0)),
+            // The person and the company by their account references (owner, 2026-11-06: no row id in an address), which
+            // the links keep; their row ids are for the query only.
+            'actor' => $actor = is_string($request['actor'] ?? null) ? trim($request['actor']) : '',
+            'actor_id' => $actor === '' ? 0 : $this->lookups->idForReference('people', $actor),
+            // The course by its code (owner, 2026-11-06: no row id in an address), which the links keep; its row id is
+            // for the query only.
+            'course' => \CattoLearning\Course\CourseCode::normalise(is_string($request['course'] ?? null) ? $request['course'] : ''),
+            'course_id' => $this->activityCourseId(is_string($request['course'] ?? null) ? $request['course'] : ''),
+            'company' => $company = is_string($request['company'] ?? null) ? trim($request['company']) : '',
+            'company_id' => $company === '' ? 0 : $this->lookups->idForReference('companies', $company),
             'q' => trim((string) ($request['q'] ?? '')),
             'after_id' => max(0, (int) ($request['after_id'] ?? 0)),
         ];
+    }
+
+    /**
+     * The row id of the course the Activity log is filtered by, from its code: 0 for none, and for a code that names no
+     * course an id no course has, so the filter matches nothing rather than everything.
+     */
+    public function activityCourseId(string $code): int
+    {
+        $code = \CattoLearning\Course\CourseCode::normalise($code);
+        return $code === '' ? 0 : ($this->courses->idForCode($code) ?? PHP_INT_MAX);
     }
 
     /**
@@ -577,6 +606,35 @@ final class PlatformAdministrationService
     private static function withSearch(array $filters, string $dataset, string $search): array
     {
         return $search === '' ? $filters : $filters + [self::searchParam($dataset) => $search];
+    }
+
+    /**
+     * The days People is narrowed to by when each account was made (people_from, people_to, both included, in the site's
+     * time zone), the instants they bound and what the address carries; nothing when neither is a real date.
+     *
+     * @param array<string,mixed> $request
+     * @return array{from_at:string,to_before:string,carried:array<string,string>,label:string}
+     */
+    private static function createdDays(array $request): array
+    {
+        $day = static fn(mixed $value): string => is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1
+            && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4)) ? $value : '';
+        $from = $day($request['people_from'] ?? '');
+        $to = $day($request['people_to'] ?? '');
+        $zone = new \DateTimeZone(date_default_timezone_get());
+        $words = static fn(string $date): string => (new \DateTimeImmutable($date, $zone))->format('j M Y');
+
+        return [
+            'from_at' => $from === '' ? '' : (new \DateTimeImmutable($from . ' 00:00:00', $zone))->format(DATE_ATOM),
+            'to_before' => $to === '' ? '' : (new \DateTimeImmutable($to . ' 00:00:00', $zone))->modify('+1 day')->format(DATE_ATOM),
+            'carried' => array_filter(['people_from' => $from, 'people_to' => $to], static fn(string $value): bool => $value !== ''),
+            'label' => match (true) {
+                $from !== '' && $to !== '' => 'Made from ' . $words($from) . ' to ' . $words($to),
+                $from !== '' => 'Made on or after ' . $words($from),
+                $to !== '' => 'Made on or before ' . $words($to),
+                default => '',
+            },
+        ];
     }
 
     /**
@@ -796,6 +854,8 @@ final class PlatformAdministrationService
         'company_favourites' => ['provider', 'category', 'standing', 'added'],
         'companies' => ['people', 'enrolments'],
         'company_creators' => ['courses'],
+        // Administration's bundles (owner, 2026-11-06): a phone keeps what can be edited in place.
+        'bundles' => ['courses', 'sales'],
         // The money records (owner, 2026-10-18): a phone keeps whose account and the sentence, which
         // already says who, what and how much.
         'ledger' => ['occurred', 'money_in', 'money_out', 'wallet'],
@@ -1313,8 +1373,9 @@ final class PlatformAdministrationService
                     'courses' => $this->adminCoursePage($actorUserId, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort),
                     'courses_search' => $search,
                     'courses_can_arrange' => $arrange,
+                    // By its code, which the drag sends as the course its first row goes after.
                     'courses_before_page' => $arrange && $pagination->offset > 0
-                        ? (int) ($this->adminCoursePage($actorUserId, $viewAll, 1, $pagination->offset - 1, '', $sort)[0]['id'] ?? 0) : 0,
+                        ? (string) ($this->adminCoursePage($actorUserId, $viewAll, 1, $pagination->offset - 1, '', $sort)[0]['code'] ?? '') : '',
                 ]
                     + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'), self::listSizes('courses', $activityFilters))
                     + self::viewData('courses', $activityFilters, '/admin/courses', $searchFilter + $sort->toPrefixedArray('courses'))
@@ -1342,14 +1403,18 @@ final class PlatformAdministrationService
                 $allRoles = $this->roles->all();
                 $search = self::searchTerm('people', $activityFilters);
                 $sort = $this->sortFor('people', $activityFilters, array_keys(AdministrationRepository::PEOPLE_SORTS), 'name');
-                $pagination = $this->paginationFor('people', $activityFilters, $this->administration->peopleCount($search));
+                // The accounts made between two days, both included (owner, 2026-11-06: Money Reports' New accounts opens
+                // the list it counts); the dates travel with the search, the sort and the pages.
+                $created = self::createdDays($activityFilters);
+                $pagination = $this->paginationFor('people', $activityFilters, $this->administration->peopleCount($search, $created['from_at'], $created['to_before']));
                 // The sort travels on every paging link and the search term travels on every sort
                 // link, so neither control undoes the other.
-                $filters = self::withSearch($scope, 'people', $search) + $sort->toPrefixedArray('people');
+                $filters = self::withSearch($scope, 'people', $search) + $sort->toPrefixedArray('people') + $created['carried'];
 
                 return [
-                    'people' => $this->normalisePeople($this->administration->people($pagination->pageSize, $pagination->offset, $search, $sort), $allRoles),
+                    'people' => $this->normalisePeople($this->administration->people($pagination->pageSize, $pagination->offset, $search, $sort, $created['from_at'], $created['to_before']), $allRoles),
                     'people_search' => $search,
+                    'people_created' => $created['carried'] === [] ? null : ['label' => $created['label'], 'carried' => $created['carried'], 'total' => $pagination->total],
                     'roles' => $this->normalAssignableRoles(),
                 ]
                     + $this->paginationView('people', $pagination, '/admin/people', 'People', $filters, self::listSizes('people', $activityFilters))
@@ -1368,7 +1433,7 @@ final class PlatformAdministrationService
                         'created' => 'Created|12',
                         'last_login' => 'Last login|15',
                         'actions' => 'Actions|6',
-                    ], array_keys(AdministrationRepository::PEOPLE_SORTS), self::withSearch($scope, 'people', $search), [
+                    ], array_keys(AdministrationRepository::PEOPLE_SORTS), self::withSearch($scope, 'people', $search) + $created['carried'], [
                         'risk' => SortOrder::DESCENDING,
                         'courses' => SortOrder::DESCENDING,
                         'created' => SortOrder::DESCENDING,
@@ -1483,7 +1548,8 @@ final class PlatformAdministrationService
                     'activity_selected_company' => $this->lookups->describe('companies', (int) ($filters['company_id'] ?? 0)),
                     'activity_selected_course' => $this->lookups->describe('courses', (int) ($filters['course_id'] ?? 0)),
                 ]
-                    + $this->paginationView('activity', $pagination, '/admin/activity', 'Activity', $filters + $scope + $sort->toPrefixedArray('activity'))
+                    // The links carry the course's code and the person's and company's references, never a row id.
+                    + $this->paginationView('activity', $pagination, '/admin/activity', 'Activity', array_diff_key($filters, ['course_id' => true, 'actor_id' => true, 'company_id' => true]) + $scope + $sort->toPrefixedArray('activity'))
                     + $this->sortView('activity', $sort, '/admin/activity', [
                         'created' => 'Time|13',
                         'actor' => 'Actor|12',
@@ -1569,6 +1635,8 @@ final class PlatformAdministrationService
                     'mail_settings' => $this->settings->mailAdminView(),
                     'site_notification' => $this->siteNotification?->settingsView(),
                     'owner_messages' => $this->ownerMessages?->view(),
+                    // Settings > Search engines and AI (owner, 2026-11-06).
+                    'search_engines' => $this->searchEngines?->view(),
                     'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode(), 'heading' => $this->site->heading(), 'notice' => $this->site->notice(), 'email_notice' => $this->site->emailNotice(), 'simulation' => $this->site->simulation(), 'own_words' => $this->site->ownWords(), 'limits' => array_map(static fn(array $word): int => $word['limit'], \CattoLearning\Configuration\SiteMode::WORDS)],
                     'site_owner' => $this->siteOwnerView(),
                 ];
@@ -1770,7 +1838,7 @@ final class PlatformAdministrationService
         if ($section === 'orders') {
             $pagination = $this->paginationFor('company_orders', $request, $companyId > 0 ? $this->administration->companyOrdersCount($companyId) : 0);
             $data['company_orders'] = $companyId > 0 ? array_map(static fn(array $order): array => $order + [
-                'number' => 'CL-' . str_pad((string) $order['id'], 8, '0', STR_PAD_LEFT),
+                'number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $order['id']),
                 'total_label' => \CattoLearning\Support\Money::ofMinorUnits((int) $order['total_minor'], (string) $order['currency'])->format(),
                 'due_label' => (int) $order['due_minor'] > 0 ? \CattoLearning\Support\Money::ofMinorUnits((int) $order['due_minor'], (string) $order['currency'])->format() : '',
                 'state_label' => ['placed' => 'Placed', 'awaiting_payment' => 'Waiting for payment', 'manual_review' => 'Being checked', 'paid' => 'Paid', 'fulfilled' => 'Paid, credits ready', 'cancelled' => 'Cancelled', 'partially_refunded' => 'Part refunded', 'refunded' => 'Refunded'][(string) $order['state']] ?? ucfirst((string) $order['state']),
@@ -2587,7 +2655,8 @@ final class PlatformAdministrationService
             throw new InvalidArgumentException('Choose the company that holds the credit.');
         }
         $userId = null;
-        $courseId = max(1, (int) ($input['course_id'] ?? 0));
+        // The course by its code, as the Give credits form chooses it (owner, 2026-11-06: no row id in an address).
+        $courseId = max(1, $this->courses->idForCode(\CattoLearning\Course\CourseCode::normalise((string) ($input['course'] ?? ''))) ?? 0);
         $period = max(86400, (int) ($input['access_period_seconds'] ?? 31536000));
         // One of the lengths the course is sold for (owner, 2026-10-26), so assigning and requests always find it.
         $lengths = $this->administration->courseSaleLengths($courseId);
@@ -2802,10 +2871,11 @@ final class PlatformAdministrationService
         return $done['connected'];
     }
 
-    public function saveOwnerMessageChoices(bool $onRegister, bool $onSale, int $actorUserId): void
+    /** The ticks of Messages to you; $signIn, when given, is Login via Telegram (owner, 2026-11-05), and $onOrder New Order (owner, 2026-11-06). */
+    public function saveOwnerMessageChoices(bool $onRegister, bool $onSale, int $actorUserId, ?bool $signIn = null, ?bool $onOrder = null): void
     {
-        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->saveChoices($onRegister, $onSale, $actorUserId);
-        $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['on_register' => $onRegister, 'on_sale' => $onSale]);
+        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->saveChoices($onRegister, $onSale, $actorUserId, $signIn, $onOrder);
+        $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['on_register' => $onRegister, 'on_sale' => $onSale] + ($onOrder === null ? [] : ['on_order' => $onOrder]) + ($signIn === null ? [] : ['telegram_sign_in' => $signIn]));
     }
 
     public function sendOwnerTestMessage(): void
@@ -3245,10 +3315,10 @@ final class PlatformAdministrationService
             // Who did it and, when the entry is about a person, who it is about: each a person with an account for
             // data.person (owner, 2026-10-21: every person named is linked to their account, with their account reference).
             $row['actor_person'] = ($row['actor_user_id'] ?? null) !== null
-                ? ['name' => (string) $row['actor_name'], 'reference' => (string) ($row['actor_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['actor_user_id']]
+                ? ['name' => (string) $row['actor_name'], 'reference' => (string) ($row['actor_reference'] ?? ''), 'href' => PersonAddress::admin((string) $row['actor_reference'])]
                 : ['name' => (string) ($row['actor_name'] ?? 'System'), 'reference' => '', 'href' => ''];
             $row['subject_person'] = (string) ($row['course_title'] ?? '') === '' && ($row['subject_user_id'] ?? null) !== null
-                ? ['name' => (string) $row['subject_user_name'], 'reference' => (string) ($row['subject_user_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['subject_user_id']]
+                ? ['name' => (string) $row['subject_user_name'], 'reference' => (string) ($row['subject_user_reference'] ?? ''), 'href' => PersonAddress::admin((string) $row['subject_user_reference'])]
                 : null;
             $row['result'] = $this->activityResult($metadata);
             $row['source_label'] = str_starts_with($key, 'mcp.') ? 'MCP' : (str_starts_with($key, 'api.') ? 'API' : 'Web');
@@ -3284,6 +3354,7 @@ final class PlatformAdministrationService
             'identity.verification_expired' => 'Identity check expired',
             'identity.verification_revoked' => 'Identity verification revoked',
             'identity.retry_allowed' => 'Another identity check allowed',
+            'identity.sandbox_ignored' => 'Identity result from Didit\'s sandbox ignored on a live site',
             'user.date_of_birth_given' => 'Date of birth given',
             'settings.payment_methods_changed' => 'Payment methods changed',
             'assessment.started' => 'Assessment started',
@@ -3348,26 +3419,37 @@ final class PlatformAdministrationService
     private function activityRelatedLinks(array $metadata): array
     {
         $links = [];
-        if ((int) ($metadata['course_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Course', 'url' => '/admin/courses/' . (int) $metadata['course_id']];
+        // The course by its code (owner, 2026-11-06: no row id in an address); none once the course is gone.
+        $courseId = (int) ($metadata['course_id'] ?? 0);
+        $code = $courseId > 0 ? ($this->activityCourseCodes[$courseId] ??= (string) $this->courses->codeForId($courseId)) : '';
+        if ($code !== '') {
+            $links[] = ['label' => 'Course', 'url' => \CattoLearning\Course\CourseAddress::admin($code)];
         }
-        if ((int) ($metadata['user_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Person', 'url' => '/admin/people/' . (int) $metadata['user_id']];
+        // The person by their account reference; none once the person is gone.
+        $personId = (int) ($metadata['user_id'] ?? 0);
+        $reference = $personId > 0 && $this->keys !== null ? ($this->activityKeys['person'][$personId] ??= (string) $this->keys->personReference($personId)) : '';
+        if ($reference !== '') {
+            $links[] = ['label' => 'Person', 'url' => PersonAddress::admin($reference)];
         }
-        if ((int) ($metadata['company_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Company administration', 'url' => '/admin/companies'];
+        // The company by its account reference, else the Companies list.
+        $companyId = (int) ($metadata['company_id'] ?? 0);
+        if ($companyId > 0) {
+            $companyReference = $this->keys !== null ? ($this->activityKeys['company'][$companyId] ??= (string) $this->keys->companyReference($companyId)) : '';
+            $links[] = $companyReference !== '' ? ['label' => 'Company', 'url' => \CattoLearning\Support\Address\CompanyAddress::admin($companyReference)] : ['label' => 'Company administration', 'url' => '/admin/companies'];
         }
         if ((int) ($metadata['enrolment_id'] ?? 0) > 0 || (int) ($metadata['request_id'] ?? 0) > 0) {
             $links[] = ['label' => 'Enrolments & Requests', 'url' => '/admin/course/enrolments'];
         }
-        if ((int) ($metadata['bundle_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Bundle', 'url' => '/admin/bundles/' . (int) $metadata['bundle_id']];
-        }
-        if ((int) ($metadata['promotion_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Promotion', 'url' => '/admin/promotions/' . (int) $metadata['promotion_id']];
-        }
-        if ((int) ($metadata['certificate_id'] ?? 0) > 0) {
-            $links[] = ['label' => 'Certificate', 'url' => '/admin/certificates/' . (int) $metadata['certificate_id']];
+        // A bundle and a promotion by their codes, a certificate by its number; none once the record is gone.
+        foreach (['bundle' => 'Bundle', 'promotion' => 'Promotion', 'certificate' => 'Certificate'] as $record => $label) {
+            $id = (int) ($metadata[$record . '_id'] ?? 0);
+            $key = $id > 0 && $this->keys !== null ? ($this->activityKeys[$record][$id] ??= (string) $this->keys->keyOf($record, $id)) : '';
+            if ($key === '') continue;
+            $links[] = ['label' => $label, 'url' => match ($record) {
+                'bundle' => \CattoLearning\Support\Address\CatalogueAddress::bundle($key),
+                'promotion' => \CattoLearning\Support\Address\CatalogueAddress::promotion($key),
+                default => \CattoLearning\Support\Address\RecordAddress::certificate('admin', $key),
+            }];
         }
         return $links;
     }

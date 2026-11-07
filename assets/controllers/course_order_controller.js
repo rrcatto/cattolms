@@ -1,7 +1,8 @@
 /* The catalogue's order on Administration → Courses (owner, 2026-10-20: "a drag handle so I can drag the course into
  * position - this will change its position number").
  *
- * The server draws each row (tr[data-course-id]) with its number and a hidden handle; this shows the handles, moves a
+ * The server draws each row (tr[data-course-code], its address in data-course-url: a course is its code, owner
+ * 2026-11-06) with its number and a hidden handle; this shows the handles, moves a
  * row while it is dragged by its handle or moved with the arrow keys, Home or End on it, and saves the move: the course
  * goes after the row now above it (or after the course before this page, or first). The server answers with each course
  * whose number changed, and those numbers are shown; when it refuses or cannot be reached the row goes back. Without
@@ -11,15 +12,15 @@ import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
     static targets = ['handle', 'status'];
-    static values = { csrf: String, before: Number };
+    static values = { csrf: String, before: String };
 
     handleTargetConnected(handle) { handle.hidden = false; }
 
-    rows() { return [...this.element.querySelectorAll('tr[data-course-id]')]; }
+    rows() { return [...this.element.querySelectorAll('tr[data-course-code]')]; }
 
     // Only a row picked up by its handle drags, so text in a row can still be selected.
     arm(event) {
-        const row = event.currentTarget.closest('tr[data-course-id]');
+        const row = event.currentTarget.closest('tr[data-course-code]');
         if (!row || this.busy) return;
         row.draggable = true;
         this.armed = row;
@@ -27,18 +28,18 @@ export default class extends Controller {
     }
 
     start(event) {
-        const row = event.target instanceof Element ? event.target.closest('tr[data-course-id]') : null;
+        const row = event.target instanceof Element ? event.target.closest('tr[data-course-code]') : null;
         if (!row || row !== this.armed) return;
         this.dragging = row;
         this.origin = row.nextElementSibling;
         event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', row.dataset.courseId);
+        event.dataTransfer.setData('text/plain', row.dataset.courseCode);
         row.classList.add('is-dragging');
     }
 
     over(event) {
         if (!this.dragging) return;
-        const row = event.target instanceof Element ? event.target.closest('tr[data-course-id]') : null;
+        const row = event.target instanceof Element ? event.target.closest('tr[data-course-code]') : null;
         event.preventDefault();
         if (!row || row === this.dragging) return;
         const box = row.getBoundingClientRect();
@@ -58,7 +59,7 @@ export default class extends Controller {
     }
 
     key(event) {
-        const row = event.currentTarget.closest('tr[data-course-id]');
+        const row = event.currentTarget.closest('tr[data-course-code]');
         const rows = this.rows();
         const at = rows.indexOf(row);
         const place = { ArrowUp: at > 0 ? rows[at - 1] : undefined, ArrowDown: at < rows.length - 1 ? rows[at + 1].nextElementSibling : undefined, Home: rows[0], End: null };
@@ -73,7 +74,7 @@ export default class extends Controller {
     }
 
     async save(row, origin) {
-        const above = row.previousElementSibling && row.previousElementSibling.matches('tr[data-course-id]') ? row.previousElementSibling.dataset.courseId : (this.beforeValue > 0 ? String(this.beforeValue) : '');
+        const above = row.previousElementSibling && row.previousElementSibling.matches('tr[data-course-code]') ? row.previousElementSibling.dataset.courseCode : this.beforeValue;
         const body = new FormData();
         body.append('csrf', this.csrfValue);
         body.append('after', above);
@@ -82,7 +83,7 @@ export default class extends Controller {
         try {
             let response;
             try {
-                response = await fetch(`/admin/courses/${row.dataset.courseId}/catalogue-move`, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                response = await fetch(`${row.dataset.courseUrl}/catalogue-move`, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
             } catch (unreachable) {
                 throw new Error('The move could not be saved because the server could not be reached. The previous order is shown.');
             }

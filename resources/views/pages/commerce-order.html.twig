@@ -1,8 +1,8 @@
 {% extends layout %}
 {% block page_body %}
-    {% set ph_kicker = 'My Orders' %}{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
+    {% set ph_kicker = 'My Orders' %}{% set ph_title = 'Order ' ~ order_number(order.id) %}
     {# A question about this order opens the contact form with the order chosen (owner, 2026-10-20). #}
-    {% set ph_actions %}{{ ui('action.link', {label: 'Ask about this order', variant: 'secondary', href: '/contact?reason=order&order=CL-' ~ '%08d'|format(order.id), icon: 'action-ask'}) }}{% endset %}
+    {% set ph_actions %}{{ ui('action.link', {label: 'Ask about this order', variant: 'secondary', href: '/contact?reason=order&' ~ order_query(order.id), icon: 'action-ask'}) }}{% endset %}
     {% include '@platform/partials/page-head.html.twig' %}
     <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
@@ -21,14 +21,14 @@
             {% if item.refund %}
                 {% if item.refund.open %}
                     <p class="help">You asked for a refund on {{ item.refund.open.requested_at|date('j M Y') }} ({{ item.refund.open.destination == 'money_back' ? 'money back' : 'wallet credit' }}). It is waiting for a decision.</p>
-                    <form action="/account/refund-requests/{{ item.refund.open.id }}/withdraw" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_id" value="{{ order.id }}">{{ ui('action.button', {label: 'Withdraw my refund request', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-restore'}) }}</form>
+                    <form action="/account/refund-requests/{{ item.refund.open.id }}/withdraw" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_number" value="{{ order_number(order.id) }}">{{ ui('action.button', {label: 'Withdraw my refund request', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-restore'}) }}</form>
                 {% elseif item.refund.last and item.refund.last.status == 'refused' %}
                     <p class="help">Your refund request was refused on {{ item.refund.last.decided_at|date('j M Y') }}: {{ item.refund.last.decision_note }}</p>
                 {% endif %}
                 {% if item.refund.can_request %}
                     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Ask for a refund', id: 'refund-request-' ~ item.item_id})} %}{% block body %}
                         {% if item.refund.refusals %}<p>{{ item.refund.refusals|join(' ') }} If the course is faulty, is not as described or cannot be provided, tell us below and we will look at it.</p>{% endif %}
-                        <form action="/account/orders/{{ order.id }}/refund-request" method="post">
+                        <form action="{{ my_order_url(order.id, '/refund-request') }}" method="post">
                             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="item_id" value="{{ item.item_id }}">
                             {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why are you asking for a refund?', for: 'refund-reason-' ~ item.item_id, required: true, full_width: true})} %}{% block control %}<textarea id="refund-reason-{{ item.item_id }}" name="reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
                             {% if order.company_id|default(null) %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unused credits to refund', for: 'refund-quantity-' ~ item.item_id, required: true, help: 'Credits are refunded only as wallet credit in the company wallet, and only credits no learner has started.'})} %}{% block control %}<input id="refund-quantity-{{ item.item_id }}" type="number" name="quantity" min="1" max="{{ item.quantity }}" value="1" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% else %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'If it is refunded', for: 'refund-destination-' ~ item.item_id, required: true, help: 'Wallet credit can be spent on any course. A refund of a card payment is what we received, less Stitch’s transaction and refund fees. What you paid from your wallet goes back to your wallet.'})} %}{% block control %}<select id="refund-destination-{{ item.item_id }}" name="destination" {{ ui_field_attrs(props) }}><option value="wallet">Wallet credit</option><option value="money_back">Money back</option></select>{% endblock %}{% endembed %}{% endif %}
@@ -44,7 +44,7 @@
         {% include '@platform/partials/billing-address.html.twig' %}
         <p class="help">As recorded when the order was placed. Changing your billing details later does not change this order or its documents.</p>
         {% for document in order.documents %}
-            <p>{{ ui('action.link', {label: 'View ' ~ document.kind|replace({'_': ' '}) ~ ' ' ~ document.number, variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true, icon: 'action-document'}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
+            <p>{{ ui('action.link', {label: 'View ' ~ document.kind|replace({'_': ' '}) ~ ' ' ~ document.number, variant: 'secondary', size: 'normal', href: order_document_url('buyer', order.id, document.number), new_window: true, icon: 'action-document'}) }} <a href="{{ order_document_url('buyer', order.id, document.number) }}?download=1">Download {{ document.number }} (PDF)</a></p>
         {% endfor %}
         {% if payment_method == 'eft' or order.details.payment_method|default('') == 'eft' %}
             <h2 class="h5 mt-7">EFT bank account details</h2>
@@ -69,7 +69,7 @@
 {% endembed %}
             {% endif %}
             {% if change_method or payment_method != 'eft' %}
-                <form action="/account/orders/{{ order.id }}/pay" method="post">
+                <form action="{{ my_order_url(order.id, '/pay') }}" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payment_key" value="{{ payment_key }}">
                     {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method} %}
                     {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
@@ -81,7 +81,7 @@
             {% else %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.link', {label: 'Change payment method', variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '?payment=change', icon: 'action-edit'}) }}<a href="/account/orders">I’ll sort it out later</a>
+{{ ui('action.link', {label: 'Change payment method', variant: 'secondary', size: 'normal', href: my_order_url(order.id, '?payment=change'), icon: 'action-edit'}) }}<a href="/account/orders">I’ll sort it out later</a>
 {% endblock %}
 {% endembed %}
             {% endif %}

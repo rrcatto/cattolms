@@ -97,6 +97,22 @@
 {% block surface_body %}
 						<h2 class="h4" id="course-access">Course access</h2>
 						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full', purchase_key: 'side'} %}
+						{# Each bundle the course is in that this visitor could buy, under the buy button, the larger saving first (owner,
+						   2026-11-06, the approved mockup; BundleService::forCourse). A visitor who has some of its courses is told so, as on
+						   the bundle's own page, and the price stays the bundle's. One whose sale starts later says when (owner, 2026-11-06). #}
+						{% if bundle_notes|default([]) %}
+							<div class="cl-course-bundles">
+								{% for note in bundle_notes %}
+									<div class="cl-course-bundle">
+										<p class="cl-course-bundle-title">Also in {{ note.title }}</p>
+										<p>This course and the {{ note.others_words }} beside it for <strong>{% include '@platform/partials/price.html.twig' with {price: note} %}</strong>, with {{ note.access_label }} of access to each.</p>
+										{% if note.owned_count %}<p>{{ note.owned_count == note.course_count ? 'You already have access to all ' ~ note.course_count ~ ' courses in this bundle.' : 'You already have access to ' ~ note.owned_count ~ ' of the ' ~ note.course_count ~ ' courses in this bundle.' }}</p>{% endif %}
+										{% if note.save_label or note.on_sale_from_short %}<p>{% if note.save_label %}{{ ui('feedback.badge', {label: 'Save ' ~ note.save_label, tone: 'success'}) }}{% endif %}{% if note.on_sale_from_short %} {{ ui('feedback.badge', {label: note.on_sale_from_short, tone: 'info'}) }}{% endif %}</p>{% endif %}
+										{{ ui('action.link', {label: 'See the bundle', variant: 'secondary', size: 'normal', full_width: true, href: note.href, icon: 'action-view'}) }}
+									</div>
+								{% endfor %}
+							</div>
+						{% endif %}
 						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
 						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
 						{# Reviewing is offered to anyone who has held access to the course, including a learner whose access has expired. #}

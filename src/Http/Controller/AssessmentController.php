@@ -9,6 +9,9 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\AssessmentService;
 use CattoLearning\Course\CourseReviewService;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Course\CourseRepository;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,23 +19,23 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class AssessmentController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly AssessmentService $assessments, private readonly LearningService $learning, private readonly CourseReviewService $reviews)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly AssessmentService $assessments, private readonly LearningService $learning, private readonly CourseReviewService $reviews, private readonly CourseRepository $courses, private readonly AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
 
-    #[Route('/learn/{slug}/item/{node_id}/assessment/{key}', name: 'assessment_course_item_overview', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'key' => '[a-zA-Z0-9._-]+'], methods: ['GET'])]
+    #[Route('/learn/{slug}/{part}/assessment/{key}', name: 'assessment_course_item_overview', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT, 'key' => '[a-zA-Z0-9._-]+'], methods: ['GET'])]
     public function overview(): Response
     {
-        $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE'); $slug = $this->param('slug'); $node = (int) $this->param('node_id'); $key = $this->param('key'); $preview = $this->previewMode();
-        return $this->handle(function () use ($user, $slug, $node, $key, $preview): Response { $data = $this->assessments->overview($user->id, $slug, $node, $key, $preview); $data['course'] = $this->learning->courseHome($user->id, $slug, $preview); $data['course']['current_node_id'] = $node; $data['assessment'] = $this->withCourseNavigation((array) $data['assessment'], (array) $data['course'], $node); return $this->render('assessment-overview', $data + ['title' => (string) $data['assessment']['title'], 'start_action' => '/learn/' . rawurlencode($slug) . '/item/' . $node . '/assessment/' . rawurlencode($key) . '/start' . $this->previewQuery($preview), 'preview_query' => $this->previewQuery($preview)]); }, '/learn/' . rawurlencode($slug));
+        $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE'); $slug = $this->param('slug'); $node = $this->partNode($slug); $key = $this->param('key'); $preview = $this->previewMode();
+        return $this->handle(function () use ($user, $slug, $node, $key, $preview): Response { $data = $this->assessments->overview($user->id, $slug, $node, $key, $preview); $data['course'] = $this->learning->courseHome($user->id, $slug, $preview); $data['course']['current_node_id'] = $node; $data['assessment'] = $this->withCourseNavigation((array) $data['assessment'], (array) $data['course'], $node); return $this->render('assessment-overview', $data + ['title' => (string) $data['assessment']['title'], 'start_action' => CoursePartAddress::reader($slug, $this->param('part'), '/assessment/' . rawurlencode($key) . '/start') . $this->previewQuery($preview), 'preview_query' => $this->previewQuery($preview)]); }, '/learn/' . rawurlencode($slug));
     }
 
-    #[Route('/learn/{slug}/item/{node_id}/assessment/{key}/start', name: 'assessment_course_item_start', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'key' => '[a-zA-Z0-9._-]+'], methods: ['POST'])]
+    #[Route('/learn/{slug}/{part}/assessment/{key}/start', name: 'assessment_course_item_start', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT, 'key' => '[a-zA-Z0-9._-]+'], methods: ['POST'])]
     public function start(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE'); $slug = $this->param('slug'); $node = (int) $this->param('node_id'); $key = $this->param('key'); $preview = $this->previewMode(); $mode = (string) ($_POST['mode'] ?? 'graded');
-        return $this->handle(function () use ($user, $slug, $node, $key, $mode, $preview): void { $session = $this->assessments->startAttempt($user->id, $slug, $node, $key, $mode, $preview); $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview)); }, '/learn/' . rawurlencode($slug) . '/item/' . $node . '/assessment/' . rawurlencode($key) . $this->previewQuery($preview));
+        $this->requireCsrf(); $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE'); $slug = $this->param('slug'); $node = $this->partNode($slug); $key = $this->param('key'); $preview = $this->previewMode(); $mode = (string) ($_POST['mode'] ?? 'graded');
+        return $this->handle(function () use ($user, $slug, $node, $key, $mode, $preview): void { $session = $this->assessments->startAttempt($user->id, $slug, $node, $key, $mode, $preview); $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview)); }, CoursePartAddress::reader($slug, $this->param('part'), '/assessment/' . rawurlencode($key)) . $this->previewQuery($preview));
     }
 
     #[Route('/learn/{slug}/assessment/session/{session}', name: 'assessment_session', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'session' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]
@@ -64,7 +67,28 @@ final class AssessmentController extends BaseController
             // After the final assessment the learner is asked for a review, on the page itself, unless they have given one (decision 8A).
             $reviewPrompt = !$preview && ($session['assessment_role'] ?? '') === 'final' && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, (int) $course['id']) && $this->reviews->learnerReview((int) $course['id'], $user->id) === null
                 ? ['max_comment' => CourseReviewService::MAX_COMMENT, 'return' => $this->sessionUrl($slug, $publicId, '/result', false)] : null;
-            return $this->render('assessment-session-result', ['course' => $course, 'review_prompt' => $reviewPrompt, 'preview_query' => $this->previewQuery($preview), 'title' => 'Assessment result', 'session' => $this->withCourseNavigation($session, $course, (int) $session['structure_node_id']), 'course_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview), 'retake_url' => '/learn/' . rawurlencode($slug) . '/item/' . (int) $session['structure_node_id'] . '/assessment/' . rawurlencode((string) $session['assessment_key']) . $this->previewQuery($preview), 'is_preview' => $preview]); }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
+            return $this->render('assessment-session-result', ['course' => $course, 'review_prompt' => $reviewPrompt, 'preview_query' => $this->previewQuery($preview), 'title' => 'Assessment result', 'session' => $this->withCourseNavigation($session, $course, (int) $session['structure_node_id']), 'course_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview), 'retake_url' => $this->retakeUrl($slug, (array) $course['structure'], $session, $preview), 'is_preview' => $preview]); }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
+    }
+
+    /**
+     * The part the address names by its part name (owner, 2026-11-06: no row id in an address); an unknown one is not found.
+     */
+    private function partNode(string $slug): int
+    {
+        $course = preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1 ? $this->courses->findBySlug($slug) : null;
+        return ($course === null ? null : $this->keys->part((int) $course['id'], $this->param('part'))) ?? throw $this->notFound('We could not find that part of the course.');
+    }
+
+    /**
+     * Where Retake leads: the assessment's page, by its part name, or the course when its part has since gone.
+     *
+     * @param list<array<string,mixed>> $structure
+     * @param array<string,mixed> $session
+     */
+    private function retakeUrl(string $slug, array $structure, array $session, bool $preview): string
+    {
+        $row = CourseNavigation::row($structure, (int) ($session['structure_node_id'] ?? 0));
+        return ($row === null ? '/learn/' . rawurlencode($slug) : CoursePartAddress::reader($slug, $row, '/assessment/' . rawurlencode((string) $session['assessment_key']))) . $this->previewQuery($preview);
     }
 
     private function previewMode(): bool { $preview = (string) ($_GET['preview'] ?? '') === '1'; if ($preview) { $this->requireCourseAuthor(); } return $preview; }

@@ -20,7 +20,7 @@ const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-parts-state.json'));
 const results = [];
 const check = (name, ok, detail = '') => { results.push({name, ok: Boolean(ok)}); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok || !detail ? '' : ' (' + detail + ')'}`); };
-const learn = (node) => `${base}/learn/${state.slug}/item/${node}/content?preview=1`;
+const learn = (part) => `${base}/learn/${state.slug}/${part}?preview=1`;
 
 async function session(browser, options = {}) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, ...options});
@@ -29,7 +29,7 @@ async function session(browser, options = {}) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_id}/preview`, {waitUntil: 'networkidle'});
+    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();
@@ -42,7 +42,7 @@ const progress = async (page) => {
     const match = /(\d+) of (\d+) parts done/.exec(text);
     return match ? {done: Number(match[1]), total: Number(match[2])} : null;
 };
-const ticked = (page, node) => page.locator(`.cl-course-outline-item.is-done a[href*="/item/${node}/"] .cl-course-outline-done`).count();
+const ticked = (page, node) => page.locator(`.cl-course-outline-item.is-done a[href$="/${node}"] .cl-course-outline-done, .cl-course-outline-item.is-done a[href*="/${node}?"] .cl-course-outline-done`).count();
 /* Presses the button: with JavaScript it answers in place, without it the page comes back. */
 const pressComplete = async (page, script) => {
     const button = page.locator('.cl-course-item-complete button');

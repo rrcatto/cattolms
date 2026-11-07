@@ -10,6 +10,8 @@ The Site Log's records (owner, 2026-11-04): each request written, listed, counte
 pages, and the old ones deleted by the daily clean-up.
 
 Changelog:
+2026/11/07 SAST
+- A request carries its person's account reference for the address (owner, 2026-11-06).
 2026/11/04 SAST
 - Created.
 */
@@ -36,7 +38,7 @@ class SiteLogRepository
 
     private const COLUMNS = 'r.id, r.at, host(r.address) AS address, abbrev(r.subject) AS subject, r.user_id, r.by_administrator, r.visitor, r.agent_kind, r.agent_label, r.agent_proved, r.device, r.user_agent,
         r.country_code, r.network_kind, r.network_asn, r.network_name, r.method, r.path, r.status, r.refused, r.came_from, r.source, r.form, r.form_signal, r.form_refused, r.form_email,
-        u.display_name AS user_name, f.level AS flag_level, f.fine AS flag_fine';
+        u.display_name AS user_name, u.account_reference AS user_reference, f.level AS flag_level, f.fine AS flag_fine';
 
     public function __construct(private readonly Database $db)
     {

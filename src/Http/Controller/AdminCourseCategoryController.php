@@ -21,6 +21,9 @@ saved tree and counts, or the authoritative ones and a 422 with the reason; a pl
 redirects back to the tree with a message.
 
 Changelog:
+2026/11/07 SAST
+- A category is named by its slug in every address (/admin/courses/categories/garden-design, ?reveal=, ?open[]=,
+  ?toggle=, ?selected=, #category-garden-design), never its row id (owner, 2026-11-06).
 2026/10/17 SAST
 - No course_group: the Courses group tab strip is gone.
 2026/10/07 SAST
@@ -57,6 +60,8 @@ use CattoLearning\View\Artwork\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use RuntimeException;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CatalogueAddress;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -72,7 +77,8 @@ final class AdminCourseCategoryController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
-        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists
+        private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
+        private readonly AddressKeyRepository $keys
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -82,14 +88,16 @@ final class AdminCourseCategoryController extends BaseController
     {
         $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $query = $this->request()->query;
-        $open = self::ids($query->all('open'));
-        $toggle = (int) $query->get('toggle', 0);
+        // One load of the taxonomy for the tree and its counts.
+        $categories = $this->courses->categories();
+        // The address names categories by their slugs (owner, 2026-11-06: no row id in an address): ?open[]=, ?toggle=, ?reveal=.
+        $bySlug = array_column(array_map(static fn(array $category): array => ['slug' => (string) $category['slug'], 'id' => (int) $category['id']], $categories), 'id', 'slug');
+        $open = self::ids($query->all('open'), $bySlug);
+        $toggle = $bySlug[(string) $query->get('toggle', '')] ?? 0;
         if ($toggle > 0) {
             $open = in_array($toggle, $open, true) ? array_values(array_diff($open, [$toggle])) : [...$open, $toggle];
         }
-        $reveal = (int) $query->get('reveal', 0);
-        // One load of the taxonomy for the tree and its counts.
-        $categories = $this->courses->categories();
+        $reveal = $bySlug[(string) $query->get('reveal', '')] ?? 0;
         if ($query->get('expand') === 'all') {
             $open = array_map(static fn(array $category): int => (int) $category['id'], $categories);
         }
@@ -98,7 +106,7 @@ final class AdminCourseCategoryController extends BaseController
             'title' => 'Course categories',
             'category_tree' => $tree,
             'category_statistics' => CourseService::categoryStatistics($categories),
-            'open_ids' => self::openIn($tree),
+            'open_slugs' => self::openIn($tree),
             'tree_error' => '',
             'create_parent' => null,
             'create_values' => [],
@@ -114,7 +122,7 @@ final class AdminCourseCategoryController extends BaseController
     }
 
     /** Add subcategory: the form for a category under this one. */
-    #[Route('/admin/courses/categories/{id}/new', name: 'admin_course_category_new_child', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/categories/{slug}/new', name: 'admin_course_category_new_child', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['GET'])]
     public function newChild(): Response
     {
         $this->requirePermission('COURSE.CATEGORY.MANAGE');
@@ -130,7 +138,7 @@ final class AdminCourseCategoryController extends BaseController
     }
 
     /** Creates a category under the one in the address: the parent is the row it was asked from. */
-    #[Route('/admin/courses/categories/{id}/children', name: 'admin_course_category_create_child', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}/children', name: 'admin_course_category_create_child', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function createChild(): Response
     {
         $this->requireCsrf();
@@ -138,7 +146,7 @@ final class AdminCourseCategoryController extends BaseController
         return $this->created($this->parent(), $user->id);
     }
 
-    #[Route('/admin/courses/categories/{id}', name: 'admin_course_category_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/categories/{slug}', name: 'admin_course_category_edit', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['GET'])]
     public function edit(): Response
     {
         $this->requirePermission('COURSE.CATEGORY.MANAGE');
@@ -150,14 +158,14 @@ final class AdminCourseCategoryController extends BaseController
             'category' => $category,
             'followers' => $this->mailingLists->followersOf('category', $categoryId) + ['name' => (string) $category['name']],
             // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
-            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $category['name'], $iconQuery), 'action' => '/admin/courses/categories/' . $categoryId],
+            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $category['name'], $iconQuery), 'action' => CatalogueAddress::category($category)],
             'category_path' => $this->courses->categoryTrail($categoryId),
             'replacement_picker' => $this->courses->replacementCategoryPicker($categoryId),
-            'tree_href' => self::revealing($categoryId),
+            'tree_href' => $this->revealing($categoryId),
         ]);
     }
 
-    #[Route('/admin/courses/categories/{id}', name: 'admin_course_category_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}', name: 'admin_course_category_update', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function update(): Response
     {
         $this->requireCsrf();
@@ -166,12 +174,13 @@ final class AdminCourseCategoryController extends BaseController
         return $this->handle(function () use ($user, $categoryId): void {
             $this->courses->updateCategory($categoryId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The course category was updated.');
-            $this->redirect(self::revealing($categoryId));
-        }, '/admin/courses/categories/' . $categoryId);
+            // A new slug is a new address: the tree is opened at the category as it is now.
+            $this->redirect($this->revealing($categoryId));
+        }, CatalogueAddress::category($this->courses->category($categoryId)));
     }
 
     /** The category's icon, from its own card: one chosen from the icon library or an SVG uploaded (owner, 2026-10-20). */
-    #[Route('/admin/courses/categories/{id}/icon', name: 'admin_course_category_icon', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}/icon', name: 'admin_course_category_icon', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function icon(): Response
     {
         $this->requireCsrf();
@@ -182,12 +191,12 @@ final class AdminCourseCategoryController extends BaseController
             if ($icon === null) throw new \InvalidArgumentException('Choose an icon from the library or upload an SVG file.');
             $this->courses->replaceCategoryIcon($id, $icon, $user->id);
             $this->flash('success', 'The icon was saved.');
-            $this->redirect('/admin/courses/categories/' . $id . '#icon');
-        }, '/admin/courses/categories/' . $id . '#icon');
+            $this->redirect(CatalogueAddress::category($this->courses->category($id), '#icon'));
+        }, CatalogueAddress::category($this->courses->category($id), '#icon'));
     }
 
     /** The ⋯ menu: top, up, down, bottom or out. */
-    #[Route('/admin/courses/categories/{id}/move', name: 'admin_course_category_move', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}/move', name: 'admin_course_category_move', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function move(): Response
     {
         $this->requireCsrf();
@@ -201,7 +210,7 @@ final class AdminCourseCategoryController extends BaseController
      * category) at index among that parent's other children (empty for last). from_parent, when
      * sent, is the parent the browser showed it under; a different stored parent refuses the move.
      */
-    #[Route('/admin/courses/categories/{id}/arrange', name: 'admin_course_category_arrange', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}/arrange', name: 'admin_course_category_arrange', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function arrange(): Response
     {
         $this->requireCsrf();
@@ -226,7 +235,7 @@ final class AdminCourseCategoryController extends BaseController
     }
 
     /** Move into…: every place the category can go, without dragging. */
-    #[Route('/admin/courses/categories/{id}/move-into', name: 'admin_course_category_move_into', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/courses/categories/{slug}/move-into', name: 'admin_course_category_move_into', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['GET'])]
     public function moveInto(): Response
     {
         $this->requirePermission('COURSE.CATEGORY.MANAGE');
@@ -237,11 +246,11 @@ final class AdminCourseCategoryController extends BaseController
             'category' => $category,
             'category_path' => $this->courses->categoryTrail($categoryId),
             'choices' => $this->courses->categoryDestinations($categoryId),
-            'tree_href' => self::revealing($categoryId),
+            'tree_href' => $this->revealing($categoryId),
         ]);
     }
 
-    #[Route('/admin/courses/categories/{id}/delete', name: 'admin_course_category_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/courses/categories/{slug}/delete', name: 'admin_course_category_delete', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
     public function delete(): Response
     {
         $this->requireCsrf();
@@ -252,8 +261,8 @@ final class AdminCourseCategoryController extends BaseController
             $category = $this->courses->category($categoryId);
             $this->courses->deleteCategory($categoryId, $replacement > 0 ? $replacement : null, $user->id);
             $this->flash('success', 'The course category was deleted.');
-            $this->redirect($category['parent_id'] === null ? self::INDEX : self::revealing((int) $category['parent_id']));
-        }, '/admin/courses/categories/' . $categoryId);
+            $this->redirect($category['parent_id'] === null ? self::INDEX : $this->revealing((int) $category['parent_id']));
+        }, CatalogueAddress::category($this->courses->category($categoryId)));
     }
 
     #[Route('/admin/courses/categories/inline', name: 'admin_course_category_inline_create', methods: ['POST'])]
@@ -302,11 +311,12 @@ final class AdminCourseCategoryController extends BaseController
         if (preg_match('/^[a-z][a-z0-9-]{0,40}$/', $fieldId) !== 1 || preg_match('/^[a-z][a-z0-9_]{0,40}$/', $fieldName) !== 1) {
             throw $this->notFound('That category field does not exist.');
         }
-        $selected = (int) $query->get('selected', 0);
+        // The category just made, by its slug (?selected=garden-design).
+        $selected = $this->keys->category((string) $query->get('selected', ''));
         return $this->renderFragment('partials/admin/course-category-field', [
             'cf_id' => $fieldId,
             'cf_name' => $fieldName,
-            'cf_picker' => $this->courses->courseCategoryPicker($selected > 0 ? $selected : null),
+            'cf_picker' => $this->courses->courseCategoryPicker($selected),
             'cf_places' => $this->courses->categoryLocationPicker(),
         ]);
     }
@@ -324,7 +334,7 @@ final class AdminCourseCategoryController extends BaseController
             return $this->createForm($parent, $_POST, [$refused->getMessage()], 422);
         }
         $this->flash('success', 'The course category “' . (string) $category['name'] . '” was created.');
-        $this->redirect(self::revealing((int) $category['id']));
+        $this->redirect($this->revealing((int) $category['id']));
     }
 
     /**
@@ -360,8 +370,8 @@ final class AdminCourseCategoryController extends BaseController
             return $this->handle(function () use ($move, $categoryId): void {
                 $move();
                 $this->flash('success', 'The category was moved.');
-                $this->redirect(self::revealing($categoryId));
-            }, self::revealing($categoryId));
+                $this->redirect($this->revealing($categoryId));
+            }, $this->revealing($categoryId));
         }
         $error = '';
         try {
@@ -387,28 +397,31 @@ final class AdminCourseCategoryController extends BaseController
         return $parent;
     }
 
+    /** The category the address names by its slug (owner, 2026-11-06: no row id in an address), as its row id. */
     private function categoryId(): int
     {
-        $categoryId = (int) $this->param('id');
-        if ($categoryId < 1) {
-            throw new InvalidArgumentException('The course category does not exist.');
-        }
-        return $categoryId;
+        return $this->keys->category($this->param('slug')) ?? throw $this->notFound('We could not find that course category.');
     }
 
-    /** The tree with this category's branch open and the page scrolled to it. */
-    private static function revealing(int $categoryId): string
+    /** The tree with this category's branch open and the page scrolled to it: ?reveal=garden-design#category-garden-design. */
+    private function revealing(int $categoryId): string
     {
-        return self::INDEX . '?reveal=' . $categoryId . '#category-' . $categoryId;
+        $category = $this->courses->category($categoryId);
+        return self::INDEX . '?reveal=' . rawurlencode(CatalogueAddress::categoryKey($category)) . '#' . CatalogueAddress::categoryAnchor($category);
     }
 
     /**
+     * The categories the address names by slug, as row ids.
+     *
      * @param array<mixed> $values
+     * @param array<string,int> $bySlug
      * @return list<int>
      */
-    private static function ids(array $values): array
+    private static function ids(array $values, array $bySlug): array
     {
-        return array_values(array_unique(array_filter(array_map('intval', $values), static fn(int $id): bool => $id > 0)));
+        $ids = [];
+        foreach ($values as $value) { if (is_string($value) && isset($bySlug[$value])) { $ids[] = $bySlug[$value]; } }
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -416,14 +429,14 @@ final class AdminCourseCategoryController extends BaseController
      * buttons, so opening one branch without JavaScript keeps the others open.
      *
      * @param list<array<string,mixed>> $nodes
-     * @return list<int>
+     * @return list<string> their slugs
      */
     private static function openIn(array $nodes): array
     {
         $open = [];
         foreach ($nodes as $node) {
             if ($node['open']) {
-                $open[] = (int) $node['id'];
+                $open[] = (string) $node['slug'];
             }
             $open = [...$open, ...self::openIn($node['children'])];
         }

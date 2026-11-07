@@ -1,0 +1,12 @@
+{#
+	A bundle's status as three feature cards (owner, 2026-11-06: "On the bundle form (new or edit), I can't set the status -
+	there are no Radio buttons or drop down - use radio buttons"), on the bundle form and in a row or card of the list edited
+	in place. Choosing one changes nothing until the form is saved, and then by the same checks as ever: publishing needs a
+	price and at least two published courses. Variables: bsc_selected (the status now), bsc_form (the form the radios
+	belong to, when they sit outside it), bsc_stacked (one card under another, in a row or a card).
+#}
+{{ ui('form.picture-choice', {name: 'status', legend: 'Status', legend_hidden: bsc_stacked|default(false), size: 'small', columns: bsc_stacked|default(false) ? 1 : 'auto', form: bsc_form|default(''), selected: bsc_selected|default('draft'), items: [
+	{value: 'draft', label: 'Draft', icon: lucide('pencil-line'), note: 'Only administrators see it.'},
+	{value: 'published', label: 'Published', icon: lucide('store'), note: 'In the catalogue.'},
+	{value: 'retired', label: 'Retired', icon: lucide('archive'), note: 'Off the catalogue, and kept for its orders.'},
+]}) }}

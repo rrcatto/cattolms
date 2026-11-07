@@ -56,21 +56,24 @@ final class AdminAttentionIntegrationTest extends TestCase
         $company = $fixture->createCompany($admin, 'Attention Company ' . $suffix, 'attention-' . $suffix . '.example.test');
         $course = $fixture->createCourse($admin, $company, 'attention-' . $suffix, 'Attention Course ' . $suffix, 'published');
         $draft = $fixture->createCourse($admin, $company, 'attention-draft-' . $suffix, 'Unfinished Course ' . $suffix, 'draft');
+        $draftCode = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $draft]);
         $review = (int) $this->db->fetchOne("INSERT INTO course_reviews (course_id, user_id, rating, comment, status, submitted_at, updated_at) VALUES (:c, :u, 4, 'Useful.', 'pending', NOW(), NOW()) RETURNING id",
             ['c' => $course, 'u' => $learner]);
         $request = (int) $this->db->fetchOne('INSERT INTO course_requests (public_id, user_id, company_id, course_id, access_period_seconds) VALUES (:p, :u, :co, :c, 31536000) RETURNING id',
             ['p' => (string) Uuid::v4(), 'u' => $learner, 'co' => $company, 'c' => $course]);
         $message = (int) $this->db->fetchOne("INSERT INTO contact_messages (reference, reason, sender_name, sender_email, message) VALUES (:r, 'course', 'Attention Sender', 'sender@example.test', 'Module two will not open.') RETURNING id",
-            ['r' => 'MSG-T' . substr($suffix, 0, 8)]);
+            ['r' => $messageReference = 'MSG-9' . random_int(10000000, 99999999)]);
 
         $rows = IntegrationContainer::get()->get(AdminAttention::class)->items($this->admin($admin, (new PermissionCatalog())->keys()));
         $byHref = array_column($rows, null, 'href');
+        // A person by their account reference (owner, 2026-11-06: no row id in an address).
+        $reference = static fn(int $id): string => (string) IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AddressKeyRepository::class)->personReference($id);
         $expected = [
-            '/admin/people/' . $waiting => ['account', 'Approve or disable', 'is waiting for approval'],
+            '/admin/people/' . $reference($waiting) => ['account', 'Approve or disable', 'is waiting for approval'],
             '/admin/course-reviews#review-' . $review => ['review', 'Approve or reject', 'reviewed Attention Course ' . $suffix . ': 4 stars'],
             '/admin/course/requests?requests_status=pending#request-' . $request => ['request', 'Approve or reject', 'asked Attention Company ' . $suffix . ' for Attention Course ' . $suffix],
-            '/admin/messages/' . $message => ['message', 'Read and reply', ': Course issue'],
-            '/admin/courses/' . $draft => ['draft', 'Open the course', 'Unfinished Course ' . $suffix . ' is not published'],
+            '/admin/messages/' . $messageReference => ['message', 'Read and reply', ': Course issue'],
+            '/admin/courses/' . $draftCode => ['draft', 'Open the course', 'Unfinished Course ' . $suffix . ' is not published'],
         ];
         foreach ($expected as $href => [$kind, $action, $title]) {
             self::assertArrayHasKey($href, $byHref, 'A row opens ' . $href);
@@ -81,11 +84,11 @@ final class AdminAttentionIntegrationTest extends TestCase
         }
         // Who it concerns, linked to their account with their account reference (owner, 2026-10-21).
         $reviewer = $byHref['/admin/course-reviews#review-' . $review]['person'];
-        self::assertSame(['Thandi Attention' . $suffix, '/admin/people/' . $learner], [$reviewer['name'] ?? null, $reviewer['href'] ?? null]);
+        self::assertSame(['Thandi Attention' . $suffix, '/admin/people/' . $reference($learner)], [$reviewer['name'] ?? null, $reviewer['href'] ?? null]);
         self::assertSame($this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner]), $reviewer['reference']);
         self::assertTrue($byHref['/admin/course-reviews#review-' . $review]['subject']);
-        self::assertSame('', $byHref['/admin/messages/' . $message]['person']['href'] ?? null, 'A sender without an account is named without a link.');
-        self::assertNull($byHref['/admin/courses/' . $draft]['person']);
+        self::assertSame('', $byHref['/admin/messages/' . $messageReference]['person']['href'] ?? null, 'A sender without an account is named without a link.');
+        self::assertNull($byHref['/admin/courses/' . $draftCode]['person']);
         $kinds = array_column($rows, 'kind');
         self::assertSame(array_values(array_unique($kinds)), array_values(array_intersect(['account', 'review', 'request', 'message', 'money', 'identity', 'draft'], $kinds)), 'Grouped by kind, people first, drafts last.');
 
@@ -93,7 +96,7 @@ final class AdminAttentionIntegrationTest extends TestCase
         $moderator = array_unique(array_column(IntegrationContainer::get()->get(AdminAttention::class)->items($this->admin($admin, ['COURSE.REVIEW.MANAGE'], [])), 'kind'));
         self::assertSame(['review'], array_values($moderator));
         // Each button's icon is in keeping with what it does (owner, 2026-10-21).
-        self::assertSame(['action-approve', 'action-reply', 'action-open'], [$byHref['/admin/people/' . $waiting]['icon'], $byHref['/admin/messages/' . $message]['icon'], $byHref['/admin/courses/' . $draft]['icon']]);
+        self::assertSame(['action-approve', 'action-reply', 'action-open'], [$byHref['/admin/people/' . $reference($waiting)]['icon'], $byHref['/admin/messages/' . $messageReference]['icon'], $byHref['/admin/courses/' . $draftCode]['icon']]);
     }
 
     /**
@@ -109,7 +112,8 @@ final class AdminAttentionIntegrationTest extends TestCase
         for ($i = 1; $i <= 25; $i++) $waiting[] = $fixture->createUser('Backlog ' . $i . ' ' . $suffix, 'backlog-' . $i . '-' . $suffix . '@example.test');
         $this->db->executeStatement("UPDATE users SET status = 'awaiting_approval' WHERE id IN (" . implode(',', $waiting) . ')');
         $rows = IntegrationContainer::get()->get(AdminAttention::class)->items($this->admin($admin, ['PLATFORM.PERSON.MANAGE'], []));
-        $listed = array_intersect(array_map(static fn(int $id): string => '/admin/people/' . $id, $waiting), array_column($rows, 'href'));
+        $keys = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AddressKeyRepository::class);
+        $listed = array_intersect(array_map(static fn(int $id): string => '/admin/people/' . $keys->personReference($id), $waiting), array_column($rows, 'href'));
         self::assertCount(25, $listed, 'All 25 accounts waiting for approval are listed.');
     }
 

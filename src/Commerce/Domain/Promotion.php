@@ -32,8 +32,12 @@ final readonly class Promotion
     public const SCOPES = [self::SCOPE_NONE, self::SCOPE_ALL, self::SCOPE_SELECTED];
     public const PRODUCT_COURSE = 'course';
     public const PRODUCT_BUNDLE = 'bundle';
-    /** The canonical form of a code: 3 to 40 upper-case letters, digits, hyphens or underscores. */
-    public const CODE_PATTERN = '/^[A-Z0-9][A-Z0-9_-]{2,39}$/D';
+    /**
+     * The canonical form of a code: 3 to 40 upper-case letters, digits, hyphens or underscores, holding a letter, because
+     * Administration names a promotion by its code (/admin/promotions/SUMMER25, owner 2026-11-06) and a code of digits
+     * alone would look like a row id.
+     */
+    public const CODE_PATTERN = '/^(?=[A-Z0-9_-]*[A-Z])[A-Z0-9][A-Z0-9_-]{2,39}$/D';
 
     /**
      * @param list<int> $courseIds the selected courses; empty unless courseScope is selected

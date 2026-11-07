@@ -11,6 +11,10 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for login token records.
 
 Changelog:
+2026/11/05 SAST
+- create() gives the new row's id; a row found by its id or its hash, its context changed, the open ones of a purpose
+  finished or deleted: for the Telegram sign-in code (kept only in the browser that asked, by its row) and for connecting
+  Telegram (owner, 2026-11-05). A Telegram connection is not a sign-in request and is never counted as one.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -41,12 +45,13 @@ final class LoginTokenRepository
         array $context,
         int $ttlSeconds,
         string $ipHash
-    ): void {
-        $this->db->executeStatement(
+    ): int {
+        return (int) $this->db->fetchOne(
             'INSERT INTO auth_login_tokens
                 (user_id, email, purpose, token_hash, context, expires_at, requested_ip_hash, created_at)
              VALUES
-                (:user_id, :email, :purpose, :token_hash, :context, :expires_at, :requested_ip_hash, :created_at)',
+                (:user_id, :email, :purpose, :token_hash, :context, :expires_at, :requested_ip_hash, :created_at)
+             RETURNING id',
             [
                 'user_id' => $userId,
                 'email' => $email,
@@ -74,6 +79,46 @@ final class LoginTokenRepository
         return $row === false ? null : $row;
     }
 
+    /** @return array<string,mixed>|null the usable row with this id and purpose, locked */
+    public function findUsableByIdForUpdate(int $id, string $purpose): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            'SELECT * FROM auth_login_tokens WHERE id = :id AND purpose = :purpose AND used_at IS NULL AND expires_at > NOW() FOR UPDATE',
+            ['id' => $id, 'purpose' => $purpose]
+        );
+
+        return $row === false ? null : $row;
+    }
+
+    /** @return array<string,mixed>|null the row with this hash and purpose, used or not, expired or not */
+    public function findByHash(string $tokenHash, string $purpose): ?array
+    {
+        $row = $this->db->fetchAssociative('SELECT * FROM auth_login_tokens WHERE token_hash = :token_hash AND purpose = :purpose', ['token_hash' => $tokenHash, 'purpose' => $purpose]);
+
+        return $row === false ? null : $row;
+    }
+
+    /** @param array<string,mixed> $context */
+    public function updateContext(int $id, array $context): void
+    {
+        $this->db->executeStatement('UPDATE auth_login_tokens SET context = :context WHERE id = :id', ['id' => $id, 'context' => json_encode($context, JSON_THROW_ON_ERROR)]);
+    }
+
+    /** Finishes every open row of a purpose for an address: a new request replaces the old one, which still counts towards the limits. */
+    public function finishOpen(string $email, string $purpose): void
+    {
+        $this->db->executeStatement(
+            'UPDATE auth_login_tokens SET used_at = :used_at WHERE email = :email AND purpose = :purpose AND used_at IS NULL',
+            ['used_at' => gmdate('Y-m-d H:i:sP'), 'email' => $email, 'purpose' => $purpose]
+        );
+    }
+
+    /** Deletes a person's open rows of a purpose that is not a sign-in request (connecting Telegram). */
+    public function deleteOpenFor(int $userId, string $purpose): void
+    {
+        $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE user_id = :user AND purpose = :purpose AND used_at IS NULL', ['user' => $userId, 'purpose' => $purpose]);
+    }
+
     public function markUsed(int $id): void
     {
         $this->db->executeStatement(
@@ -93,7 +138,7 @@ final class LoginTokenRepository
     public function recentEmailCount(string $email, int $windowSeconds): int
     {
         return (int) $this->db->fetchOne(
-            'SELECT COUNT(*)::int FROM auth_login_tokens WHERE email = :email AND created_at > :since',
+            "SELECT COUNT(*)::int FROM auth_login_tokens WHERE email = :email AND created_at > :since AND purpose <> 'telegram_connect'",
             ['email' => $email, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
         );
     }
@@ -101,7 +146,7 @@ final class LoginTokenRepository
     public function recentIpCount(string $ipHash, int $windowSeconds): int
     {
         return (int) $this->db->fetchOne(
-            'SELECT COUNT(*)::int FROM auth_login_tokens WHERE requested_ip_hash = :ip_hash AND created_at > :since',
+            "SELECT COUNT(*)::int FROM auth_login_tokens WHERE requested_ip_hash = :ip_hash AND created_at > :since AND purpose <> 'telegram_connect'",
             ['ip_hash' => $ipHash, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
         );
     }

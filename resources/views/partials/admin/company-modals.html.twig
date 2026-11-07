@@ -43,7 +43,7 @@
 {% endblock %}
 {% endembed %}
 	{% for company in cm_rows %}
-		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-edit-' ~ (company.id), title: 'Edit ' ~ (company.name), action: '/admin/companies/' ~ (company.id), method: 'post'})} %}
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-edit-' ~ company.account_reference, title: 'Edit ' ~ (company.name), action: company_url(company), method: 'post'})} %}
 {% block modal_body %}
 
 					<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -81,7 +81,7 @@
 								</div>
 							</div>
 {# The logo is changed on the company's own page (owner, 2026-10-26). #}
-							<p class="cl-ui-field--full help">The logo, the people and everything else about it are on <a href="/admin/companies/{{ company.id }}">its page</a>.</p>
+							<p class="cl-ui-field--full help">The logo, the people and everything else about it are on <a href="{{ company_url(company) }}">its page</a>.</p>
 
 {% endblock %}
 {% endembed %}
@@ -91,10 +91,10 @@
 
 						{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 						{{ ui('action.button', {label: 'Save company', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
-					{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ (company.id) ~ '-status', icon: (company.status == 'active' ? 'action-disable' : 'action-enable')}) }}
+					{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ company.account_reference ~ '-status', icon: (company.status == 'active' ? 'action-disable' : 'action-enable')}) }}
 {% endblock %}
 {% block additional_forms %}
-<form action="/admin/companies/{{ company.id }}/status" method="post" id="company-edit-{{ company.id }}-status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ company.status=='active' ? 'disabled' : 'active' }}"></form>
+<form action="{{ company_url(company, '/status') }}" method="post" id="company-edit-{{ company.account_reference }}-status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ company.status=='active' ? 'disabled' : 'active' }}"></form>
 {% endblock %}
 {% endembed %}
 	{% endfor %}

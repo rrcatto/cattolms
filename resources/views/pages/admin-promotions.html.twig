@@ -15,7 +15,7 @@
 {% block body %}
 {% for row in promotions %}
 <tr>
-	<td><a href="/admin/promotions/{{ row.id }}"><strong>{{ row.code }}</strong></a>{% if row.automatic %}<br>{{ ui('feedback.badge', {label: 'Applies automatically', tone: 'info', size: 'small'}) }}{% endif %}</td>
+	<td><a href="{{ promotion_url(row.code) }}"><strong>{{ row.code }}</strong></a>{% if row.automatic %}<br>{{ ui('feedback.badge', {label: 'Applies automatically', tone: 'info', size: 'small'}) }}{% endif %}</td>
 	<td>{{ row.name }}</td>
 	<td>{{ row.discount }}{% if row.minimum %}<br><small>Minimum {{ row.minimum }}</small>{% endif %}</td>
 	<td>{{ row.validity }}</td>

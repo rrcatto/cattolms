@@ -73,9 +73,11 @@ if ($action === 'create') {
     $container->get(\CattoLearning\Course\CourseService::class)->updatePresentationCss($id, '.cl-course-presentation h2, .cl-course-presentation h3 {color: rgb(200, 0, 0); font-family: "Courier New", monospace; border-bottom: 4px solid rgb(200, 0, 0)} .cl-course-presentation p {letter-spacing: 3px} .cl-course-presentation button {background: rgb(200, 0, 0)}', $admin['id']);
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Course parts browser', $admin['email']);
-    $state = ['token' => $token, 'course_id' => $id, 'slug' => $course['slug'], 'module' => $module, 'second_module' => $second,
-        'presentation_item' => $presentation['item'], 'presentation_node' => $presentation['node'], 'lesson_node' => $lesson['node'], 'summary_node' => $summary['node'],
-        'flashcards_node' => $flashcards['node'], 'practical_node' => $practical['node'], 'cards' => count($cards), 'scrub' => $fixture->seeds()];
+    // Each part by its name, as its addresses name it (owner, 2026-11-06: no row id in an address).
+    $part = static fn(int $node): string => (string) $db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $node]);
+    $state = ['token' => $token, 'course_id' => $id, 'course_code' => (string) $db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $id]), 'slug' => $course['slug'], 'module' => $part($module), 'second_module' => $part($second),
+        'presentation_item' => $presentation['item'], 'presentation_url' => \CattoLearning\Support\Address\CourseItemAddress::admin($items->itemName((int) $presentation['item'])), 'presentation_node' => $part($presentation['node']), 'lesson_node' => $part($lesson['node']), 'summary_node' => $part($summary['node']),
+        'flashcards_node' => $part($flashcards['node']), 'practical_node' => $part($practical['node']), 'cards' => count($cards), 'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo json_encode(['course' => $id, 'slug' => $course['slug']]), PHP_EOL;

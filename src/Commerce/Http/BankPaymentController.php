@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Http;
 
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\BankPayments;
 use CattoLearning\Http\Controller\BaseController;
@@ -68,7 +69,7 @@ final class BankPaymentController extends BaseController
             $this->bank->recordAgainstOrder($actor, $orderId, $this->posted('request_key'), EftForm::amount($this->posted('amount')),
                 EftForm::receivedAt($this->posted('received_on'), $this->posted('received_time')), $this->posted('reference'), $this->posted('bank_reference'), $this->posted('reason'));
             $this->flash('success', 'The EFT payment is recorded against this order.');
-            $this->redirect('/admin/commerce/orders/' . $orderId);
+            $this->redirect(OrderAddress::admin($orderId));
         }, $back);
     }
 
@@ -119,7 +120,7 @@ final class BankPaymentController extends BaseController
         return $this->handle(function () use ($actor, $id, $orderId): void {
             $this->bank->match($actor, $id, $orderId);
             $this->flash('success', 'The deposit is matched: it is recorded as this order’s EFT payment.');
-            $this->redirect('/admin/commerce/orders/' . $orderId);
+            $this->redirect(OrderAddress::admin($orderId));
         }, '/admin/commerce/unmatched/' . $id);
     }
 

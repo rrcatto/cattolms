@@ -56,7 +56,8 @@ final class OrderService
         private readonly WalletService $wallets,
         private readonly ?SiteMode $site = null,
         private readonly ?\CattoLearning\Legal\LegalDocuments $legal = null,
-        private readonly ?PaymentMethods $methods = null
+        private readonly ?PaymentMethods $methods = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null
     ) {}
 
     /** The site's payment methods (owner, 2026-10-19); without the setting, EFT and a demo site's simulated card. */
@@ -338,6 +339,7 @@ final class OrderService
             if ($method==='eft') $this->queuePaymentInstructions($id);
             elseif ($checkout['invoice_email'] ?? false) $this->records->enqueue('invoice:'.$id, 'invoice.email_requested', ['order_id'=>$id], $now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));
+            $this->ownerMessages?->orderPlaced($this->records->order($id), $this->records->items($id), $method);
             $this->records->audit($id,$actor->id,'order.placed',['total_minor'=>$total]+($discount===null?[]:['promotion_id'=>$discount->promotion->id,'discount_minor'=>$discountMinor]),$now->format(DATE_ATOM));
             return $id;
         });

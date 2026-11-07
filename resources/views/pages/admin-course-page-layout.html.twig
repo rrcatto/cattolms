@@ -65,7 +65,7 @@
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Courses using it', heading_level: 2, summary: pl_layout.is_default ? 'The courses on the default layout, and any that chose it by name.' : 'The courses that chose this layout on their Page layout tab or on Course Page Layouts.'}) }}
 			{% if using %}
-			<ul class="cl-page-layout-courses">{% for course in using %}<li><code class="cl-course-code">{{ course.code }}</code> <a href="/admin/courses/{{ course.id }}?tab=page-layout" data-page-layout-leave>{{ course.title }}</a></li>{% endfor %}</ul>
+			<ul class="cl-page-layout-courses">{% for course in using %}<li><code class="cl-course-code">{{ course.code }}</code> <a href="{{ course_admin_url(course, '?tab=page-layout') }}" data-page-layout-leave>{{ course.title }}</a></li>{% endfor %}</ul>
 			{% else %}
 			<p>None yet. Give it to courses on <a href="/admin/courses/page-layouts#courses-layouts">Course Page Layouts</a>.</p>
 			{% endif %}

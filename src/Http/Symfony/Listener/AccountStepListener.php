@@ -13,9 +13,11 @@ since 2026-10-20; CurrentUser::$accountStep): their date of birth at the first s
 someone else created, or that has none yet (/account/id-number, the South African ID number, 2026-10-27), and, for good, the adults-only page when their verified
 identity shows them under 18 (/account/adults-only). Those pages, signing out, the legal pages, Help,
 the FAQ, the contact form, public certificates and transcripts, and machine addresses (the API,
-webhooks, assets, robots.txt, the sitemap) are never held up.
+webhooks, assets, robots.txt, the sitemap, llms.txt and share pictures) are never held up.
 
 Changelog:
+2026/11/06 SAST
+- /llms.txt and the share pictures (/share/) are machine addresses too.
 2026/10/20 SAST
 - Adults only: the date of birth, and the adults-only page in place of a parent or guardian's consent.
 2026/10/19 SAST
@@ -40,7 +42,7 @@ final class AccountStepListener implements EventSubscriberInterface
 
     /** Addresses a pending step never holds up. */
     private const OPEN = ['/account/id-number', '/account/adults-only', '/logout', '/auth/', '/login', '/register', '/terms', '/refunds', '/privacy', '/help', '/faq', '/contact',
-        '/api/', '/webhooks/', '/m/', '/theme/', '/assets/', '/css/', '/js/', '/img/', '/robots.txt', '/sitemap', '/certificates/', '/transcripts/', '/favicon', '/_'];
+        '/api/', '/webhooks/', '/m/', '/theme/', '/assets/', '/css/', '/js/', '/img/', '/robots.txt', '/sitemap', '/llms.txt', '/share/', '/certificates/', '/transcripts/', '/favicon', '/_'];
 
     public function __construct(private readonly AuthService $auth) {}
 

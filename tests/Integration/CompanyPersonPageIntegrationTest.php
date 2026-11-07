@@ -65,23 +65,27 @@ final class CompanyPersonPageIntegrationTest extends TestCase
         $this->fixture->addCompanyMember($company, $member);
         $outsider = $this->fixture->createUser('Not Here' . $suffix, 'person-outsider-' . $suffix . '@seed.test');
         $this->signIn($manager);
+        // A person by their account reference (owner, 2026-11-06: no row id in an address).
+        $stored = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $member]);
+        $outsiderReference = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $outsider]);
 
-        $page = $this->send('/company/people/' . $member);
+        $page = $this->send('/company/people/' . $stored);
         self::assertSame(200, $page->getStatusCode(), substr(strip_tags((string) $page->getContent()), 0, 300));
         $html = (string) $page->getContent();
         $reference = AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $member]));
-        foreach (['Lerato Member' . $suffix, $reference, 'person-member-' . $suffix . '@seed.test', '>Courses<', '>Course requests<', '/company/people/' . $member . '/delete'] as $text) {
+        foreach (['Lerato Member' . $suffix, $reference, 'person-member-' . $suffix . '@seed.test', '>Courses<', '>Course requests<', '/company/people/' . $stored . '/delete'] as $text) {
             self::assertStringContainsString($text, $html);
         }
         self::assertStringNotContainsString('+02</dd>', $html, 'Dates are written out, not raw timestamps.');
-        self::assertSame(404, $this->send('/company/people/' . $outsider)->getStatusCode(), 'A person outside the company is not found.');
+        self::assertSame(404, $this->send('/company/people/' . $outsiderReference)->getStatusCode(), 'A person outside the company is not found.');
+        self::assertSame(404, $this->send('/company/people/' . $member)->getStatusCode(), 'Their row id names nobody.');
 
         // Disabling them from their page comes back to their page.
-        $back = $this->post('/company/people/' . $member . '/status', ['status' => 'disabled', 'return' => '/company/people/' . $member]);
-        self::assertSame('/company/people/' . $member, $back->headers->get('Location'));
+        $back = $this->post('/company/people/' . $stored . '/status', ['status' => 'disabled', 'return' => '/company/people/' . $stored]);
+        self::assertSame('/company/people/' . $stored, $back->headers->get('Location'));
         self::assertSame('disabled', $this->db->fetchOne('SELECT status FROM users WHERE id = :id', ['id' => $member]));
         // The company's lists link the name to this page.
-        self::assertStringContainsString('href="/company/people/' . $member . '"', (string) $this->send('/company/people')->getContent());
+        self::assertStringContainsString('href="/company/people/' . $stored . '"', (string) $this->send('/company/people')->getContent());
     }
 
     private function signIn(int $user): void

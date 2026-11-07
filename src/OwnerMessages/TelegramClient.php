@@ -14,6 +14,10 @@ address, so anything Telegram or the network says is scrubbed of it before it is
 and to store.
 
 Change log:
+2026/11/05 SAST (evening)
+- Messages go with link_preview_options {is_disabled: true}: a sign-in message's link is used up when it is opened, so no
+  preview may open it. updates() reads what the bot has been sent from a saved offset, for TelegramInbox. A failure carries
+  Telegram's answer as its code, so the Telegram log can say why a person did not get a message.
 2026/11/05 SAST
 - Created.
 */
@@ -33,7 +37,20 @@ class TelegramClient
 
     public function send(string $address, string $key, string $chatId, string $text): void
     {
-        $this->call($address, $key, 'sendMessage', ['chat_id' => $chatId, 'text' => $text, 'disable_web_page_preview' => true]);
+        $this->call($address, $key, 'sendMessage', ['chat_id' => $chatId, 'text' => $text, 'link_preview_options' => ['is_disabled' => true]]);
+    }
+
+    /**
+     * What the bot has been sent since the offset, oldest first: reading from an offset tells Telegram that everything before it
+     * has been handled, so it is never given again. Messages only, at once, never waiting.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function updates(string $address, string $key, int $offset): array
+    {
+        $answer = $this->call($address, $key, 'getUpdates', ['offset' => $offset, 'limit' => 100, 'timeout' => 0, 'allowed_updates' => ['message']]);
+
+        return array_values(array_filter($answer, 'is_array'));
     }
 
     /** The bot this key belongs to: its username, which shows the key is good. */
@@ -72,7 +89,7 @@ class TelegramClient
             $status = $response->getStatusCode();
             $data = json_decode($response->getContent(false), true);
         } catch (ExceptionInterface $network) {
-            throw new TelegramFailed('Telegram could not be reached: ' . self::scrubbed($network->getMessage(), $key));
+            throw new TelegramFailed('Telegram could not be reached: ' . self::scrubbed($network->getMessage(), $key), 0);
         }
         if ($status < 300 && is_array($data) && ($data['ok'] ?? false) === true) return is_array($data['result'] ?? null) ? $data['result'] : [];
         $said = is_array($data) ? self::scrubbed(trim((string) ($data['description'] ?? '')), $key) : '';
@@ -83,7 +100,7 @@ class TelegramClient
             $status === 429 => 'Telegram asks to wait a moment before trying again.',
             $status >= 500 => 'Telegram is having trouble (it answered ' . $status . ').',
             default => 'Telegram answered ' . $status . ($said !== '' ? ': ' . $said : '.'),
-        });
+        }, $status);
     }
 
     /** What is left of a message with the key taken out, in the address or on its own. */

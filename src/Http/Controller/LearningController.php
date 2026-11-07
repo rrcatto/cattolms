@@ -11,6 +11,9 @@ Description:
 Handles web requests for learning operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/07 SAST
+- A part is named by its part name, never its row id (owner, 2026-11-06): /learn/{slug}/{part}, /pdf,
+  /download/{item_key} and /complete replace /learn/{slug}/item/{node_id}/content and the rest. An old address is not found.
 2026/11/01 SAST
 - POST /learn/{slug}/item/{node_id}/complete: a learner marks a part complete or unmarks it (owner, 2026-11-01), a plain
   form returning to the same part.
@@ -46,6 +49,8 @@ use CattoLearning\Course\ResourceUnavailable;
 use CattoLearning\Http\FileDownload;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use CattoLearning\Course\CourseRepository;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CoursePartAddress;
 
 use CattoLearning\View\ThemeRenderer;
 
@@ -74,7 +79,9 @@ final class LearningController extends BaseController
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly AnalyticsEventRecorder $analytics,
         private readonly \CattoLearning\Mailing\MailingConsents $mailing,
-        private readonly \CattoLearning\Course\Parts\CoursePartPdfs $partPdfs
+        private readonly \CattoLearning\Course\Parts\CoursePartPdfs $partPdfs,
+        private readonly CourseRepository $courses,
+        private readonly AddressKeyRepository $keys
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -139,12 +146,12 @@ final class LearningController extends BaseController
     }
 
 
-    #[Route('/learn/{slug}/item/{node_id}/content', name: 'learning_course_content', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    #[Route('/learn/{slug}/{part}', name: 'learning_course_content', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['GET'])]
     public function item(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
         $slug = (string) $this->param('slug');
-        $nodeId = (int) $this->param('node_id');
+        $nodeId = $this->partNode($slug);
         $preview = $this->previewMode();
         return $this->handle(function () use ($user, $slug, $nodeId, $preview): Response {
             $course = $this->learning->item($user->id, $slug, $nodeId, $preview);
@@ -177,18 +184,19 @@ final class LearningController extends BaseController
      * A learner marks a part complete, or unmarks it (owner, 2026-11-01: "a mark complete button which could be a toggle,
      * so a student could unmark it"). A plain form, so it works without JavaScript; it returns to the same part.
      */
-    #[Route('/learn/{slug}/item/{node_id}/complete', name: 'learning_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['POST'])]
+    #[Route('/learn/{slug}/{part}/complete', name: 'learning_mark_part', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['POST'])]
     public function markPart(): Response
     {
         $slug = (string) $this->param('slug');
-        $nodeId = (int) $this->param('node_id');
+        $part = $this->param('part');
         $query = (string) ($_GET['preview'] ?? '') === '1' ? '?preview=1' : '';
         // A plain form comes back to the buttons it was pressed at, not the top of the page.
-        $back = '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/content' . $query . '#cl-course-item-paging';
+        $back = CoursePartAddress::reader($slug, $part) . $query . '#cl-course-item-paging';
         if (!$this->isHtmxRequest()) {
             $this->requireCsrf();
             $user = $this->requirePermission('LEARNING.COURSE.VIEW');
             $preview = $this->previewMode();
+            $nodeId = $this->partNode($slug);
             return $this->handle(function () use ($user, $slug, $nodeId, $preview, $back): void {
                 $this->learning->markPart($user->id, $slug, $nodeId, $this->posted('completed') === '1', $preview);
                 $this->redirect($back);
@@ -201,6 +209,7 @@ final class LearningController extends BaseController
             $this->requireCsrf();
             $user = $this->requirePermission('LEARNING.COURSE.VIEW');
             $preview = $this->previewMode();
+            $nodeId = $this->partNode($slug);
             $this->learning->markPart($user->id, $slug, $nodeId, $this->posted('completed') === '1', $preview);
             $course = $this->learning->courseHome($user->id, $slug, $preview);
         } catch (HttpExceptionInterface) {
@@ -213,16 +222,17 @@ final class LearningController extends BaseController
         $rows = CourseNavigation::rowsUpTo((array) $course['structure'], $nodeId);
         return $this->renderFragment('partials/course-part-done', [
             'course' => $course, 'public_preview' => false, 'presentation_query' => $query, 'is_preview' => $preview, 'rows' => $rows,
-            'paging_complete' => ['action' => '/learn/' . rawurlencode($slug) . '/item/' . $nodeId . '/complete' . $query, 'done' => !empty($rows[0]['is_done'])],
+            'paging_complete' => ['action' => CoursePartAddress::reader($slug, $part, '/complete') . $query, 'done' => !empty($rows[0]['is_done'])],
         ]);
     }
 
-    #[Route('/learn/{slug}/item/{node_id}/download/{item_key}', name: 'learning_course_download', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'item_key' => '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}'], methods: ['GET'])]
+    #[Route('/learn/{slug}/{part}/download/{item_key}', name: 'learning_course_download', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT, 'item_key' => '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}'], methods: ['GET'])]
     public function download(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+        $nodeId = $this->partNode((string) $this->param('slug'));
         try {
-            $file = $this->learning->download($user->id, (string) $this->param('slug'), (int) $this->param('node_id'), (string) $this->param('item_key'), $this->previewMode());
+            $file = $this->learning->download($user->id, (string) $this->param('slug'), $nodeId, (string) $this->param('item_key'), $this->previewMode());
         } catch (ResourceUnavailable $exception) {
             throw $this->notFound($exception->getMessage());
         } catch (\InvalidArgumentException $exception) {
@@ -235,12 +245,13 @@ final class LearningController extends BaseController
      * A module's lesson, summary, flash cards or practical work as a PDF to keep (owner, 2026-10-28, decision 6A), for a
      * learner who may open the part now.
      */
-    #[Route('/learn/{slug}/item/{node_id}/pdf', name: 'learning_course_part_pdf', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    #[Route('/learn/{slug}/{part}/pdf', name: 'learning_course_part_pdf', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'part' => CoursePartAddress::REQUIREMENT], methods: ['GET'])]
     public function pdf(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+        $nodeId = $this->partNode((string) $this->param('slug'));
         try {
-            $course = $this->learning->item($user->id, (string) $this->param('slug'), (int) $this->param('node_id'), $this->previewMode());
+            $course = $this->learning->item($user->id, (string) $this->param('slug'), $nodeId, $this->previewMode());
         } catch (\InvalidArgumentException $exception) {
             throw $this->notFound($exception->getMessage());
         }
@@ -258,6 +269,16 @@ final class LearningController extends BaseController
         $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, (string) $node['rendered_html'])]]);
         $file = $this->partPdfs->file($html);
         return FileDownload::attachment($file, \CattoLearning\Course\Parts\CoursePartPdfs::filename($heading['module'], $heading['part'] === 'Lesson' ? '' : $heading['part']), 'application/pdf');
+    }
+
+    /**
+     * The part the address names by its part name, in the course the address names by its slug (owner, 2026-11-06: no
+     * row id in an address): an unknown course or part is not found.
+     */
+    private function partNode(string $slug): int
+    {
+        $course = preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1 ? $this->courses->findBySlug($slug) : null;
+        return ($course === null ? null : $this->keys->part((int) $course['id'], $this->param('part'))) ?? throw $this->notFound('We could not find that part of the course.');
     }
 
     private function previewMode(): bool

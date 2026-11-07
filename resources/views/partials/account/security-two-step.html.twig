@@ -1,0 +1,62 @@
+{#
+	The Two-step sign-in card of Sign-in and security (owner, 2026-11-05, the approved mockup): set it up with a QR code drawn
+	on the server and a first code, keep the recovery codes shown once, and make new ones or turn it off, both after a current
+	code. Turning it off is not offered while the site asks this person to use it.
+#}
+{% set two = security.two_step %}
+{% set manage = can_manage_security|default(false) %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'security-two-step', section_spacing: true})} %}{% block surface_body %}
+	<div class="cl-security-card" data-security-two-step="{{ two.state }}">
+	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Two-step sign-in'})} %}{% block section_actions %}{{ ui('feedback.badge', two.state == 'on' or two.state == 'codes' ? {label: 'On', tone: 'success'} : {label: 'Off', tone: 'neutral'}) }}{% endblock %}{% endembed %}
+	{% if two.note %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: two.note.tone})} %}{% block body %}<p class="mb-0" role="status" data-security-note>{{ two.note.words }}</p>{% endblock %}{% endembed %}{% endif %}
+	{% if two.state == 'scan' %}
+		{% include '@platform/partials/account/two-step-scan.html.twig' with {qr: two.qr, key: two.key, action: '/account/security/two-step/confirm', cancel_action: '/account/security/two-step/cancel', card: 'security-two-step', csrf: csrf} only %}
+	{% elseif two.state == 'codes' %}
+		{% include '@platform/partials/account/two-step-recovery-codes.html.twig' with {codes: two.codes} only %}
+		<form action="/account/security/two-step/kept" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/two-step/kept', hx_card: 'security-two-step'} only %}>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{{ ui('action.button', {label: 'I have kept them', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}
+		</form>
+	{% elseif two.state == 'on' %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success'})} %}{% block body %}<p class="mb-0"><strong>Two-step sign-in is on.</strong> You have {{ two.left }} recovery {{ two.left == 1 ? 'code' : 'codes' }} left.{% if two.required %} This site asks you to use it, so it stays on.{% endif %}</p>{% endblock %}{% endembed %}
+		{% if manage %}
+		{% if two.ask %}
+		{# The step that asks for a current code first: New recovery codes, or Turn off. #}
+		<form action="/account/security/two-step/{{ two.ask }}" method="post" class="cl-sign-in-code" novalidate {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/two-step/' ~ two.ask, hx_card: 'security-two-step'} only %}>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: two.ask == 'off' ? 'A code from your app, to turn two-step off' : 'A code from your app, for new recovery codes', for: 'two-step-current', help: 'Lost your phone? A recovery code works here too.'})} %}
+{% block control %}<input class="cl-input cl-input-lg cl-input-code" type="text" id="two-step-current" name="code" autocomplete="one-time-code" maxlength="12" placeholder="000000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{% if two.ask == 'off' %}{{ ui('action.button', {label: 'Turn off', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-disable'}) }}{% else %}{{ ui('action.button', {label: 'Make new recovery codes', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-refresh'}) }}{% endif %}
+				{{ ui('action.link', {label: 'Cancel', variant: 'secondary', size: 'normal', href: '/account/security#security-two-step', icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
+		</form>
+		{% else %}
+		<div class="cl-security-actions">
+			<form action="/account/security" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
+				<input type="hidden" name="two_step" value="codes">
+				{{ ui('action.button', {label: 'New recovery codes', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-refresh'}) }}
+			</form>
+			{% if not two.required %}
+			<form action="/account/security" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
+				<input type="hidden" name="two_step" value="off">
+				{{ ui('action.button', {label: 'Turn off', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-disable'}) }}
+			</form>
+			{% endif %}
+		</div>
+		<p class="small cl-text-secondary mb-0">{{ two.required ? 'New recovery codes asks for a code from your app first.' : 'Both ask for a code from your app first.' }}</p>
+		{% endif %}
+		{% endif %}
+	{% else %}
+		<p class="mb-0">After your link or code, we also ask for a 6-digit code from an app on your phone, so someone who gets into your email or Telegram still cannot get in. Any authenticator app works, such as Google Authenticator, Microsoft Authenticator or Authy.</p>
+		{% if two.required %}<p class="mb-0">This site asks you to use it: you set it up at your next sign-in if you have not by then.</p>{% endif %}
+		{% if manage %}
+		<div class="cl-security-actions">
+			<form action="/account/security/two-step/start" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/two-step/start', hx_card: 'security-two-step'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Set up two-step', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-verify'}) }}
+			</form>
+		</div>
+		{% endif %}
+	{% endif %}
+	</div>
+{% endblock %}{% endembed %}

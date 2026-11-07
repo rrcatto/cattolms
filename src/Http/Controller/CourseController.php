@@ -43,10 +43,12 @@ final class CourseController extends BaseController
         private readonly AnalyticsEventRecorder $analytics,
         private readonly CourseReviewService $reviews,
         private readonly \CattoLearning\Bundle\BundleRepository $bundles,
+        private readonly \CattoLearning\Bundle\BundleService $bundleOffers,
         private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases,
         private readonly \CattoLearning\Mailing\MailingConsents $mailing,
         private readonly \CattoLearning\Course\CoursePageView $coursePage,
-        private readonly \CattoLearning\Course\CoursePageLayouts $layouts
+        private readonly \CattoLearning\Course\CoursePageLayouts $layouts,
+        private readonly \CattoLearning\Search\PageMetadata $metadata
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -58,18 +60,13 @@ final class CourseController extends BaseController
     #[Route('/courses/category/{slug}', name: 'course_catalogue_2', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
     public function catalogue(): Response
     {
-        // The category picker submits a category ID; browsing keeps the readable category URL.
+        // The category picker and the category cards choose a category by its address, never its number (owner,
+        // 2026-11-06: a public page's address carries its name, for search engines). With JavaScript they open
+        // /courses/category/{slug} themselves; without it the form asks /courses?category={slug}, which goes there.
         if ($this->request()->query->has('category')) {
-            $chosen = (int) $this->request()->query->get('category', '0');
-            $target = '/courses';
-            if ($chosen > 0) {
-                try {
-                    $target = '/courses/category/' . rawurlencode((string) $this->courses->category($chosen)['slug']);
-                } catch (\InvalidArgumentException) {
-                    throw $this->notFound('The course category was not found.');
-                }
-            }
-            $this->redirect($target);
+            $chosen = trim((string) $this->request()->query->get('category', ''));
+            if ($chosen !== '' && $this->courses->browsableCategory($chosen) === null) throw $this->notFound('The course category was not found.');
+            $this->redirect($chosen === '' ? '/courses' : '/courses/category/' . rawurlencode($chosen));
         }
         $slug = trim((string) $this->param('slug'));
         $category = $this->courses->browsableCategory($slug);
@@ -83,16 +80,20 @@ final class CourseController extends BaseController
         $courses = $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset);
         $navigation = $this->courses->categoryNavigation($category);
         $scope = $category === null ? '' : (string) $category['name'] . ($navigation['subcategories'] === [] ? '' : ' and all its subcategories');
+        // Bundles first, above the courses (owner, 2026-11-06, the approved mockup): on All courses and a category's first
+        // page, never with a search (or on a tag's page, which is not this one). The line about bundles stays where they do not.
+        $bundleRow = $search === '' && $pagination->page === 1 ? $this->bundleOffers->catalogueRow($category === null ? null : (int) $category['id'], $this->currentUser()) : [];
         // Cards or a list, as the reader chose, remembered (owner, 2026-10-26).
         $query = $this->request()->query->all();
         $view = ListView::chosen(self::DATASET, $query, $this->request()->cookies->all());
         ListView::rememberAsked(self::DATASET, $query);
 
         return $this->render('courses', [
+            // The courses it shows, for search engines (owner, 2026-11-06): the summary page of Google's Course list.
+            'page_meta' => $this->metadata->catalogue($base, $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses', $courses, $search !== ''),
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
             'category_picker' => $this->courses->catalogueCategoryPicker($category),
             'catalogue_search' => $search,
-            'bundle_count' => $this->bundles->publishedCount(),
             'courses' => $this->withFavourites($courses),
             'can_favourite' => $this->currentUser() !== null,
             'favourite_return' => $this->requests->getCurrentRequest()?->getRequestUri() ?? $base,
@@ -102,8 +103,10 @@ final class CourseController extends BaseController
                     ? ($category === null ? 'Searching every course.' : 'Searching ' . $scope . '.')
                     : ($category === null ? 'Every course in the catalogue. Choose a category to narrow the list.' : 'Every course in ' . $scope . '.'),
                 'navigation' => $navigation,
+                'bundles' => $bundleRow === [] ? null : ['cards' => $bundleRow, 'summary' => $category === null ? 'Several courses for one price.' : 'Bundles with a course in ' . (string) $category['name'] . '.'],
+                'bundles_line' => $bundleRow === [] && $this->bundles->publishedCount() > 0,
                 'view' => $view,
-                'follow' => $category === null ? null : $this->followView('category', (int) $category['id'], (string) $category['name'], $base . '#follow'),
+                'follow' => $category === null ? null : $this->followView('category', (int) $category['id'], (string) $category['name'], $base . '#follow', (string) $category['slug']),
                 'view_switch' => ListView::switcher(self::DATASET, $view, $base, [PlatformAdministrationService::searchParam(self::DATASET) => $search]),
                 'paginated' => true,
                 'empty_heading' => $search !== '' ? 'No courses match your search' : 'No courses to show here yet',
@@ -215,7 +218,7 @@ final class CourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $period): void {
             $this->platformAdministration->requestCourse($user->id, $courseId, $period, (string) ($_POST['note'] ?? ''));
             $this->flash('success', 'Your course request was sent to your company administrator.');
-            $this->redirect('/account/courses?list=requests');
+            $this->redirect('/account/requests');
         }, '/courses');
     }
 
@@ -277,9 +280,12 @@ final class CourseController extends BaseController
             'preview' => !empty($course['has_public_preview']), 'related' => count($related), 'owned' => ($purchase['state'] ?? '') === 'owned',
         ]);
         $rows = \CattoLearning\Course\CoursePageLayout::rows($this->layouts->forCourse($courseId)['blocks'], $present);
+        // What its head tells search engines, AI assistants and the sites it is shared on, from what the page shows (owner, 2026-11-06).
+        $meta = $this->metadata->course($course, $page, $rating->toArray(), array_merge(...array_map(static fn(array $row): array => array_column($row, 'id'), $rows)));
 
         return $this->render('course-detail', [
-            'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow'),
+            'page_meta' => $meta,
+            'follow' => $this->followView('course', (int) $course['id'], (string) $course['title'], '/courses/' . $course['slug'] . '#follow', (string) $course['code']),
             'title' => (string) $course['title'],
             'course' => $course,
             'course_page' => $page,
@@ -303,6 +309,8 @@ final class CourseController extends BaseController
             'own_review' => $canReview ? $this->reviews->learnerReview($courseId, $user->id) : null,
             // The published courses related to this one (owner, 2026-10-20), as catalogue cards.
             'related_courses' => $related,
+            // Each bundle the course is in that this visitor could buy, under the buy button (owner, 2026-11-06, the approved mockup).
+            'bundle_notes' => $this->bundleOffers->forCourse($courseId, $user),
         ]);
     }
 
@@ -315,11 +323,14 @@ final class CourseController extends BaseController
      *
      * @return array{kind:string,id:int,name:string,following:bool,signed_in:bool,return:string,choose_how:bool,how:array<string,mixed>}
      */
-    private function followView(string $kind, int $id, string $name, string $return): array
+    private function followView(string $kind, int $id, string $name, string $return, string $key): array
     {
         $user = $this->currentUser();
+        // Follow's address and what is carried through signing in name a course by its code, a category by its slug
+        // (owner, 2026-11-06: no row id in an address).
+        $named = ['href' => $kind === 'course' ? \CattoLearning\Course\CourseAddress::to('follow', $key) : \CattoLearning\Support\Address\CatalogueAddress::follow($kind, $key), 'intent' => $kind . ':' . $key];
 
-        return ['kind' => $kind, 'id' => $id, 'name' => $name, 'following' => $user !== null && $this->mailing->isSubscribed($user->id, $kind, $id), 'signed_in' => $user !== null, 'return' => $return]
+        return $named + ['kind' => $kind, 'id' => $id, 'name' => $name, 'following' => $user !== null && $this->mailing->isSubscribed($user->id, $kind, $id), 'signed_in' => $user !== null, 'return' => $return]
             + $this->mailing->followChoice($user === null ? 0 : $user->id);
     }
 }

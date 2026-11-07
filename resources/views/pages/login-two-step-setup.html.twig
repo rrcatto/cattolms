@@ -1,0 +1,29 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		Setting two-step up at sign-in, for someone this site asks to use it (owner, 2026-11-05, the approved mockup): the QR code
+		drawn on the server, the key to type instead, the first code, then the recovery codes shown once. Only then does the
+		sign-in complete.
+	#}
+	{% set ph_kicker = 'Passwordless access' %}
+	{% set ph_title = setup.codes ? 'Keep your recovery codes' : 'Set up two-step sign-in' %}
+	{% set ph_lead = setup.codes ? 'Two-step sign-in is on. One last thing before you go on.' : 'This site asks you to use a code from an app on your phone each time you sign in.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+				{% if setup.codes %}
+				{% include '@platform/partials/account/two-step-recovery-codes.html.twig' with {codes: setup.codes} only %}
+				<form action="/login/two-step/setup/kept" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('action.button', {label: 'I have kept them', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}
+				</form>
+				{% else %}
+				{% include '@platform/partials/account/two-step-scan.html.twig' with {qr: setup.qr, key: setup.key, action: '/login/two-step/setup', cancel_action: '/login/two-step/cancel', card: '', csrf: csrf} only %}
+				{% endif %}
+
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

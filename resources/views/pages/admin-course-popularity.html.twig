@@ -34,7 +34,7 @@
 {% for row in courses %}
 <tr>
 	<td>{{ row.rank }}</td>
-	<td><a href="/admin/reports/popularity/{{ row.course_id }}"><strong>{{ row.title }}</strong></a>{% if row.offer != 'paid' %} {{ ui('feedback.badge', {label: row.offer == 'free' ? 'Free' : 'No active price', tone: 'info', size: 'small'}) }}{% endif %}</td>
+	<td><a href="{{ course_url('popularity', row) }}"><strong>{{ row.title }}</strong></a>{% if row.offer != 'paid' %} {{ ui('feedback.badge', {label: row.offer == 'free' ? 'Free' : 'No active price', tone: 'info', size: 'small'}) }}{% endif %}</td>
 	<td><strong>{{ row.score|number_format(1) }}</strong></td>
 	<td>{{ row.unique_views }}</td>
 	<td>{{ row.favourites }}</td>

@@ -239,7 +239,7 @@ final class WalletService
             $row['in_label'] = (int) $row['wallet_effect'] > 0 ? Money::strictMinorUnits($amount, (string) $row['currency'])->format() : '';
             $row['out_label'] = (int) $row['wallet_effect'] < 0 ? Money::strictMinorUnits($amount, (string) $row['currency'])->format() : '';
             $row['balance_label'] = Money::ofMinorUnits(max(0, (int) $row['balance_after']), (string) $row['currency'])->format();
-            $row['order_label'] = $row['order_id'] === null ? '' : 'CL-' . sprintf('%08d', (int) $row['order_id']);
+            $row['order_label'] = $row['order_id'] === null ? '' : \CattoLearning\Commerce\Domain\OrderNumber::format((int) $row['order_id']);
             $rows[] = $row;
         }
 

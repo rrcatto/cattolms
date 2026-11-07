@@ -11,6 +11,8 @@ where they are from and what they are doing, the Site Log, flagged activity, one
 site protection settings. Only Platform Administrators see it (PLATFORM.SITEANALYTICS.VIEW and MANAGE).
 
 Changelog:
+2026/11/07 SAST
+- People are linked by their account references (owner, 2026-11-06: no row id in an address).
 2026/11/04 SAST
 - Created.
 */
@@ -66,6 +68,7 @@ final class SiteAnalyticsController extends BaseController
         private readonly AuditRepository $audit,
         private readonly \CattoLearning\Auth\Signup\SignInHistory $signIns,
         private readonly \CattoLearning\OwnerMessages\OwnerMessageRepository $ownerMessages,
+        private readonly \CattoLearning\OwnerMessages\OwnerMessageSettings $ownerMessageSettings,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -96,7 +99,7 @@ final class SiteAnalyticsController extends BaseController
             'period_query' => $periodQuery,
             'attention' => array_map([$this, 'attentionRow'], array_slice($waiting, 0, 8)),
             'attention_more' => max(0, count($waiting) - 8),
-            'new_countries' => array_map(static fn(array $signIn): array => ['name' => (string) ($signIn['name'] ?: $signIn['email']), 'href' => '/admin/people/' . (int) $signIn['user_id'] . '#recent-sign-ins', 'country' => (string) $signIn['country_name'],
+            'new_countries' => array_map(static fn(array $signIn): array => ['name' => (string) ($signIn['name'] ?: $signIn['email']), 'href' => \CattoLearning\Support\Address\PersonAddress::admin((string) $signIn['account_reference'], '#recent-sign-ins'), 'country' => (string) $signIn['country_name'],
                 'earlier' => implode(', ', (array) $signIn['earlier']), 'at' => Words::when((string) $signIn['at']), 'ip' => (string) $signIn['ip']], $this->signIns->newCountries()),
             'figures' => [
                 'visitors' => ['value' => number_format($figures['visitors']), 'note' => self::compared($figures['visitors'], $before['visitors'])],
@@ -163,7 +166,12 @@ final class SiteAnalyticsController extends BaseController
         ]);
     }
 
-    /** What went to the owner's Telegram (owner, 2026-11-05: "so I can see what messages you sent and I can check if I got them"). */
+    /**
+     * Every message the site sends by Telegram (owner, 2026-11-05: "so I can see what messages you sent and I can check if I got
+     * them"; and "The Telegram log does not say which telegram account a message was sent to"), with who each went to: the
+     * person on this site with their username, or You, the owner's own, with theirs. Rows made before that have no username,
+     * and show the owner's current one.
+     */
     #[Route('/admin/site-analytics/telegram-log', name: 'admin_telegram_log', methods: ['GET'])]
     public function telegramLog(): Response
     {
@@ -175,19 +183,42 @@ final class SiteAnalyticsController extends BaseController
         if (!isset($counts[$list])) $list = 'all';
         $pagination = Pagination::create($query->get('telegramlog_page'), $query->get('telegramlog_page_size'), $counts[$list], 25);
         $zone = new \DateTimeZone(date_default_timezone_get());
-        $when = static fn(mixed $at): string => is_string($at) ? (new DateTimeImmutable($at))->setTimezone($zone)->format('j M Y, H:i:s') : '';
+        $today = (new DateTimeImmutable('now', $zone))->format('Y-m-d');
+        $when = static fn(mixed $at): string => is_string($at) ? (new DateTimeImmutable($at))->setTimezone($zone)->format('j M, H:i') : '';
+        $sentAt = static function (mixed $at) use ($zone, $today): string {
+            if (!is_string($at)) return '';
+            $moment = (new DateTimeImmutable($at))->setTimezone($zone);
+
+            return $moment->format('Y-m-d') === $today ? $moment->format('H:i') : $moment->format('j M, H:i');
+        };
+        $ownUsername = $this->ownerMessageSettings->saved()['username'];
+        $canOpenPeople = $this->requireUser()->hasPermission('PLATFORM.PERSON.VIEW');
 
         return $this->render('admin-telegram-log', [
             'title' => 'Telegram log',
             'active_nav' => 'admin',
             'list' => $list,
             'counts' => $counts,
-            'rows' => array_map(static fn(array $row): array => [
-                'id' => (int) $row['id'], 'body' => (string) $row['body'], 'when' => $when($row['created_at']), 'sent' => $when($row['sent_at']), 'tries' => (int) $row['tries'],
-                'kind' => ['registration' => 'Registration', 'sale' => 'Sale', 'test' => 'Test message'][(string) $row['kind']] ?? (string) $row['kind'],
-                'status' => $row['sent_at'] !== null ? ['label' => 'Sent', 'tone' => 'success'] : ((string) $row['kind'] === 'test' ? ['label' => 'Failed', 'tone' => 'danger'] : ['label' => 'Waiting', 'tone' => 'warning']),
-                'error' => (string) ($row['last_error'] ?? ''),
-            ], $this->ownerMessages->logPage($list, $pagination->pageSize, $pagination->offset)),
+            'rows' => array_map(static function (array $row) use ($when, $sentAt, $ownUsername, $canOpenPeople): array {
+                $own = $row['chat_id'] === null;
+                $username = (string) ($row['to_username'] ?? '') !== '' ? (string) $row['to_username'] : ($own ? $ownUsername : '');
+                $person = $row['to_user_id'] !== null && ($row['first_name'] !== null || $row['display_name'] !== null || $row['primary_email'] !== null) ? \CattoLearning\Support\PersonName::full($row) : '';
+                $failed = $row['sent_at'] === null && ($row['kind'] === 'test' || !$own);
+
+                return [
+                    'id' => (int) $row['id'], 'body' => (string) $row['body'], 'when' => $when($row['created_at']), 'sent' => $sentAt($row['sent_at']), 'tries' => (int) $row['tries'],
+                    'kind' => match ((string) $row['kind']) {
+                        'sign_in' => 'Sign-in', 'registration' => 'Registration', 'order' => 'New order', 'sale' => 'Sale', 'test' => 'Test',
+                        'money_report' => 'Money report',
+                        'connected' => str_starts_with((string) $row['reference'], 'connected:') ? 'Connected' : 'Bot reply',
+                        default => (string) $row['kind'],
+                    },
+                    'to' => ['own' => $own, 'name' => $own ? 'You' : $person, 'href' => !$own && $person !== '' && $canOpenPeople && (string) ($row['to_reference'] ?? '') !== '' ? \CattoLearning\Support\Address\PersonAddress::admin((string) $row['to_reference']) : '',
+                        'handle' => $username !== '' ? '@' . $username : ''],
+                    'status' => $row['sent_at'] !== null ? ['label' => 'Sent', 'tone' => 'success'] : ($failed ? ['label' => 'Not sent', 'tone' => 'danger'] : ['label' => 'Waiting', 'tone' => 'warning']),
+                    'error' => (string) ($row['last_error'] ?? ''),
+                ];
+            }, $this->ownerMessages->logPage($list, $pagination->pageSize, $pagination->offset)),
             'telegramlog_pagination' => PlatformAdministrationService::paginationPayload('telegramlog', $pagination, self::BASE . '/telegram-log', 'Telegram log', $list === 'all' ? [] : ['list' => $list]),
             'can_manage_settings' => $this->requireUser()->hasPermission('SYSTEM.SETTING.MANAGE'),
         ]);

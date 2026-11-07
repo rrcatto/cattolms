@@ -9,13 +9,15 @@ Version: 1.0.0
 
 Description:
 The presentation editor's pages (owner, 2026-10-30: "build the presentation editor from the mockup"). The presentation's
-own page is /admin/course-items/{id} (AdminCourseComponentController::edit draws it for a Presentation); here are its
+own page is /admin/course-items/{slug of its name} (AdminCourseComponentController::edit draws it for a Presentation); here are its
 slides' moves, copies and deletions, a slide's page with its Preview, Save slide and Close and its narration, the
 layout window (a window over the page with JavaScript, a page of its own without), a new slide, and the details page.
 Every change is made by Course\Catwalk\PresentationEditor, one part at a time; every page is gathered by
 Course\Catwalk\PresentationPages. Without JavaScript every form posts and the page is drawn again.
 
 Changelog:
+2026/11/07 SAST
+- A Presentation's pages are named by the slug of its name, never its row id (owner, 2026-11-06).
 2026/10/30 SAST
 - Created.
 */
@@ -33,6 +35,8 @@ use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Catwalk\SlideLayouts;
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CourseService;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\CourseItemAddress;
 use CattoLearning\Support\ListView;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
@@ -45,8 +49,9 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class AdminPresentationController extends BaseController
 {
-    private const ITEM = ['item_id' => '\d+'];
-    private const SLIDE = ['item_id' => '\d+', 'slide_id' => '[a-z0-9]{6,32}'];
+    /** A Presentation by the slug of its name (owner, 2026-11-06: no row id in an address); slide ids are random. */
+    private const ITEM = ['item' => CourseItemAddress::REQUIREMENT];
+    private const SLIDE = ['item' => CourseItemAddress::REQUIREMENT, 'slide_id' => '[a-z0-9]{6,32}'];
 
     public function __construct(
         AuthService $auth,
@@ -56,7 +61,8 @@ final class AdminPresentationController extends BaseController
         private readonly CourseService $courses,
         private readonly PresentationEditor $editor,
         private readonly PresentationPages $pages,
-        private readonly Narrations $narrations
+        private readonly Narrations $narrations,
+        private readonly AddressKeyRepository $keys
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -64,7 +70,7 @@ final class AdminPresentationController extends BaseController
     // ---- Page 1: the slides' moves, copies and deletions ---------------------------------------------------
 
     /** The ⋯ menu: to the start, earlier, later or to the end. */
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/move', name: 'admin_presentation_slide_move', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/move', name: 'admin_presentation_slide_move', requirements: self::SLIDE, methods: ['POST'])]
     public function move(): Response
     {
         [$user, $item] = $this->changing();
@@ -74,7 +80,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** A drag, or a move from the keyboard: the slide goes to index among the others, the order shown sent with it. */
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/arrange', name: 'admin_presentation_slide_arrange', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/arrange', name: 'admin_presentation_slide_arrange', requirements: self::SLIDE, methods: ['POST'])]
     public function arrange(): Response
     {
         [$user, $item] = $this->changing();
@@ -89,7 +95,7 @@ final class AdminPresentationController extends BaseController
         });
     }
 
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/copy', name: 'admin_presentation_slide_copy', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/copy', name: 'admin_presentation_slide_copy', requirements: self::SLIDE, methods: ['POST'])]
     public function copy(): Response
     {
         [$user, $item] = $this->changing();
@@ -101,7 +107,7 @@ final class AdminPresentationController extends BaseController
         }, $home . '#presentation-slides');
     }
 
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/delete', name: 'admin_presentation_slide_delete', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/delete', name: 'admin_presentation_slide_delete', requirements: self::SLIDE, methods: ['POST'])]
     public function delete(): Response
     {
         [$user, $item] = $this->changing();
@@ -115,7 +121,7 @@ final class AdminPresentationController extends BaseController
 
     // ---- Page 2: one slide --------------------------------------------------------------------------------
 
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}', name: 'admin_presentation_slide', requirements: self::SLIDE, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}', name: 'admin_presentation_slide', requirements: self::SLIDE, methods: ['GET'])]
     public function slide(): Response
     {
         $item = $this->viewing();
@@ -125,7 +131,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** Save slide (stays on the page), Preview (saves nothing) or a layout chosen in the layout window (unsaved). */
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}', name: 'admin_presentation_slide_save', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}', name: 'admin_presentation_slide_save', requirements: self::SLIDE, methods: ['POST'])]
     public function saveSlide(): Response
     {
         [$user, $item] = $this->changing();
@@ -135,7 +141,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** A new slide's page: nothing is kept until Save slide. */
-    #[Route('/admin/course-items/{item_id}/slides/new', name: 'admin_presentation_slide_new', requirements: self::ITEM, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/slides/new', name: 'admin_presentation_slide_new', requirements: self::ITEM, methods: ['GET'])]
     public function newSlide(): Response
     {
         $item = $this->viewing();
@@ -145,7 +151,7 @@ final class AdminPresentationController extends BaseController
         return $this->slidePage($item, $slide, $this->afterOf($deck, $_GET['after'] ?? null));
     }
 
-    #[Route('/admin/course-items/{item_id}/slides/new', name: 'admin_presentation_slide_create', requirements: self::ITEM, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/new', name: 'admin_presentation_slide_create', requirements: self::ITEM, methods: ['POST'])]
     public function createSlide(): Response
     {
         [$user, $item] = $this->changing();
@@ -153,7 +159,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** A slide's narration script, saved on its own, an audio file uploaded without JavaScript, or its recording removed. */
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/narration', name: 'admin_presentation_slide_narration', requirements: self::SLIDE, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/narration', name: 'admin_presentation_slide_narration', requirements: self::SLIDE, methods: ['POST'])]
     public function narration(): Response
     {
         [$user, $item] = $this->changing();
@@ -186,7 +192,7 @@ final class AdminPresentationController extends BaseController
     // ---- Page 3: the layout window --------------------------------------------------------------------------
 
     /** Change layout: a window over the slide's page, or a page of its own without JavaScript. */
-    #[Route('/admin/course-items/{item_id}/slides/{slide_id}/layout', name: 'admin_presentation_slide_layout', requirements: self::SLIDE, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/slides/{slide_id}/layout', name: 'admin_presentation_slide_layout', requirements: self::SLIDE, methods: ['GET'])]
     public function layout(): Response
     {
         $item = $this->viewing();
@@ -196,7 +202,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** Change layout on a new slide that is not saved yet. */
-    #[Route('/admin/course-items/{item_id}/slides/new/layout', name: 'admin_presentation_new_slide_layout', requirements: self::ITEM, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/slides/new/layout', name: 'admin_presentation_new_slide_layout', requirements: self::ITEM, methods: ['GET'])]
     public function newSlideLayout(): Response
     {
         $item = $this->viewing();
@@ -207,7 +213,7 @@ final class AdminPresentationController extends BaseController
     }
 
     /** Add a slide: its layout and where it goes, then its own page. */
-    #[Route('/admin/course-items/{item_id}/slides/add', name: 'admin_presentation_slide_add', requirements: self::ITEM, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/slides/add', name: 'admin_presentation_slide_add', requirements: self::ITEM, methods: ['GET'])]
     public function add(): Response
     {
         $item = $this->viewing();
@@ -219,13 +225,13 @@ final class AdminPresentationController extends BaseController
 
     // ---- Page 4: the details ---------------------------------------------------------------------------------
 
-    #[Route('/admin/course-items/{item_id}/details', name: 'admin_presentation_details', requirements: self::ITEM, methods: ['GET'])]
+    #[Route('/admin/course-items/{item}/details', name: 'admin_presentation_details', requirements: self::ITEM, methods: ['GET'])]
     public function details(): Response
     {
         return $this->detailsPage($this->viewing(), null);
     }
 
-    #[Route('/admin/course-items/{item_id}/details', name: 'admin_presentation_details_save', requirements: self::ITEM, methods: ['POST'])]
+    #[Route('/admin/course-items/{item}/details', name: 'admin_presentation_details_save', requirements: self::ITEM, methods: ['POST'])]
     public function saveDetails(): Response
     {
         [$user, $item] = $this->changing();
@@ -236,7 +242,8 @@ final class AdminPresentationController extends BaseController
             return $this->detailsPage($item, $input, ['tone' => 'danger', 'text' => $refused->getMessage()], 422);
         }
         $this->flash('success', 'The details were saved.');
-        $this->redirect(self::home($item));
+        // Saving may rename it, and its address follows its name.
+        $this->redirect(CourseItemAddress::admin($this->items->itemName((int) $item['id'])));
     }
 
     // ---- Shared ------------------------------------------------------------------------------------------------
@@ -397,7 +404,7 @@ final class AdminPresentationController extends BaseController
     private function viewing(): array
     {
         $user = $this->requirePermission('COURSE.EDIT');
-        $id = (int) $this->param('item_id');
+        $id = $this->keys->courseItem($this->param('item')) ?? throw new NotFoundHttpException('That presentation does not exist.');
         try {
             $item = $this->items->item($id);
         } catch (InvalidArgumentException|RuntimeException) {
@@ -420,6 +427,6 @@ final class AdminPresentationController extends BaseController
     /** @param array<string,mixed> $item */
     private static function home(array $item): string
     {
-        return '/admin/course-items/' . (int) $item['id'];
+        return CourseItemAddress::admin($item);
     }
 }

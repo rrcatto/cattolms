@@ -103,16 +103,16 @@ final class CatwalkSlideDeckTest extends TestCase
     {
         $deck = SlideDeck::validate(self::deck() + ['theme' => 'dark']);
         $first = $deck['slides'][0]['id'];
-        $html = (new DeckRenderer())->render($deck, 'gdn-101-m1-presentation', 'What you will learn', ['continue' => '/learn/gdn/item/7/content'], [$first => '/narrations/abc']);
+        $html = (new DeckRenderer())->render($deck, 'gdn-101-m1-presentation', 'What you will learn', ['continue' => '/learn/gdn/module-1-video'], [$first => '/narrations/abc']);
         self::assertStringContainsString('<div class="cw-deck" tabindex="0" data-cw-key="gdn-101-m1-presentation" data-cw-kind="intro" data-cw-title="What you will learn" data-cw-version="1" data-cw-theme="dark"', $html);
-        self::assertStringContainsString('data-cw-host-links="{&quot;continue&quot;:&quot;/learn/gdn/item/7/content&quot;}"', $html);
+        self::assertStringContainsString('data-cw-host-links="{&quot;continue&quot;:&quot;/learn/gdn/module-1-video&quot;}"', $html);
         self::assertSame(4, substr_count($html, '<section class="cw-slide"'));
         self::assertStringContainsString('data-cw-audio="/narrations/abc"', $html);
         self::assertStringContainsString('<aside class="cw-notes">We start underground.</aside>', $html);
         self::assertStringContainsString('<li class="cw-step">Test your soil</li>', $html);
         self::assertStringContainsString('<ol class="cw-options" data-cw-answer="1">', $html);
         self::assertStringContainsString('<details class="cw-explain"><summary>Show the answer</summary>', $html);
-        self::assertStringContainsString('<a class="cw-action" data-cw-action="continue" href="/learn/gdn/item/7/content">Watch the video</a>', $html);
+        self::assertStringContainsString('<a class="cw-action" data-cw-action="continue" href="/learn/gdn/module-1-video">Watch the video</a>', $html);
         $escaped = (new DeckRenderer())->render(['kind' => 'intro', 'slides' => [['id' => 'abcdef12', 'layout' => 'statement', 'title' => 'Q', 'text' => 'Tom & Jerry "quoted"']]], 'k', 'T');
         self::assertStringContainsString('Tom &amp; Jerry &quot;quoted&quot;', $escaped);
     }

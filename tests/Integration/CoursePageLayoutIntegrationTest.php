@@ -46,6 +46,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class CoursePageLayoutIntegrationTest extends TestCase
 {
+    private string $code = '';
     private const HEADINGS = ['About this course' => 'about', 'How each module works' => 'how', 'Course Content' => 'modules', 'At a glance' => 'glance',
         'What you get' => 'get', 'Reviews' => 'reviews', 'Course access' => 'access', 'Related courses' => 'related'];
 
@@ -73,6 +74,7 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         $this->fixture->grantRole($this->admin, 'ADMIN');
         $company = $this->fixture->createCompany($this->admin, 'Page layout ' . $this->suffix, 'page-layout-' . $this->suffix . '.seed.test');
         $this->course = $this->fixture->createCourse($this->admin, $company, $this->slug, 'Page layout ' . $this->suffix);
+        $this->code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
         $this->cookies = $_COOKIE;
         $_SESSION['csrf'] = str_repeat('c', 64);
     }
@@ -161,7 +163,7 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         $this->signIn($this->admin);
         $list = $this->html('/admin/courses/page-layouts');
         self::assertStringContainsString('Courses and their layouts', $list);
-        self::assertStringContainsString('/admin/courses/' . $this->course . '?tab=page-layout', $list, 'Every course is listed with a link to its Page layout tab.');
+        self::assertStringContainsString('/admin/courses/' . $this->code . '?tab=page-layout', $list, 'Every course is listed with a link to its Page layout tab.');
         self::assertStringContainsString('Ready to start (no free preview)', $this->html('/admin/courses/page-layouts?show=default'), 'What a course leaves out, and why.');
         self::assertStringNotContainsString('id="settings-course-pages"', $this->html('/admin/settings'), 'Settings no longer holds course pages.');
 
@@ -182,9 +184,9 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         self::assertSame(['layout', $id], [$this->layouts->forCourse($this->course)['choice'], $this->layouts->forCourse($this->course)['layout']['id'] ?? 0]);
 
         // The course's tab: the three choices, the custom layout's builder, Start again from and Save as a layout.
-        $tab = $this->html('/admin/courses/' . $this->course . '?tab=page-layout');
+        $tab = $this->html('/admin/courses/' . $this->code . '?tab=page-layout');
         foreach (['Choose the layout', 'One of your layouts', 'Custom layout', 'Plain ' . $this->suffix, 'Start again from'] as $words) self::assertStringContainsString($words, $tab);
-        $tabUrl = '/admin/courses/' . $this->course . '/page-layout';
+        $tabUrl = '/admin/courses/' . $this->code . '/page-layout';
         $this->post($tabUrl, ['source' => 'default', 'layout_id' => (string) $id, 'order' => $order, 'shown' => $shown, 'action' => 'save']);
         self::assertSame('default', $this->layouts->forCourse($this->course)['choice']);
         $this->post($tabUrl, ['source' => 'custom', 'order' => $order, 'shown' => $shown, 'action' => 'move:how:up']);

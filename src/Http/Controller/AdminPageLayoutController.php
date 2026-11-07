@@ -115,7 +115,8 @@ final class AdminPageLayoutController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         $id = $this->layoutId();
-        $back = self::PAGE . '/' . $id . (isset($_POST['course']) ? '?course=' . (int) $_POST['course'] : '');
+        // The course the sketch was drawn for, by its code (owner, 2026-11-06: no row id in an address).
+        $back = self::PAGE . '/' . $id . (is_string($_POST['course'] ?? null) && $_POST['course'] !== '' ? '?course=' . rawurlencode($_POST['course']) : '');
         return $this->handle(function () use ($id, $user, $back): void {
             [$blocks, $action] = CoursePageLayouts::fromForm($_POST);
             $this->layouts->update($id, (string) ($_POST['name'] ?? ''), (string) ($_POST['purpose'] ?? ''), $blocks, $user->id);
@@ -192,10 +193,11 @@ final class AdminPageLayoutController extends BaseController
         $default = $this->layouts->defaultLayout();
         $using = array_values(array_filter($courses, static fn(array $course): bool => $layout['id'] > 0
             && (($course['choice'] === 'layout' && $course['layout_id'] === $layout['id']) || ($course['choice'] === 'default' && $layout['is_default']))));
-        $chosen = (int) ($_GET['course'] ?? 0);
+        // The course to sketch, named by its code in the address (owner, 2026-11-06).
+        $chosen = (int) (array_column($courses, 'id', 'code')[is_string($_GET['course'] ?? null) ? $_GET['course'] : ''] ?? 0);
         $ids = array_column($courses, 'id');
         if (!in_array($chosen, $ids, true)) $chosen = (int) ($using[0]['id'] ?? $ids[0] ?? 0);
-        $sketchCourses = array_map(static fn(array $course): array => ['id' => $course['id'], 'label' => $course['code'] . ' · ' . $course['title'],
+        $sketchCourses = array_map(static fn(array $course): array => ['id' => $course['id'], 'code' => $course['code'], 'label' => $course['code'] . ' · ' . $course['title'],
             'present' => $course['present'], 'selected' => $course['id'] === $chosen], $courses);
         $present = $chosen > 0 ? (array_column($courses, 'present', 'id')[$chosen] ?? array_keys(CoursePageLayout::BLOCKS)) : array_keys(CoursePageLayout::BLOCKS);
         return $this->render('admin-course-page-layout', [

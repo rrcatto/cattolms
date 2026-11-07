@@ -19,6 +19,8 @@ Identity verification's pages (owner, 2026-10-19; IdentityVerificationService):
 - ADMIN revokes a verification with a reason and allows another try (PLATFORM.IDENTITY.MANAGE).
 
 Changelog:
+2026/11/07 SAST
+- The person's identity forms are at their account reference (owner, 2026-11-06); a check keeps its number.
 2026/10/20 SAST
 - No parent or guardian's consent page: the site is for adults only (AccountStepController).
 2026/10/19 SAST
@@ -29,6 +31,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Identity\IdentityVerificationService;
 use CattoLearning\Identity\InvalidDiditWebhook;
@@ -42,7 +45,7 @@ use Throwable;
 
 final class IdentityController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly IdentityVerificationService $identity)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly IdentityVerificationService $identity, private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -115,12 +118,14 @@ final class IdentityController extends BaseController
         return new JsonResponse(['ok' => true]);
     }
 
-    #[Route('/admin/people/{id}/identity/{verification}/revoke', name: 'admin_identity_revoke', requirements: ['id' => '\d+', 'verification' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/identity/{verification}/revoke', name: 'admin_identity_revoke', requirements: ['reference' => PersonAddress::REQUIREMENT, 'verification' => '\d+'], methods: ['POST'])]
     public function revoke(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.IDENTITY.MANAGE');
-        $person = '/admin/people/' . (int) $this->param('id') . '#identity';
+        // The person by their account reference (owner, 2026-11-06); the check keeps its number, which permissions protect.
+        $this->personIdFromAddress($this->keys);
+        $person = PersonAddress::admin($this->param('reference'), '#identity');
         return $this->handle(function () use ($actor, $person): void {
             $this->identity->revoke((int) $this->param('verification'), $actor->id, $this->posted('reason'));
             $this->flash('success', 'The verification was revoked. The person must verify again before a purchase or a certificate.');
@@ -128,13 +133,13 @@ final class IdentityController extends BaseController
         }, $person);
     }
 
-    #[Route('/admin/people/{id}/identity/allow-retry', name: 'admin_identity_allow_retry', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/identity/allow-retry', name: 'admin_identity_allow_retry', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function allowRetry(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.IDENTITY.MANAGE');
-        $userId = (int) $this->param('id');
-        $person = '/admin/people/' . $userId . '#identity';
+        $userId = $this->personIdFromAddress($this->keys);
+        $person = PersonAddress::admin($this->param('reference'), '#identity');
         return $this->handle(function () use ($actor, $userId, $person): void {
             $this->identity->allowAnotherTry($userId, $actor->id);
             $this->flash('success', 'The person may try again: ' . IdentityVerificationService::TRIES . ' more checks.');

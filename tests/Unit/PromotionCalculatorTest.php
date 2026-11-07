@@ -21,7 +21,7 @@ final class PromotionCalculatorTest extends TestCase
     {
         foreach (['SAVE10', 'save10', 'Save10', '  sAvE10 '] as $typed) self::assertSame('SAVE10', Promotion::normaliseCode($typed));
         foreach (['SAVE10', 'WELCOME-2026', 'A_B', '100OFF'] as $valid) self::assertTrue(Promotion::isValidCode($valid), $valid);
-        foreach (['', 'AB', 'save10', '-SAVE', 'SAVE 10', 'SAVE10!', str_repeat('A', 41), "SAVE10\n"] as $invalid) self::assertFalse(Promotion::isValidCode($invalid), $invalid);
+        foreach (['', 'AB', 'save10', '-SAVE', 'SAVE 10', 'SAVE10!', str_repeat('A', 41), "SAVE10\n", '2026', '100_200'] as $invalid) self::assertFalse(Promotion::isValidCode($invalid), $invalid);
     }
 
     public function testPercentagesRoundHalfUpToTheMinorUnit(): void

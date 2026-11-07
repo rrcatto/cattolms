@@ -51,7 +51,12 @@ final class InProcessPage
                 $type = (string) $parameter->getType();
                 $arguments[] = $type === RequestStack::class ? $stack : $container->get($type);
             }
-            $response = $class->newInstanceArgs($arguments)->{$method}();
+            // An action that takes the request or a route value (the tag page's tag($request, $slug)) is given them.
+            $values = [];
+            foreach ($class->getMethod($method)->getParameters() as $parameter) {
+                $values[] = (string) $parameter->getType() === Request::class ? $request : ($attributes[$parameter->getName()] ?? null);
+            }
+            $response = $class->newInstanceArgs($arguments)->{$method}(...$values);
             $headers = [];
             foreach ($response->headers->all() as $name => $values) $headers[(string) $name] = implode(', ', array_map('strval', $values));
             return ['status' => $response->getStatusCode(), 'body' => (string) $response->getContent(), 'location' => $response->headers->get('Location'), 'headers' => $headers];

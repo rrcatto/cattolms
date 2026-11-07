@@ -8,6 +8,7 @@ use CattoLearning\Course\Catwalk\DeckRenderer;
 use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Catwalk\NarrationRepository;
 use CattoLearning\Course\Parts\FlashCards;
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\View\Ui\PlatformUi;
 
 /** Resolves stored Course Item source at display time and delegates output to bounded type renderers. */
@@ -27,10 +28,12 @@ final class CourseItemRenderer
 
     /**
      * @param array<string,mixed> $item
+     * @param string $contextPart The part name of the placement the item is shown in, which a file's download and an
+     *                            assessment's link name (/learn/{slug}/{part}/download/{key}), never its row id.
      * @param list<string> $stack
      * @param array{continue?:string,enrol?:string,preview?:string} $links Where a Presentation's buttons lead: the next stop, buying and the preview.
      */
-    public function render(array $item, string $courseSlug, int $contextNodeId, bool $publicPreview = false, array $stack = [], array $links = []): string
+    public function render(array $item, string $courseSlug, string $contextPart, bool $publicPreview = false, array $stack = [], array $links = []): string
     {
         $key = (string) ($item['item_key'] ?? '');
         if (in_array($key, $stack, true)) {
@@ -45,12 +48,12 @@ final class CourseItemRenderer
         $description = (string) (($item['display_description_override'] ?? '') ?: ($item['description_html'] ?? ''));
         $config = is_array($item['type_config'] ?? null) ? $item['type_config'] : [];
         return match ((string) ($item['item_type'] ?? '')) {
-            'html_lesson' => $this->leadDescription($description, $embedded) . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack, $links),
+            'html_lesson' => $this->leadDescription($description, $embedded) . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextPart, $publicPreview, $stack, $links),
             // A Presentation's description is in its player's top bar, not above it (owner, 2026-10-30).
             'slide_deck' => $this->deck($item, $courseSlug, $links, $description),
             'flashcards' => $this->leadDescription($description, $embedded) . FlashCards::render(FlashCards::normalise($config['cards'] ?? []), $key),
             // The tasks, then the model answer, which stays closed until the learner chooses to see it (decision 3A).
-            'practical' => $this->leadDescription($description, $embedded) . '<div class="cl-practical">' . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack, $links) . '</div>'
+            'practical' => $this->leadDescription($description, $embedded) . '<div class="cl-practical">' . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextPart, $publicPreview, $stack, $links) . '</div>'
                 . '<details class="cl-practical-answer"><summary>Show the model answer</summary><div class="cl-practical-answer-body">' . (string) ($config['answer_html'] ?? '') . '</div></details>',
             'image_graphic' => '<figure class="cl-course-item-media"><img src="' . $this->resourceUrl($item) . '" alt="' . self::escape((string) ($item['resource_description'] ?? '')) . '"><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>',
             'youtube' => '<figure class="cl-course-item-media"><iframe src="https://www.youtube-nocookie.com/embed/' . rawurlencode((string) ($config['youtube_id'] ?? '')) . ((int) ($config['start_seconds'] ?? 0) > 0 ? '?start=' . (int) $config['start_seconds'] : '') . '" title="' . self::escape((string) ($item['title'] ?? 'Video')) . '" allowfullscreen></iframe><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
@@ -58,8 +61,8 @@ final class CourseItemRenderer
             'audio' => '<section class="cl-course-item-media"><audio controls src="' . ($item['resource_id'] ? $this->resourceUrl($item) : self::escape((string) ($config['remote_uri'] ?? ''))) . '"></audio>' . $description . '<p>' . self::escape((string) ($config['caption'] ?? '')) . '</p>' . $this->transcript($config) . '</section>',
             'pdf' => '<section class="cl-course-item-document"><object data="' . $this->resourceUrl($item) . '" type="application/pdf"><a href="' . $this->resourceUrl($item) . '">Open the PDF</a></object><p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="' . $this->resourceUrl($item) . '" download>' . $this->downloadIcon() . '<span>Download</span></a></p>' . $description . '</section>',
             'markdown' => $this->leadDescription($description, $embedded) . '<article class="cl-course-item-markdown">' . $this->markdown($this->resourceSource($item)) . '<p><a href="' . $this->resourceUrl($item) . '" download>Download source</a></p></article>',
-            'downloadable_file' => $this->download($item, $description, $courseSlug, $contextNodeId, $publicPreview, $embedded),
-            'assessment','diagnostic' => '<section class="cl-course-item-assessment"><h2>' . self::escape((string) ($item['title'] ?? $item['item_title'] ?? 'Assessment')) . '</h2>' . $description . '<p><a href="' . ($publicPreview ? '/courses/' . rawurlencode($courseSlug) . '/preview/' : '/learn/' . rawurlencode($courseSlug) . '/item/') . $contextNodeId . '/assessment/' . rawurlencode($key) . '">' . ($publicPreview ? 'Try assessment' : 'Open assessment') . '</a></p></section>',
+            'downloadable_file' => $this->download($item, $description, $courseSlug, $contextPart, $publicPreview, $embedded),
+            'assessment','diagnostic' => '<section class="cl-course-item-assessment"><h2>' . self::escape((string) ($item['title'] ?? $item['item_title'] ?? 'Assessment')) . '</h2>' . $description . '<p><a href="' . ($publicPreview ? CoursePartAddress::preview($courseSlug, $contextPart, '/assessment/' . rawurlencode($key)) : CoursePartAddress::reader($courseSlug, $contextPart, '/assessment/' . rawurlencode($key))) . '">' . ($publicPreview ? 'Try assessment' : 'Open assessment') . '</a></p></section>',
             default => '<aside class="cl-course-item-error">Unsupported Course Item type.</aside>',
         };
     }
@@ -80,14 +83,14 @@ final class CourseItemRenderer
      *
      * @param array<string,mixed> $item
      */
-    private function download(array $item, string $description, string $slug, int $contextNodeId, bool $public, bool $embedded): string
+    private function download(array $item, string $description, string $slug, string $contextPart, bool $public, bool $embedded): string
     {
         $filename = (string) (($item['original_filename'] ?? '') ?: ($item['resource_filename'] ?? ''));
         $title = (string) ($item['display_title_override'] ?? '') ?: (string) ($item['title'] ?? $item['item_title'] ?? 'Download');
         $meta = $filename === '' ? 'File not yet attached' : $filename . ' · ' . ResourceLibraryService::formatLabel($filename) . ' · ' . ResourceLibraryService::sizeLabel((int) ($item['byte_size'] ?? 0));
         $action = $public || $filename === ''
             ? '<p class="cl-course-item-download-note">' . ($filename === '' ? 'This file is not available yet.' : 'Available to download after you start the course.') . '</p>'
-            : '<p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download>' . $this->downloadIcon() . '<span>Download</span><span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
+            : '<p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="' . CoursePartAddress::reader($slug, $contextPart, '/download/' . rawurlencode((string) ($item['item_key'] ?? ''))) . '" download>' . $this->downloadIcon() . '<span>Download</span><span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
         return '<section class="cl-course-item-download">'
             . ($embedded ? '<h3 class="cl-course-item-download-title">' . self::escape($title) . '</h3>' : '')
             . $description
@@ -100,11 +103,11 @@ final class CourseItemRenderer
      * @param list<string> $stack
      * @param array<string,string> $links
      */
-    private function renderHtml(string $source, string $slug, int $contextNodeId, bool $public, array $stack, array $links = []): string
+    private function renderHtml(string $source, string $slug, string $contextPart, bool $public, array $stack, array $links = []): string
     {
-        return (string) preg_replace_callback('/\[course-item:([a-zA-Z0-9][a-zA-Z0-9._-]{0,119})\]/', function (array $match) use ($slug, $contextNodeId, $public, $stack, $links): string {
+        return (string) preg_replace_callback('/\[course-item:([a-zA-Z0-9][a-zA-Z0-9._-]{0,119})\]/', function (array $match) use ($slug, $contextPart, $public, $stack, $links): string {
             $item = $this->items->itemByKey((string) $match[1]);
-            return $item === null ? '<aside class="cl-course-item-error">Unresolved Course Item: ' . self::escape((string) $match[1]) . '</aside>' : $this->render($item, $slug, $contextNodeId, $public, $stack, $links);
+            return $item === null ? '<aside class="cl-course-item-error">Unresolved Course Item: ' . self::escape((string) $match[1]) . '</aside>' : $this->render($item, $slug, $contextPart, $public, $stack, $links);
         }, $source);
     }
 

@@ -1,0 +1,24 @@
+{#
+	Setting two-step sign-in up (owner, 2026-11-05, the approved mockup), on the account page and at a sign-in this site asks to
+	use it: the QR code drawn on the server (TwoStep\QrPicture), the key to type instead, and the first code, which turns it on.
+	action: where the code goes; cancel_action: where Cancel goes; card: the card to change in place, or empty; csrf.
+#}
+<div class="cl-two-step-setup" data-two-step-scan>
+	<div class="cl-two-step-qr">{{ qr|raw }}</div>
+	<div class="cl-two-step-steps">
+		<p class="mb-0"><strong>Step 1.</strong> In your authenticator app, add an account and scan this picture.</p>
+		<p class="small cl-text-secondary mb-0">Cannot scan it? Type this key instead: <code class="cl-two-step-key" data-two-step-key>{{ key }}</code></p>
+		<p class="mb-0"><strong>Step 2.</strong> Type the 6-digit code it shows.</p>
+		<form action="{{ action }}" method="post" class="cl-sign-in-code" novalidate{% if card|default('') %} {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: action, hx_card: card} only %}{% endif %}>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: '6-digit code', for: 'two-step-setup-code'})} %}
+{% block control %}<input class="cl-input cl-input-lg cl-input-code" type="text" id="two-step-setup-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Turn on two-step', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}{% endblock %}{% endembed %}
+		</form>
+		<form action="{{ cancel_action }}" method="post"{% if card|default('') %} {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: cancel_action, hx_card: card} only %}{% endif %}>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-cancel'}) }}
+		</form>
+	</div>
+</div>

@@ -4,7 +4,8 @@ The reader's paging row, one for every page of a course, the learner's and the p
 column, so a page without one of them (a section, an assessment, the first or last stop) keeps the others where they
 belong.
 
-  paging_base       where a stop's address starts: '/learn/<slug>/item/' or '/courses/<slug>/preview/'
+  paging_public     true in the public preview: a stop's address is /courses/<slug>/preview/<part>, else the reader's
+                    /learn/<slug>/<part> (stop_url, by the part's name, never its row id), for the course in `course`
   paging_query      '?preview=1' for an author's preview, else ''
   paging_previous   the stop before, or null
   paging_next       the stop after, or null
@@ -19,8 +20,8 @@ belong.
 {% set paging_previous_link = paging_previous_link|default(null) %}
 {% set paging_centre_link = paging_centre_link|default(null) %}
 <nav id="cl-course-item-paging" class="cl-course-item-paging" aria-label="{{ paging_label|default('Course Content') }}">
-<span class="cl-course-item-paging-previous">{% if paging_previous_link %}{{ ui('action.link', {label: paging_previous_link.label, variant: 'secondary', size: 'normal', href: paging_previous_link.href, icon: paging_previous_link.icon}) }}{% elseif paging_previous|default(null) %}{{ ui('action.link', {label: 'Previous', variant: 'primary', size: 'normal', href: paging_base ~ paging_previous.id ~ (paging_previous.item_type|default('') in ['assessment', 'diagnostic'] ? '/assessment/' ~ paging_previous.item_key : '/content') ~ paging_query|default(''), icon: 'action-previous'}) }}{% endif %}</span>
+<span class="cl-course-item-paging-previous">{% if paging_previous_link %}{{ ui('action.link', {label: paging_previous_link.label, variant: 'secondary', size: 'normal', href: paging_previous_link.href, icon: paging_previous_link.icon}) }}{% elseif paging_previous|default(null) %}{{ ui('action.link', {label: 'Previous', variant: 'primary', size: 'normal', href: stop_url(paging_public|default(false) ? 'preview' : 'reader', course, paging_previous, paging_query|default('')), icon: 'action-previous'}) }}{% endif %}</span>
 {% if paging_complete %}{% include '@platform/partials/course-item-complete.html.twig' %}{% endif %}
 {% if paging_centre_link %}<span class="cl-course-item-paging-centre">{{ ui('action.link', {label: paging_centre_link.label, variant: 'secondary', size: 'normal', href: paging_centre_link.href, icon: paging_centre_link.icon}) }}</span>{% endif %}
-<span class="cl-course-item-paging-next">{% if paging_next_link %}{{ ui('action.link', {label: paging_next_link.label, variant: 'primary', size: 'normal', href: paging_next_link.href, icon: paging_next_link.icon}) }}{% elseif paging_next|default(null) %}{{ ui('action.link', {label: 'Next', variant: 'primary', size: 'normal', href: paging_base ~ paging_next.id ~ (paging_next.item_type|default('') in ['assessment', 'diagnostic'] ? '/assessment/' ~ paging_next.item_key : '/content') ~ paging_query|default(''), icon: 'action-next'}) }}{% endif %}</span>
+<span class="cl-course-item-paging-next">{% if paging_next_link %}{{ ui('action.link', {label: paging_next_link.label, variant: 'primary', size: 'normal', href: paging_next_link.href, icon: paging_next_link.icon}) }}{% elseif paging_next|default(null) %}{{ ui('action.link', {label: 'Next', variant: 'primary', size: 'normal', href: stop_url(paging_public|default(false) ? 'preview' : 'reader', course, paging_next, paging_query|default('')), icon: 'action-next'}) }}{% endif %}</span>
 </nav>

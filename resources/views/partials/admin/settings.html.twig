@@ -183,10 +183,15 @@
 			{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
 			<form action="/admin/settings/owner-messages/choices" method="post" hx-post="/admin/settings/owner-messages/choices" hx-trigger="change" hx-swap="none" data-owner-messages-choices>
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('form.picture-choice', {multiple: true, legend: 'Send me a message', id: 'owner-messages-events', size: 'small', selected: (om.on_register ? ['on_register'] : [])|merge(om.on_sale ? ['on_sale'] : []), items: [
-					{value: 'on_register', label: 'When someone registers', icon: '<svg ' ~ icon_attributes ~ '><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M18 8v6"/><path d="M15 11h6"/></svg>'},
-					{value: 'on_sale', label: 'When an order is paid', icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>'},
+				{# One row of four ticks, in the owner's order (owner, 2026-11-06: "Put them in this order: sign in, new account, new order, payment"). #}
+				{{ ui('form.picture-choice', {multiple: true, legend: 'Use Telegram for', id: 'owner-messages-events', size: 'small', columns: 4,
+					selected: (om.sign_in ? ['telegram_sign_in'] : [])|merge(om.on_register ? ['on_register'] : [])|merge(om.on_order ? ['on_order'] : [])|merge(om.on_sale ? ['on_sale'] : []), items: [
+					{value: 'telegram_sign_in', label: 'Login via Telegram', icon: '<svg ' ~ icon_attributes ~ '><path d="M21 4 3 11l6 2.5L19 7l-7.5 8 6 4.5z"/></svg>'},
+					{value: 'on_register', label: 'New Account', icon: '<svg ' ~ icon_attributes ~ '><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M18 8v6"/><path d="M15 11h6"/></svg>'},
+					{value: 'on_order', label: 'New Order', icon: '<svg ' ~ icon_attributes ~ '><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.5L22 7H6"/></svg>'},
+					{value: 'on_sale', label: 'Payment made', icon: '<svg ' ~ icon_attributes ~ '><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>'},
 				]}) }}
+				<p class="small cl-text-secondary mb-0" data-telegram-one-site>A bot can serve one site for sign-in: reading what people send it uses it up, so give each site its own bot.{% if not om.has_key %} It needs a bot key saved above.{% endif %}</p>
 				<noscript>{{ ui('action.button', {label: 'Save', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-save'}) }}</noscript>
 			</form>
 			{% endif %}
@@ -220,6 +225,33 @@
 			<form action="/admin/settings/sign-in/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{{ ui('action.button', {label: 'Reset who can sign in to .env', variant: 'danger', size: 'small', confirm: 'Remove what is saved here and follow AUTH_SIGNIN and AUTH_SIGNIN_ALLOWED_EMAILS in .env?', icon: 'action-reset'}) }}
+			</form>
+			{% endif %}
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {# Two-step sign-in (owner, 2026-11-05, the approved mockup): who has to use a code from an authenticator app, over AUTH_TWO_STEP. #}
+    {% if two_step_policy|default(null) %}
+    {% set tsp = two_step_policy %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Two-step sign-in', summary: tsp.summary, id: 'settings-two-step', open: settings_open_section|default('') == 'two-step'})} %}
+{% block body %}
+			{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+			<p>{% if tsp.source == 'database' %}This is saved here and overrides <span class="mono">AUTH_TWO_STEP</span> in <span class="mono">.env</span>, which says {{ tsp.choices[tsp.environment].label|lower }}.{% elseif tsp.source == 'environment' %}<span class="mono">AUTH_TWO_STEP={{ tsp.environment }}</span> in <span class="mono">.env</span> sets it.{% else %}<span class="mono">AUTH_TWO_STEP</span> in <span class="mono">.env</span> is not CHOICE, ADMINS or EVERYONE (or is not there), so administrators must use it.{% endif %} Someone who must use it sets it up at their next sign-in, before they get in, and cannot turn it off.</p>
+			<form action="/admin/settings/two-step" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {name: 'two_step', legend: 'Who has to use a code from an authenticator app when they sign in?', id: 'two-step-choice', size: 'small', selected: tsp.value, items: [
+					{value: 'CHOICE', label: tsp.choices.CHOICE.label, icon: '<svg ' ~ icon_attributes ~ '><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>', note: tsp.choices.CHOICE.note},
+					{value: 'ADMINS', label: tsp.choices.ADMINS.label, icon: '<svg ' ~ icon_attributes ~ '><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>', note: tsp.choices.ADMINS.note},
+					{value: 'EVERYONE', label: tsp.choices.EVERYONE.label, icon: '<svg ' ~ icon_attributes ~ '><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 14.5a5 5 0 0 1 5 5.5"/></svg>', note: tsp.choices.EVERYONE.note},
+				]}) }}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% endembed %}
+			</form>
+			{% if tsp.source == 'database' %}
+			<form action="/admin/settings/two-step/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset two-step sign-in to .env', variant: 'danger', size: 'small', confirm: 'Remove what is saved here and follow AUTH_TWO_STEP in .env?', icon: 'action-reset'}) }}
 			</form>
 			{% endif %}
 {% endblock %}
@@ -267,6 +299,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {# Search engines and AI (owner, 2026-11-06): AI crawlers, the Search Console and Bing codes, and share pictures. #}
+    {% if search_engines|default(null) %}{% include '@platform/partials/admin/settings-search-engines.html.twig' %}{% endif %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'The platform name.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
 {% block body %}
 
@@ -474,16 +508,24 @@
     {% endif %}
     {# Identity verification (owner, 2026-10-19): through Didit's hosted page; the keys come from .env only. #}
     {% if identity_settings|default(null) %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? 'Connected to Didit.' : 'Not available: keys missing from .env.', id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity-verification'})} %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? (identity_settings.key_kind == 'sandbox' ? 'Connected to Didit\'s sandbox.' : 'Connected to Didit.') : (identity_settings.sandbox_on_live ? 'Not available: a sandbox key on a live site.' : 'Not available: keys missing from .env.'), id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity-verification'})} %}
 {% block body %}
 
 			<p>Learners verify on Didit's hosted page: they photograph their ID or passport and take a live selfie, and Didit matches them. This site keeps no images. Verification is needed only before a certificate and transcript are issued. Nothing is asked before a purchase.</p>
-			{% if identity_settings.available %}
+			{# Didit's keys say what they are (owner, 2026-11-06): sk_test_ is the sandbox, sk_live_ the live application. #}
+			{% if identity_settings.sandbox_on_live %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'Identity verification is not available: this live site has a sandbox key.'})} %}{% block body %}<p>DIDIT_API_KEY starts with <span class="mono">sk_test_</span>, so it belongs to Didit's sandbox, whose checks are mocked and can be forced to pass. A live site needs the live key, which starts with <span class="mono">sk_live_</span>, with the live application's workflow and webhook secret. Until then certificates and transcripts wait. Verification is never skipped.</p>{% endblock %}{% endembed %}
+			{% elseif identity_settings.available %}
 				{{ ui('feedback.notice', {tone: 'success', heading: 'Didit is configured: DIDIT_API_KEY, DIDIT_WORKFLOW_ID and DIDIT_WEBHOOK_SECRET are in .env.'}) }}
+				{% if identity_settings.key_kind == 'sandbox' %}
+					{{ ui('feedback.notice', {tone: 'info', heading: 'This is Didit\'s sandbox: checks are mocked, nothing is billed, and you can choose the result. Learners are not really verified.'}) }}
+				{% elseif identity_settings.key_kind == 'live' and identity_settings.demo_site %}
+					{{ ui('feedback.notice', {tone: 'warning', heading: 'This demo site has Didit\'s live key: every check here is real and billed. For testing, use the sandbox key, which starts with sk_test_.'}) }}
+				{% endif %}
 			{% else %}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Identity verification is not available.'})} %}{% block body %}<p>Add {{ identity_settings.missing_keys|join(', ') }} to <span class="mono">.env</span>. Until then certificates and transcripts wait. Verification is never skipped.</p>{% endblock %}{% endembed %}
 			{% endif %}
-			{{ ui('data.key-value-list', {items: [{label: 'Webhook address for the Didit console', value: identity_settings.webhook_url}]}) }}
+			{{ ui('data.key-value-list', {items: [{label: 'Didit key', value: identity_settings.key_kind == 'sandbox' ? 'Sandbox (starts with sk_test_)' : (identity_settings.key_kind == 'live' ? 'Live (starts with sk_live_)' : (identity_settings.missing_keys is empty ? 'Not a key Didit\'s prefixes recognise' : 'Not set'))}, {label: 'Webhook address for the Didit console', value: identity_settings.webhook_url}]}) }}
 
 {% endblock %}
 {% endembed %}

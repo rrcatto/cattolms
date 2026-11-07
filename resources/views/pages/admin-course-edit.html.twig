@@ -11,13 +11,13 @@
 	<section class="cl-page-section">
 		<nav aria-label="Course tools">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content', icon: 'action-edit'}) }}
-			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview', icon: 'action-preview'}) }}{% endif %}
-			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate', icon: 'action-edit'}) }}{% endif %}
-			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status), icon: 'action-edit'}) }}
-			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
-			{{ ui('action.link', {label: 'Download as one HTML file', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-file', icon: 'action-download', title: 'One HTML file of the whole course, without its PDFs and downloads: it works on its own in a browser, and importing it gives the course back'}) }}
-			{{ ui('action.link', {label: 'Download with its files (.zip)', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/course-package', icon: 'action-download', title: 'The whole course with its PDFs and downloads, which imports back at Import and Export Catalogue'}) }}
+			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: course_admin_url(course, '/content'), icon: 'action-edit'}) }}
+			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: course_admin_url(course, '/preview'), icon: 'action-preview'}) }}{% endif %}
+			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: course_admin_url(course, '/certificate'), icon: 'action-edit'}) }}{% endif %}
+			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: course_admin_url(course, '/landing'), aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status), icon: 'action-edit'}) }}
+			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: course_admin_url(course, '/export'), icon: 'action-export'}) }}
+			{{ ui('action.link', {label: 'Download as one HTML file', variant: 'secondary', size: 'small', href: course_admin_url(course, '/course-file'), icon: 'action-download', title: 'One HTML file of the whole course, without its PDFs and downloads: it works on its own in a browser, and importing it gives the course back'}) }}
+			{{ ui('action.link', {label: 'Download with its files (.zip)', variant: 'secondary', size: 'small', href: course_admin_url(course, '/course-package'), icon: 'action-download', title: 'The whole course with its PDFs and downloads, which imports back at Import and Export Catalogue'}) }}
 			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import', icon: 'action-import'}) }}
 {% endblock %}
 {% endembed %}</nav>
@@ -30,7 +30,7 @@
 					{label: 'Status', value: course.status|capitalize},
 					{label: 'Approval', value: course.publication_approval_status|capitalize},
 					{label: 'Owning company', value: course.owner_company_name ?: 'Not assigned'},
-					course.owner_user_id ? {label: 'Owning person', person: {name: course.owner_person_name, reference: course.owner_person_reference|default(''), href: '/admin/people/' ~ course.owner_user_id}} : {label: 'Owning person', value: 'Not assigned'},
+					course.owner_user_id ? {label: 'Owning person', person: {name: course.owner_person_name, reference: course.owner_person_reference|default(''), href: person_url(course.owner_person_reference)}} : {label: 'Owning person', value: 'Not assigned'},
 					{label: 'JSON schema', value: course.interchange_schema_version}
 				]}) }}
 				{{ ui('layout.section-head', {heading: 'What this course contains', heading_level: 2, summary: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '') ~ ' · ' ~ content_summary.question_count ~ ' questions across assessments and diagnostics.'}) }}
@@ -39,7 +39,7 @@
 					{% for type in content_summary.type_counts %}{{ ui('data.stat-card', {value: type.count, label: type.label}) }}{% endfor %}
 {% endblock %}
 {% endembed %}
-				<form action="/admin/courses/{{ course.id }}" method="post" enctype="multipart/form-data">
+				<form action="{{ course_admin_url(course) }}" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Course details', heading_level: 2, summary: 'These details appear in the catalogue and on the course introduction page.'}) }}
 					{% include '@platform/partials/admin-course-fields.html.twig' %}
@@ -82,7 +82,7 @@
 
 			{% if active_tab == 'test-access' %}
 				{{ ui('layout.section-head', {heading: 'Test access', heading_level: 2, summary: 'Add existing people to this course, including while it is a draft. Access expires counted from the time you grant it.'}) }}
-				<form action="/admin/courses/{{ course.id }}/grant" method="post">
+				<form action="{{ course_admin_url(course, '/grant') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
@@ -112,8 +112,8 @@
 {% block body %}
 					{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments', icon: 'action-manage'}) }}
 					{% if can_preview_courses %}
-						<form action="/admin/courses/{{ course.id }}/preview/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset my preview progress', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>
-						<form action="/admin/courses/{{ course.id }}/grant-self" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Add to my library', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}</form>
+						<form action="{{ course_admin_url(course, '/preview/reset') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset my preview progress', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>
+						<form action="{{ course_admin_url(course, '/grant-self') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Add to my library', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}</form>
 					{% endif %}
 {% endblock %}
 {% endembed %}
@@ -121,7 +121,7 @@
 
 			{% if active_tab == 'people' %}
 				{{ ui('layout.section-head', {heading: 'Owner & editors', heading_level: 2, summary: 'Every course has an owning person, and an owning company or none: a course no company owns belongs to the Site Owner. Course Editors may work only on courses assigned to them.'}) }}
-				<form action="/admin/courses/{{ course.id }}/people" method="post">
+				<form action="{{ course_admin_url(course, '/people') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
@@ -161,8 +161,8 @@
 								<td class="cell-actions">
 									{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Move', icon: 'action-move'})} %}
 {% block body %}
-										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: price_index==0}) }}</form>
-										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: price_index+1==course.price_variants|length}) }}</form>
+										<form action="{{ course_admin_url(course, '/pricing/' ~ price.id ~ '/move') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: price_index==0}) }}</form>
+										<form action="{{ course_admin_url(course, '/pricing/' ~ price.id ~ '/move') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: price_index+1==course.price_variants|length}) }}</form>
 {% endblock %}
 {% endembed %}
 								</td>
@@ -181,7 +181,7 @@
 									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
-											<form id="{{ price_form }}" action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}</form>
+											<form id="{{ price_form }}" action="{{ course_admin_url(course, '/pricing/' ~ price.id) }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}</form>
 											{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'small', href: tab_url ~ '#price-' ~ price.id, icon: 'action-cancel'}) }}
 {% endblock %}
 {% endembed %}
@@ -199,9 +199,9 @@
 {% block body %}
 											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: tab_url ~ '&edit_price=' ~ price.id ~ '#price-' ~ price.id, icon: 'action-edit'}) }}
 											{% if not price.is_default %}
-												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>
+												<form action="{{ course_admin_url(course, '/pricing/' ~ price.id ~ '/default') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>
 											{% endif %}
-											<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this price option?', icon: 'action-remove'}) }}</form>
+											<form action="{{ course_admin_url(course, '/pricing/' ~ price.id ~ '/delete') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this price option?', icon: 'action-remove'}) }}</form>
 {% endblock %}
 {% endembed %}
 									</td>
@@ -213,7 +213,7 @@
 				{% else %}
 					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and exactly one active default price before it can be published.'}) }}
 				{% endif %}
-				<form class="mt-7" action="/admin/courses/{{ course.id }}/pricing" method="post">
+				<form class="mt-7" action="{{ course_admin_url(course, '/pricing') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Add a price option', heading_level: 2}) }}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
@@ -251,7 +251,7 @@
 
 			{% if active_tab == 'content' %}
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course content', heading_level: 2, summary: 'The nested course structure, built from reusable Course Items and course-specific placements. This outline is read-only; arrange the course in the Course Content editor.'})} %}
-{% block section_actions %}{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content', icon: 'action-edit'}) }}{% endblock %}
+{% block section_actions %}{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: course_admin_url(course, '/content'), icon: 'action-edit'}) }}{% endblock %}
 {% endembed %}
 				{% if content_summary.outline %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '')})} %}
@@ -284,7 +284,7 @@
 
 			{% if active_tab == 'css' %}
 				{{ ui('layout.section-head', {heading: 'CSS', heading_level: 2, summary: 'The course-specific stylesheet that keeps the visual styling of the original self-contained HTML course. It styles course content only, never the LMS navigation or theme.'}) }}
-				<form action="/admin/courses/{{ course.id }}/presentation-css" method="post">
+				<form action="{{ course_admin_url(course, '/presentation-css') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
@@ -298,7 +298,7 @@
 {% endblock %}
 {% endembed %}
 				</form>
-				<form class="mt-7" action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">
+				<form class="mt-7" action="{{ course_admin_url(course, '/presentation') }}" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Import from the original HTML file', heading_level: 2, summary: 'Replaces the stylesheet above with the presentation CSS and authored stylesheet imports found in the file. Modules, assessments, grades, enrolments and course IDs are not changed.'}) }}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
@@ -325,7 +325,7 @@
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'What the bands control', section_spacing: true})} %}
 {% block body %}<ul><li><strong>Assessment results:</strong> each graded module assessment and the final show the band its score falls in.</li><li><strong>Final course grade:</strong> 50% module assessments plus 50% final assessment, placed in a band.</li><li><strong>Pass or fail:</strong> the course is passed when the final grade lands in a band marked Passing.</li><li><strong>Certificate:</strong> never depends on the grade. A learner earns it by completing every assessment, pass or fail, and it shows no mark or grade. The marks and grade are on its transcript.</li></ul>{% endblock %}
 {% endembed %}
-				<form action="/admin/courses/{{ course.id }}/grade-bands" method="post">
+				<form action="{{ course_admin_url(course, '/grade-bands') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
@@ -384,7 +384,7 @@
 {% block body %}Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.{% endblock %}
 {% endembed %}
 				{% if can_publish_courses %}
-					<form action="/admin/courses/{{ course.id }}/status" method="post">
+					<form action="{{ course_admin_url(course, '/status') }}" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
@@ -402,7 +402,7 @@
 {% endembed %}
 					</form>
 				{% else %}
-					<form action="/admin/courses/{{ course.id }}/submit-for-approval" method="post">
+					<form action="{{ course_admin_url(course, '/submit-for-approval') }}" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						{{ ui('data.key-value-list', {items: [{label: 'Current approval', value: course.publication_approval_status|capitalize}]}) }}
 						{{ ui('form.picture-choice', {multiple: true, legend: 'Publication warnings', legend_hidden: true, size: 'small', selected: [], items: [
@@ -428,7 +428,7 @@
 {% endblock %}
 {% block body %}
 						{% for event in course.history %}
-							<tr><td>{{ event.created_at }}</td><td>{{ event.summary }}</td><td>{% if event.user_id %}{{ ui('data.person', {name: event.user_name ?: event.user_email, reference: event.user_reference, href: '/admin/people/' ~ event.user_id}) }}{% else %}System{% endif %}</td></tr>
+							<tr><td>{{ event.created_at }}</td><td>{{ event.summary }}</td><td>{% if event.user_id %}{{ ui('data.person', {name: event.user_name ?: event.user_email, reference: event.user_reference, href: person_url(event.user_reference)}) }}{% else %}System{% endif %}</td></tr>
 						{% endfor %}
 {% endblock %}
 {% endembed %}
@@ -447,7 +447,7 @@
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
 {% block surface_body %}
 						{{ ui('layout.section-head', {heading: 'Reset course content', heading_level: 3, summary: 'Removes course content and learner test data. The empty course shell remains for re-import.'}) }}
-						<form action="/admin/courses/{{ course.id }}/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-reset'}) }}</form>
+						<form action="{{ course_admin_url(course, '/reset') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-reset'}) }}</form>
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
@@ -457,7 +457,7 @@
 						{{ ui('layout.section-head', {heading: 'This course cannot be deleted', heading_level: 3, summary: 'It has been bought (' ~ (course.buying_orders == 1 ? '1 order' : course.buying_orders ~ ' orders') ~ '), and orders, invoices and receipts are kept for good. ' ~ (course.status == 'retired' ? 'It is retired: it is out of the catalogue and nobody can buy it.' : 'Retire it on the Publication tab instead: it leaves the catalogue and nobody can buy it.')}) }}
 						{% else %}
 						{{ ui('layout.section-head', {heading: 'Delete course permanently', heading_level: 3, summary: 'Deletes the course and removes all associated learner access, progress, attempts and results.'}) }}
-						<form action="/admin/courses/{{ course.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete course permanently', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this course and scrub all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}</form>
+						<form action="{{ course_admin_url(course, '/delete') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete course permanently', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this course and scrub all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}</form>
 						{% endif %}
 {% endblock %}
 {% endembed %}

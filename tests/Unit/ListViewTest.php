@@ -47,9 +47,14 @@ final class ListViewTest extends TestCase
         self::assertSame([24, 48, 96], ListView::pageSizes('courses', 'grid'), '4 to a row.');
         self::assertSame(Pagination::PAGE_SIZES, ListView::pageSizes('people', 'list'), 'A table keeps the tables\' sizes.');
         // A company's own page shows the courses it provides 4 to a row (owner-approved mockup, 2026-10-27); Mailing's
-        // Subscribers 5 to a row, like People (owner, 2026-10-28).
-        self::assertSame(['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5], ListView::COLUMNS);
+        // Subscribers 5 to a row, like People (owner, 2026-10-28). Administration's bundles and a person's Favourites 4 to a
+        // row, as courses (owner, 2026-11-06).
+        self::assertSame(['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4], ListView::COLUMNS);
         self::assertSame([30, 60, 90], ListView::pageSizes('subscribers', 'grid'));
+        self::assertSame([24, 48, 96], ListView::pageSizes('bundles', 'grid'));
+        self::assertSame([24, 48, 96], ListView::pageSizes('favourites', 'grid'));
+        self::assertSame('list', ListView::chosen('bundles', [], []), 'The bundle list opens as its table.');
+        self::assertSame('grid', ListView::chosen('favourites', [], []), 'Favourites opens as cards.');
 
         $page = Pagination::within('2', '60', 284, [30, 60, 90]);
         self::assertSame([2, 60, 60], [$page->page, $page->pageSize, $page->offset]);

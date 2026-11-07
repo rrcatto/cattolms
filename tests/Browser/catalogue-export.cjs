@@ -2,7 +2,8 @@
  * without JavaScript (owner, 2026-10-23: "manually ticking the courses does not change this msg ... the clear ticks
  * button also does not work if I manually tick"): the count follows boxes ticked by hand; Clear the ticks clears them;
  * Tick every course and Tick the published courses tick the right boxes; without JavaScript each of the three reloads
- * the page with the boxes ticked; and the package downloaded holds exactly the courses ticked by hand.
+ * the page with the boxes ticked; and the package downloaded holds exactly the courses ticked by hand. Each tick carries
+ * its course's code, never a row id (owner, 2026-11-06: no row id in any address), and so does the download's address.
  *
  * Run against the development instance with the section pages fixture (an ADMIN session):
  *   section-pages-fixture.php create, its state copied to /tmp/catto-section-pages-state.json, then cleanup. */
@@ -88,12 +89,27 @@ const packaged = (file) => JSON.parse(execFileSync('python3', ['-I', '-c', "impo
             await ctx.close();
         });
 
+        await scenario('each tick carries its course\'s code, never a row id', browserName, async () => {
+            const {ctx, page} = await open(browser);
+            const ticks = await page.locator(BOX).evaluateAll((boxes) => boxes.map((box) => [box.value, box.getAttribute('aria-label').split(' ')[1]]));
+            assert.ok(ticks.length > 0, 'there are courses to tick');
+            for (const [value, code] of ticks) {
+                assert.equal(value, code, `the tick for ${code} carries its code`);
+                assert.match(value, /^(?=[A-Z0-9-]*[A-Z])[A-Z0-9]+(-[A-Z0-9]+)*$/, `${value} is a course code`);
+            }
+            await ctx.close();
+        });
+
         await scenario('the package holds exactly the courses ticked by hand', browserName, async () => {
             const {ctx, page} = await open(browser);
             const box = page.locator(BOX).first();
             await box.check();
             const code = (await box.getAttribute('aria-label')).split(' ')[1];
+            const asked = [];
+            page.on('request', (request) => { if (request.url().includes('/admin/courses/catalogue/export')) asked.push(request.url()); });
             const [download] = await Promise.all([page.waitForEvent('download', {timeout: 120000}), page.getByRole('button', {name: 'Download catalogue package (.zip)'}).click()]);
+            const query = new URL(asked[0]).searchParams.getAll('courses[]');
+            assert.deepEqual(query, [code], 'the download\'s address names the course by its code');
             const saved = path.join(output, `${browserName}-one.zip`);
             await download.saveAs(saved);
             assert.deepEqual(packaged(saved), [code]);

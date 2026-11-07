@@ -1,6 +1,6 @@
 {# The taxonomy counts above the category tree. Levels follow parent_id, so a move between levels changes them; the category-tree controller swaps this region with the tree after every move. A category counts as having courses when courses are filed directly in it. #}
 {% set stats = category_statistics %}
-<div class="cl-category-statistics" id="category-statistics">
+<div class="cl-category-statistics" id="category-tree-statistics">
 	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact'})} %}
 {% block body %}{{ ui('data.stat-card', {label: 'Main categories', value: stats.main}) }}{{ ui('data.stat-card', {label: 'Subcategories', value: stats.sub}) }}{{ ui('data.stat-card', {label: 'Sub-subcategories', value: stats.sub_sub}) }}{{ ui('data.stat-card', {label: 'Total categories', value: stats.total}) }}{{ ui('data.stat-card', {label: 'With courses', value: stats.with_courses}) }}{{ ui('data.stat-card', {label: 'Empty categories', value: stats.empty}) }}{% endblock %}
 	{% endembed %}

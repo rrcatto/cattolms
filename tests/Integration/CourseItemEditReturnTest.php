@@ -10,6 +10,7 @@ use CattoLearning\Http\Controller\AdminCourseComponentController;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
+use CattoLearning\Support\Address\CourseItemAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\IntegrationContainer;
@@ -25,6 +26,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class CourseItemEditReturnTest extends TestCase
 {
+    private string $code = '';
     private Database $db;
     private IntegrationDataFixture $fixture;
     private CourseItemService $items;
@@ -33,6 +35,9 @@ final class CourseItemEditReturnTest extends TestCase
     private int $course;
     private int $otherCourse;
     private int $itemId;
+    /** The item's name, whose slug is its address (owner, 2026-11-06: no row id in an address). */
+    private string $name = '';
+    private string $item = '';
     private int $node;
     private string $returnTo;
     /** @var array<string,mixed> */
@@ -51,11 +56,14 @@ final class CourseItemEditReturnTest extends TestCase
         $this->fixture->grantRole($this->owner, 'ADMIN');
         $company = $this->fixture->createCompany($this->owner, 'Item editor ' . $this->suffix, 'item-editor-' . $this->suffix . '.seed.test');
         $this->course = $this->fixture->createCourse($this->owner, $company, 'item-editor-' . $this->suffix, 'Item editor ' . $this->suffix);
+        $this->code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
         $this->otherCourse = $this->fixture->createCourse($this->owner, $company, 'item-editor-other-' . $this->suffix, 'Item editor other ' . $this->suffix);
-        $this->itemId = $this->items->create(['item_key' => 'shared-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => 'Shared lesson', 'content_source' => '<p>Body</p>'], $this->owner);
+        $this->name = 'Shared lesson ' . $this->suffix;
+        $this->itemId = $this->items->create(['item_key' => 'shared-' . $this->suffix, 'name' => $this->name, 'item_type' => 'html_lesson', 'title' => 'Shared lesson', 'content_source' => '<p>Body</p>'], $this->owner);
+        $this->item = CourseItemAddress::admin($this->name);
         $this->node = $this->items->addExisting($this->course, $this->itemId, [], $this->owner);
         $this->items->addExisting($this->otherCourse, $this->itemId, [], $this->owner);
-        $this->returnTo = '/admin/courses/' . $this->course . '/content#course-node-' . $this->node;
+        $this->returnTo = '/admin/courses/' . $this->code . '/content#course-node-' . $this->node;
 
         $token = Token::generate();
         $container->get(AuthSessionRepository::class)->create($this->owner, Token::hash($token), 3600, 'qa', 'PHPUnit');
@@ -76,20 +84,21 @@ final class CourseItemEditReturnTest extends TestCase
 
     public function testCourseContentOpensTheEditorWithItsOwnReturnPath(): void
     {
-        $html = $this->ok('/admin/courses/' . $this->course . '/content');
-        $link = '/admin/course-items/' . $this->itemId . '?return_to=' . rawurlencode($this->returnTo);
-        self::assertStringContainsString('href="' . htmlspecialchars($link, ENT_QUOTES) . '"', $html, 'Edit Course Item carries the course and the row.');
-        self::assertStringNotContainsString('href="/admin/course-items/' . $this->itemId . '"', $html, 'No Edit Course Item link in Course Content loses its context.');
+        $html = $this->ok('/admin/courses/' . $this->code . '/content');
+        $link = $this->item . '?return_to=' . rawurlencode($this->returnTo);
+        self::assertStringContainsString('href="' . htmlspecialchars($link, ENT_QUOTES) . '"', $html, 'Edit Course Item carries the course and the row, and names the item by its name.');
+        self::assertStringNotContainsString('href="' . $this->item . '"', $html, 'No Edit Course Item link in Course Content loses its context.');
+        self::assertStringNotContainsString('/admin/course-items/' . $this->itemId, $html, 'No item is named by its number.');
     }
 
     public function testEditingFromCourseContentReturnsToThatCourse(): void
     {
-        $form = $this->ok('/admin/course-items/' . $this->itemId . '?return_to=' . rawurlencode($this->returnTo));
+        $form = $this->ok($this->item . '?return_to=' . rawurlencode($this->returnTo));
         self::assertStringContainsString('<input type="hidden" name="return_to" value="' . htmlspecialchars($this->returnTo, ENT_QUOTES) . '">', $form, 'The form carries the return path.');
         self::assertSame(2, substr_count($form, 'href="' . htmlspecialchars($this->returnTo, ENT_QUOTES) . '"'), 'Back and Cancel both return to the course.');
         self::assertStringContainsString('Course Content', $form);
 
-        $saved = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['title' => 'Edited in the course', 'return_to' => $this->returnTo]));
+        $saved = $this->post($this->item, $this->fields(['title' => 'Edited in the course', 'return_to' => $this->returnTo]));
         self::assertSame(303, $saved->getStatusCode());
         self::assertSame($this->returnTo, $saved->headers->get('Location'), 'Save returns to the row in Course Content.');
         foreach ([$this->course, $this->otherCourse] as $course) {
@@ -99,7 +108,7 @@ final class CourseItemEditReturnTest extends TestCase
 
     public function testARefusedSaveAndARedisplayKeepTheReturnPath(): void
     {
-        $refused = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['title' => '', 'content_source' => '<p>Kept body</p>', 'return_to' => $this->returnTo]));
+        $refused = $this->post($this->item, $this->fields(['title' => '', 'content_source' => '<p>Kept body</p>', 'return_to' => $this->returnTo]));
         self::assertSame(422, $refused->getStatusCode(), 'A refused save shows the form again.');
         $html = (string) $refused->getContent();
         self::assertStringContainsString('name="return_to" value="' . htmlspecialchars($this->returnTo, ENT_QUOTES) . '"', $html);
@@ -107,41 +116,77 @@ final class CourseItemEditReturnTest extends TestCase
         self::assertStringContainsString('href="' . htmlspecialchars($this->returnTo, ENT_QUOTES) . '"', $html, 'Cancel still returns to the course.');
         self::assertSame('Shared lesson', $this->db->fetchOne('SELECT title FROM course_items WHERE id=:id', ['id' => $this->itemId]), 'Nothing was saved.');
 
-        $redisplayed = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['question_action' => 'add-question', 'return_to' => $this->returnTo]));
+        $redisplayed = $this->post($this->item, $this->fields(['question_action' => 'add-question', 'return_to' => $this->returnTo]));
         self::assertStringContainsString('name="return_to" value="' . htmlspecialchars($this->returnTo, ENT_QUOTES) . '"', (string) $redisplayed->getContent(), 'A form re-display keeps it too.');
 
-        $copy = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['item_action' => 'save_as', 'copy_key' => 'copy-' . $this->suffix, 'copy_title' => 'Copy', 'return_to' => $this->returnTo]));
+        $copy = $this->post($this->item, $this->fields(['item_action' => 'save_as', 'copy_key' => 'copy-' . $this->suffix, 'copy_title' => 'Copy', 'copy_name' => 'Copy of ' . $this->name, 'return_to' => $this->returnTo]));
         self::assertSame(303, $copy->getStatusCode());
-        self::assertMatchesRegularExpression('~^/admin/course-items/\d+\?return_to=' . preg_quote(rawurlencode($this->returnTo), '~') . '$~', (string) $copy->headers->get('Location'), 'Save As opens the copy with the same way back.');
+        self::assertSame(CourseItemAddress::admin('Copy of ' . $this->name) . '?return_to=' . rawurlencode($this->returnTo), (string) $copy->headers->get('Location'), 'Save As opens the copy, by its name, with the same way back.');
     }
 
     public function testEditingFromTheLibraryKeepsTheLibraryDefaults(): void
     {
-        $form = $this->ok('/admin/course-items/' . $this->itemId);
+        $form = $this->ok($this->item);
         self::assertStringNotContainsString('name="return_to"', $form);
         self::assertStringContainsString('href="/admin/course-items"', $form, 'Back and Cancel go to the Course Item Library.');
-        $saved = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['title' => 'Edited in the library']));
-        self::assertSame('/admin/course-items/' . $this->itemId, $saved->headers->get('Location'), 'Without a return path the existing destination applies.');
-        $fromLibrary = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['title' => 'Edited again', 'return_to' => '/admin/course-items']));
+        $saved = $this->post($this->item, $this->fields(['title' => 'Edited in the library']));
+        self::assertSame($this->item, $saved->headers->get('Location'), 'Without a return path the existing destination applies.');
+        $fromLibrary = $this->post($this->item, $this->fields(['title' => 'Edited again', 'return_to' => '/admin/course-items']));
         self::assertSame('/admin/course-items', $fromLibrary->headers->get('Location'));
     }
 
     public function testUnsafeReturnPathsAreIgnored(): void
     {
         foreach (['https://evil.example/admin/courses/1/content', '//evil.example/admin/course-items', '/\\evil.example', 'javascript:alert(1)', "/admin/course-items\n", '/admin/courses/1/content/../../people', '/admin/courses/1/content?next=//evil', '/admin/people', '/admin/courses/0/content', ' /admin/course-items'] as $unsafe) {
-            $form = $this->ok('/admin/course-items/' . $this->itemId . '?return_to=' . rawurlencode($unsafe));
+            $form = $this->ok($this->item . '?return_to=' . rawurlencode($unsafe));
             self::assertStringNotContainsString('name="return_to"', $form, 'Not carried: ' . $unsafe);
-            $saved = $this->post('/admin/course-items/' . $this->itemId, $this->fields(['title' => 'Safe', 'return_to' => $unsafe]));
-            self::assertSame('/admin/course-items/' . $this->itemId, $saved->headers->get('Location'), 'Not followed: ' . json_encode($unsafe));
+            $saved = $this->post($this->item, $this->fields(['title' => 'Safe', 'return_to' => $unsafe]));
+            self::assertSame($this->item, $saved->headers->get('Location'), 'Not followed: ' . json_encode($unsafe));
         }
+    }
+
+    /** An item is named by the slug of its name (owner, 2026-11-06): its number, or a near miss, names nothing. */
+    public function testAnItemOpensByTheSlugOfItsNameAndItsNumberIsNotFound(): void
+    {
+        self::assertSame(200, $this->send(Request::create($this->item, 'GET'))->getStatusCode());
+        foreach (['/admin/course-items/' . $this->itemId, '/admin/course-items/' . strtoupper(substr($this->item, strlen('/admin/course-items/'))), $this->item . '-x'] as $address) {
+            self::assertSame(404, $this->send(Request::create($address, 'GET'))->getStatusCode(), $address . ' names no item.');
+        }
+    }
+
+    /** A name is its item's address, so names that differ only in capitals, spaces or punctuation are one name. */
+    public function testTwoNamesWithOneSlugAreOneName(): void
+    {
+        foreach ([strtolower($this->name), str_replace(' ', '-', $this->name), $this->name . '!'] as $twin) {
+            try {
+                $this->items->create(['item_key' => 'twin-' . $this->suffix, 'name' => $twin, 'item_type' => 'html_lesson', 'title' => 'Twin', 'content_source' => '<p>Twin</p>'], $this->owner);
+                self::fail('"' . $twin . '" was taken although "' . $this->name . '" has its address.');
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString('already named "' . $this->name . '"', $refused->getMessage());
+            }
+        }
+        foreach (['2026', 'New', '???'] as $unaddressable) {
+            try {
+                $this->items->create(['item_key' => 'bare-' . $this->suffix, 'name' => $unaddressable, 'item_type' => 'html_lesson', 'title' => 'Bare', 'content_source' => '<p>Bare</p>'], $this->owner);
+                self::fail('"' . $unaddressable . '" was taken as a name.');
+            } catch (\InvalidArgumentException $refused) {
+                self::assertStringContainsString('at least one letter', $refused->getMessage());
+            }
+        }
+        // A name made for an item takes the next free number instead.
+        self::assertSame($this->name . ' 2', $this->items->freeName($this->name));
+        self::assertSame(strtolower($this->name) . ' 2', $this->items->freeName(strtolower($this->name)), 'Its slug is taken, so the same name in lower case is numbered too.');
+        self::assertSame('Course item 2026', $this->items->freeName('2026'), 'A base that cannot be an address becomes one.');
     }
 
     public function testOnlyKnownAdminDestinationsAreAccepted(): void
     {
-        self::assertSame('/admin/courses/12/content', AdminCourseComponentController::safeReturn('/admin/courses/12/content'));
-        self::assertSame('/admin/courses/12/content#course-node-7', AdminCourseComponentController::safeReturn('/admin/courses/12/content#course-node-7'));
+        // Course Content of a course named by its code (owner, 2026-11-06), never by its row id.
+        self::assertSame('/admin/courses/GDN-101/content', AdminCourseComponentController::safeReturn('/admin/courses/GDN-101/content'));
+        self::assertSame('/admin/courses/GDN-101/content#course-node-7', AdminCourseComponentController::safeReturn('/admin/courses/GDN-101/content#course-node-7'));
         self::assertSame('/admin/course-items', AdminCourseComponentController::safeReturn('/admin/course-items'));
-        foreach (['', 'https://catto.test/admin/course-items', '//catto.test/admin/course-items', '/admin/courses/12/content#x', '/admin/courses/12/content/', '/admin/courses/-1/content', "/admin/courses/12/content\n", '/admin/course-items/5'] as $value) {
+        self::assertSame('/admin/course-items/gdn-101-module-1-presentation', AdminCourseComponentController::safeReturn('/admin/course-items/gdn-101-module-1-presentation'), 'An item by the slug of its name.');
+        foreach (['', 'https://catto.test/admin/course-items', '//catto.test/admin/course-items', '/admin/courses/12/content', '/admin/courses/gdn-101/content', '/admin/courses/GDN-101/content#x', '/admin/courses/GDN-101/content/', '/admin/courses/-1/content', "/admin/courses/GDN-101/content\n", '/admin/course-items/5', '/admin/course-items/new', '/admin/course-items/GDN-101'] as $value) {
             self::assertNull(AdminCourseComponentController::safeReturn($value), json_encode($value) . ' is refused.');
         }
     }
@@ -152,7 +197,7 @@ final class CourseItemEditReturnTest extends TestCase
      */
     private function fields(array $changes): array
     {
-        return $changes + ['item_key' => 'shared-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => 'Shared lesson', 'content_source' => '<p>Body</p>'];
+        return $changes + ['item_key' => 'shared-' . $this->suffix, 'name' => $this->name, 'item_type' => 'html_lesson', 'title' => 'Shared lesson', 'content_source' => '<p>Body</p>'];
     }
 
     private function ok(string $url): string

@@ -15,6 +15,10 @@ longer a static file in the web root, so the web server passes it here.
 Changelog:
 2026/10/19 SAST
 - Created.
+2026/11/06 SAST
+- GET /llms.txt (Search\LlmsTxt), answering "not found" on a demo site as the sitemap does, and the share pictures of a
+  published course or bundle, /share/course/{slug}.png and /share/bundle/{slug}.png (Search\SharePictures), served as
+  pictures are, by PictureResponse with the ?v= version their pages name.
 */
 
 declare(strict_types=1);
@@ -23,6 +27,10 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\Sitemap;
+use CattoLearning\Http\PictureResponse;
+use CattoLearning\Search\LlmsTxt;
+use CattoLearning\Search\SearchRepository;
+use CattoLearning\Search\SharePictures;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,7 +39,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class SearchEngineController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly Sitemap $sitemap)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly Sitemap $sitemap,
+        private readonly LlmsTxt $llms, private readonly SharePictures $pictures, private readonly SearchRepository $records)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -52,6 +61,35 @@ final class SearchEngineController extends BaseController
     public function robots(): Response
     {
         return new Response($this->sitemap->robots(), 200, ['Content-Type' => 'text/plain; charset=UTF-8', 'Cache-Control' => 'public, max-age=3600']);
+    }
+
+    /** A summary of the site for AI assistants (llmstxt.org), on a live site only. */
+    #[Route('/llms.txt', name: 'llms_txt', methods: ['GET'])]
+    public function llms(): Response
+    {
+        $document = $this->llms->document() ?? throw new NotFoundHttpException('This site has no llms.txt.');
+        return new Response($document, 200, ['Content-Type' => 'text/plain; charset=UTF-8', 'Cache-Control' => 'public, max-age=3600']);
+    }
+
+    /** A published course's share picture, its cover at 1200 by 630 (Search\SharePictures). */
+    #[Route('/share/course/{slug}.png', name: 'share_course_picture', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function coursePicture(): Response
+    {
+        return $this->picture($this->records->courseCover((string) $this->param('slug')));
+    }
+
+    /** A published bundle's share picture: its own cover, else its first course's. */
+    #[Route('/share/bundle/{slug}.png', name: 'share_bundle_picture', requirements: ['slug' => '[a-z0-9]+(?:-[a-z0-9]+)*'], methods: ['GET'])]
+    public function bundlePicture(): Response
+    {
+        return $this->picture($this->records->bundleCover((string) $this->param('slug')));
+    }
+
+    private function picture(?string $cover): Response
+    {
+        $bytes = $cover === null ? null : $this->pictures->bytes($cover);
+        if ($bytes === null) throw new NotFoundHttpException('There is no such picture.');
+        return PictureResponse::of($bytes, 'image/png', true);
     }
 
     private static function xml(?string $document): Response

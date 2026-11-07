@@ -41,7 +41,7 @@
 {% block body %}
 					{% for course in export_choices %}
 					<tr>
-						<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Export'})} %}{% block control %}<input type="checkbox" name="courses[]" value="{{ course.id }}" {{ course.ticked ? 'checked' : '' }} data-catalogue-export-target="box" data-status="{{ course.status }}" aria-label="Export {{ course.code }} {{ course.title }}">{% endblock %}{% endembed %}</td>
+						<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Export'})} %}{% block control %}<input type="checkbox" name="courses[]" value="{{ course.code }}" {{ course.ticked ? 'checked' : '' }} data-catalogue-export-target="box" data-status="{{ course.status }}" aria-label="Export {{ course.code }} {{ course.title }}">{% endblock %}{% endembed %}</td>
 						<td><code class="cl-course-code">{{ course.code }}</code></td>
 						<td class="cell-text">{{ course.title }}</td>
 						<td class="cell-text">{{ course.category ?: 'Uncategorised' }}</td>
@@ -79,7 +79,7 @@
 			</form>
 			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'How courses are matched', section_spacing: true})} %}
 {% block body %}
-				<p class="mb-0">A course is known by its course code alone, such as GDN-101, never by its title or address. A course whose code is not on this site is imported as a new course. A course whose code is here already is updated: its cover, tags and position in the catalogue, its category only when it has none, and never its prices. Its lessons and assessments are replaced only if you tick that for it on the review page, and never once a learner has started it.</p>
+				<p class="mb-0">A course is known by its course code alone, such as GDN-101, never by its title or address, and a file by the name its course links, never by a hidden number. A course whose code is not on this site is imported as a new course. What is in the package wins: a course whose code is here already takes the package's content, category (made if this site lacks it), tags, prices, cover, position in the catalogue, page layout, related courses and status; a file of the same name with other contents is replaced for every course that uses it; and a bundle already here takes the package's words, courses, price and status. The review page lists every difference, and for each you can keep this site's instead. What is replaced is not kept. A course's lessons and assessments are never replaced once a learner has started it.</p>
 {% endblock %}
 {% endembed %}
 {% endblock %}

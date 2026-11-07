@@ -9,8 +9,8 @@
 {% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
 {% block title %}Editing <code class="cl-course-code">{{ course.code }}</code>{% endblock %}
 {% block details %}
-	<span id="course-{{ course.id }}" class="cl-course-anchor"></span>
-	<form id="{{ cq_form }}" class="cl-course-quick-card" action="/admin/courses/{{ course.id }}/row" method="post" hx-post="/admin/courses/{{ course.id }}/row" hx-target="closest li" hx-swap="outerHTML">
+	<span id="{{ course_anchor(course) }}" class="cl-course-anchor"></span>
+	<form id="{{ cq_form }}" class="cl-course-quick-card" action="{{ course_admin_url(course, '/row') }}" method="post" hx-post="{{ course_admin_url(course, '/row') }}" hx-target="closest li" hx-swap="outerHTML">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		<input type="hidden" name="view" value="grid">
 		<input type="hidden" name="return" value="{{ courses_list_href }}">
@@ -23,13 +23,13 @@
 			<label class="cl-course-quick-field"><span>Was price</span><input class="cl-input" name="was_price" value="{{ cq.price.was }}" inputmode="decimal" autocomplete="off"></label>
 			<span class="cl-course-quick-field"><span>Access period</span><span class="cl-course-quick-period"><input class="cl-input" type="number" min="1" name="access_period_value" value="{{ cq.price.period_value }}" aria-label="Access period"><select class="cl-select" name="access_period_unit" aria-label="Unit">{% for unit in cq.price.units %}<option value="{{ unit }}"{% if unit == cq.price.period_unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select></span></span>
 		{% else %}
-			<p class="cl-ui-card-line">{% if course.price %}<strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %} <span class="cl-ui-card-quiet">· {{ course.price.period_label }}</span>{% endif %}{% if cq.price.shown %} <a href="/admin/courses/{{ course.id }}?tab=pricing">Manage prices</a>{% endif %}</p>
+			<p class="cl-ui-card-line">{% if course.price %}<strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %} <span class="cl-ui-card-quiet">· {{ course.price.period_label }}</span>{% endif %}{% if cq.price.shown %} <a href="{{ course_admin_url(course, '?tab=pricing') }}">Manage prices</a>{% endif %}</p>
 		{% endif %}
 		<span class="cl-course-quick-field"><span>Category</span>{{ ui('form.tree-select', {id: 'course-quick-category-' ~ course.id, name: 'category_id', mode: 'field', items: cq.category.items, selected: cq.category.selected, placeholder: 'Uncategorised', list_label: 'Course categories'}) }}</span>
 	</form>
 {% endblock %}
 {% block actions %}
 	{{ ui('action.button', {label: 'Save', aria_label: 'Save ' ~ course.title, title: 'Save', icon: 'action-save-changes', icon_only: true, variant: 'primary', size: 'small', form: cq_form}) }}
-	{{ ui('action.link', {label: 'Cancel', aria_label: 'Cancel editing ' ~ course.title, title: 'Cancel', icon: 'action-cancel', icon_only: true, variant: 'quiet', size: 'small', href: courses_list_href|trim('?&', 'right') ~ '#course-' ~ course.id, get: '/admin/courses/' ~ course.id ~ '/row?view=grid', target: 'closest li', swap: 'outerHTML'}) }}
+	{{ ui('action.link', {label: 'Cancel', aria_label: 'Cancel editing ' ~ course.title, title: 'Cancel', icon: 'action-cancel', icon_only: true, variant: 'quiet', size: 'small', href: courses_list_href|trim('?&', 'right') ~ '#' ~ course_anchor(course), get: course_admin_url(course, '/row?view=grid'), target: 'closest li', swap: 'outerHTML'}) }}
 {% endblock %}
 {% endembed %}

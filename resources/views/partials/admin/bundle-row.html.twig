@@ -1,0 +1,21 @@
+{#
+	One bundle's row in Administration > Bundles (shown in the list, and drawn again after it is edited in place, owner
+	2026-11-06). Variables: bundle (the list's row, AdminBundleController::row), can_manage (the pencil), bundles_list_href
+	(the list's address, to add edit= to); bundle_saved marks a row just saved.
+#}
+<tr id="{{ bundle_anchor(bundle) }}" data-bundle-id="{{ bundle.id }}"{% if bundle_saved|default(false) %} data-bundle-saved{% endif %}>
+	<td><code class="cl-course-code">{{ bundle.code }}</code></td>
+	<td class="cell-text"><a href="{{ bundle_admin_url(bundle) }}"><strong>{{ bundle.title }}</strong></a>{% if bundle_saved|default(false) %}<span class="visually-hidden" role="status">Saved</span>{% endif %}<br><small>/bundles/{{ bundle.slug }}</small></td>
+	<td>{% include '@platform/partials/bundle-status.html.twig' with {status: bundle.status, on_sale: bundle.offer_active} %}</td>
+	<td>{% if bundle.price_label %}<strong class="cl-price-now">{{ bundle.price_label }}</strong>{% if bundle.was_label %}<br><small class="cl-text-muted"><s class="cl-price-was"><span class="visually-hidden">Was </span>{{ bundle.was_label }}</s></small>{% endif %}{% else %}No price yet{% endif %}</td>
+	<td>{{ bundle.from_label ?? '—' }}</td>
+	<td>{{ bundle.until_label ?? '—' }}</td>
+	<td>{{ bundle.access_label ?? '—' }}</td>
+	<td>{{ bundle.course_count }}</td>
+	<td>{{ bundle.sales }}</td>
+	<td class="cell-actions">
+		{# Edited in place (owner, 2026-11-06): the row becomes its form; without JavaScript the list again with the row open. #}
+		{% if can_manage %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ bundle.title ~ ' here', title: 'Edit the code, title, status, price, sale dates and access here', icon: 'action-edit', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href ~ 'edit=' ~ bundle.code|url_encode ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?mode=edit&view=list'), target: 'closest tr', swap: 'outerHTML'}) }}
+		{% else %}{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: bundle_admin_url(bundle), icon: 'action-view'}) }}{% endif %}
+	</td>
+</tr>

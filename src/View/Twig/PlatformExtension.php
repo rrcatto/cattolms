@@ -21,6 +21,11 @@ lines at a time produces a page that looks right and is wrong in one place nobod
 templates keep the semantics they were written against and this supplies them.
 
 Changelog:
+2026/11/07 SAST
+- person_url, company_url, order_url and the rest: every other record's addresses by its code, number, slug or name
+  (Support\Address), stage 2 of keeping row ids out of addresses.
+2026/11/06 SAST
+- course_admin_url, course_anchor and course_url: a course's addresses by its code (Course\CourseAddress).
 2026/11/01 SAST
 - course_outline: the course reader's sidebar, each section holding its rows
 - course_styles: a course's own stylesheet as the reader prints it, kept away from the presentation player
@@ -34,11 +39,56 @@ declare(strict_types=1);
 namespace CattoLearning\View\Twig;
 
 use CattoLearning\Course\CourseItemService;
+use CattoLearning\Support\Address as A;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 final class PlatformExtension extends AbstractExtension
 {
+    /**
+     * A course's addresses outside its public pages, by its code (owner, 2026-11-06: no row id in any address;
+     * Course\CourseAddress): course_admin_url(course, '/content'), course_anchor(course) and course_url('popularity',
+     * course). Each takes a course's row (its code or course_code) or a code.
+     *
+     * @return list<TwigFunction>
+     */
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('course_admin_url', \CattoLearning\Course\CourseAddress::admin(...)),
+            new TwigFunction('course_anchor', \CattoLearning\Course\CourseAddress::anchor(...)),
+            new TwigFunction('course_url', static fn(string $place, array|string $course): string => \CattoLearning\Course\CourseAddress::to($place, $course)),
+            // Every other record by its code, number, slug or name (stage 2, Support\Address).
+            new TwigFunction('person_url', A\PersonAddress::admin(...)),
+            new TwigFunction('company_person_url', A\PersonAddress::company(...)),
+            new TwigFunction('person_to', A\PersonAddress::to(...)),
+            new TwigFunction('company_url', A\CompanyAddress::admin(...)),
+            new TwigFunction('company_to', A\CompanyAddress::to(...)),
+            new TwigFunction('order_url', A\OrderAddress::admin(...)),
+            new TwigFunction('my_order_url', A\OrderAddress::buyer(...)),
+            new TwigFunction('order_document_url', A\OrderAddress::document(...)),
+            new TwigFunction('order_number', A\OrderAddress::number(...)),
+            new TwigFunction('order_query', A\OrderAddress::query(...)),
+            new TwigFunction('attention_url', A\OrderAddress::attention(...)),
+            new TwigFunction('bundle_admin_url', A\CatalogueAddress::bundle(...)),
+            new TwigFunction('bundle_anchor', A\CatalogueAddress::bundleAnchor(...)),
+            new TwigFunction('promotion_url', A\CatalogueAddress::promotion(...)),
+            new TwigFunction('category_admin_url', A\CatalogueAddress::category(...)),
+            new TwigFunction('category_anchor', A\CatalogueAddress::categoryAnchor(...)),
+            new TwigFunction('tag_admin_url', A\CatalogueAddress::tag(...)),
+            new TwigFunction('follow_url', static fn(string $kind, array|string $record): string => $kind === 'course' ? \CattoLearning\Course\CourseAddress::to('follow', $record) : A\CatalogueAddress::follow($kind, $record)),
+            new TwigFunction('certificate_url', A\RecordAddress::certificate(...)),
+            new TwigFunction('certificate_anchor', A\RecordAddress::certificateAnchor(...)),
+            new TwigFunction('message_url', A\RecordAddress::message(...)),
+            new TwigFunction('course_item_url', A\CourseItemAddress::admin(...)),
+            new TwigFunction('part_url', A\CoursePartAddress::reader(...)),
+            new TwigFunction('preview_part_url', A\CoursePartAddress::preview(...)),
+            new TwigFunction('content_part_url', A\CoursePartAddress::content(...)),
+            new TwigFunction('stop_url', A\CoursePartAddress::stop(...)),
+        ];
+    }
+
     /** @return list<TwigFilter> */
     public function getFilters(): array
     {

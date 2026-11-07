@@ -7,7 +7,7 @@
 	"Pg 1 of 1" says why there is one page.
 #}
 {% set pg_id = pg.prefix ~ '-' ~ pg_position|default('single') %}
-<nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}">
+<nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}" data-page-sizes="{{ pg.page_sizes|default([])|length }}">
 	<div class="pagination-summary" aria-live="polite">
 		{% if pg.total > 0 %}<span>{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
 		<span class="pagination-pages">Pg {{ pg.page }} of {{ pg.total_pages }}</span>

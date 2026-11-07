@@ -40,7 +40,7 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.exists
 const results = [], failures = [];
 const adminTokens = [...state.admin_tokens];
 const admin = () => adminTokens.shift();
-const settingsUrl = `/admin/courses/${state.course}/certificate`;
+const settingsUrl = `/admin/courses/${state.course_code}/certificate`;
 const INSTALLED = ['Classic', 'Modern', 'Minimal', 'Legal Seal', 'Gold Frame', 'Professional CPD'];
 const DESIGN = state.design_name;
 const UPLOADED = state.background_name;

@@ -15,8 +15,9 @@ final class BundleFixture
 {
     /**
      * @param list<int> $courseIds in bundle order
-     * @param array<string,mixed> $overrides bundles columns (status, available_from, available_until, title, slug)
-     * @return array{id:int,offer:int,slug:string,title:string}
+     * @param array<string,mixed> $overrides bundles columns (status, available_from, available_until, title, slug) and the
+     *        offer's was_price (minor units)
+     * @return array{id:int,offer:int,slug:string,title:string,code:string} code: the bundle's code, its address in Administration
      */
     public static function create(Database $db, int $actorId, array $courseIds, int $priceMinor = 120000, array $overrides = [], int $periodSeconds = 31536000, bool $onSale = true): array
     {
@@ -27,8 +28,9 @@ final class BundleFixture
         $id = $repository->create(['slug' => $slug, 'title' => $title, 'short_description' => 'Several courses together.', 'description_html' => '<p>A bundle.</p>', 'cover_svg' => '',
             'available_from' => $overrides['available_from'] ?? null, 'available_until' => $overrides['available_until'] ?? null], $actorId, $now);
         foreach ($courseIds as $courseId) $repository->addCourse($id, $courseId);
-        $repository->saveOffer($id, $priceMinor, 'ZAR', $periodSeconds, $onSale, $actorId, $now);
+        $repository->saveOffer($id, $priceMinor, 'ZAR', $periodSeconds, $onSale, $actorId, $now, isset($overrides['was_price']) ? (int) $overrides['was_price'] : null);
         $repository->setStatus($id, (string) ($overrides['status'] ?? 'published'), $actorId, $now);
-        return ['id' => $id, 'offer' => (int) $db->fetchOne('SELECT id FROM bundle_offers WHERE bundle_id=:id', ['id' => $id]), 'slug' => $slug, 'title' => $title];
+        return ['id' => $id, 'offer' => (int) $db->fetchOne('SELECT id FROM bundle_offers WHERE bundle_id=:id', ['id' => $id]), 'slug' => $slug, 'title' => $title,
+            'code' => (string) $db->fetchOne('SELECT code FROM bundles WHERE id=:id', ['id' => $id])];
     }
 }

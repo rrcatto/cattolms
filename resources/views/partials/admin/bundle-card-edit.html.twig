@@ -1,0 +1,32 @@
+{#
+	One bundle's card in Administration > Bundles' grid as a form, edited in place (owner, 2026-11-06): the same fields as
+	its row (bundle-row-edit.html.twig), one under another, Save and Cancel at the card's foot. With JavaScript only this
+	card changes. Variables as the row's.
+#}
+{% set bq = bundle_edit %}
+{% set bq_form = 'bundle-quick-' ~ bundle.id %}
+{% embed ui_template('data.card') with {props: ui_props('data.card', {title: bundle.title, picture: 'wide'})} %}
+{% block picture %}{% if bundle.cover_svg|default('') starts with '<svg' %}{{ bundle.cover_svg|raw }}{% endif %}{% endblock %}
+{% block title %}Editing <code class="cl-course-code">{{ bundle.code }}</code>{% endblock %}
+{% block details %}
+	<span id="{{ bundle_anchor(bundle) }}" class="cl-course-anchor"></span>
+	<form id="{{ bq_form }}" class="cl-course-quick-card" action="{{ bundle_admin_url(bundle, '/row') }}" method="post" hx-post="{{ bundle_admin_url(bundle, '/row') }}" hx-target="closest li" hx-swap="outerHTML">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		<input type="hidden" name="view" value="grid">
+		<input type="hidden" name="return" value="{{ bundles_list_href }}">
+		{% if bundle_error|default('') %}<p class="cl-course-quick-error" role="alert">{{ bundle_error }}</p>{% endif %}
+		<label class="cl-course-quick-field"><span>Code</span><input class="cl-input" name="code" value="{{ bq.code }}" maxlength="20" autocomplete="off" autofocus></label>
+		<label class="cl-course-quick-field"><span>Title</span><input class="cl-input" name="title" value="{{ bq.title }}" required maxlength="240" autocomplete="off"></label>
+		{% include '@platform/partials/admin/bundle-status-choice.html.twig' with {bsc_selected: bq.status, bsc_stacked: true} only %}
+		<label class="cl-course-quick-field"><span>Now price ({{ currency }})</span><input class="cl-input" name="price" value="{{ bq.price }}" inputmode="decimal" autocomplete="off" placeholder="2500.00"></label>
+		<label class="cl-course-quick-field"><span>Was price</span><input class="cl-input" name="was_price" value="{{ bq.was_price }}" inputmode="decimal" autocomplete="off"></label>
+		<label class="cl-course-quick-field"><span>On sale from</span><input class="cl-input" type="datetime-local" name="available_from" value="{{ bq.available_from }}"></label>
+		<label class="cl-course-quick-field"><span>On sale until</span><input class="cl-input" type="datetime-local" name="available_until" value="{{ bq.available_until }}"></label>
+		<span class="cl-course-quick-field"><span>Access period</span><span class="cl-course-quick-period"><input class="cl-input" type="number" min="1" max="3650" name="access_period_value" value="{{ bq.access_period_value }}" aria-label="Access period"><select class="cl-select" name="access_period_unit" aria-label="Unit">{% for unit in units %}<option value="{{ unit }}"{% if unit == bq.access_period_unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select></span></span>
+	</form>
+{% endblock %}
+{% block actions %}
+	{{ ui('action.button', {label: 'Save', aria_label: 'Save ' ~ bundle.title, title: 'Save', icon: 'action-save-changes', icon_only: true, variant: 'primary', size: 'small', form: bq_form}) }}
+	{{ ui('action.link', {label: 'Cancel', aria_label: 'Cancel editing ' ~ bundle.title, title: 'Cancel', icon: 'action-cancel', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href|trim('?&', 'right') ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?view=grid'), target: 'closest li', swap: 'outerHTML'}) }}
+{% endblock %}
+{% endembed %}

@@ -94,7 +94,7 @@ final class OwnerMessagesTest extends TestCase
         });
         (new TelegramClient($http))->send('https://api.telegram.org', self::KEY, '4242', 'Sale: <b>not bold</b>');
         self::assertSame(['POST', 'https://api.telegram.org/bot' . self::KEY . '/sendMessage'], [$seen[0], $seen[1]]);
-        self::assertSame(['chat_id' => '4242', 'text' => 'Sale: <b>not bold</b>', 'disable_web_page_preview' => true], $seen[2], 'No parse mode, so a name cannot break it.');
+        self::assertSame(['chat_id' => '4242', 'text' => 'Sale: <b>not bold</b>', 'link_preview_options' => ['is_disabled' => true]], $seen[2], 'No parse mode, so a name cannot break it, and no link preview.');
     }
 
     public function testOnlyTheChatOfTheNamedAccountIsFound(): void

@@ -91,12 +91,15 @@ final class ProfilePicturesIntegrationTest extends TestCase
 
     public function testAPageOfPeopleGetsTheirPictureAddressesInOneGo(): void
     {
-        $rows = $this->pictures->withPictures([['id' => $this->person, 'name' => 'Pictured person'], ['id' => 999999999, 'name' => 'Gone']]);
-        self::assertSame('/admin/people/' . $this->person . '/profile-image?v=' . $this->pictures->state($this->person)['version'], $rows[0]['picture_url']);
+        // By their account reference (owner, 2026-11-06: no row id in an address).
+        $reference = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $this->person]);
+        $rows = $this->pictures->withPictures([['id' => $this->person, 'name' => 'Pictured person', 'account_reference' => $reference], ['id' => 999999999, 'name' => 'Gone', 'account_reference' => 'CL202601010001K']]);
+        self::assertSame('/admin/people/' . $reference . '/profile-image?v=' . $this->pictures->state($this->person)['version'], $rows[0]['picture_url']);
+        self::assertSame('/company/people/' . $reference . '/picture?v=' . $this->pictures->state($this->person)['version'], $this->pictures->withPictures([['id' => $this->person, 'account_reference' => $reference]], 'company')[0]['picture_url'], 'The Company workspace\'s too.');
         self::assertTrue($rows[0]['picture_drawn']);
         self::assertSame('', $rows[1]['picture_url'], 'Nobody, no picture.');
         $this->pictures->showAnother($this->person);
-        self::assertNotSame($rows[0]['picture_url'], $this->pictures->withPictures([['id' => $this->person]])[0]['picture_url'], 'Another picture, another address.');
+        self::assertNotSame($rows[0]['picture_url'], $this->pictures->withPictures([['id' => $this->person, 'account_reference' => $reference]])[0]['picture_url'], 'Another picture, another address.');
     }
 
     public function testAnAccountThatDoesNotExistHasNoPicture(): void

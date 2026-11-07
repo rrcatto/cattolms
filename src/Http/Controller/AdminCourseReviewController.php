@@ -40,18 +40,20 @@ final class AdminCourseReviewController extends BaseController
         // Pending is the default view: the queue is what this page is for.
         $status = (string) ($_GET['status'] ?? 'pending');
         $status = in_array($status, [...self::STATUSES, 'all'], true) ? $status : 'pending';
-        $course = ctype_digit((string) ($_GET['course_id'] ?? '')) && (int) $_GET['course_id'] > 0 ? (int) $_GET['course_id'] : null;
+        // The course by its code (owner, 2026-11-06: no row id in an address); one no course has matches nothing.
+        $code = is_string($_GET['course'] ?? null) ? trim($_GET['course']) : '';
+        $course = $code === '' ? null : (array_column($this->queue->reviewedCourses(), 'id', 'code')[$code] ?? 0);
         $rating = preg_match('/^[1-5]$/', (string) ($_GET['rating'] ?? '')) === 1 ? (int) $_GET['rating'] : null;
         $filters = array_filter(['status' => $status === 'all' ? null : $status, 'course_id' => $course, 'rating' => $rating], static fn(mixed $value): bool => $value !== null);
         $pagination = Pagination::create($this->request()->query->get('reviews_page'), $this->request()->query->get('reviews_page_size'), $this->queue->moderationCount($filters), 25);
-        $query = ['status' => $status, 'course_id' => $course ?? '', 'rating' => $rating ?? ''];
+        $query = ['status' => $status, 'course' => $code, 'rating' => $rating ?? ''];
         $return = self::BASE . '?' . http_build_query(array_filter($query + ['reviews_page' => $pagination->page], static fn(mixed $value): bool => $value !== ''));
         return $this->render('admin-course-reviews', [
             'title' => 'Course Reviews',
             'reviews' => $this->queue->moderationList($filters, $pagination->pageSize, $pagination->offset),
             'counts' => $this->queue->statusCounts(),
             'courses' => $this->queue->reviewedCourses(),
-            'filter' => ['status' => $status, 'course_id' => $course === null ? '' : (string) $course, 'rating' => $rating === null ? '' : (string) $rating],
+            'filter' => ['status' => $status, 'course' => $code, 'rating' => $rating === null ? '' : (string) $rating],
             'reviews_pagination' => PlatformAdministrationService::paginationPayload('reviews', $pagination, self::BASE, 'Course reviews', $query),
             'return_to' => $return,
             'max_note' => CourseReviewService::MAX_NOTE,

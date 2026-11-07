@@ -116,6 +116,11 @@ final class FakeMailer implements MailerInterface
         $this->record('order_cancelled', compact('email', 'order'));
     }
 
+    public function sendMoneyReport(string $email, array $report, array $files): void
+    {
+        $this->record('money_report', compact('email', 'report', 'files'));
+    }
+
     public function sendInvoice(string $email, string $number, string $pdf): void
     {
         $this->record('invoice', compact('email', 'number', 'pdf'));

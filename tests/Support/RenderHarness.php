@@ -252,10 +252,10 @@ final class RenderHarness
             'activity_selected_actor' => null, 'activity_selected_company' => null,
             'activity_selected_course' => null, 'activity_events' => [], 'activity_families' => [],
             'activity_last_id' => 0,
-            'activity_filters' => ['from' => '', 'to' => '', 'family' => '', 'actor_id' => 0,
-                'course_id' => 0, 'company_id' => 0, 'q' => '', 'after_id' => 0],
+            'activity_filters' => ['from' => '', 'to' => '', 'family' => '', 'actor' => '', 'actor_id' => 0,
+                'course' => '', 'course_id' => 0, 'company' => '', 'company_id' => 0, 'q' => '', 'after_id' => 0],
             'roles' => [['role_key' => 'STUDENT', 'role_name' => 'Student']],
-            'company' => ['id' => 1, 'name' => 'C', 'domain' => 'c.test'],
+            'company' => ['id' => 1, 'name' => 'C', 'domain' => 'c.test', 'account_reference' => 'CL202601010002H'],
             'company_platform_wide' => false,
         ];
 
@@ -305,6 +305,8 @@ final class RenderHarness
         return match ($dataset) {
             'people' => [[
                 'id' => 1, 'public_id' => 'p1', 'name' => 'A B', 'email' => 'a@b.c', 'status' => 'active',
+                // A person and a company are named by their account references in addresses (owner, 2026-11-06).
+                'account_reference' => 'CL202601010001K', 'company_reference' => 'CL202601010002H',
                 'company_name' => 'C', 'company_id' => 1, 'roles' => ['STUDENT'], 'roles_label' => 'Student',
                 'role_options' => [], 'course_count' => 0, 'created_at' => '2026-01-01',
                 'last_login_at' => '2026-01-01', 'first_name' => 'A', 'last_name' => 'B',
@@ -314,7 +316,7 @@ final class RenderHarness
                 'certificate_name' => 'A B', 'mobile_number' => '', 'middle_names' => '',
             ]],
             'companies' => [[
-                'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active',
+                'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active', 'account_reference' => 'CL202601010002H',
                 'is_client' => true, 'is_course_provider' => false, 'company_type_label' => 'Client',
                 'status_label' => 'Active', 'people_count' => 1, 'owned_course_count' => 0,
                 'enrolment_count' => 0, 'created_at' => '2026-01-01',
@@ -343,13 +345,13 @@ final class RenderHarness
                 'id' => 1, 'public_id' => 'r1', 'learner_name' => 'A', 'course_title' => 'T',
                 'company_name' => 'C', 'status' => 'pending', 'requested_at' => '2026-01-01',
                 'slug' => 't', 'email' => 'a@b.c', 'note' => '', 'decided_at' => null,
-                'decision_note' => '', 'access_period_seconds' => 31536000, 'course_id' => 1,
-                'user_id' => 1, 'company_id' => 1, 'learner_reference' => 'CL202601010001K',
+                'decision_note' => '', 'access_period_seconds' => 31536000, 'course_id' => 1, 'course_code' => 'T-101',
+                'user_id' => 1, 'company_id' => 1, 'learner_reference' => 'CL202601010001K', 'company_reference' => 'CL202601010002H',
                 // The readable status, as PlatformAdministrationService::normaliseRequests() adds it.
                 'status_label' => 'Pending', 'status_tone' => 'warning', 'awaiting_payment' => false,
             ]],
             'credits' => [[
-                'id' => 1, 'public_id' => 'cr1', 'holder_name' => 'C', 'company_id' => 1, 'user_id' => null, 'holder_reference' => null, 'course_title' => 'T',
+                'id' => 1, 'public_id' => 'cr1', 'holder_name' => 'C', 'company_id' => 1, 'company_reference' => 'CL202601010002H', 'user_id' => null, 'holder_reference' => null, 'course_title' => 'T',
                 'quantity' => 1, 'assigned_count' => 0, 'consumed_count' => 0, 'available_count' => 1,
                 'access_period_seconds' => 31536000, 'access_period_label' => '12 months',
                 'source_type' => 'administrator', 'note' => '', 'created_at' => '2026-01-01',

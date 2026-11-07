@@ -42,7 +42,7 @@ BASE="/usr/local/lib/php/cattolms"
 LEGACY_BASE="/usr/local/lib/php/catto-learning"
 # 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619 (remote code execution); nothing earlier is safe to run.
 PHP_MIN="8.5.12"
-EXTENSIONS=(dom fileinfo gd json mbstring openssl pdo pdo_pgsql zip)
+EXTENSIONS=(dom fileinfo gd json libxml mbstring openssl pdo pdo_pgsql xmlreader zip)
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }
 note() { printf '  %s\n' "$*"; }
@@ -193,6 +193,7 @@ ln -sfn "$TARGET" "$BASE/current"
 # names this site unless another site's .env already has that place.
 [ -e "$BASE/.env" ] || ln -s "$ENV_FILE" "$BASE/.env"
 command -v cron >/dev/null 2>&1 || command -v crond >/dev/null 2>&1 || note "cron is not installed: install it (apt install cron) or the scheduler will not run."
+command -v rsvg-convert >/dev/null 2>&1 || note "rsvg-convert is not installed: install it (apt install librsvg2-bin) so courses and bundles get the share pictures social sites and search engines show."
 mkdir -p /etc/cron.d
 cat > "/etc/cron.d/cattolms-$USERNAME" <<CRON
 # CattoLMS scheduler for $USERNAME: order emails and cancellations every minute, popularity hourly, the clean-up daily.

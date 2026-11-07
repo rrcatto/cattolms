@@ -94,7 +94,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->items->create(['item_key' => $key, 'item_type' => 'html_lesson', 'title' => 'Explicit replacement', 'content_source' => '<p>Replacement</p>'], $this->owner);
         self::assertSame([], $this->items->publicationValidation($this->course)['errors']);
         $renderer = $this->renderer;
-        self::assertStringContainsString('Replacement', $renderer->render($this->items->item($host), 'components-' . $this->suffix, 1));
+        self::assertStringContainsString('Replacement', $renderer->render($this->items->item($host), 'components-' . $this->suffix, 'module-1-lesson'));
         self::assertSame($source, $this->items->item($host)['content_source']);
     }
 
@@ -199,7 +199,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->items->addExisting($this->course, $id, [], $this->owner);
         self::assertStringContainsString('Circular', implode(' ', $this->items->publicationValidation($this->course)['errors']));
         $renderer = $this->renderer;
-        self::assertStringContainsString('Circular', $renderer->render($this->items->item($id), 'components-' . $this->suffix, 1));
+        self::assertStringContainsString('Circular', $renderer->render($this->items->item($id), 'components-' . $this->suffix, 'module-1-lesson'));
     }
 
     public function testEmbeddedAssessmentHasItsOwnIdentityAndCountsOncePerContext(): void
@@ -270,7 +270,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $id = $this->items->create(['item_key' => $key, 'item_type' => 'html_lesson', 'title' => 'Mixed case', 'content_source' => 'Resolved mixed case'], $this->owner);
         self::assertSame($key, $this->items->item($id)['item_key']);
         $host = $this->lesson('case-host', '[course-item:' . $key . ']');
-        self::assertSame('Resolved mixed case', $this->renderer->render($this->items->item($host), 'test', 1));
+        self::assertSame('Resolved mixed case', $this->renderer->render($this->items->item($host), 'test', 'module-1-lesson'));
         self::assertNull($this->records->itemByKey(strtolower($key)));
     }
 

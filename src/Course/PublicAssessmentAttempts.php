@@ -261,7 +261,7 @@ final class PublicAssessmentAttempts
                 $item = $this->itemRecords->itemByKey((string) $key);
                 if ($item === null) { continue; }
                 $item['node_id'] = null;
-                foreach ($structure as $node) { if (($node['node_type'] ?? '') === 'item' && (int) ($node['course_item_id'] ?? 0) === (int) $item['id']) { $item['node_id'] = (int) $node['id']; break; } }
+                foreach ($structure as $node) { if (($node['node_type'] ?? '') === 'item' && (int) ($node['course_item_id'] ?? 0) === (int) $item['id']) { $item['node_id'] = (int) $node['id']; $item['part_name'] = (string) ($node['part_name'] ?? ''); break; } }
                 $view['diagnostic_remediation_items'][] = $item;
             }
         }

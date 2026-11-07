@@ -89,7 +89,7 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 36, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Said yes'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'When'}} %}{% if can_manage %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}{% endif %}</tr>{% endblock %}
 			{% block body %}{% for follower in followers %}<tr>
-				<td class="cell-text">{{ ui('data.person', {name: follower.name, href: '/admin/people/' ~ follower.user_id}) }}</td>
+				<td class="cell-text">{{ ui('data.person', {name: follower.name, href: person_url(follower.account_reference)}) }}</td>
 				<td>{{ sources[follower.source]|default(follower.source) }}</td>
 				<td>{{ follower.changed_at|date('j M Y \\a\\t H:i') }}</td>
 				{% if can_manage %}<td class="cell-actions"><form action="/mailing/lists/{{ list.id }}/take-off" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ follower.user_id }}">{{ ui('action.button', {label: 'Take off this list', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Take ' ~ follower.name ~ ' off ' ~ list.name ~ '?'}) }}</form></td>{% endif %}

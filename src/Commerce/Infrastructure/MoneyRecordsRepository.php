@@ -15,6 +15,9 @@ append-only. Filters arrive normalised by MoneyRecords: dates as the instants th
 (from_at, to_before), every other value already checked against its list.
 
 Changelog:
+2026/11/06 SAST
+- Money Reports (owner, 2026-11-06): the ledger takes several kinds at once and the orders several states, so a report's
+  figure (both card fees, every order paid in full) and the list it opens are counted by the same SQL.
 2026/10/18 SAST
 - Created.
 */
@@ -71,6 +74,12 @@ final class MoneyRecordsRepository
         if (($f['from_at'] ?? '') !== '') { $where[] = 'l.occurred_at >= CAST(:from_at AS TIMESTAMPTZ)'; $params['from_at'] = $f['from_at']; }
         if (($f['to_before'] ?? '') !== '') { $where[] = 'l.occurred_at < CAST(:to_before AS TIMESTAMPTZ)'; $params['to_before'] = $f['to_before']; }
         if (($f['kind'] ?? '') !== '') { $where[] = 'l.kind = :kind'; $params['kind'] = $f['kind']; }
+        // Several kinds that make one figure, such as both card fees (MoneyRecords::LEDGER_KIND_GROUPS).
+        if (is_array($f['kinds'] ?? null) && $f['kinds'] !== []) {
+            $names = [];
+            foreach (array_values($f['kinds']) as $index => $kind) { $names[] = ':kinds_' . $index; $params['kinds_' . $index] = (string) $kind; }
+            $where[] = 'l.kind IN (' . implode(', ', $names) . ')';
+        }
         if (($f['method'] ?? '') !== '') { $where[] = 'l.method = :method'; $params['method'] = $f['method']; }
         $where[] = match ($f['money'] ?? '') { 'in' => 'l.cash_effect = 1', 'out' => 'l.cash_effect = -1', 'none' => 'l.cash_effect = 0', default => 'TRUE' };
         $where[] = match ($f['wallet'] ?? '') { 'in' => 'l.wallet_effect = 1', 'out' => 'l.wallet_effect = -1', default => 'TRUE' };
@@ -305,6 +314,12 @@ final class MoneyRecordsRepository
         if (($f['from_at'] ?? '') !== '') { $where[] = 'o.placed_at >= CAST(:from_at AS TIMESTAMPTZ)'; $params['from_at'] = $f['from_at']; }
         if (($f['to_before'] ?? '') !== '') { $where[] = 'o.placed_at < CAST(:to_before AS TIMESTAMPTZ)'; $params['to_before'] = $f['to_before']; }
         if (($f['state'] ?? '') !== '') { $where[] = 'o.state = :state'; $params['state'] = $f['state']; }
+        // Several states that make one figure, such as every order paid in full (MoneyRecords::ORDER_STATE_GROUPS).
+        if (is_array($f['states'] ?? null) && $f['states'] !== []) {
+            $names = [];
+            foreach (array_values($f['states']) as $index => $state) { $names[] = ':states_' . $index; $params['states_' . $index] = (string) $state; }
+            $where[] = 'o.state IN (' . implode(', ', $names) . ')';
+        }
         if (($f['account'] ?? '') === 'company') $where[] = 'o.company_id IS NOT NULL';
         if (($f['account'] ?? '') === 'person') $where[] = 'o.company_id IS NULL';
         if (($f['q'] ?? '') !== '') {

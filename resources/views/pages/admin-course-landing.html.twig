@@ -6,7 +6,7 @@
 	address, title and description. The landing-sections controller adds dragging; every action is an
 	ordinary form without JavaScript.
 #}
-{% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Landing page' %}{% set ph_title = course.title %}{% set ph_lead = 'A marketing page that sells this course, separate from its page in the catalogue. Its price, rating, reviews and outline always come from the course.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Landing page' %}{% set ph_title = course.title %}{% set ph_lead = 'A marketing page that sells this course, separate from its page in the catalogue. Its price, rating, reviews and outline always come from the course.' %}{% include '@platform/partials/page-head.html.twig' %}
 {{ importmap() }}
 <section class="cl-page-section">
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 1, section_spacing: true})} %}
@@ -16,7 +16,7 @@
 {% block surface_body %}
 			{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'This course has no landing page', summary: 'Create one to start with a hero, the course’s outline, its reviews and its price, and room for your own copy. It stays a draft, seen only in its preview, until you publish it.'})} %}
 {% block actions %}
-				<form action="/admin/courses/{{ course.id }}/landing" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Create landing page', variant: 'primary', type: 'submit', icon: 'action-add'}) }}</form>
+				<form action="{{ course_admin_url(course, '/landing') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Create landing page', variant: 'primary', type: 'submit', icon: 'action-add'}) }}</form>
 {% endblock %}
 {% endembed %}
 {% endblock %}
@@ -40,16 +40,16 @@
 			{% endif %}
 			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-				{{ ui('action.link', {label: 'Preview', variant: published ? 'secondary' : 'primary', href: '/admin/courses/' ~ course.id ~ '/landing/preview', new_window: true, icon: 'action-preview'}) }}
+				{{ ui('action.link', {label: 'Preview', variant: published ? 'secondary' : 'primary', href: course_admin_url(course, '/landing/preview'), new_window: true, icon: 'action-preview'}) }}
 				{% if can_publish %}
 					{% if published %}
-						<form action="/admin/courses/{{ course.id }}/landing/unpublish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', confirm: 'Unpublish the landing page? Its address will be not found until you publish it again. Nothing on it is lost.', icon: 'action-hide'}) }}</form>
+						<form action="{{ course_admin_url(course, '/landing/unpublish') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', confirm: 'Unpublish the landing page? Its address will be not found until you publish it again. Nothing on it is lost.', icon: 'action-hide'}) }}</form>
 					{% else %}
-						<form action="/admin/courses/{{ course.id }}/landing/publish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Publish', variant: 'primary', type: 'submit', disabled: landing_page.problems is not empty, title: landing_page.problems is not empty ? 'Put right what is listed above first.' : '', icon: 'action-publish'}) }}</form>
+						<form action="{{ course_admin_url(course, '/landing/publish') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Publish', variant: 'primary', type: 'submit', disabled: landing_page.problems is not empty, title: landing_page.problems is not empty ? 'Put right what is listed above first.' : '', icon: 'action-publish'}) }}</form>
 					{% endif %}
 				{% endif %}
 				{% if not landing_page.was_published %}
-					<form action="/admin/courses/{{ course.id }}/landing/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete page', variant: 'danger', type: 'submit', icon: 'action-remove', confirm: 'Delete this landing page and everything written on it? The course is not changed.'}) }}</form>
+					<form action="{{ course_admin_url(course, '/landing/delete') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete page', variant: 'danger', type: 'submit', icon: 'action-remove', confirm: 'Delete this landing page and everything written on it? The course is not changed.'}) }}</form>
 				{% endif %}
 {% endblock %}
 			{% endembed %}
@@ -65,7 +65,7 @@
 				{{ ui('action.link', {label: 'Add section', variant: 'primary', href: '#landing-add', modal: 'landing-add', icon: 'action-add'}) }}
 {% endblock %}
 {% endembed %}
-			<div class="cl-tree-wrap cl-landing-editor" data-controller="landing-sections" data-landing-sections-url-value="/admin/courses/{{ course.id }}/landing/sections" data-action="dragstart->landing-sections#start dragover->landing-sections#over dragleave->landing-sections#leave drop->landing-sections#drop dragend->landing-sections#end submit->landing-sections#menu">
+			<div class="cl-tree-wrap cl-landing-editor" data-controller="landing-sections" data-landing-sections-url-value="{{ course_admin_url(course, '/landing/sections') }}" data-action="dragstart->landing-sections#start dragover->landing-sections#over dragleave->landing-sections#leave drop->landing-sections#drop dragend->landing-sections#end submit->landing-sections#menu">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				<p class="cl-tree-help" id="landing-section-keys" data-landing-sections-target="enhanced" hidden>Drag a section by its handle and drop it on the upper or lower part of another to put it before or after it. On a focused handle, ↑ and ↓ move it, and Home and End move it to the top or bottom.</p>
 				<p class="cl-tree-status" role="status" aria-live="polite" data-landing-sections-target="status"></p>
@@ -86,7 +86,7 @@
 			{% if settings_error %}
 				{{ ui('feedback.notice', {tone: 'danger', heading: 'The settings were not saved. ' ~ settings_error}) }}
 			{% endif %}
-			<form action="/admin/courses/{{ course.id }}/landing/settings" method="post">
+			<form action="{{ course_admin_url(course, '/landing/settings') }}" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}
 {% block body %}
@@ -112,7 +112,7 @@
 	{% endembed %}
 </section>
 {% if landing_page %}
-	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'landing-add', title: 'Add a section', action: '/admin/courses/' ~ course.id ~ '/landing/sections'})} %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'landing-add', title: 'Add a section', action: course_admin_url(course, '/landing/sections')})} %}
 {% block modal_body %}
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		{% set la_icons = {hero: 'panels-top-left', audience: 'users', outcomes: 'target', contents: 'list-tree', benefits: 'gem', reviews: 'star', pricing: 'badge-percent', faq: 'circle-help', cta: 'megaphone', presentation: 'presentation'} %}

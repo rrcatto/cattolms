@@ -168,17 +168,17 @@ final class WalletLedgerIntegrationTest extends TestCase
         $order = array_values(array_filter($records->orders(['q' => $email])['rows'], static fn(array $row): bool => (int) $row['id'] === $orderId))[0] ?? null;
         self::assertNotNull($order, 'The order is found by the buyer\'s email.');
         self::assertSame($buyer->id, (int) $order['purchaser_user_id']);
-        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $buyer->id, 'email' => $email],
+        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $reference, 'email' => $email],
             array_intersect_key($order['purchaser_person'], ['reference' => 1, 'href' => 1, 'email' => 1]), 'The orders list names the buyer as a person.');
 
-        $paid = array_values(array_filter($records->ledger(['order' => (string) $orderId])['rows'], static fn(array $row): bool => $row['kind'] === 'payment_received'))[0];
-        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $buyer->id, 'email' => $email],
+        $paid = array_values(array_filter($records->ledger(['order' => \CattoLearning\Commerce\Domain\OrderNumber::format($orderId)])['rows'], static fn(array $row): bool => $row['kind'] === 'payment_received'))[0];
+        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $reference, 'email' => $email],
             array_intersect_key((array) $paid['account_person'], ['reference' => 1, 'href' => 1, 'email' => 1]), 'A ledger line names its account as a person.');
-        self::assertSame('/admin/people/' . $buyer->id, $paid['sentence_parts'][0]['person']['href'] ?? null, 'Its sentence draws the buyer as a person.');
+        self::assertSame('/admin/people/' . $reference, $paid['sentence_parts'][0]['person']['href'] ?? null, 'Its sentence draws the buyer as a person.');
         self::assertSame($paid['sentence'], implode('', array_map(static fn(array $part): string => $part['text'] ?? $part['person']['name'], $paid['sentence_parts'])), 'The parts read as the sentence.');
 
-        $page = InProcessPage::run($this->admin(), \CattoLearning\Commerce\Http\PaymentAdministrationController::class, 'order', ['id' => (string) $orderId])['body'];
-        self::assertStringContainsString('<a class="cl-ui-person-account" href="/admin/people/' . $buyer->id . '">', $page, 'The order page links the buyer to their account.');
+        $page = InProcessPage::run($this->admin(), \CattoLearning\Commerce\Http\PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
+        self::assertStringContainsString('<a class="cl-ui-person-account" href="/admin/people/' . $reference . '">', $page, 'The order page links the buyer to their account.');
         self::assertStringContainsString('<span class="cl-ui-person-line cl-ui-person-reference">' . AccountReference::format($reference) . '</span>', $page, 'with their account reference, once, under the order number');
         $placedWith = (string) (CommerceRepository::decode((string) $this->records->order($orderId)['snapshot'])['purchaser_email'] ?? '');
         self::assertNotSame('', $placedWith);
@@ -267,7 +267,7 @@ final class WalletLedgerIntegrationTest extends TestCase
         $this->orders->changeCart($buyer, $this->course['A']['variant']);
         $orderId = $this->buy($buyer, 'eft');
         self::assertSame('awaiting_payment', $this->records->order($orderId)['state']);
-        $page = InProcessPage::run($buyer, \CattoLearning\Commerce\Http\CommerceController::class, 'order', ['id' => (string) $orderId])['body'];
+        $page = InProcessPage::run($buyer, \CattoLearning\Commerce\Http\CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)])['body'];
         $reference = AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id=:id', ['id' => $buyer->id]));
         self::assertStringContainsString('Use your account reference as the payment reference: <strong>' . $reference . '</strong>', $page, 'The EFT instructions quote the account reference.');
 
@@ -279,6 +279,17 @@ final class WalletLedgerIntegrationTest extends TestCase
         $underpaid = $this->itemsFor($attention, $orderId);
         self::assertSame(['underpaid'], array_column($underpaid, 'kind'));
         self::assertStringContainsString('still due by', $underpaid[0]['summary']);
+        // An underpaid order's item is named by the order's number (owner, 2026-11-06: no row id in an address), and it opens.
+        $number = \CattoLearning\Commerce\Domain\OrderNumber::format($orderId);
+        self::assertSame('/admin/commerce/attention/underpaid/' . $number, $underpaid[0]['href']);
+        $page = InProcessPage::run($admin, AttentionController::class, 'show', ['kind' => 'underpaid', 'number' => $number])['body'];
+        self::assertStringContainsString('action="/admin/commerce/attention/underpaid/' . $number . '/email"', $page, 'Its email form is the item\'s address.');
+        self::assertStringContainsString('href="/admin/commerce/orders/' . $number . '"', $page, 'and it opens the order by its number.');
+        try {
+            InProcessPage::run($admin, AttentionController::class, 'show', ['kind' => 'underpaid', 'number' => (string) $orderId]);
+            self::fail('The order\'s row id opened its attention item.');
+        } catch (NotFoundHttpException) {
+        }
 
         $bank->confirmBank($admin, $orderId, Uuid::v4(), 40000, $this->clock->now()->format(DATE_ATOM), 'FNB-0002', 'The rest, and more.');
         self::assertSame('fulfilled', $this->records->order($orderId)['state'], 'Paid in full: the course starts.');
@@ -287,6 +298,7 @@ final class WalletLedgerIntegrationTest extends TestCase
             array_map(static fn(array $r): array => [$r['kind'], (int) $r['amount_minor'], $r['method']], $this->db->fetchAllAssociative("SELECT kind, amount_minor, method FROM commerce_ledger_entries WHERE order_id=:o ORDER BY id", ['o' => $orderId])));
         $overpaid = $this->itemsFor($attention, $orderId);
         self::assertSame(['overpaid'], array_column($overpaid, 'kind'), 'The underpaid item is resolved and the overpayment needs attention.');
+        self::assertSame('/admin/commerce/attention/overpaid/' . $overpaid[0]['reference'], $overpaid[0]['href'], 'An overpayment is its ledger line, which keeps its number.');
 
         $detail = $attention->detail('overpaid', $overpaid[0]['reference']);
         self::assertSame($reference, $detail['account_reference']);

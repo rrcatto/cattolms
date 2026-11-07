@@ -97,7 +97,7 @@ final class CommerceRepository
      */
     public function bundleCourses(int $bundleId): array
     {
-        return $this->db->fetchAllAssociative('SELECT c.id AS course_id, c.title, c.slug, c.status FROM bundle_courses bc JOIN courses c ON c.id=bc.course_id WHERE bc.bundle_id=:id ORDER BY bc.position', ['id'=>$bundleId]);
+        return $this->db->fetchAllAssociative('SELECT c.id AS course_id, c.code AS course_code, c.title, c.slug, c.status FROM bundle_courses bc JOIN courses c ON c.id=bc.course_id WHERE bc.bundle_id=:id ORDER BY bc.position', ['id'=>$bundleId]);
     }
 
     public function changeCartBundle(int $cartId, int $offerId, bool $remove): void

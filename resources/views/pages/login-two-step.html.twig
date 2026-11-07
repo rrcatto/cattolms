@@ -1,0 +1,45 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		The second step of a sign-in (owner, 2026-11-05, the approved mockup): a code from the authenticator app, or a recovery
+		code. No session exists until it is passed; five wrong codes end the sign-in.
+	#}
+	{% set ph_kicker = 'Passwordless access' %}
+	{% set ph_title = 'One more step' %}
+	{% set ph_lead = 'Your account has two-step sign-in on.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+				<form action="/login/two-step" method="post" class="cl-sign-in-code" novalidate>
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% if use_recovery|default(false) %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Recovery code', full_width: true, for: 'two-step-recovery'})} %}
+{% block control %}<input class="cl-input cl-input-lg" type="text" id="two-step-recovery" name="recovery" autocomplete="off" maxlength="12" placeholder="XXXX-XXXX" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Continue', variant: 'primary', size: 'large', full_width: true, type: 'submit', icon: 'action-verify'}) }}{% endblock %}{% endembed %}
+					<p class="small cl-text-secondary mb-0">Each recovery code works once. No codes left? Ask an administrator to reset two-step for you.</p>
+					{% else %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: '6-digit code from your authenticator app', full_width: true, for: 'two-step-code'})} %}
+{% block control %}<input class="cl-input cl-input-lg cl-input-code" type="text" id="two-step-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Continue', variant: 'primary', size: 'large', full_width: true, type: 'submit', icon: 'action-verify'}) }}{% endblock %}{% endembed %}
+					{% endif %}
+				</form>
+				<div class="cl-sign-in-links">
+					{% if use_recovery|default(false) %}
+					{{ ui('action.link', {label: 'Use my authenticator app', variant: 'quiet', size: 'small', href: '/login/two-step', icon: 'action-verify'}) }}
+					{% else %}
+					{{ ui('action.link', {label: 'Lost your phone? Use a recovery code', variant: 'quiet', size: 'small', href: '/login/two-step?use=recovery', icon: 'action-private'}) }}
+					{% endif %}
+					<form action="/login/two-step/cancel" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-cancel'}) }}
+					</form>
+				</div>
+
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

@@ -1,0 +1,87 @@
+{#
+	Favourites (owner, 2026-11-06: "Favourites must get its own page and menu-item"): the courses and bundles the person
+	starred, together, newest first (Application\AccountFavourites). A feature card for All, Courses and Bundles says how
+	many each holds; choosing one changes the list in place (htmx into #favourites-list, the address following), and
+	without JavaScript Show does. The list is the catalogue's cards, or a table, as the person chooses (List and Grid,
+	remembered), searched from five entries and paged like My Courses. Each card opens its page and its star unstars it in
+	place.
+#}
+{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{% set kind_icons = {
+	all: '<svg ' ~ a ~ '><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+	courses: '<svg ' ~ a ~ '><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/></svg>',
+	bundles: '<svg ' ~ a ~ '><path d="M12 3 3.5 7.5 12 12l8.5-4.5z"/><path d="M3.5 12 12 16.5 20.5 12"/><path d="M3.5 16.5 12 21l8.5-4.5"/></svg>',
+} %}
+{% set kind_cards = [] %}
+{% for kind in favourites_kinds %}
+	{% set kind_cards = kind_cards|merge([{value: kind.value, label: kind.label, icon: kind_icons[kind.value], note: kind.note}]) %}
+{% endfor %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Your favourites', eyebrow: 'Favourites', summary: 'The courses and bundles you starred. Choose which to show.'}) }}
+		<form class="cl-library-lists" method="get" action="/account/favourites" data-choose-submits
+		      hx-get="/account/favourites" hx-target="#favourites-list" hx-select="#favourites-list" hx-swap="outerHTML" hx-push-url="true">
+			{{ ui('form.picture-choice', {name: 'kind', legend: 'Which favourites', id: 'favourite-kinds', size: 'small', selected: favourites_kind, items: kind_cards}) }}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		<div id="favourites-list" data-favourites-kind="{{ favourites_kind }}">
+			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'favourites', pagination: favourites_pagination, search: favourites_searchable ? {ds_name: 'favourites', ds_label: 'Search your favourites', ds_value: favourites_search, ds_action: '/account/favourites', ds_hidden: favourites_kind == 'all' ? {} : {kind: favourites_kind}} : []})} %}
+{% block toolbar %}{% if favourites_cards %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: favourites_view_switch} %}</div>{% endif %}{% endblock %}
+{% block results %}
+
+				{% if favourites_cards and favourites_view == 'list' %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Your favourites'})} %}
+{% block header %}
+
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Course or bundle'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Kind', wide: true}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Actions'}} %}
+						</tr>
+
+{% endblock %}
+{% block body %}
+
+						{% for card in favourites_cards %}
+							{% set card_href = card.href|default('/courses/' ~ card.slug) %}
+							{% set card_price = (card.facts|default([])|filter(f => f.label == 'Price')|first) %}
+							<tr>
+								<td class="cell-text">
+									<span class="cl-catalogue-row">
+										<a class="cl-catalogue-row-cover" href="{{ card_href }}" tabindex="-1" aria-hidden="true">{% if card.cover_svg is defined and card.cover_svg starts with '<svg' %}{{ card.cover_svg|raw }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ card.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
+										<a class="cl-catalogue-row-title" href="{{ card_href }}">{{ card.title }}</a>
+									</span>
+								</td>
+								<td>{{ card.kind == 'bundle' ? 'Bundle' : 'Course' }}</td>
+								<td>{% if card.kind == 'bundle' %}{% if card_price %}<strong class="cl-price-now">{{ card_price.value }}</strong>{% if card_price.was|default(null) %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ card_price.was }}</s>{% endif %}{% endif %}{% if card.availability_badge|default(null) %}<br><small>{{ card.availability_badge }}</small>{% endif %}{% elseif card.default_price_label|default('') %}<strong class="cl-price-now">{{ card.default_price_label }}</strong>{% if card.default_was_label|default('') %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ card.default_was_label }}</s>{% endif %}{% endif %}</td>
+								<td class="cell-actions">
+									<span class="cl-catalogue-row-actions">
+										{{ ui('action.link', {label: card.kind == 'bundle' ? 'View bundle' : 'View course', variant: 'primary', size: 'small', href: card_href, icon: 'action-view'}) }}
+										{% include '@platform/partials/course-favourite.html.twig' with {course: card, favourite_kind: card.kind, favourite_return: '/account/favourites'} %}
+									</span>
+								</td>
+							</tr>
+						{% endfor %}
+
+{% endblock %}
+{% endembed %}
+				{% elseif favourites_cards %}
+					{{ ui('catalogue.course-grid', {courses: favourites_cards}) }}
+				{% else %}
+					{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
+						{{ favourites_search ? 'Nothing in your favourites matches your search.' : {all: 'No favourites yet. Star a course or a bundle in the catalogue to keep it here.', courses: 'No favourite courses yet.', bundles: 'No favourite bundles yet.'}[favourites_kind] }}
+
+{% endblock %}
+{% endembed %}
+				{% endif %}
+
+{% endblock %}
+{% endembed %}
+		</div>
+
+{% endblock %}
+{% endembed %}

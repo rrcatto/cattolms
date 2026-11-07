@@ -27,7 +27,9 @@ const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tm
 const results = [];
 const check = (name, ok, detail = '') => { results.push({name, ok: Boolean(ok)}); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok || !detail ? '' : ' (' + detail + ')'}`); };
 const pub = (path) => `${base}/courses/${state.slug}/preview/${path}`;
-const learn = (path) => `${base}/learn/${state.slug}/item/${path}?preview=1`;
+const learn = (path) => `${base}/learn/${state.slug}/${path}?preview=1`;
+// A link to a part, by its name: its own page, with or without a query, or a page beneath it (its assessment).
+const to = (part) => `[href$="/${part}"], [href*="/${part}?"], [href*="/${part}/"]`;
 
 async function admin(browser, options) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, ...options});
@@ -36,7 +38,7 @@ async function admin(browser, options) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_id}/preview`, {waitUntil: 'networkidle'});
+    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();
@@ -71,7 +73,7 @@ const progress = async (page) => {
     const match = /(\d+) of (\d+) parts done/.exec(await label.innerText());
     return match ? {done: Number(match[1]), total: Number(match[2])} : null;
 };
-const ticked = (page, node) => page.locator(`.cl-course-outline-item.is-done a[href*="/preview/${node}/"] .cl-course-outline-done`).count();
+const ticked = (page, node) => page.locator(to(node).split(', ').map((link) => `.cl-course-outline-item.is-done a${link} .cl-course-outline-done`).join(', ')).count();
 const press = (page, locator) => Promise.all([page.waitForNavigation(), locator.click()]);
 /* Mark complete answers in place with JavaScript (owner, 2026-11-02). */
 const markInPlace = async (page, reads) => {
@@ -81,7 +83,7 @@ const markInPlace = async (page, reads) => {
 const badge = async (page) => (await page.locator('.cl-question-focus').getByText(/^Question \d+ of \d+$/).first().innerText()).trim();
 
 /* A section in the outline, by the link to its own page. */
-const group = (page, node) => page.locator(`.cl-course-outline-group:has(> summary a[href*="/${node}/content"])`);
+const group = (page, node) => page.locator(to(node).split(', ').map((link) => `.cl-course-outline-group:has(> summary a${link})`).join(', '));
 const isOpen = (page, node) => group(page, node).evaluate((details) => details.open);
 const toggle = (page, node) => group(page, node).locator('> summary > .cl-course-outline-toggle').click();
 const openCount = (page) => page.locator('.cl-course-outline details[open]').count();
@@ -91,17 +93,17 @@ async function studentSections(page, name) {
     const at = `${name} student preview`;
     await page.goto(`${base}/learn/${state.slug}?preview=1`, {waitUntil: 'load'});
     check(`${at}: the course introduction opens no section`, await openCount(page) === 0);
-    await page.goto(learn(`${state.lesson_node}/content`), {waitUntil: 'load'});
+    await page.goto(learn(state.lesson_node), {waitUntil: 'load'});
     check(`${at}: a part opens its own section and no other`, await isOpen(page, state.module) && await openCount(page) === 1);
-    check(`${at}: the parts of a closed section are out of sight`, await page.locator(`.cl-course-outline a[href*="/${state.second_lesson_node}/content"]`).isHidden());
+    check(`${at}: the parts of a closed section are out of sight`, await page.locator(to(state.second_lesson_node).split(', ').map((link) => `.cl-course-outline a${link}`).join(', ')).isHidden());
     await toggle(page, state.second_module);
-    check(`${at}: the arrow opens another section, with no new page`, await isOpen(page, state.second_module) && await isOpen(page, state.module) && page.url().includes(`/${state.lesson_node}/`));
+    check(`${at}: the arrow opens another section, with no new page`, await isOpen(page, state.second_module) && await isOpen(page, state.module) && new URL(page.url()).pathname.endsWith(`/${state.lesson_node}`));
     await toggle(page, state.module);
-    check(`${at}: the arrow closes the current one too`, !await isOpen(page, state.module) && await page.locator(`.cl-course-outline a[href*="/${state.lesson_node}/content"]`).isHidden());
-    await press(page, page.locator(`.cl-course-outline a[href*="/${state.second_lesson_node}/content"]`));
+    check(`${at}: the arrow closes the current one too`, !await isOpen(page, state.module) && await page.locator(to(state.lesson_node).split(', ').map((link) => `.cl-course-outline a${link}`).join(', ')).isHidden());
+    await press(page, page.locator(to(state.second_lesson_node).split(', ').map((link) => `.cl-course-outline a${link}`).join(', ')));
     check(`${at}: moving into another section opens it and closes the last`, await isOpen(page, state.second_module) && !await isOpen(page, state.module) && await openCount(page) === 1);
     await press(page, group(page, state.module).locator('> summary a'));
-    check(`${at}: a section's title goes to its page, and opens it`, page.url().includes(`/${state.module}/content`) && await isOpen(page, state.module) && await openCount(page) === 1);
+    check(`${at}: a section's title goes to its page, and opens it`, new URL(page.url()).pathname.endsWith(`/${state.module}`) && await isOpen(page, state.module) && await openCount(page) === 1);
     await press(page, page.locator('.cl-course-item-paging-next a'));
     check(`${at}: Next moves on with its section open`, await isOpen(page, state.module) && await openCount(page) === 1);
     await page.goto(learn(`${state.final_node}/assessment/${state.final_key}`), {waitUntil: 'load'});
@@ -116,7 +118,7 @@ async function studentSections(page, name) {
 async function visitorSections(page, at) {
     await page.goto(pub('').replace(/\/$/, ''), {waitUntil: 'load'});
     check(`${at}: the course introduction opens no section`, await openCount(page) === 0);
-    await page.goto(pub(`${state.lesson_node}/content`), {waitUntil: 'load'});
+    await page.goto(pub(state.lesson_node), {waitUntil: 'load'});
     check(`${at}: a part opens its own section`, await isOpen(page, state.module) && await openCount(page) === 1);
     const box = await group(page, state.module).locator('> summary > .cl-course-outline-toggle').boundingBox();
     check(`${at}: the arrow is big enough to press`, box.width >= 32 && box.height >= 32, JSON.stringify(box));
@@ -124,7 +126,7 @@ async function visitorSections(page, at) {
     const down = await arrow();
     check(`${at}: the arrow is drawn as an arrow, pointing down while open`, down.w >= 8 && Math.abs(down.w - down.h) < 1 && down.right > 0 && down.bottom > 0 && down.turn > 0, JSON.stringify(down));
     await toggle(page, state.module);
-    check(`${at}: the arrow closes it, staying on the page`, !await isOpen(page, state.module) && page.url().includes(`/${state.lesson_node}/`));
+    check(`${at}: the arrow closes it, staying on the page`, !await isOpen(page, state.module) && new URL(page.url()).pathname.endsWith(`/${state.lesson_node}`));
     check(`${at}: and then points sideways`, (await arrow()).turn < 0);
     await toggle(page, state.module);
     check(`${at}: and opens it again`, await isOpen(page, state.module));
@@ -195,7 +197,7 @@ async function gradedWayOn(page, at) {
     await resultPage(page, at, 'a graded module result');
     check(`${at}: a graded module result has Assessment options and Next`, (await rowLabels(page)).join(' | ').replace(/\s+/g, ' ').match(/Assessment options.*\|.*Next/) !== null, (await rowLabels(page)).join(' | '));
     await press(page, page.locator('.cl-course-item-paging-next a'));
-    check(`${at}: Next goes to the next part`, page.url().includes(`/item/${state.second_module}/`), page.url());
+    check(`${at}: Next goes to the next part`, new URL(page.url()).pathname.endsWith(`/${state.second_module}`), page.url());
     await page.goto(learn(`${state.final_node}/assessment/${state.final_key}`), {waitUntil: 'load'});
     await press(page, page.locator('button:has-text("Start graded assessment"), button:has-text("Start assessment")').first());
     for (let turn = 0; turn < 6 && await page.locator('.cl-question-focus').count() === 1; turn++) {
@@ -244,7 +246,7 @@ async function visitorAssessment(page, at) {
 }
 
 async function visitorTicks(page, at) {
-    await page.goto(pub(`${state.lesson_node}/content`), {waitUntil: 'load'});
+    await page.goto(pub(state.lesson_node), {waitUntil: 'load'});
     const before = await progress(page);
     check(`${at}: the public preview shows the progress bar and Mark complete`, before !== null && await page.locator('.cl-course-item-complete button').innerText().then((t) => t.includes('Mark complete')));
     // Down at the buttons, with a closed section opened by hand: the page must not reload or move (owner, 2026-11-02).
@@ -273,8 +275,8 @@ async function run(browserType, name) {
     // The student preview: the administrator's preview of the learner's pages.
     const student = listen(await (await admin(browser, {viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'})).newPage());
     await startPreview(student);
-    await row(student, `${name} student preview, a part`, learn(`${state.lesson_node}/content`), {previous: true, next: true, complete: true});
-    await row(student, `${name} student preview, a section`, learn(`${state.module}/content`), {previous: true, next: true, complete: false});
+    await row(student, `${name} student preview, a part`, learn(state.lesson_node), {previous: true, next: true, complete: true});
+    await row(student, `${name} student preview, a section`, learn(state.module), {previous: true, next: true, complete: false});
     await row(student, `${name} student preview, an assessment`, learn(`${state.assessment_node}/assessment/${state.assessment_key}`), {previous: true, next: true, complete: false});
     await row(student, `${name} student preview, the course page`, `${base}/learn/${state.slug}?preview=1`, {next: true});
     await studentSections(student, name);
@@ -282,8 +284,8 @@ async function run(browserType, name) {
 
     // The public preview, as a visitor who is not signed in.
     const visitor = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'})).newPage());
-    await row(visitor, `${name} public preview, a part`, pub(`${state.lesson_node}/content`), {previous: true, next: true, complete: true});
-    await row(visitor, `${name} public preview, a section`, pub(`${state.module}/content`), {previous: true, next: true, complete: false});
+    await row(visitor, `${name} public preview, a part`, pub(state.lesson_node), {previous: true, next: true, complete: true});
+    await row(visitor, `${name} public preview, a section`, pub(state.module), {previous: true, next: true, complete: false});
     await row(visitor, `${name} public preview, an assessment`, pub(`${state.assessment_node}/assessment/${state.assessment_key}`), {previous: true, complete: false});
     await visitorTicks(visitor, `${name} public preview`);
     await visitorSections(visitor, `${name} public preview`);
@@ -291,7 +293,7 @@ async function run(browserType, name) {
     check(`${name}: nothing scrolls sideways`, await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
     const phone = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 390, height: 844}, reducedMotion: 'reduce'})).newPage());
-    await row(phone, `${name} public preview at 390, a part`, pub(`${state.lesson_node}/content`), {complete: 'above'});
+    await row(phone, `${name} public preview at 390, a part`, pub(state.lesson_node), {complete: 'above'});
     check(`${name} at 390: nothing scrolls sideways`, await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     await visitorSections(phone, `${name} at 390`);
 

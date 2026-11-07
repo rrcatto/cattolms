@@ -25,6 +25,8 @@ allows: orders, their documents, purchasers and the courses they bought are immu
 history and stay. The development database is disposable; a reset removes them.
 
 Changelog:
+2026/11/07 SAST
+- The state names each order by its number and each document by its own (owner, 2026-11-06: no row id in an address).
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -81,11 +83,13 @@ $place = static function (CurrentUser $actor, array $variants, array $offers, ?s
     $cart = $orders->cart($actor);
     return $orders->place($actor, (int) $cart['id'], (string) $cart['quote'], $billing($actor->displayName, '9 Original Street'), true, ['payment_method' => $method]);
 };
+// Each of an order's documents by its number, which its address names (owner, 2026-11-06: no row id in an address).
 $documentIds = static function (int $orderId) use ($records): array {
-    $ids = [];
-    foreach ($records->documents($orderId) as $document) $ids[(string) $document['kind']][] = (int) $document['id'];
-    return $ids;
+    $numbers = [];
+    foreach ($records->documents($orderId) as $document) $numbers[(string) $document['kind']][] = (string) $document['number'];
+    return $numbers;
 };
+$number = static fn(int $orderId): string => \CattoLearning\Commerce\Domain\OrderNumber::format($orderId);
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous financial documents fixture first.');
@@ -145,7 +149,7 @@ if ($action === 'create') {
         'users' => ['admin' => $admin['id'], 'provider' => $provider['id'], 'learner' => $learner['id'], 'other' => $other['id'], 'eft' => $eftBuyer['id'], 'company' => $companyAdmin['id']],
         'notes' => ['invoice' => 'Thank you for learning with us.', 'credit_note' => 'Refunds are paid within seven days.', 'receipt' => 'Keep this receipt for your records.'],
         'learner' => ['id' => $learner['id'], 'email' => $learner['email'], 'name' => $learner['name']],
-        'orders' => ['paid' => $paid, 'zero' => $zero, 'eft' => $eft, 'company' => $companyOrder],
+        'orders' => ['paid' => $number($paid), 'zero' => $number($zero), 'eft' => $number($eft), 'company' => $number($companyOrder)],
         'documents' => ['paid' => $documentIds($paid), 'zero' => $documentIds($zero), 'eft' => $documentIds($eft), 'company' => $documentIds($companyOrder)],
         'tokens' => ['admin' => array_map(static fn() => $session($admin['id'], $admin['email']), range(1, 12)), 'learner' => [$session($learner['id'], $learner['email']), $session($learner['id'], $learner['email'])],
             'other' => $session($other['id'], $other['email']), 'eft' => $session($eftBuyer['id'], $eftBuyer['email']), 'company' => $session($companyAdmin['id'], $companyAdmin['email'])]];
@@ -160,7 +164,7 @@ if ($action === 'create') {
     $state['later_courses'][] = $course;
     $state['scrub']['courses'][] = $course;
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
-    echo json_encode(['order' => $orderId, 'documents' => $documentIds($orderId)], JSON_THROW_ON_ERROR), "\n";
+    echo json_encode(['order' => $number($orderId), 'documents' => $documentIds($orderId)], JSON_THROW_ON_ERROR), "\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);

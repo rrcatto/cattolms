@@ -41,6 +41,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class CourseQuickEditIntegrationTest extends TestCase
 {
+    private string $code = '';
     private Database $db;
     private IntegrationDataFixture $fixture;
     private CourseQuickEdit $quick;
@@ -65,6 +66,7 @@ final class CourseQuickEditIntegrationTest extends TestCase
         $company = $this->fixture->createCompany($this->admin, 'Quick edit ' . $suffix, 'quick-edit-' . $suffix . '.seed.test');
         $this->slug = 'quick-edit-' . $suffix;
         $this->course = $this->fixture->createCourse($this->admin, $company, $this->slug, 'Quick edit ' . $suffix);
+        $this->code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
         $this->cookies = $_COOKIE;
         $this->server = $_SERVER;
         $_SESSION['csrf'] = str_repeat('q', 64);
@@ -142,33 +144,33 @@ final class CourseQuickEditIntegrationTest extends TestCase
     {
         $this->signIn($this->admin);
         $_SERVER['HTTP_HX_REQUEST'] = 'true';
-        $form = $this->send('GET', '/admin/courses/' . $this->course . '/row?mode=edit&view=list');
+        $form = $this->send('GET', '/admin/courses/' . $this->code . '/row?mode=edit&view=list');
         self::assertSame(200, $form->getStatusCode());
         $html = (string) $form->getContent();
-        self::assertStringStartsWith('<tr id="course-' . $this->course . '" class="cl-course-quick"', trim((string) preg_replace('/^\s*(<!--.*?-->\s*)*/s', '', $html)));
+        self::assertStringStartsWith('<tr id="course-' . $this->code . '" class="cl-course-quick"', trim((string) preg_replace('/^\s*(<!--.*?-->\s*)*/s', '', $html)));
         self::assertStringNotContainsString('<html', $html, 'Only the row is sent.');
         foreach (['name="catalogue_position"', 'name="code"', 'name="title"', 'name="price"', 'name="was_price"', 'name="access_period_value"', 'name="category_id"', 'form="course-quick-' . $this->course . '"'] as $part) {
             self::assertStringContainsString($part, $html);
         }
-        $card = (string) $this->send('GET', '/admin/courses/' . $this->course . '/row?mode=edit&view=grid')->getContent();
+        $card = (string) $this->send('GET', '/admin/courses/' . $this->code . '/row?mode=edit&view=grid')->getContent();
         self::assertStringContainsString('<li class="cl-ui-card"', $card);
 
         $course = $this->courses->findById($this->course);
-        $refused = $this->send('POST', '/admin/courses/' . $this->course . '/row', ['code' => (string) $course['code'], 'title' => 'Kept as typed', 'category_id' => '0', 'price' => '2000', 'was_price' => '1500', 'access_period_value' => '12', 'access_period_unit' => 'months', 'view' => 'list']);
+        $refused = $this->send('POST', '/admin/courses/' . $this->code . '/row', ['code' => (string) $course['code'], 'title' => 'Kept as typed', 'category_id' => '0', 'price' => '2000', 'was_price' => '1500', 'access_period_value' => '12', 'access_period_unit' => 'months', 'view' => 'list']);
         self::assertSame(422, $refused->getStatusCode());
         self::assertStringContainsString('cl-course-quick-error', (string) $refused->getContent());
         self::assertStringContainsString('value="Kept as typed"', (string) $refused->getContent());
 
-        $saved = $this->send('POST', '/admin/courses/' . $this->course . '/row', ['code' => (string) $course['code'], 'title' => 'Saved in place', 'category_id' => '0', 'price' => '', 'was_price' => '', 'access_period_value' => '12', 'access_period_unit' => 'months', 'view' => 'list']);
+        $saved = $this->send('POST', '/admin/courses/' . $this->code . '/row', ['code' => (string) $course['code'], 'title' => 'Saved in place', 'category_id' => '0', 'price' => '', 'was_price' => '', 'access_period_value' => '12', 'access_period_unit' => 'months', 'view' => 'list']);
         self::assertSame(200, $saved->getStatusCode());
         self::assertStringContainsString('data-course-saved', (string) $saved->getContent());
         self::assertStringContainsString('Saved in place', (string) $saved->getContent());
         self::assertSame('Saved in place', (string) $this->courses->findById($this->course)['title']);
 
         unset($_SERVER['HTTP_HX_REQUEST']);
-        $plain = $this->send('GET', '/admin/courses/' . $this->course . '/row?mode=edit');
+        $plain = $this->send('GET', '/admin/courses/' . $this->code . '/row?mode=edit');
         self::assertSame(303, $plain->getStatusCode(), 'Without JavaScript the pencil opens the list.');
-        $list = $this->send('GET', '/admin/courses?edit=' . $this->course . '&courses_q=' . rawurlencode('Saved in place'));
+        $list = $this->send('GET', '/admin/courses?edit=' . $this->code . '&courses_q=' . rawurlencode('Saved in place'));
         self::assertStringContainsString('class="cl-course-quick"', (string) $list->getContent(), 'The list opens the row as its form.');
     }
 

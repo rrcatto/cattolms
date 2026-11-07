@@ -6,8 +6,9 @@
 	star was at the very bottom of the card.
 
 	A course bundle is shown with this same card: it supplies its own href, link_label and facts
-	(the key-value rows), so a bundle looks like a catalogue item in every theme without a second
-	card of its own.
+	(the key-value rows) and its saving_badge, so a bundle looks like a catalogue item in every theme
+	without a second card of its own. A bundle has the same favourite star, by its bundle_id (owner, 2026-11-06), and one
+	whose sale starts later says when in its availability_badge.
 
 	The artwork is a background rather than content: it is decoration behind the two things that
 	matter, and a scrim keeps the title legible whatever colours the artwork happens to use.
@@ -28,8 +29,10 @@
 			<h3 class="cl-course-card-title">
 				<a href="{{ course.href|default('/courses/' ~ course.slug) }}">{{ course.title }}</a>
 			</h3>
-			{% if can_favourite is defined and can_favourite %}
+			{% if can_favourite is defined and can_favourite and course.id is defined %}
 				{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}
+			{% elseif can_favourite is defined and can_favourite and course.bundle_id is defined %}
+				{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_kind: 'bundle', favourite_return: favourite_return|default('/bundles')} %}
 			{% endif %}
 		</div>
 	</header>
@@ -53,9 +56,12 @@
 				{% endfor %}
 			</div>
 		{% endif %}
-		{# A marked-down course or bundle is flagged as a special (owner, 2026-10-20), its was price struck through in the Price row. #}
+		{# A marked-down course is flagged as a special (owner, 2026-10-20), its was price struck through in the Price row. A bundle says what it saves under its price instead. #}
 		{% if course.saving_percent|default(null) %}<p class="cl-course-card-special">{{ ui('feedback.badge', {label: 'Special: save ' ~ course.saving_percent ~ '%', tone: 'success'}) }}</p>{% endif %}
 		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label), was: course.default_was_label|default(null)}]}) }}
+		{# A bundle says what it saves under its price (owner, 2026-11-06, the approved mockup). #}
+		{# One whose sale starts later says when (owner, 2026-11-06: "show me WHEN the bundle will be available to purchase"). #}
+		{% if course.saving_badge|default(null) or course.availability_badge|default(null) %}<p class="cl-course-card-saving">{% if course.saving_badge|default(null) %}{{ ui('feedback.badge', {label: course.saving_badge, tone: 'success'}) }}{% endif %}{% if course.availability_badge|default(null) %} {{ ui('feedback.badge', {label: course.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
 		<div class="cl-course-card-foot">
 			{{ ui('action.link', {label: course.link_label|default('View course'), variant: 'primary', size: 'small', href: course.href|default('/courses/' ~ (course.slug)), icon: 'action-view'}) }}
 		</div>

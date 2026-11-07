@@ -19,14 +19,14 @@
 			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'People'})} %}
 {% block body %}
 				{% for person in people %}
-					{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: '/company/people/' ~ person.id, picture: 'round'})} %}
+					{% embed ui_template('data.card') with {props: ui_props('data.card', {title: person.name, href: company_person_url(person), picture: 'round'})} %}
 {% block picture %}{% if person.picture_url|default('') %}<img src="{{ person.picture_url }}" alt="" width="96" height="96" loading="lazy">{% endif %}{% endblock %}
-{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/company/people/' ~ person.id}) }}{% endblock %}
+{% block title %}{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: company_person_url(person)}) }}{% endblock %}
 {% block details %}
 						<div class="role-list">{{ ui('feedback.badge', {label: cp_role_names[person.company_role|default('student')]|default('Student'), tone: 'info'}) }}{{ ui('feedback.badge', {label: (cp_status[person.status]|default(['Disabled', 'danger']))[0], tone: (cp_status[person.status]|default(['Disabled', 'danger']))[1]}) }}{% if company_people_waiting[person.id] is defined %}{{ ui('feedback.badge', {label: 'Asked to choose by ' ~ company_people_waiting[person.id].answer_by_words, tone: 'warning'}) }}{% endif %}</div>
 						<p class="cl-ui-card-line cl-ui-card-quiet">{{ person.course_count }} {{ person.course_count == 1 ? 'course' : 'courses' }}</p>
 {% endblock %}
-{% block actions %}{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ person.id, icon: 'action-edit'}) }}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/company/people/' ~ person.id, icon: 'action-open'}) }}{% endblock %}
+{% block actions %}{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ person.account_reference, icon: 'action-edit'}) }}{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: company_person_url(person), icon: 'action-open'}) }}{% endblock %}
 {% endembed %}
 				{% endfor %}
 {% endblock %}
@@ -51,7 +51,7 @@
 						<tr>
 							<td>
 								{# The name and account reference, linked to the person's page (owner, 2026-10-21). #}
-								<strong>{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/company/people/' ~ person.id}) }}</strong>
+								<strong>{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: company_person_url(person)}) }}</strong>
 								<div class="small muted">
 									{{ person.email }}
 								</div>
@@ -69,22 +69,22 @@
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-										{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ (person.id), icon: 'action-edit'}) }}
+										{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ person.account_reference, icon: 'action-edit'}) }}
 										{% if person.status=='active' %}
-											<form action="/company/people/{{ person.id }}/status" method="post">
+											<form action="{{ company_person_url(person, '/status') }}" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="status" value="disabled">
 												{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.', icon: 'action-disable'}) }}
 											</form>
 										{% elseif person.status == 'disabled' %}
-											<form action="/company/people/{{ person.id }}/status" method="post">
+											<form action="{{ company_person_url(person, '/status') }}" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="status" value="active">
 												{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 											</form>
 										{% endif %}
 										{# Delete, never removal from the company (owner, 2026-10-26); its page says what it will do. #}
-										<form action="/company/people/{{ person.id }}/delete" method="post">
+										<form action="{{ company_person_url(person, '/delete') }}" method="post">
 											<input type="hidden" name="csrf" value="{{ csrf }}">
 											{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', confirm: 'Delete ' ~ person.name ~ '? If they are busy with a course we email them first to choose, and someone who completed a course is never deleted. Their page says which applies.', icon: 'action-remove'}) }}
 										</form>
@@ -100,7 +100,7 @@
 			{% endif %}
 
 		{% for person in people %}
-			{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-person-' ~ (person.id), title: 'Edit ' ~ (person.name), action: '/company/people/' ~ (person.id), method: 'post'})} %}
+			{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-person-' ~ person.account_reference, title: 'Edit ' ~ (person.name), action: company_person_url(person), method: 'post'})} %}
 {% block modal_body %}
 
 						<input type="hidden" name="csrf" value="{{ csrf }}">

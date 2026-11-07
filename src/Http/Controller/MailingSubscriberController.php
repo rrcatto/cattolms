@@ -17,6 +17,8 @@ them off every list and puts the address on Addresses never emailed. Seeing need
 PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/07 SAST
+- A subscriber's page is at their account reference (/mailing/subscribers/CL2026…, owner 2026-11-06).
 2026/10/28 SAST
 - Created.
 */
@@ -25,6 +27,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -55,6 +58,7 @@ final class MailingSubscriberController extends BaseController
         private readonly CampaignRepository $campaigns,
         private readonly AuditRepository $audit,
         private readonly \CattoLearning\Application\ProfilePictures $pictures,
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -92,11 +96,12 @@ final class MailingSubscriberController extends BaseController
         ]);
     }
 
-    #[Route('/mailing/subscribers/{id}', name: 'mailing_manage_subscriber', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/mailing/subscribers/{reference}', name: 'mailing_manage_subscriber', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function subscriber(): Response
     {
         $user = $this->requirePermission('PLATFORM.MAILING.VIEW');
-        $person = $this->subscribers->person((int) $this->param('id'));
+        // By their account reference (owner, 2026-11-06: no row id in an address).
+        $person = $this->subscribers->person($this->personIdFromAddress($this->keys));
         if ($person === null) throw $this->notFound('That person could not be found.');
         $id = (int) $person['user_id'];
 
@@ -114,16 +119,16 @@ final class MailingSubscriberController extends BaseController
         ]);
     }
 
-    #[Route('/mailing/subscribers/{id}/{action}', name: 'mailing_manage_subscriber_change', requirements: ['id' => '\d+', 'action' => 'take-off|stop'], methods: ['POST'])]
+    #[Route('/mailing/subscribers/{reference}/{action}', name: 'mailing_manage_subscriber_change', requirements: ['reference' => PersonAddress::REQUIREMENT, 'action' => 'take-off|stop'], methods: ['POST'])]
     public function change(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.MAILING.MANAGE');
-        $id = (int) $this->param('id');
+        $id = $this->personIdFromAddress($this->keys);
         $action = $this->param('action');
         // From the list's Actions menu, back to the list as it was.
         $return = (string) ($_POST['return'] ?? '');
-        $back = preg_match('#^/mailing/subscribers(\?[A-Za-z0-9_=&%.+-]*)?$#', $return) === 1 ? $return : self::BASE . '/' . $id . ($action === 'stop' ? '#stop' : '#lists');
+        $back = preg_match('#^/mailing/subscribers(\?[A-Za-z0-9_=&%.+-]*)?$#', $return) === 1 ? $return : PersonAddress::to('subscriber', $this->param('reference')) . ($action === 'stop' ? '#stop' : '#lists');
 
         return $this->handle(function () use ($user, $id, $action, $back): void {
             $person = $this->subscribers->person($id);

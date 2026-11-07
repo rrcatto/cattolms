@@ -17,7 +17,14 @@ Verification is needed only for certificates and transcripts (owner, 2026-10-20:
 verification for certificates and transcripts only. We accept all payments."): nothing is asked before
 a purchase, and there is no setting for it.
 
+Didit tells its keys apart by their start (owner, 2026-11-06): sk_test_ is a sandbox key, whose checks are
+mocked and can be forced to pass, and sk_live_ a live one. A live site with a sandbox key has no
+verification: certificates wait rather than trust a mocked check. A demo site takes either, and Settings
+says which it has.
+
 Changelog:
+2026/11/06 SAST
+- The key's kind (sandbox or live) from its start; a sandbox key on a live site is not available.
 2026/10/20 SAST
 - Verification before a first purchase and its setting are gone.
 2026/10/19 SAST
@@ -28,6 +35,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Identity;
 
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Support\Env;
 
 final class IdentitySettings
@@ -41,10 +49,35 @@ final class IdentitySettings
     /** Where Didit sends its webhooks: entered in the Didit console. */
     public const WEBHOOK_PATH = '/webhooks/didit';
 
-    /** Whether the keys verification needs are all in .env. */
+    /** Didit's key prefixes: a sandbox key and a live one. */
+    public const SANDBOX_PREFIX = 'sk_test_';
+    public const LIVE_PREFIX = 'sk_live_';
+
+    public function __construct(private readonly ?SiteMode $site = null) {}
+
+    /** Whether the keys verification needs are all in .env, and a live site does not hold a sandbox key. */
     public function available(): bool
     {
-        return $this->missingKeys() === [];
+        return $this->missingKeys() === [] && !$this->sandboxKeyOnLiveSite();
+    }
+
+    /** sandbox, live or unknown, from the key's start. */
+    public function keyKind(): string
+    {
+        $key = $this->apiKey();
+        return str_starts_with($key, self::SANDBOX_PREFIX) ? 'sandbox' : (str_starts_with($key, self::LIVE_PREFIX) ? 'live' : 'unknown');
+    }
+
+    /** A live site holding a sandbox key: its checks prove nothing, so verification is not available. */
+    public function sandboxKeyOnLiveSite(): bool
+    {
+        return $this->site !== null && !$this->site->isDemo() && $this->keyKind() === 'sandbox';
+    }
+
+    /** Whether this is a demo site, for the Settings page's words. */
+    public function demoSite(): bool
+    {
+        return $this->site === null || $this->site->isDemo();
     }
 
     /** @return list<string> the .env keys still missing */

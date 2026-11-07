@@ -14,6 +14,9 @@ setting. Telegram's address is its own row that no page sets, so that a browser 
 ever sending a key to the real service.
 
 Change log:
+2026/11/05 SAST (evening)
+- People can sign in with Telegram (owner, 2026-11-05, the approved mockup): a third choice beside the two, off until it is
+  ticked, kept when Disconnect forgets the key. It is offered only while a key is saved (signInOffered()).
 2026/11/05 SAST
 - Created.
 */
@@ -32,12 +35,14 @@ class OwnerMessageSettings
     public const OPTION = 'owner_messages';
     public const ADDRESS_OPTION = 'owner_messages.telegram_address';
     public const TELEGRAM = 'https://api.telegram.org';
+    /** Where TelegramInbox keeps how far it has read and the chats it has seen lately. */
+    public const INBOX_OPTION = 'telegram.inbox';
 
     public function __construct(private readonly OptionRepository $options, private readonly SecretCipher $cipher)
     {
     }
 
-    /** @return array{key:string,bot_name:string,username:string,chat_id:string,on_register:bool,on_sale:bool,disconnected:bool} what is saved, the key still encrypted */
+    /** @return array{key:string,bot_name:string,username:string,chat_id:string,on_register:bool,on_order:bool,on_sale:bool,sign_in:bool,disconnected:bool} what is saved, the key still encrypted */
     public function saved(): array
     {
         $saved = [];
@@ -48,7 +53,8 @@ class OwnerMessageSettings
         if (!is_array($saved)) $saved = [];
 
         return ['key' => (string) ($saved['key'] ?? ''), 'bot_name' => (string) ($saved['bot_name'] ?? ''), 'username' => (string) ($saved['username'] ?? ''), 'chat_id' => (string) ($saved['chat_id'] ?? ''),
-            'on_register' => (bool) ($saved['on_register'] ?? true), 'on_sale' => (bool) ($saved['on_sale'] ?? true), 'disconnected' => (bool) ($saved['disconnected'] ?? false)];
+            'on_register' => (bool) ($saved['on_register'] ?? true), 'on_order' => (bool) ($saved['on_order'] ?? true), 'on_sale' => (bool) ($saved['on_sale'] ?? true), 'sign_in' => (bool) ($saved['sign_in'] ?? false),
+            'disconnected' => (bool) ($saved['disconnected'] ?? false)];
     }
 
     /** The bot's key to use, or nothing when none is saved or it cannot be read. */
@@ -59,6 +65,18 @@ class OwnerMessageSettings
         } catch (Throwable) {
             return '';
         }
+    }
+
+    /** Whether people may sign in with Telegram: ticked, and a bot key saved to send with. */
+    public function signInOffered(): bool
+    {
+        return $this->saved()['sign_in'] && $this->key() !== '';
+    }
+
+    /** The bot's own username, for a person's t.me link. */
+    public function botName(): string
+    {
+        return $this->saved()['bot_name'];
     }
 
     public function connected(): bool
@@ -77,9 +95,14 @@ class OwnerMessageSettings
         $this->write(['key' => $this->cipher->encrypt($key), 'bot_name' => $botName, 'chat_id' => '', 'disconnected' => false] + $this->saved(), $actor);
     }
 
-    public function setChoices(bool $onRegister, bool $onSale, int $actor): void
+    public function setChoices(bool $onRegister, bool $onSale, int $actor, ?bool $onOrder = null): void
     {
-        $this->write(['on_register' => $onRegister, 'on_sale' => $onSale] + $this->saved(), $actor);
+        $this->write(['on_register' => $onRegister, 'on_sale' => $onSale] + ($onOrder === null ? [] : ['on_order' => $onOrder]) + $this->saved(), $actor);
+    }
+
+    public function setSignIn(bool $signIn, ?int $actor): void
+    {
+        $this->write(['sign_in' => $signIn] + $this->saved(), $actor);
     }
 
     /** Another account has another chat, so a changed username is found again and nothing goes to the old one. */
@@ -94,15 +117,15 @@ class OwnerMessageSettings
         $this->write(['chat_id' => $id] + $this->saved(), $actor);
     }
 
-    /** The key and the account go, and the two choices stay. The page then says Disconnected. */
+    /** The key and the account go, and the choices stay. The page then says Disconnected. */
     public function forget(?int $actor = null): void
     {
         $saved = $this->saved();
-        $this->options->set(self::OPTION, json_encode(['on_register' => $saved['on_register'], 'on_sale' => $saved['on_sale'], 'disconnected' => true], JSON_THROW_ON_ERROR), $actor);
+        $this->options->set(self::OPTION, json_encode(['on_register' => $saved['on_register'], 'on_order' => $saved['on_order'], 'on_sale' => $saved['on_sale'], 'sign_in' => $saved['sign_in'], 'disconnected' => true], JSON_THROW_ON_ERROR), $actor);
     }
 
     /** @param array<string,mixed> $values */
-    private function write(array $values, int $actor): void
+    private function write(array $values, ?int $actor): void
     {
         $this->options->set(self::OPTION, json_encode($values, JSON_THROW_ON_ERROR), $actor);
     }

@@ -66,6 +66,7 @@
                     {% endblock %}{% endembed %}
                     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'sign-in', eyebrow: 'Account', icon: icons.account, heading: 'Sign in and your account'})} %}{% block body %}
                         <p>CattoLMS is for adults: you must be 18 or older, and you give your date of birth when you register. CattoLMS uses a one-time sign-in link instead of a password. Enter your email address on the <a href="/login">sign-in page</a> and use the link in the latest email. A link expires and works only once.</p>
+                        <p>Under Account, Sign-in and security, you can turn on two-step sign-in, so that signing in also asks for a 6-digit code from an authenticator app on your phone, and keep its recovery codes for the day you lose your phone. Where the site offers it, you can also connect your Telegram account there and sign in with a code or link it messages you.</p>
                         <p>Once signed in, your account holds your courses, orders, certificates, profile details, email addresses and active sessions. Keep your email address current so you receive sign-in links and order emails.</p>
                     {% endblock %}{% endembed %}
                     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'answers', eyebrow: 'Contact', icon: icons.contact, heading: 'Still need an answer?'})} %}{% block body %}

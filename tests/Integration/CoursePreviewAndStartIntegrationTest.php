@@ -148,11 +148,13 @@ final class CoursePreviewAndStartIntegrationTest extends TestCase
             $_POST = ['csrf' => $_SESSION['csrf'], 'confirm_start' => 'yes'];
             $started = $this->send(Request::create('/learn/' . $course['slug'] . '/start', 'POST', $_POST));
             $_POST = [];
-            self::assertSame('/learn/' . $course['slug'] . '/item/' . $lesson['node'] . '/content', $started->headers->get('Location'), 'Start course opens the first part.');
+            // The part by its name (owner, 2026-11-06: no row id in an address).
+            $part = (string) $db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $lesson['node']]);
+            self::assertSame('/learn/' . $course['slug'] . '/' . $part, $started->headers->get('Location'), 'Start course opens the first part.');
             self::assertNotNull($db->fetchOne('SELECT started_at FROM course_enrolments WHERE user_id = :u AND course_id = :c', ['u' => $learner['id'], 'c' => $course['id']]));
             $home = (string) $this->send(Request::create('/learn/' . $course['slug']))->getContent();
             self::assertStringNotContainsString('refund', $home, 'A course given to test names no refund on its page.');
-            self::assertStringContainsString('href="/learn/' . $course['slug'] . '/item/' . $lesson['node'] . '/content"', $home, 'A learner coming back finds Begin course leading to the same part.');
+            self::assertStringContainsString('href="/learn/' . $course['slug'] . '/' . $part . '"', $home, 'A learner coming back finds Begin course leading to the same part.');
         } finally {
             $_COOKIE = $cookies;
             $_POST = [];

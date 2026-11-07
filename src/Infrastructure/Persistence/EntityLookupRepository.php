@@ -20,6 +20,10 @@ controller and the view; this class never decides who may search, only what a se
 
 Changelog:
 
+2026/11/07 SAST
+- People and companies carry their account references, which a lookup that names them in an address chooses
+  (idForReference reads one back), so the Activity filter's address holds no row id.
+
 2026/09/07 23:45 SAST
 
 - assignable_courses: what this company may put somebody on right now - owned, or holding a credit with a free seat.
@@ -105,7 +109,7 @@ final class EntityLookupRepository
 
         $rows = match ($type) {
             'people' => $this->db->fetchAllAssociative(
-                'SELECT u.id,
+                'SELECT u.id, u.account_reference AS code,
                         COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS label,
                         ue.email AS detail
                  FROM users u
@@ -116,11 +120,11 @@ final class EntityLookupRepository
                 ['id' => $id, 'company_id' => $companyId]
             ),
             'companies' => $this->db->fetchAllAssociative(
-                'SELECT c.id, c.name AS label, c.domain AS detail FROM companies c WHERE c.id=:id' . $companyScope . ' LIMIT 1',
+                'SELECT c.id, c.account_reference AS code, c.name AS label, c.domain AS detail FROM companies c WHERE c.id=:id' . $companyScope . ' LIMIT 1',
                 ['id' => $id]
             ),
             'courses' => $this->db->fetchAllAssociative(
-                'SELECT c.id, c.title AS label, c.slug AS detail
+                'SELECT c.id, c.code, c.title AS label, c.slug AS detail
                  FROM courses c
                  WHERE c.id=:id AND (:company_id=0 OR c.owner_company_id=:company_id)' . $companyScope . '
                  LIMIT 1',
@@ -137,7 +141,7 @@ final class EntityLookupRepository
     private function searchPeople(string $term, int $companyId): array
     {
         return $this->rows($this->db->fetchAllAssociative(
-            'SELECT DISTINCT u.id,
+            'SELECT DISTINCT u.id, u.account_reference AS code,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS label,
                     ue.email AS detail
              FROM users u
@@ -158,7 +162,7 @@ final class EntityLookupRepository
     private function searchCompanies(string $term): array
     {
         return $this->rows($this->db->fetchAllAssociative(
-            'SELECT c.id, c.name AS label, c.domain AS detail
+            'SELECT c.id, c.account_reference AS code, c.name AS label, c.domain AS detail
              FROM companies c
              WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . '' . '
              ORDER BY c.name, c.id
@@ -181,7 +185,7 @@ final class EntityLookupRepository
     private function searchCourses(string $term, int $companyId): array
     {
         return $this->rows($this->db->fetchAllAssociative(
-            'SELECT c.id, c.title AS label, c.slug AS detail
+            'SELECT c.id, c.code, c.title AS label, c.slug AS detail
              FROM courses c
              WHERE (:company_id=0 OR c.owner_company_id=:company_id)
                AND (c.title ILIKE :term OR c.slug ILIKE :term)' . '' . '
@@ -212,7 +216,7 @@ final class EntityLookupRepository
         }
 
         return $this->rows($this->db->fetchAllAssociative(
-            "SELECT c.id, c.title AS label,
+            "SELECT c.id, c.code, c.title AS label,
                     CASE WHEN c.owner_company_id = :company_id THEN 'Owned - free for staff'
                          ELSE 'Seats available' END AS detail
              FROM courses c
@@ -245,8 +249,27 @@ final class EntityLookupRepository
     }
 
     /**
+     * The person or company an Activity filter names by its account reference (owner, 2026-11-06: no row id in an
+     * address): 0 for none, and for a reference that names nobody an id no row has, so the filter matches nothing rather
+     * than everything. The reference is compared as the site stores it.
+     */
+    public function idForReference(string $type, string $reference): int
+    {
+        if ($reference === '') return 0;
+        $id = match ($type) {
+            'people' => $this->db->fetchOne('SELECT id FROM users WHERE account_reference = :reference', ['reference' => $reference]),
+            'companies' => $this->db->fetchOne('SELECT id FROM companies WHERE account_reference = :reference', ['reference' => $reference]),
+            default => false,
+        };
+        return $id === false || $id === null ? PHP_INT_MAX : (int) $id;
+    }
+
+    /**
+     * A course's row also carries its code, and a person's or a company's its account reference, which a lookup that
+     * names them in an address (an Activity filter, owner 2026-11-06) chooses instead of the id.
+     *
      * @param array<string,mixed> $row
-     * @return array{id:int,label:string,detail:string}
+     * @return array{id:int,label:string,detail:string,code?:string}
      */
     private function row(array $row): array
     {
@@ -254,6 +277,6 @@ final class EntityLookupRepository
             'id' => (int) ($row['id'] ?? 0),
             'label' => (string) ($row['label'] ?? ''),
             'detail' => (string) ($row['detail'] ?? ''),
-        ];
+        ] + (isset($row['code']) ? ['code' => (string) $row['code']] : []);
     }
 }

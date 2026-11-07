@@ -11,6 +11,10 @@ Description:
 Handles web requests for admin operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/07 SAST
+- A person's and a company's pages and forms are at their account references (/admin/people/CL2026…,
+  /admin/companies/CL2026…), and the Activity filter names them as ?actor= and ?company= (owner, 2026-11-06: no row
+  id in an address); the return checks accept references.
 2026/10/26 SAST
 - Grid views (owner, 2026-10-26): each list's view comes from the address or the reader's remembered choice
   (Support\ListView) and is remembered when asked for; People rows carry their picture's address.
@@ -81,6 +85,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Seed\SeedDatabaseService;
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
@@ -157,7 +163,9 @@ final class AdminController extends BaseController
         private readonly \CattoLearning\Maintenance\LogArchive $logArchive,
         private readonly \CattoLearning\Course\CataloguePositions $cataloguePositions,
         private readonly \CattoLearning\Course\CourseQuickEdit $courseQuickEdit,
-        private readonly \CattoLearning\SiteAnalytics\SiteLogRepository $siteLog
+        private readonly \CattoLearning\SiteAnalytics\SiteLogRepository $siteLog,
+        private readonly \CattoLearning\Application\SignInSecurityAdministration $signInSecurity,
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -420,9 +428,11 @@ final class AdminController extends BaseController
             'from' => trim((string) ($_GET['from'] ?? '')),
             'to' => trim((string) ($_GET['to'] ?? '')),
             'family' => trim((string) ($_GET['family'] ?? '')),
-            'actor_id' => max(0, (int) ($_GET['actor_id'] ?? 0)),
-            'course_id' => max(0, (int) ($_GET['course_id'] ?? 0)),
-            'company_id' => max(0, (int) ($_GET['company_id'] ?? 0)),
+            // The person, the course and the company by their references and code (owner, 2026-11-06), as the Activity
+            // filter names them.
+            'actor_id' => is_string($_GET['actor'] ?? null) && $_GET['actor'] !== '' ? ($this->keys->person($_GET['actor']) ?? PHP_INT_MAX) : 0,
+            'course_id' => $this->platformAdministration->activityCourseId(is_string($_GET['course'] ?? null) ? $_GET['course'] : ''),
+            'company_id' => is_string($_GET['company'] ?? null) && $_GET['company'] !== '' ? ($this->keys->company($_GET['company']) ?? PHP_INT_MAX) : 0,
             'q' => trim((string) ($_GET['q'] ?? '')),
             'page' => max(1, (int) ($_GET['page'] ?? 1)),
             'after_id' => max(0, (int) ($_GET['after_id'] ?? 0)),
@@ -451,24 +461,25 @@ final class AdminController extends BaseController
     }
 
     /** A person's profile picture, for their page in Administration only (owner, 2026-10-20). */
-    #[Route('/admin/people/{id}/profile-image', name: 'admin_person_profile_image', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/people/{reference}/profile-image', name: 'admin_person_profile_image', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function personProfileImage(): Response
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
         // Their upload, or their drawn avatar (owner, 2026-10-26).
         try {
-            $picture = $this->pictures->picture(max(1, (int) $this->param('id')));
+            $picture = $this->pictures->picture($this->personIdFromAddress($this->keys));
         } catch (\RuntimeException) {
             throw new NotFoundHttpException('There is no such person.');
         }
         return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
     }
 
-    #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/people/{reference}', name: 'admin_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function person(): Response
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
+        $reference = $this->param('reference');
         $data = $this->platformAdministration->personForAdministration($target);
         // Their courses; searched by title once there are five or more (owner, 2026-10-20).
         $libraryAll = $this->learning->library($target);
@@ -499,13 +510,15 @@ final class AdminController extends BaseController
             'wallet_balance' => $companyAccount ? '' : \CattoLearning\Support\Money::ofMinorUnits($this->wallets->balance(\CattoLearning\Commerce\Wallet\WalletOwner::person($target)))->format(),
             'courses_list' => $coursesList,
             'grant_open' => isset($_GET['grant']) || $courseSearch !== '',
-            'person_company_logo' => ($logo = ($data['company'] ?? null) !== null ? $this->logos->state((int) $data['company']['id']) : null) === null ? '' : '/admin/companies/' . (int) $data['company']['id'] . '/logo?v=' . $logo['version'],
-            'profile_image_url' => $picture === null ? '' : '/admin/people/' . $target . '/profile-image?v=' . $picture['version'],
+            'person_company_logo' => ($logo = ($data['company'] ?? null) !== null ? $this->logos->state((int) $data['company']['id']) : null) === null ? '' : CompanyAddress::admin($data['company'], '/logo?v=' . $logo['version']),
+            'profile_image_url' => $picture === null ? '' : PersonAddress::admin($reference, '/profile-image?v=' . $picture['version']),
             'profile_image_drawn' => $picture !== null && $picture['drawn'],
             'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
+            // The person's account reference, which names them in their page's addresses (owner, 2026-11-06).
+            'target_reference' => $reference,
             // The reader's own account: no Disable button and the ADMIN role kept (2026-10-25).
             'is_own_account' => $target === $this->requireUser()->id,
             // How they registered and where they sign in from (owner, 2026-10-26).
@@ -532,20 +545,30 @@ final class AdminController extends BaseController
             'can_manage_identity' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.MANAGE'),
             'can_manage_enrolments' => $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE'),
             'identity_console' => \CattoLearning\Identity\IdentityVerificationService::CONSOLE,
+            // Their Telegram account and their two-step sign-in, with Reset two-step (owner, 2026-11-05).
+            'person_sign_in' => $this->signInSecurity->personView($target),
         ]);
     }
 
-    #[Route('/admin/people/{id}/courses/grant', name: 'admin_person_grant_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/courses/grant', name: 'admin_person_grant_course', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function grantPersonCourse(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
-        $personId = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $personId): void {
+        $personId = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
+        return $this->handle(function () use ($user, $personId, $back): void {
             $result = $this->courses->grantToPerson((int) ($_POST['course_id'] ?? 0), $personId, (int) ($_POST['access_days'] ?? 0), $user->id);
             $this->flash('success', 'Course access granted until ' . $result['expires_at'] . '.');
-            $this->redirect('/admin/people/' . $personId);
-        }, '/admin/people/' . $personId);
+            $this->redirect($back);
+        }, $back);
+    }
+
+    /** A person's page in Administration, by the person's row id carried in a form: their account reference, or the list. */
+    private function personPage(int $personId, string $rest = ''): string
+    {
+        $reference = $this->keys->personReference($personId);
+        return $reference === null ? '/admin/people' : PersonAddress::admin($reference, $rest);
     }
 
     #[Route('/admin/test-grants/{id}/revoke', name: 'admin_revoke_test_grant', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -556,7 +579,7 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $courseId = (int) ($_POST['course_id'] ?? 0);
         $personId = (int) ($_POST['person_id'] ?? 0);
-        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '?tab=test-access';
+        $back = ($_POST['context'] ?? '') === 'person' ? $this->personPage($personId) : $this->courseTestAccess($courseId);
         return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
             $this->platformAdministration->revokeTestGrant($id, $courseId, $personId, $user->id);
             $this->flash('success', 'Test access was revoked. Progress and results were retained.');
@@ -572,7 +595,7 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $courseId = (int) ($_POST['course_id'] ?? 0);
         $personId = (int) ($_POST['person_id'] ?? 0);
-        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '?tab=test-access';
+        $back = ($_POST['context'] ?? '') === 'person' ? $this->personPage($personId) : $this->courseTestAccess($courseId);
         return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
             $this->platformAdministration->inviteTestLearner($id, $courseId, $personId, $user->id);
             $this->flash('success', 'Test invitation sent.');
@@ -592,80 +615,85 @@ final class AdminController extends BaseController
         }, self::companyPageReturn('/admin/people'));
     }
 
-    #[Route('/admin/people/{id}', name: 'admin_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}', name: 'admin_update_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $target): void {
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
+        return $this->handle(function () use ($user, $target, $back): void {
             $this->platformAdministration->updatePerson($target, $_POST, $user->id);
             $this->flash('success', 'The person was updated.');
-            $this->redirect('/admin/people/' . $target);
-        }, '/admin/people/' . $target);
+            $this->redirect($back);
+        }, $back);
     }
 
-    #[Route('/admin/people/{id}/status', name: 'admin_change_person_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/status', name: 'admin_change_person_status', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function changePersonStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
         $status = trim((string) ($_POST['status'] ?? 'disabled'));
-        return $this->handle(function () use ($user, $target, $status): void {
+        return $this->handle(function () use ($user, $target, $status, $back): void {
             $this->platformAdministration->setPersonStatus($target, $status, $user->id);
             $this->flash('success', 'The account status was updated.');
-            $this->redirect('/admin/people/' . $target);
-        }, '/admin/people/' . $target);
+            $this->redirect($back);
+        }, $back);
     }
 
     /** A demo site's new account approved (owner, 2026-10-21): it can sign in, and its holder is emailed. */
-    #[Route('/admin/people/{id}/approve', name: 'admin_approve_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/approve', name: 'admin_approve_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function approvePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $target): void {
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
+        return $this->handle(function () use ($user, $target, $back): void {
             $this->auth->approveAccount($target, $user->id);
             $this->flash('success', 'The account is approved. The person has been emailed that they can sign in.');
-            $this->redirect('/admin/people/' . $target);
-        }, '/admin/people/' . $target);
+            $this->redirect($back);
+        }, $back);
     }
 
     /**
      * A deactivated account restored at a new address (owner, 2026-10-26: "Admin can restore her account, change her
      * email to her private one and allow her to continue with the courses that her profile has access to").
      */
-    #[Route('/admin/people/{id}/restore', name: 'admin_restore_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/restore', name: 'admin_restore_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function restorePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $target): void {
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
+        return $this->handle(function () use ($user, $target, $back): void {
             $this->departures->restore($user->id, $target, (string) ($_POST['email'] ?? ''));
             $this->flash('success', 'The account is restored at its new address, with every course it had. The person can sign in with it.');
-            $this->redirect('/admin/people/' . $target);
-        }, '/admin/people/' . $target);
+            $this->redirect($back);
+        }, $back);
     }
 
-    #[Route('/admin/people/{id}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function revokePersonSession(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->param('id'));
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'));
         $sessionId = trim((string) ($_POST['session_id'] ?? ''));
-        return $this->handle(function () use ($actor, $target, $sessionId): void {
+        return $this->handle(function () use ($actor, $target, $sessionId, $back): void {
             if ($sessionId === '') {
                 throw new RuntimeException('Select a session to revoke.');
             }
             $this->auth->revokeSession($target, $sessionId);
             $this->platformAdministration->recordAdministratorSessionRevocation($actor->id, $target, $sessionId);
             $this->flash('success', 'The login session was revoked.');
-            $this->redirect('/admin/people/' . $target);
-        }, '/admin/people/' . $target);
+            $this->redirect($back);
+        }, $back);
     }
 
     #[Route('/admin/companies', name: 'admin_create_company', methods: ['POST'])]
@@ -680,12 +708,12 @@ final class AdminController extends BaseController
         }, '/admin/companies');
     }
 
-    #[Route('/admin/companies/{id}', name: 'admin_update_company', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/companies/{reference}', name: 'admin_update_company', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['POST'])]
     public function updateCompany(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->param('id'));
+        $id = $this->companyIdFromAddress($this->keys);
         return $this->handle(function () use ($user, $id): Response {
             // A new domain moves every staff address, so it is shown first (owner, 2026-10-26: "it should warn about this
             // before the change is made"); the warning page sends the same form back with confirm_domain.
@@ -695,23 +723,23 @@ final class AdminController extends BaseController
                 $company = $this->platformAdministration->adminCompanyView($id)['admin_company'] ?? [];
                 return $this->render('admin-company-domain', ['title' => 'Change the domain of ' . (string) ($company['name'] ?? 'the company'), 'active_nav' => 'admin',
                     'domain_company' => $company, 'new_name' => (string) ($_POST['name'] ?? ''), 'new_domain' => $domain, 'moves' => $moves,
-                    'moves_taken' => count(array_filter($moves, static fn(array $move): bool => $move['taken'])), 'return_to' => self::companyReturn($id)]);
+                    'moves_taken' => count(array_filter($moves, static fn(array $move): bool => $move['taken'])), 'return_to' => $this->companyReturn()]);
             }
             $this->platformAdministration->updateCompany($id, $_POST + ['move_staff' => $moves !== []], $user->id);
             $this->flash('success', $moves === [] ? 'The company was updated.' : 'The company was updated, and ' . count($moves) . ' staff ' . (count($moves) === 1 ? 'address was' : 'addresses were') . ' moved to ' . $domain . '. Each person was emailed at their old address.');
-            $this->redirect(self::companyReturn($id));
-        }, self::companyReturn($id));
+            $this->redirect($this->companyReturn());
+        }, $this->companyReturn());
     }
 
     /**
      * A company's page in Administration (owner, 2026-10-26: "a page per company in Administration ... with the logo at
      * its top"): the logo first, which is changed here, then its details with Edit and Disable, and its people.
      */
-    #[Route('/admin/companies/{id}', name: 'admin_company', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/companies/{reference}', name: 'admin_company', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['GET'])]
     public function company(): Response
     {
         $user = $this->requirePermission('PLATFORM.COMPANY.VIEW');
-        $id = (int) $this->param('id');
+        $id = $this->companyIdFromAddress($this->keys);
         // Everything about the company on one page (owner, 2026-10-27: the approved mockup).
         $view = $this->companyOverview->view($id, $user, $this->request()->query->all(), $this->request()->cookies->all());
         if ($view === null) throw $this->notFound('That company could not be found.');
@@ -720,7 +748,7 @@ final class AdminController extends BaseController
         return $this->render('admin-company', $view + [
             'title' => (string) $view['admin_company']['name'],
             'active_nav' => 'admin',
-            'company_logo' => $logo === null ? null : ['url' => '/admin/companies/' . $id . '/logo?v=' . $logo['version'], 'uploaded' => $logo['uploaded']],
+            'company_logo' => $logo === null ? null : ['url' => CompanyAddress::admin($this->param('reference'), '/logo?v=' . $logo['version']), 'uploaded' => $logo['uploaded']],
             'can_manage_companies' => $user->hasPermission('PLATFORM.COMPANY.MANAGE'),
             'can_manage_people' => $user->hasPermission('PLATFORM.PERSON.MANAGE'),
             'can_manage_credits' => $user->hasPermission('PLATFORM.CREDIT.MANAGE'),
@@ -730,73 +758,83 @@ final class AdminController extends BaseController
     }
 
     /** Back to the company's own page when a form was sent from it (owner, 2026-10-27: one page for a company), else $fallback. */
+    /** A course's Test access tab, by its code (owner, 2026-11-06), or the Courses list when the course is gone. */
+    private function courseTestAccess(int $courseId): string
+    {
+        $code = $this->courses->courseCodeForId($courseId);
+        return $code === null ? '/admin/courses' : \CattoLearning\Course\CourseAddress::admin($code, '?tab=test-access');
+    }
+
     private static function companyPageReturn(string $fallback): string
     {
         $return = (string) ($_POST['return'] ?? '');
 
-        return preg_match('#^/admin/companies/\d+(\#[a-z-]+)?$#', $return) === 1 ? $return : $fallback;
+        // A company's page, by its account reference (owner, 2026-11-06), and the part of it the form was in.
+        return preg_match('#^/admin/companies/' . CompanyAddress::REQUIREMENT . '(\#[a-z-]+)?$#', $return) === 1 ? $return : $fallback;
     }
 
-    /** Where a company's forms return: its page when sent from there, else the Companies list. */
-    private static function companyReturn(int $id): string
+    /** Where a company's forms return: its page (the company the address names) when sent from there, else the Companies list. */
+    private function companyReturn(): string
     {
-        return ($_POST['return'] ?? '') === 'page' ? '/admin/companies/' . $id : '/admin/companies';
+        return ($_POST['return'] ?? '') === 'page' ? CompanyAddress::admin($this->param('reference')) : '/admin/companies';
     }
 
     /** A company's logo, or its drawn picture (owner, 2026-10-26). */
-    #[Route('/admin/companies/{id}/logo', name: 'admin_company_logo', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/companies/{reference}/logo', name: 'admin_company_logo', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['GET'])]
     public function companyLogo(): Response
     {
         $this->requirePermission('PLATFORM.COMPANY.VIEW');
         try {
-            $picture = $this->logos->picture(max(1, (int) $this->param('id')));
+            $picture = $this->logos->picture($this->companyIdFromAddress($this->keys));
         } catch (\RuntimeException) {
             throw new NotFoundHttpException('There is no such company.');
         }
         return \CattoLearning\Http\PictureResponse::of($picture['bytes'], $picture['mime_type']);
     }
 
-    #[Route('/admin/companies/{id}/logo', name: 'admin_upload_company_logo', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/companies/{reference}/logo', name: 'admin_upload_company_logo', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['POST'])]
     public function uploadCompanyLogo(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $id): void {
+        $id = $this->companyIdFromAddress($this->keys);
+        $back = CompanyAddress::admin($this->param('reference'), '#company-logo');
+        return $this->handle(function () use ($user, $id, $back): void {
             $upload = $this->request()->files->get('logo');
             if ($upload === null || !$upload->isValid()) {
                 throw new \RuntimeException('No logo was received. Please choose a file and try again.');
             }
             $this->logos->upload($id, (string) file_get_contents((string) $upload->getPathname()), $user->id);
             $this->flash('success', 'The company logo was saved.');
-            $this->redirect('/admin/companies/' . $id . '#company-logo');
-        }, '/admin/companies/' . $id . '#company-logo');
+            $this->redirect($back);
+        }, $back);
     }
 
-    #[Route('/admin/companies/{id}/logo/remove', name: 'admin_remove_company_logo', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/companies/{reference}/logo/remove', name: 'admin_remove_company_logo', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['POST'])]
     public function removeCompanyLogo(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $id): void {
+        $id = $this->companyIdFromAddress($this->keys);
+        $back = CompanyAddress::admin($this->param('reference'), '#company-logo');
+        return $this->handle(function () use ($user, $id, $back): void {
             $this->logos->remove($id, $user->id);
             $this->flash('success', 'The company logo was removed. A drawn picture is shown instead.');
-            $this->redirect('/admin/companies/' . $id . '#company-logo');
-        }, '/admin/companies/' . $id . '#company-logo');
+            $this->redirect($back);
+        }, $back);
     }
 
-    #[Route('/admin/companies/{id}/status', name: 'admin_change_company_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/companies/{reference}/status', name: 'admin_change_company_status', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['POST'])]
     public function changeCompanyStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->param('id'));
+        $id = $this->companyIdFromAddress($this->keys);
         return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->setCompanyStatus($id, (string) ($_POST['status'] ?? 'disabled'), $user->id);
             $this->flash('success', 'The company status was updated.');
-            $this->redirect(self::companyReturn($id));
-        }, self::companyReturn($id));
+            $this->redirect($this->companyReturn());
+        }, $this->companyReturn());
     }
 
     #[Route('/admin/course/enrolments/{id}/remove', name: 'admin_remove_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -830,7 +868,7 @@ final class AdminController extends BaseController
     private function enrolmentReturn(): string
     {
         $return = (string) ($_POST['return'] ?? '');
-        return preg_match('#^/admin/people/\d+$#', $return) === 1 ? $return : '/admin/course/enrolments';
+        return preg_match('#^/admin/people/' . PersonAddress::REQUIREMENT . '$#', $return) === 1 ? $return : '/admin/course/enrolments';
     }
 
     /** Unused places of a credit given by hand taken back, with a reason (owner, 2026-10-26: "Unused places only"). */
@@ -851,7 +889,8 @@ final class AdminController extends BaseController
     public function creditLengthOptions(): Response
     {
         $this->requirePermission('PLATFORM.CREDIT.MANAGE');
-        $courseId = (int) ($_GET['course_id'] ?? 0);
+        // The course by its code, as the form's lookup names it (owner, 2026-11-06).
+        $courseId = $this->courses->courseIdForCode(is_string($_GET['course'] ?? null) ? $_GET['course'] : '') ?? 0;
 
         return $this->renderFragment('partials/credit-length-options', ['lengths' => $this->platformAdministration->creditLengths($courseId), 'course_chosen' => $courseId > 0, 'empty_words' => 'Not sold at any length yet: give it a price first']);
     }
@@ -882,7 +921,7 @@ final class AdminController extends BaseController
                 $existing = $this->creditPurchases->startForRequest($user,(int)$result['company_id'],$id);
                 if ($existing !== null) {
                     $this->flash('info','A company purchase for this request is already in progress.');
-                    $this->redirect('/account/orders/'.$existing);
+                    $this->redirect(\CattoLearning\Support\Address\OrderAddress::buyer((int) $existing));
                 }
                 // Say which company the checkout is for: the Company workspace has just been switched to it (2026-10-26 audit).
                 $this->flash('info', 'The company has no credit for this course. You are buying one for ' . (string) ($this->platformAdministration->adminCompanyView((int) $result['company_id'])['admin_company']['name'] ?? 'the company') . ': complete checkout to approve the request and enrol the learner.');
@@ -1050,7 +1089,8 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        $this->platformAdministration->saveOwnerMessageChoices(isset($_POST['on_register']), isset($_POST['on_sale']), $user->id);
+        // One row of four ticks (owner, 2026-11-06): Login via Telegram, New Account, New Order and Payment made.
+        $this->platformAdministration->saveOwnerMessageChoices(isset($_POST['on_register']), isset($_POST['on_sale']), $user->id, isset($_POST['telegram_sign_in']), isset($_POST['on_order']));
         if ($this->request()->headers->has('HX-Request')) return new Response('', 204);
         $this->redirect(self::OWNER_MESSAGES_PAGE);
     }
@@ -1148,17 +1188,18 @@ final class AdminController extends BaseController
     }
 
     /** Marks a sign-in from a new country as seen: it leaves Needs your attention (owner, 2026-10-26). */
-    #[Route('/admin/people/{id}/sign-ins/{login}/seen', name: 'admin_signin_seen', requirements: ['id' => '\\d+', 'login' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/people/{reference}/sign-ins/{login}/seen', name: 'admin_signin_seen', requirements: ['reference' => PersonAddress::REQUIREMENT, 'login' => '\\d+'], methods: ['POST'])]
     public function signInSeen(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = (int) $this->request()->attributes->get('id');
-        return $this->handle(function () use ($user, $target): void {
+        $target = $this->personIdFromAddress($this->keys);
+        $back = PersonAddress::admin($this->param('reference'), '#recent-sign-ins');
+        return $this->handle(function () use ($user, $target, $back): void {
             $this->signInHistory->markSeen($target, (int) $this->request()->attributes->get('login'), $user->id);
             $this->flash('success', 'The sign-in is marked as seen.');
-            $this->redirect('/admin/people/' . $target . '#recent-sign-ins');
-        }, '/admin/people/' . $target . '#recent-sign-ins');
+            $this->redirect($back);
+        }, $back);
     }
 
     /** Settings > Sign-up checks (owner, 2026-10-26): the allowed and blocked countries. */
@@ -1389,9 +1430,10 @@ final class AdminController extends BaseController
             unset($query['edit']);
             $data['courses_quick_edit'] = $user->hasPermission('COURSE.EDIT');
             $data['courses_list_href'] = '/admin/courses?' . ($query === [] ? '' : http_build_query($query) . '&');
-            $editing = (int) ($_GET['edit'] ?? 0);
+            // The row to open is named by its code (owner, 2026-11-06: no row id in any address).
+            $editing = is_string($_GET['edit'] ?? null) ? (string) $_GET['edit'] : '';
             foreach ($data['courses'] as $row) {
-                if ($data['courses_quick_edit'] && is_array($row) && (int) ($row['id'] ?? 0) === $editing && $editing > 0) {
+                if ($data['courses_quick_edit'] && is_array($row) && $editing !== '' && (string) ($row['code'] ?? '') === $editing) {
                     $data['courses_editing'] = $editing;
                     $data['course_edit'] = $this->courseQuickEdit->form($row, $user->hasPermission('COURSE.PRICING.MANAGE'));
                 }
@@ -1475,6 +1517,8 @@ final class AdminController extends BaseController
             // What is in force, where it comes from, and what .env says, which Reset returns to (owner, 2026-10-24).
             $data['sign_in'] = ['restricted' => $this->signIn->restricted(), 'emails' => implode("\n", $this->signIn->allowedEmails()), 'source' => $this->signIn->source(),
                 'environment' => $this->signIn->environmentRestricted(), 'environment_emails' => $this->signIn->environmentEmails()];
+            // Who must use two-step sign-in, over AUTH_TWO_STEP (owner, 2026-11-05).
+            $data['two_step_policy'] = $this->signInSecurity->settingsView();
             // The sign-up check's countries and what it reads (owner, 2026-10-26).
             $environment = $this->signupCountries->environmentLists();
             $data['signup_checks'] = [
@@ -1500,7 +1544,8 @@ final class AdminController extends BaseController
             $data['scheduled_jobs'] = $this->scheduledJobs->jobs();
             $data['payment_methods'] = $this->paymentMethods->settingsView();
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
-                'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
+                'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl(),
+                'key_kind' => $this->identitySettings->keyKind(), 'sandbox_on_live' => $this->identitySettings->sandboxKeyOnLiveSite(), 'demo_site' => $this->identitySettings->demoSite()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
             $data['owner_messages_note'] = $_SESSION['owner_messages_note'] ?? null;
             $data['can_view_telegram_log'] = $this->currentUser()?->hasPermission('PLATFORM.SITEANALYTICS.VIEW') ?? false;
@@ -1616,6 +1661,9 @@ final class AdminController extends BaseController
         // Course Requests narrows by status as well, so an operator can find the approvals that are
         // waiting on payment and have therefore put nobody on a course.
         $request['requests_status'] = $_GET['requests_status'] ?? null;
+        // People narrows to the accounts made between two days, as Money Reports' New accounts opens it (owner, 2026-11-06).
+        $request['people_from'] = $_GET['people_from'] ?? null;
+        $request['people_to'] = $_GET['people_to'] ?? null;
 
         // A list shown as a table or a grid of cards, as its reader chose (owner, 2026-10-26): the address's choice is
         // remembered, and the remembered one used when the address names none.
@@ -1650,9 +1698,10 @@ final class AdminController extends BaseController
             'from' => trim((string) ($_GET['from'] ?? '')),
             'to' => trim((string) ($_GET['to'] ?? '')),
             'family' => trim((string) ($_GET['family'] ?? '')),
-            'actor_id' => max(0, (int) ($_GET['actor_id'] ?? 0)),
-            'course_id' => max(0, (int) ($_GET['course_id'] ?? 0)),
-            'company_id' => max(0, (int) ($_GET['company_id'] ?? 0)),
+            // The person and the company by their account references (owner, 2026-11-06).
+            'actor' => is_string($_GET['actor'] ?? null) ? $_GET['actor'] : '',
+            'course' => is_string($_GET['course'] ?? null) ? $_GET['course'] : '',
+            'company' => is_string($_GET['company'] ?? null) ? $_GET['company'] : '',
             'q' => trim((string) ($_GET['q'] ?? '')),
         ];
     }

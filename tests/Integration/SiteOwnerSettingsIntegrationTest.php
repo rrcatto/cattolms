@@ -113,6 +113,9 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
             'platform_name' => 'Test LMS', 'platform_name_source' => 'environment', 'mail_settings' => $settings->mailAdminView(),
             'site_mode' => ['mode' => 'demo', 'source' => 'environment', 'environment' => 'demo', 'heading' => 'Demo mode', 'notice' => 'Notice', 'email_notice' => 'Email', 'simulation' => 'Simulation', 'own_words' => false, 'limits' => ['heading' => 60, 'notice' => 300, 'email_notice' => 400, 'simulation' => 300]],
             'site_owner' => IntegrationContainer::get()->get(PlatformAdministrationService::class)->siteOwnerView(),
+            // What the real page passes (PlatformAdministrationService), so a notification showing on the site does not
+            // put the banner's value in its place.
+            'site_notification' => IntegrationContainer::get()->get(\CattoLearning\Configuration\SiteNotification::class)->settingsView(),
             'commerce_fields' => \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView(IntegrationContainer::get()->get(\CattoLearning\Commerce\Settings\CommerceSettings::class)),
             'can_manage_settings' => true, 'settings_open_section' => 'site-owner',
             'maintenance' => ['login_tokens' => 0, 'auth_sessions' => 0, 'web_sessions' => 0],

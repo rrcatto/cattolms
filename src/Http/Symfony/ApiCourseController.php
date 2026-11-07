@@ -37,6 +37,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Symfony;
 
 use CattoLearning\Api\ApiScope;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Api\AuthorizationException;
 use CattoLearning\Api\Security\ApiUser;
 use CattoLearning\Course\CatalogueFilter;
@@ -104,27 +105,38 @@ final class ApiCourseController
         return ApiResponse::data($this->courses->adminCourse($courseId), 201);
     }
 
-    #[Route('/api/v1/admin/courses/{id}', name: 'api_courses_update', methods: ['PUT'], requirements: ['id' => '\d+'])]
+    #[Route('/api/v1/admin/courses/{code}', name: 'api_courses_update', methods: ['PUT'], requirements: ['code' => CourseAddress::REQUIREMENT])]
     #[IsGranted(ApiScope::COURSES_WRITE)]
     #[IsGranted('COURSE.EDIT')]
-    public function update(int $id, Request $request, #[CurrentUser] ApiUser $user): JsonResponse
+    public function update(string $code, Request $request, #[CurrentUser] ApiUser $user): JsonResponse
     {
+        $id = $this->courseId($code);
         $this->requireManagement($id, $user);
         $this->courses->updateCourse($id, ApiRequest::jsonBody($request), $user->identity->userId);
 
         return ApiResponse::data($this->courses->adminCourse($id));
     }
 
-    #[Route('/api/v1/admin/courses/{id}/status', name: 'api_courses_status', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[Route('/api/v1/admin/courses/{code}/status', name: 'api_courses_status', methods: ['POST'], requirements: ['code' => CourseAddress::REQUIREMENT])]
     #[IsGranted(ApiScope::COURSES_PUBLISH)]
     #[IsGranted('COURSE.PUBLISH')]
-    public function status(int $id, Request $request, #[CurrentUser] ApiUser $user): JsonResponse
+    public function status(string $code, Request $request, #[CurrentUser] ApiUser $user): JsonResponse
     {
+        $id = $this->courseId($code);
         $this->requireManagement($id, $user);
         $body = ApiRequest::jsonBody($request);
         $this->courses->changeStatus($id, (string) ($body['status'] ?? ''), $user->identity->userId);
 
         return ApiResponse::data($this->courses->adminCourse($id));
+    }
+
+    /**
+     * The course the address names by its code (owner, 2026-11-06: no row id in an address), as its row id; not found when
+     * no course has the code.
+     */
+    private function courseId(string $code): int
+    {
+        return $this->courses->courseIdForCode($code) ?? throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException('No course has the code ' . $code . '.');
     }
 
     /**

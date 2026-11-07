@@ -26,10 +26,18 @@ final class AccountSectionRegistry
             // My Subscriptions since 2026-10-28 (round two 5A): with how and how often updates come, and the lists to join.
             $this->s('subscriptions','My Subscriptions','contact','/account/subscriptions','partials/account/subscriptions.html.twig','The news you get by email, what you follow and how often it comes.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
-            $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
+            // My Courses holds the courses being taken and those finished; Favourites and Course Requests are pages of their own
+            // after it (owner, 2026-11-06: "The My Courses page should be restricted to showing courses you're currently taking
+            // and completed courses. Favourites must get its own page and menu-item"). Course Requests is only a company
+            // account's (owner, 2026-10-21).
+            $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','The courses you are taking and the courses you have completed.'),
+            $this->s('favourites','Favourites','courses','/account/favourites','partials/account/favourites.html.twig','The courses and bundles you starred, to come back to.'),
+            $this->s('requests','Course Requests','requests','/account/requests','partials/account/requests.html.twig','The courses you asked your company for, and where each request stands.'),
             // Each certificate and transcript is private until its learner makes it public; the learner
             // decides here, and can give either a new address (owner, 2026-10-19).
             $this->s('certificates','My Certificates','reports','/account/certificates','partials/account/certificates.html.twig','Your certificates and transcripts, and who can see each one.'),
+            // How they sign in and what protects the account (owner, 2026-11-05): Telegram and two-step sign-in.
+            $this->s('security','Sign-in and security','signin','/account/security','partials/account/security.html.twig','How you sign in, and what protects your account.'),
             $this->s('sessions','Sessions','sessions','/account/sessions','partials/account/sessions.html.twig','Active sign-in sessions and device access.'),
             $this->s('activity','Activity','activity','/account/activity','partials/account/activity.html.twig','Audit activity performed by this account.'),
         ];

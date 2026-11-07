@@ -138,6 +138,120 @@ final class BundleAdministrationIntegrationTest extends TestCase
         }
     }
 
+    public function testEachBundleHasACodeNoCourseOrOtherBundleHas(): void
+    {
+        // Owner, 2026-11-06: "Each bundle needs its own code, like a course code".
+        $suffix = strtoupper(substr($this->fixture->suffix(), 0, 6));
+        $id = $this->bundles->create($this->admin, ['title' => 'Garden Design Set ' . $suffix, 'code' => 'bdl gds ' . $suffix]);
+        self::assertSame('BDL-GDS-' . $suffix, $this->records->find($id)['code'] ?? null, 'Typed as a person types it, kept as a code is written.');
+        $suggested = $this->bundles->create($this->admin, ['title' => 'Pottery Course Bundle ' . $suffix]);
+        self::assertMatchesRegularExpression('/^BDL-PCB/', (string) ($this->records->find($suggested)['code'] ?? ''), 'Left empty, one is made from the title.');
+        $course = $this->course('Coded', 1000);
+        $courseCode = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $course]);
+        foreach ([
+            'The code ' . $courseCode . ' is a course\'s: Course Coded. A code names one course or one bundle, so give the bundle a code of its own.' => $courseCode,
+            'Another bundle already has the code BDL-GDS-' . $suffix . '. Each bundle has a code of its own.' => 'BDL-GDS-' . $suffix,
+            'A bundle code is capital letters and digits, in parts joined by hyphens, with at least one letter, such as GDN-101 (2 to 20 characters). "BDL-!" is not one.' => 'BDL--!',
+        ] as $message => $code) {
+            try {
+                $this->bundles->updateDetails($this->admin, $suggested, ['title' => 'Pottery Course Bundle ' . $suffix, 'code' => $code]);
+                self::fail($message);
+            } catch (RuntimeException $refused) {
+                self::assertSame($message, $refused->getMessage());
+            }
+        }
+        // And the other way: no course may take a bundle's code, by its form or by the database.
+        try {
+            IntegrationContainer::get()->get(\CattoLearning\Course\CourseService::class)->courseCode('BDL-GDS-' . $suffix, 'A course', $course);
+            self::fail('A course may not take a bundle\'s code.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringStartsWith('The code BDL-GDS-' . $suffix . ' is a bundle\'s: Garden Design Set', $refused->getMessage());
+        }
+        $this->db->executeStatement('SAVEPOINT code');
+        try {
+            $this->db->executeStatement('UPDATE courses SET code = :code WHERE id = :id', ['code' => 'BDL-GDS-' . $suffix, 'id' => $course]);
+            self::fail('The database keeps a code to one course or one bundle.');
+        } catch (DbalException) {
+            $this->db->executeStatement('ROLLBACK TO SAVEPOINT code');
+        }
+        self::assertSame(1, $this->records->count(['search' => 'gds-' . $suffix]), 'The list finds a bundle by its code.');
+    }
+
+    public function testTheStatusIsChosenOnTheBundleFormByTheSameChecks(): void
+    {
+        // Owner, 2026-11-06: "On the bundle form (new or edit), I can't set the status ... use radio buttons".
+        $suffix = $this->fixture->suffix();
+        $form = InProcessPage::run($this->admin, AdminBundleController::class, 'create');
+        foreach (['name="status" value="draft" checked', 'name="status" value="published"', 'name="status" value="retired"', 'Only administrators see it.', 'In the catalogue.', 'Off the catalogue, and kept for its orders.', 'id="bundle-code"'] as $shown) {
+            self::assertStringContainsString($shown, $form['body'], $shown);
+        }
+        $refused = null;
+        $id = $this->bundles->create($this->admin, ['title' => 'Status Bundle ' . $suffix, 'status' => 'published'], $refused);
+        self::assertSame(['draft', 'Add at least two courses before publishing the bundle.'], [$this->records->find($id)['status'] ?? null, $refused], 'A new bundle is made a draft when the checks refuse what was chosen, and says why.');
+        $this->bundles->addCourse($this->admin, $id, $this->course('S1', 1000));
+        $this->bundles->addCourse($this->admin, $id, $this->course('S2', 1000));
+        try {
+            $this->bundles->updateDetails($this->admin, $id, ['title' => 'Renamed ' . $suffix, 'status' => 'published']);
+            self::fail('Publishing still needs a price.');
+        } catch (RuntimeException $notYet) {
+            self::assertSame('Set the bundle price before publishing it.', $notYet->getMessage());
+        }
+        self::assertSame(['Status Bundle ' . $suffix, 'draft'], [$this->records->find($id)['title'], $this->records->find($id)['status']], 'Refused, nothing is saved: the details and the status go together.');
+        $this->bundles->saveOffer($this->admin, $id, ['price' => '1500', 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        $code = (string) $this->records->find($id)['code'];
+        $saved = InProcessPage::run($this->admin, AdminBundleController::class, 'update', ['code' => $code], ['csrf' => $_SESSION['csrf'], 'title' => 'Renamed ' . $suffix, 'code' => $code, 'status' => 'published']);
+        self::assertSame('/admin/bundles/' . $code, $saved['location'], 'A bundle\'s page is at its code.');
+        self::assertSame(['Renamed ' . $suffix, 'published'], [$this->records->find($id)['title'], $this->records->find($id)['status']]);
+        $editor = InProcessPage::run($this->admin, AdminBundleController::class, 'show', ['code' => $code]);
+        self::assertStringContainsString('name="status" value="published" checked', $editor['body'], 'The edit form shows the status chosen.');
+        self::assertStringNotContainsString('/status"', $editor['body'], 'No second way to change it.');
+    }
+
+    public function testARowOfTheListIsSavedInPlaceTogetherOrNotAtAll(): void
+    {
+        // Owner, 2026-11-06: "In the bundle list, it must be editable, just like courses are. these fields must be editable:
+        // bundle code, title, status, price, start & end dates, access period".
+        $suffix = strtoupper(substr($this->fixture->suffix(), 0, 6));
+        $bundle = BundleFixture::create($this->db, $this->owner, [$this->course('R1', 1000), $this->course('R2', 1000)], 150000, ['title' => 'Row Bundle ' . $suffix, 'status' => 'draft']);
+        $row = ['csrf' => $_SESSION['csrf'], 'code' => 'BDL-ROW-' . $suffix, 'title' => 'Row Bundle Plus ' . $suffix, 'status' => 'published', 'price' => '1250', 'was_price' => '1800',
+            'available_from' => '2026-12-01T09:30', 'available_until' => '2027-01-31T17:00', 'access_period_value' => '18', 'access_period_unit' => 'months', 'view' => 'list', 'return' => '/admin/bundles?bundles_q=row'];
+        $_SERVER['HTTP_HX_REQUEST'] = 'true';
+        try {
+            $saved = InProcessPage::run($this->admin, AdminBundleController::class, 'saveRow', ['code' => $bundle['code']], $row);
+            // The row's code is now the one typed, and its addresses follow it.
+            $code = 'BDL-ROW-' . $suffix;
+            self::assertStringContainsString('id="bundle-' . $code . '"', $saved['body'], 'The row is anchored by its code.');
+            self::assertStringContainsString('/admin/bundles/' . $code . '/row', $saved['body']);
+            self::assertStringContainsString('data-bundle-saved', $saved['body'], 'The row comes back as it now is.');
+            $money = static fn(int $minor): string => htmlspecialchars(\CattoLearning\Support\Money::strictMinorUnits($minor, 'ZAR')->format(), ENT_QUOTES);
+            foreach (['BDL-ROW-' . $suffix, 'Row Bundle Plus ' . $suffix, $money(125000), $money(180000), '1 Dec 2026 09:30', '31 Jan 2027 17:00', '18 months'] as $shown) self::assertStringContainsString($shown, $saved['body'], $shown);
+            $now = $this->records->find($bundle['id']) ?? [];
+            self::assertSame(['published', 125000, 180000, 545 * 86400, true], [$now['status'], (int) $now['price_minor_units'], (int) $now['was_price_minor_units'], (int) $now['access_period_seconds'], (bool) $now['offer_active']],
+                'Its status, price, was price and access saved, and whether it is on sale kept.');
+            self::assertSame($bundle['slug'], $now['slug'], 'Its web address is the bundle form\'s to change.');
+
+            $refused = InProcessPage::run($this->admin, AdminBundleController::class, 'saveRow', ['code' => $code], ['title' => 'Never saved', 'price' => 'lots'] + $row);
+            self::assertSame(422, $refused['status']);
+            self::assertStringContainsString('Enter the bundle price as an amount with no more than two decimal places.', $refused['body']);
+            self::assertStringContainsString('value="Never saved"', $refused['body'], 'What was typed stays.');
+            self::assertSame('Row Bundle Plus ' . $suffix, $this->records->find($bundle['id'])['title'], 'Nothing is saved when any of it is refused.');
+
+            $edit = InProcessPage::run($this->admin, AdminBundleController::class, 'row', ['code' => $code], null, ['mode' => 'edit', 'view' => 'grid']);
+            self::assertStringContainsString('class="cl-course-quick-card"', $edit['body'], 'A card opens as its form in the grid.');
+        } finally {
+            unset($_SERVER['HTTP_HX_REQUEST']);
+        }
+        $code = 'BDL-ROW-' . $suffix;
+        $plain = InProcessPage::run($this->admin, AdminBundleController::class, 'saveRow', ['code' => $code], ['title' => 'Plain ' . $suffix] + $row);
+        self::assertSame('/admin/bundles?bundles_q=row#bundle-' . $code, $plain['location'], 'Without JavaScript the list comes back.');
+        $list = InProcessPage::run($this->admin, AdminBundleController::class, 'index', [], null, ['bundles_q' => 'row-' . strtolower($suffix), 'edit' => $code]);
+        self::assertStringContainsString('id="bundle-quick-' . $bundle['id'] . '"', $list['body'], 'edit= opens the row as its form.');
+        $viewer = new CurrentUser($this->admin->id, Uuid::v4(), 'viewer@example.test', 'Viewer', ['STUDENT'], ['BUNDLE.MANAGEMENT.VIEW'], Uuid::v4());
+        self::assertStringNotContainsString('/row?mode=edit', InProcessPage::run($viewer, AdminBundleController::class, 'index', [], null, ['bundles_q' => 'row-' . strtolower($suffix)])['body'], 'No pencil without the bundle permission.');
+        $this->expectException(AccessDeniedHttpException::class);
+        InProcessPage::run($viewer, AdminBundleController::class, 'saveRow', ['code' => $code], $row);
+    }
+
     public function testOnlyAnUnusedDraftCanBeDeletedAndASoldBundleKeepsItsHistory(): void
     {
         $unused = BundleFixture::create($this->db, $this->owner, [$this->course('A', 1000), $this->course('B', 1000)], 1500, ['status' => 'draft']);
@@ -189,12 +303,12 @@ final class BundleAdministrationIntegrationTest extends TestCase
         $page = InProcessPage::run($this->admin, AdminBundleController::class, 'index', [], null, ['bundles_q' => $prefix, 'status' => 'off_sale']);
         self::assertStringContainsString('Listed off sale', $page['body']);
         self::assertStringNotContainsString('Listed retired', $page['body']);
-        $editor = InProcessPage::run($this->admin, AdminBundleController::class, 'show', ['id' => (string) $onSale['id']]);
-        foreach (['action="/admin/bundles/' . $onSale['id'] . '/courses"', 'name="add_course_id"', '/move"', '/remove"', 'action="/admin/bundles/' . $onSale['id'] . '/offer"', 'Retire', 'Not sold yet'] as $shown) self::assertStringContainsString($shown, $editor['body']);
+        $editor = InProcessPage::run($this->admin, AdminBundleController::class, 'show', ['code' => $onSale['code']]);
+        foreach (['action="/admin/bundles/' . $onSale['code'] . '/courses"', 'name="add_course_id"', '/move"', '/remove"', 'action="/admin/bundles/' . $onSale['code'] . '/offer"', 'Retire', 'Not sold yet'] as $shown) self::assertStringContainsString($shown, $editor['body']);
 
-        $failed = InProcessPage::run($this->admin, AdminBundleController::class, 'update', ['id' => (string) $onSale['id']], ['csrf' => $_SESSION['csrf'], 'title' => 'Kept title', 'slug' => 'NOT VALID']);
-        self::assertSame('/admin/bundles/' . $onSale['id'], $failed['location']);
-        self::assertStringContainsString('value="NOT VALID"', InProcessPage::run($this->admin, AdminBundleController::class, 'show', ['id' => (string) $onSale['id']])['body'], 'A failed save keeps what was entered.');
+        $failed = InProcessPage::run($this->admin, AdminBundleController::class, 'update', ['code' => $onSale['code']], ['csrf' => $_SESSION['csrf'], 'title' => 'Kept title', 'slug' => 'NOT VALID']);
+        self::assertSame('/admin/bundles/' . $onSale['code'], $failed['location']);
+        self::assertStringContainsString('value="NOT VALID"', InProcessPage::run($this->admin, AdminBundleController::class, 'show', ['code' => $onSale['code']])['body'], 'A failed save keeps what was entered.');
 
         $learner = new CurrentUser($this->admin->id, Uuid::v4(), 'learner@example.test', 'Learner', ['STUDENT'], ['COURSE.MANAGEMENT.VIEW'], Uuid::v4());
         $viewer = new CurrentUser($this->admin->id, Uuid::v4(), 'viewer@example.test', 'Viewer', ['STUDENT'], ['BUNDLE.MANAGEMENT.VIEW'], Uuid::v4());
@@ -206,7 +320,7 @@ final class BundleAdministrationIntegrationTest extends TestCase
                 $this->addToAssertionCount(1);
             }
         }
-        $readOnly = InProcessPage::run($viewer, AdminBundleController::class, 'show', ['id' => (string) $onSale['id']]);
+        $readOnly = InProcessPage::run($viewer, AdminBundleController::class, 'show', ['code' => $onSale['code']]);
         self::assertStringNotContainsString('/offer"', $readOnly['body'], 'Viewing is not managing.');
         foreach (['add' => fn() => $this->bundles->addCourse($viewer, $onSale['id'], 1), 'retire' => fn() => $this->bundles->setStatus($viewer, $onSale['id'], 'retired')] as $what => $attempt) {
             try {

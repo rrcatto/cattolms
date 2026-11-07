@@ -11,7 +11,7 @@ A person with an account is named with their account reference, as one link to t
 "Every time you mention a person with an account in the system, I want their name linked to their account!" and
 "every single page which mentions their Name, needs to also include their unique Account Reference number"). Lists in
 Administration render each person through data.person; the Company workspace links each to its own person page
-(/company/people/{id}), never to Administration; a key-value item can hold a person.
+(/company/people/{account reference}), never to Administration; a key-value item can hold a person.
 
 Changelog:
 2026/10/21 SAST
@@ -38,13 +38,15 @@ final class PersonMentionContractTest extends TestCase
         $hive['people'][0]['name'] = 'Thandi Nkosi';
         $html = RenderHarness::render('partials/admin/people', $hive);
         // A table names a person by their name, linked to their profile, and nothing more (owner, 2026-10-21).
-        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/42"><span class="cl-ui-person-name">Thandi Nkosi</span></a></span>', $html);
+        // By their account reference, never their row id (owner, 2026-11-06).
+        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/' . self::REFERENCE . '"><span class="cl-ui-person-name">Thandi Nkosi</span></a></span>', $html);
+        self::assertStringNotContainsString('/admin/people/42', $html);
         self::assertStringNotContainsString('cl-ui-person-reference', $html);
 
         $hive = RenderHarness::baseHive();
         $hive['requests'] = RenderHarness::rows('requests');
         $requests = RenderHarness::render('partials/admin/requests', $hive);
-        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/1"><span class="cl-ui-person-name">A</span></a></span>', $requests, 'A course request names its learner the same way.');
+        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/CL202601010001K"><span class="cl-ui-person-name">A</span></a></span>', $requests, 'A course request names its learner the same way.');
     }
 
     public function testTheCompanyWorkspaceLinksAPersonToTheirCompanyPage(): void
@@ -52,15 +54,15 @@ final class PersonMentionContractTest extends TestCase
         $hive = RenderHarness::baseHive();
         $hive['enrolments'] = RenderHarness::rows('enrolments');
         $html = RenderHarness::render('partials/company/enrolments', $hive);
-        $id = (int) ($hive['enrolments'][0]['user_id'] ?? 0);
-        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/company/people/' . $id . '"><span class="cl-ui-person-name">A</span></a></span>', $html);
+        $reference = (string) ($hive['enrolments'][0]['learner_reference'] ?? '');
+        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/company/people/' . $reference . '"><span class="cl-ui-person-name">A</span></a></span>', $html);
         self::assertStringNotContainsString('href="/admin/people/', $html, 'The Company workspace links to its own person page, never to Administration.');
     }
 
     public function testAKeyValueItemCanHoldAPerson(): void
     {
-        $html = RenderHarness::renderSource("{{ ui('data.key-value-list', {items: [{label: 'Owning person', person: {name: 'Thandi Nkosi', reference: 'CL202601010001K', href: '/admin/people/7'}}, {label: 'Course', value: 'Bookkeeping'}]}) }}");
-        self::assertStringContainsString('<dt>Owning person</dt><dd><span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/7">', $html);
-        self::assertStringContainsString('<dt>Course</dt><dd>Bookkeeping</dd>', $html);
+        $html = RenderHarness::renderSource("{{ ui('data.key-value-list', {items: [{label: 'Owning person', person: {name: 'Thandi Nkosi', reference: 'CL202601010001K', href: '/admin/people/CL202601010001K'}}, {label: 'Course', value: 'Garden Design'}]}) }}");
+        self::assertStringContainsString('<dt>Owning person</dt><dd><span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/CL202601010001K">', $html);
+        self::assertStringContainsString('<dt>Course</dt><dd>Garden Design</dd>', $html);
     }
 }

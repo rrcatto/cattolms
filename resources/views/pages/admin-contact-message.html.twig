@@ -23,8 +23,8 @@
 			{label: 'Status', value: message.answered ? 'Answered on ' ~ (message.answered_at|date('j M Y H:i')) : 'Not answered yet'},
 		] | merge(message.answered_by ? [{label: 'Answered by', person: message.answered_by}] : []))}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if message.user_id %}{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ message.user_id, icon: 'action-open'}) }}{% endif %}
-			{% if message.order_id %}{{ ui('action.link', {label: 'Open order ' ~ message.order_number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ message.order_id, icon: 'action-open'}) }}{% endif %}
+			{% if message.user_id %}{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: message.sender.href, icon: 'action-open'}) }}{% endif %}
+			{% if message.order_id %}{{ ui('action.link', {label: 'Open order ' ~ message.order_number, variant: 'secondary', size: 'small', href: order_url(message.order_id), icon: 'action-open'}) }}{% endif %}
 			{% if message.course_slug %}{{ ui('action.link', {label: 'Open the course page', variant: 'secondary', size: 'small', href: '/courses/' ~ message.course_slug, icon: 'action-open'}) }}{% endif %}
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
@@ -32,11 +32,11 @@
 		{{ ui('layout.section-head', {heading: 'The message'}) }}
 		<p class="cl-contact-message-text">{{ message.message|nl2br }}</p>
 		{% if can_manage and not message.answered %}
-		<form action="/admin/messages/{{ message.id }}/answered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+		<form action="{{ message_url(message, '/answered') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as answered', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}{% endblock %}{% endembed %}
 		</form>
 		{% elseif can_manage %}
-		<form action="/admin/messages/{{ message.id }}/unanswered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+		<form action="{{ message_url(message, '/unanswered') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as not answered', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-restore'}) }}{% endblock %}{% endembed %}
 		</form>
 		{% endif %}

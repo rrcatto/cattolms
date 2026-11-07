@@ -12,29 +12,55 @@ A site's whole catalogue in one file, made and loaded at Administration -> Cours
 2026-10-23: "I don't want to manage my LMS via CLI commands ... I should be able to import the catalogue.json myself
 without learning a CLI command to run"). The package is a zip:
 
-  catalogue.json             the categories and tags with their icons, and the courses' codes in catalogue order
-                             (CatalogueFile, version 2)
+  catalogue.json             the categories and tags with their icons, the courses' codes in catalogue order and the
+                             bundles of those courses (CatalogueFile, version 2; Bundle\BundleCatalogue)
   courses/GDN-101.json       each course's package (catto-learning-course 2.1): its whole content as it stands on the
                              site, its code and its place in the catalogue (CourseCatalogueSettings)
   resources/<id>/<filename>  each Resource Library file the courses use
 
-A course is known by its code alone (CourseCode). Importing is two steps. plan() reads a staged package and says what
-would happen, changing nothing: the categories and tags it would make, and for each course whether it is new, already
-here (and what would change), or left out and why. apply() then does it, as ADMIN on the course pages would:
+A course is known by its code alone (CourseCode), and a file by the name its course links (its original_filename),
+never by a hidden id (owner, 2026-11-06: "The identifier for a json course file is its course code not its contents").
+The import is canonical (owner, 2026-11-06: "By default, what is in the import file wins ... everything, by default, is
+overwritten and replaced. Do not retain or backup what is being replaced"). Importing is two steps. plan() reads a
+staged package and says what would happen, changing nothing: the categories and tags it would make, each file new, the
+same or different here, and for each course and bundle whether it is new, already here with every difference in words,
+or left out and why. apply() then does it, as ADMIN on the course pages would, taking the file's version of every
+difference but those ADMIN chose to keep:
 
-  categories and tags first, then the files the courses need, kept with the public ids they had;
-  each new course imported into its category with its code, then its tags, cover, position and, when asked, its prices
-  (owner, 2026-10-23: the file's prices for new courses only);
-  each course already here given its tags, cover and position (its category only when it has none, its prices never),
-  its content replaced only when asked and only while nobody has started it;
-  the related courses once every course is in, adding only;
-  new courses published, when asked, if they were published where they came from: the warnings they were published
-  past there are accepted, and one with an error (no price, say) stays a draft with the reason.
+  categories and tags first, then the files: one the site lacks is added (with the public id it had, when that is free
+  here), one of that name with other contents has its contents replaced in place, its record kept, so every course
+  using it has the new file; each course's parts are pointed at the site's file by name;
+  each new course imported into its category (the path made when missing) with its code, then its tags, cover,
+  position and, when asked, its prices;
+  each course already here given the file's content (as Replace does, never once a learner has started it), category
+  (made when missing), tags exactly, prices (the options on sale made the file's), cover, position and page layout;
+  the related courses once every course is in, replaced among the package's own courses (a relation is the pair's:
+  either file naming the other keeps it), and a course the package does not hold left as it is unless named;
+  then the statuses: new courses published, when asked, if they were published where they came from, a course already
+  here given the file's; one with an error (no price, say) stays as it is with the reason;
+  then the bundles ticked, each known by its code (owner, 2026-11-06: bundles "backed up as part of the catalogue"): a
+  new one with the package's words, courses, price, sale dates and status (published only while all its courses are
+  published here), one already here taking the file's version of each difference (Bundle\BundleCatalogue).
 
-Each course is imported on its own: one that fails is reported and the rest go on. Loading the same package again
-changes nothing. A plain catalogue.json is taken too: its categories and tags only.
+Changing prices needs the course pricing permission and changing a status the publishing permission: without them
+those stay as they are here. Each course is imported on its own: one that fails is reported and the rest go on.
+Loading the same package again finds no difference and changes nothing. A plain catalogue.json is taken too: its
+categories and tags only. downloadName() names a course's package as its course file is named.
 
 Changelog:
+2026/11/07 SAST
+- One course file by the same rules (reviewCourseFile() and importCourseFile(), for Administration > Courses >
+  Import): the course with the file's code is the one updated, every difference the file states listed with Use the
+  file's (the default) and Keep this site's, nothing replaced kept, an out-of-date review refused; an HTML file is
+  compared with the course's own course file, and states no prices, related courses, status or other catalogue
+  settings, which stay as they are here. A package that carries no frame differs from a course that has one.
+2026/11/06 SAST
+- Bundles: an export carries the bundles whose courses are all among those ticked, and an import reviews and loads them
+  after the courses (Bundle\BundleCatalogue).
+- The import is canonical (owner, 2026-11-06): files matched by the name the course links, one that differs replaced in
+  place; a course already here takes the file's content, category, tags, prices, cover, position, page layout, related
+  courses and status; every difference listed for the review and kept as this site's only when chosen; nothing
+  replaced kept. downloadName(): the course file's name with -with-its-files.zip.
 2026/10/23 SAST
 - Created.
 - An export holds the courses ADMIN ticks, only their categories (with those above) and tags, and related courses
@@ -60,8 +86,6 @@ final class CataloguePackage
     public const RESOURCES = 'resources/';
     /** Each Presentation's recorded narration, one clip per slide (CatWalk, owner 2026-10-28). */
     public const NARRATIONS = 'narrations/';
-    /** What a course already here gains when the package holds its original file and the site does not. */
-    private const FILE_FRAME = 'The page layout of its HTML file';
     /** What an upload may be, and what a package may unpack to. */
     public const MAXIMUM_UPLOAD_BYTES = 64 * 1024 * 1024;
     private const MAXIMUM_UNPACKED_BYTES = 512 * 1024 * 1024;
@@ -83,7 +107,20 @@ final class CataloguePackage
         private readonly ?Catwalk\Narrations $narrations = null,
         private readonly ?CataloguePositions $positions = null,
         private readonly ?CourseItemService $courseItems = null,
+        private readonly ?\CattoLearning\Bundle\BundleCatalogue $bundles = null,
+        // The course on the site as its own HTML file, which an HTML course file is compared with (reviewCourseFile()).
+        private readonly ?CourseFile $courseFile = null,
     ) {}
+
+    /**
+     * The name of a course's download with its files (owner, 2026-11-06): the course file's name, when it was made, the
+     * course's code and its title, with -with-its-files: "20261106-2259-GDN-101-growing-vegetables-with-its-files.zip".
+     */
+    public function downloadName(int $courseId): string
+    {
+        $course = $this->repository->findById($courseId) ?? throw new InvalidArgumentException('The course does not exist.');
+        return substr(CourseFile::filename(['course' => $course]), 0, -strlen('.html')) . '-with-its-files.zip';
+    }
 
     /**
      * Every course, in catalogue order, for the export form: its code, title, category and status.
@@ -142,7 +179,9 @@ final class CataloguePackage
             }
         }
         [$categories, $tags] = $this->taxonomyOf($chosen);
-        $zip->addFromString(self::CATALOGUE, self::json($this->file->export($categories, $tags) + ['courses' => $codes]));
+        // The bundles of these courses only (owner, 2026-11-06): one with a course not exported stays out.
+        $bundles = $this->bundles?->export($codes) ?? [];
+        $zip->addFromString(self::CATALOGUE, self::json($this->file->export($categories, $tags) + ['courses' => $codes] + ($bundles === [] ? [] : ['bundles' => $bundles])));
         $site = $this->items->sitePresentation();
         if ($site !== null) {
             $zip->addFromString(self::SITE_PRESENTATION, self::json(['item_key' => $site['item_key'], 'name' => $site['name'], 'title' => $site['title'], 'description_html' => $site['description_html'], 'deck' => $site['type_config']]));
@@ -151,7 +190,7 @@ final class CataloguePackage
         foreach ($written as $json) @unlink($json);
         if (!$closed) throw new RuntimeException('The catalogue package could not be written.');
         $this->audit->record($userId, 'catalogue.exported', ['courses' => count($codes), 'categories' => count($categories), 'tags' => count($tags), 'files' => count($files),
-            'every_course' => $courseIds === null]);
+            'bundles' => count($bundles), 'every_course' => $courseIds === null]);
         return $path;
     }
 
@@ -229,7 +268,11 @@ final class CataloguePackage
     }
 
     /**
-     * What importing the staged package would do, changing nothing.
+     * What importing the staged package would do, changing nothing (owner, 2026-11-06: "the import process can compare
+     * the categories and tags, and supporting files and highlight where they differ and ask Admin, who is doing the
+     * import, how to resolve the conflicts"): the categories and tags it makes; each file by the name the courses link,
+     * new, the same or different here; and each course and bundle new, already here with every difference in words, or
+     * left out and why.
      *
      * @return array<string,mixed>
      */
@@ -238,46 +281,94 @@ final class CataloguePackage
         [$path, $meta] = $this->staged($key);
         $package = $this->read($path, (string) $meta['extension']);
         $inPackage = array_fill_keys(array_keys($package['files']), true);
+        $summaries = $this->summaries($path, $package);
+        $files = $this->planFiles($path, $package, $summaries);
         $plan = [
             'key' => $key,
             'filename' => (string) $meta['original_filename'],
             'kind' => (string) $meta['extension'],
             'catalogue' => $this->file->plan($package['catalogue']),
             'site_presentation' => !isset($package['site_presentation']) ? '' : ($this->items->sitePresentation() === null ? 'new' : 'here'),
-            'files_new' => count(array_filter(array_keys($inPackage), fn(string $id): bool => $this->items->resourceByPublicId($id) === null)),
+            'files' => array_values($files),
+            'files_new' => count(array_filter($files, static fn(array $file): bool => $file['state'] === 'new')),
+            'files_different' => count(array_filter($files, static fn(array $file): bool => $file['state'] === 'differs')),
             'courses' => [],
             'counts' => ['new' => 0, 'update' => 0, 'unchanged' => 0, 'skip' => 0],
         ];
+        $packageRelated = self::relatedIn($summaries);
+        $plan['package_related'] = $packageRelated;
         $codes = [];
         $slugs = [];
         foreach ($package['courses'] as $entry) {
-            $row = $this->planCourse($entry['name'], $this->courseIn($path, $entry['name']), $inPackage, $codes, $slugs);
+            $data = self::remap($this->courseIn($path, $entry['name']), self::siteIds($files));
+            $row = $this->planCourse($entry['name'], $data, $inPackage, $codes, $slugs, $packageRelated, $package['narrations'], $files);
             $plan['courses'][] = $row;
             $plan['counts'][$row['action']]++;
         }
+        $plan['bundles'] = $this->planBundles($package, $plan['courses']);
+        $plan['bundle_counts'] = ['new' => 0, 'update' => 0, 'unchanged' => 0, 'skip' => 0];
+        foreach ($plan['bundles'] as $row) $plan['bundle_counts'][$row['action']]++;
+        $plan['fingerprint'] = self::fingerprint($plan);
         return $plan;
     }
 
     /**
-     * Imports the staged package as its review chose, and answers what was done.
+     * What a review showed, in one value: each course, file and bundle with what would happen to it and every
+     * difference. The import compares it with the plan made as it runs, so it never does what nobody saw.
      *
-     * @param array{courses?:list<string>|null,replace?:list<string>,prices?:bool,publish?:bool} $choices
-     *        courses: the codes to import or update (null for every one); replace: the courses already here whose
-     *        content is replaced; prices: the package's prices for new courses; publish: new courses published as they were
+     * @param array<string,mixed> $plan
+     */
+    private static function fingerprint(array $plan): string
+    {
+        $shown = [
+            array_map(static fn(array $row): array => [$row['code'], $row['action'], $row['reason'], array_column($row['differences'], 'words'), array_column($row['differences'], 'choosable'), $row['notes']], $plan['courses']),
+            array_map(static fn(array $file): array => [$file['name'], $file['state']], $plan['files']),
+            array_map(static fn(array $row): array => [$row['code'], $row['action'], $row['reason'], $row['changes']], $plan['bundles']),
+        ];
+        return hash('sha256', (string) json_encode($shown, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * Imports the staged package as its review chose, and answers what was done. Every difference takes the file's
+     * version unless it is listed in keep (owner, 2026-11-06: "By default, what is in the import file wins"); nothing
+     * replaced is kept or backed up.
+     *
+     * @param array{fingerprint?:string,courses?:list<string>|null,keep?:array<string,list<string>>,keep_files?:list<string>,keep_file_keys?:list<string>,keep_bundles?:array<string,list<string>>,prices?:bool,publish?:bool,may_price?:bool,may_publish?:bool,bundles?:list<string>|null} $choices
+     *        fingerprint: what the review showed (plan()'s), refused when the site has changed since; courses: the codes
+     *        to import or update (null for every one); keep: by course code, the differences whose
+     *        site version is kept (content, category, tags, prices, cover, position, page_layout, related, status);
+     *        keep_files: the names of the files kept as this site's (keep_file_keys: the same by the review's keys); keep_bundles: by bundle code, the differences kept
+     *        (title, short_description, description, cover, courses, price, status, sale_dates, address); prices: the
+     *        package's prices for new courses; publish: new courses published as they were; may_price and may_publish:
+     *        whether the importer may change prices and statuses (the course pricing and publishing permissions), which
+     *        otherwise stay as they are here; bundles: the bundle codes to import or update (null for every one)
      * @return array<string,mixed>
      */
     public function apply(string $key, array $choices, int $userId): array
     {
         $plan = $this->plan($key);
+        // The import does exactly what the review showed: a site changed since (a price set, a course moved) would make
+        // it do what nobody saw, so it stops and asks for the review again, changing nothing (2026-11-06).
+        if (isset($choices['fingerprint']) && !hash_equals($plan['fingerprint'], (string) $choices['fingerprint'])) {
+            throw new InvalidArgumentException('Something on this site changed after the review was drawn, so nothing was imported. Check the review again, then import.');
+        }
         [$path, $meta] = $this->staged($key);
         $package = $this->read($path, (string) $meta['extension']);
-        $chosen = $choices['courses'] ?? null;
-        $replace = array_map([CourseCode::class, 'normalise'], (array) ($choices['replace'] ?? []));
-        $prices = (bool) ($choices['prices'] ?? true);
-        $publish = (bool) ($choices['publish'] ?? true);
-        $report = ['filename' => $plan['filename'], 'catalogue' => $this->file->import($package['catalogue'], $userId), 'files_installed' => 0, 'site_presentation' => $this->installSitePresentation($package['site_presentation'] ?? null, $userId),
+        $chosen = isset($choices['courses']) ? array_map([CourseCode::class, 'normalise'], $choices['courses']) : null;
+        $keep = [];
+        foreach ((array) ($choices['keep'] ?? []) as $code => $kinds) $keep[CourseCode::normalise((string) $code)] = array_map('strval', (array) $kinds);
+        $mayPrice = (bool) ($choices['may_price'] ?? true);
+        $mayPublish = (bool) ($choices['may_publish'] ?? true);
+        $prices = $mayPrice && (bool) ($choices['prices'] ?? true);
+        $publish = $mayPublish && (bool) ($choices['publish'] ?? true);
+        $report = ['filename' => $plan['filename'], 'catalogue' => $this->file->import($package['catalogue'], $userId), 'files_installed' => 0, 'files_replaced' => 0, 'site_presentation' => $this->installSitePresentation($package['site_presentation'] ?? null, $userId),
             'courses' => [], 'counts' => ['imported' => 0, 'updated' => 0, 'replaced' => 0, 'unchanged' => 0, 'left_out' => 0, 'skipped' => 0, 'failed' => 0]];
-        $report['files_installed'] = $this->installFiles($path, $package['files'], $package['courses'], $userId);
+        $taking = [];
+        foreach ($plan['courses'] as $row) if ($row['action'] !== 'skip' && ($chosen === null || in_array($row['code'], $chosen, true))) $taking[] = $row['code'];
+        $packageRelated = (array) $plan['package_related'];
+        $keepFiles = array_map('strval', (array) ($choices['keep_files'] ?? []));
+        foreach ($plan['files'] as $file) if (in_array($file['key'], (array) ($choices['keep_file_keys'] ?? []), true)) $keepFiles[] = (string) $file['name'];
+        [$map, $report['files_installed'], $report['files_replaced']] = $this->installFiles($path, $plan['files'], $taking, $keepFiles, $userId);
 
         $done = [];
         foreach ($plan['courses'] as $row) {
@@ -287,17 +378,18 @@ final class CataloguePackage
                 $report['counts']['skipped']++;
                 continue;
             }
-            if ($chosen !== null && !in_array($row['code'], array_map([CourseCode::class, 'normalise'], $chosen), true)) {
+            if (!in_array($row['code'], $taking, true)) {
                 $report['courses'][] = array_replace($outcome, ['outcome' => 'left out']);
                 $report['counts']['left_out']++;
                 continue;
             }
-            $course = $this->courseIn($path, $row['file']);
+            $course = self::remap($this->courseIn($path, $row['file']), $map);
             $block = is_array($course['catalogue'] ?? null) ? $course['catalogue'] : [];
             try {
                 if ($row['action'] === 'new') {
                     $analysis = $this->portability->analysePackage($course, $row['file']);
                     $categoryId = $this->settings->categoryIdByPath((string) ($block['category'] ?? ''));
+                    if ($categoryId === null && trim((string) ($block['category'] ?? '')) !== '') $categoryId = $this->settings->ensureCategoryPath((string) $block['category'], $userId);
                     $courseId = $this->portability->importChecked($analysis, $categoryId ?? 0, $userId, null, $row['code']);
                     $details = array_merge([$categoryId === null ? 'Uncategorised' : 'Category: ' . $block['category']],
                         $this->settings->apply($courseId, array_diff_key($block, ['category' => true]), $userId, $prices));
@@ -308,25 +400,29 @@ final class CataloguePackage
                     if ($placed !== null) $details[] = 'Position in the catalogue: ' . $placed . ', by its code\'s range';
                     $outcome = array_replace($outcome, ['course_id' => $courseId, 'outcome' => 'imported', 'details' => $details]);
                     $report['counts']['imported']++;
-                    $done[$courseId] = ['block' => $block, 'new' => true];
+                    $done[$courseId] = ['block' => $block, 'new' => true, 'kinds' => ['related']];
                 } else {
                     $courseId = (int) $row['course_id'];
+                    $kinds = self::taken($row, $keep[$row['code']] ?? [], $mayPrice, $mayPublish);
                     $details = [];
-                    if (in_array($row['code'], $replace, true)) {
-                        if ($row['started']) throw new InvalidArgumentException('Learners have started this course, so its content is not replaced.');
+                    $replaced = in_array('content', $kinds, true);
+                    if ($replaced) {
+                        if ($this->portability->hasStartedLearners($courseId)) throw new InvalidArgumentException('Learners have started this course, so its content is not replaced.');
                         $current = $this->repository->findById($courseId) ?? throw new InvalidArgumentException('The course is no longer on the site.');
                         $analysis = $this->portability->analysePackage($course, $row['file']);
                         $this->portability->importChecked($analysis, (int) ($current['category_id'] ?? 0), $userId, $courseId, $row['code']);
-                        $details[] = 'Content replaced with the package\'s';
+                        $details[] = 'Content replaced with the file\'s';
                         $narrated = $this->installNarrations($path, $package['narrations'], $course, $userId);
                         if ($narrated > 0) $details[] = 'Narration: ' . $narrated . ' slides';
                     }
-                    $details = array_merge($details, $this->settings->apply($courseId, $block, $userId, false));
-                    if ($this->portability->adoptFileFrame($courseId, $course)) $details[] = self::FILE_FRAME;
-                    $kind = in_array($row['code'], $replace, true) ? 'replaced' : ($details === [] ? 'unchanged' : 'updated');
-                    $outcome = array_replace($outcome, ['outcome' => $kind === 'replaced' ? 'content replaced' : $kind, 'details' => $details]);
+                    $details = array_merge($details, $this->settings->applyChosen($courseId, $block, $kinds, $userId));
+                    foreach ($row['differences'] as $difference) {
+                        if (str_starts_with($difference['kind'], 'file:')) $details[] = $difference['file'] . (in_array($difference['file'], $keepFiles, true) ? ' kept as this site\'s' : ' replaced with the file\'s');
+                    }
+                    $kind = $replaced ? 'replaced' : 'updated';
+                    $outcome = array_replace($outcome, ['outcome' => $replaced ? 'content replaced' : 'updated', 'details' => $details]);
+                    $done[$courseId] = ['block' => $block, 'new' => false, 'kinds' => $kinds, 'index' => count($report['courses'])];
                     $report['counts'][$kind]++;
-                    $done[$courseId] = ['block' => $block, 'new' => false];
                 }
             } catch (Throwable $failed) {
                 $outcome = array_replace($outcome, ['outcome' => 'failed', 'details' => [$failed->getMessage()]]);
@@ -334,25 +430,212 @@ final class CataloguePackage
             }
             $report['courses'][] = $outcome;
         }
-        // The related courses once every course is in; then the new courses published as they were where they came from.
+        // The related courses once every course is in, then the status: the new courses published as they were where
+        // they came from, a course here given the file's.
         $byId = [];
-        foreach ($report['courses'] as $index => $outcome) if ($outcome['course_id'] !== null) $byId[(int) $outcome['course_id']] = $index;
+        foreach ($report['courses'] as $index => $outcome) if ($outcome['course_id'] !== null && $outcome['outcome'] !== 'failed') $byId[(int) $outcome['course_id']] = $index;
         foreach ($done as $courseId => $course) {
-            $added = $this->settings->relate($courseId, $course['block']);
-            if ($added > 0) $report['courses'][$byId[$courseId]]['details'][] = 'Related courses: ' . $added . ' added';
-            if ($course['new'] && $publish && (string) ($course['block']['status'] ?? '') === 'published') {
+            if (!isset($byId[$courseId])) continue;
+            $index = $byId[$courseId];
+            if (in_array('related', $course['kinds'], true)) {
+                $related = $this->settings->replaceRelated($courseId, $course['block'], $packageRelated);
+                if ($related !== null) $report['courses'][$index]['details'][] = $related;
+            }
+            $status = (string) ($course['block']['status'] ?? '');
+            $wanted = $course['new'] ? ($publish && $status === 'published' ? 'published' : null) : (in_array('status', $course['kinds'], true) ? $status : null);
+            if ($wanted !== null) {
                 try {
-                    // Its warnings were accepted where it was published; an error (no price, say) still keeps it a draft.
-                    $this->courses->changeStatus($courseId, 'published', $userId, true);
-                    $report['courses'][$byId[$courseId]]['details'][] = 'Published';
+                    // Its warnings were accepted where it was published; an error (no price, say) still keeps it as it is.
+                    $this->courses->changeStatus($courseId, $wanted, $userId, true);
+                    $report['courses'][$index]['details'][] = $course['new'] ? 'Published' : 'Status: ' . $wanted;
                 } catch (InvalidArgumentException|RuntimeException $refused) {
-                    $report['courses'][$byId[$courseId]]['details'][] = 'Left as a draft: ' . $refused->getMessage();
+                    $report['courses'][$index]['details'][] = ($course['new'] ? 'Left as a draft: ' : 'Left ' . (string) ($this->repository->findById($courseId)['status'] ?? '') . ': ') . $refused->getMessage();
                 }
             }
+            if (!$course['new'] && $report['courses'][$index]['outcome'] === 'updated' && $report['courses'][$index]['details'] === []) {
+                $report['courses'][$index]['outcome'] = 'unchanged';
+                $report['counts']['updated']--;
+                $report['counts']['unchanged']++;
+            }
         }
-        $this->audit->record($userId, 'catalogue.imported', ['filename' => $plan['filename'], 'catalogue' => $report['catalogue'], 'files_installed' => $report['files_installed'], 'counts' => $report['counts']]);
+        // The bundles once their courses are in (owner, 2026-11-06).
+        $keepBundles = [];
+        foreach ((array) ($choices['keep_bundles'] ?? []) as $code => $kinds) $keepBundles[CourseCode::normalise((string) $code)] = array_map('strval', (array) $kinds);
+        $bundles = $this->bundles?->apply((array) ($package['catalogue']['bundles'] ?? []), $plan['bundles'], $choices['bundles'] ?? null, $userId, $keepBundles) ?? ['bundles' => [], 'counts' => []];
+        $report['bundles'] = $bundles['bundles'];
+        $report['bundle_counts'] = $bundles['counts'] + ['imported' => 0, 'updated' => 0, 'unchanged' => 0, 'left_out' => 0, 'skipped' => 0, 'failed' => 0];
+        $this->audit->record($userId, 'catalogue.imported', ['filename' => $plan['filename'], 'catalogue' => $report['catalogue'], 'files_installed' => $report['files_installed'], 'files_replaced' => $report['files_replaced'], 'counts' => $report['counts'],
+            'bundle_counts' => $report['bundle_counts']]);
         $this->discard($key);
         return $report;
+    }
+
+    /**
+     * The review of one course file at Administration > Courses > Import (an HTML course file or a JSON course package),
+     * by the catalogue's rules (owner, 2026-11-06: "consider the import file to be canonical ... By default, what is in the
+     * import file wins", "The identifier for a json course file is its course code not its contents"): the course with
+     * the file's code is the one it updates, with every difference the file states in words, each taking the file's
+     * version unless Keep this site's is chosen; a course the site lacks is new; a file without a code whose content is
+     * a course here is left out with the code that updates it. An HTML file states no prices, related courses, status,
+     * category, tags, position or page layout (specification 4.11), so none is listed and the site's stays. Changes
+     * nothing.
+     *
+     * @return array<string,mixed> {code, title, kind, course_id, site_title, action (new, update, unchanged or skip),
+     *         reason, differences, started, fingerprint}
+     */
+    public function reviewCourseFile(string $key): array
+    {
+        $analysis = $this->portability->reanalyseImport($key);
+        $staged = $this->portability->stagedFile($key);
+        $kind = $staged['extension'] === 'json' ? 'json' : 'html';
+        $code = CourseCode::normalise((string) ($analysis['course']['code'] ?? ''));
+        $block = is_array($analysis['catalogue'] ?? null) ? $analysis['catalogue'] : [];
+        $row = ['code' => $code, 'title' => trim((string) ($analysis['course']['title'] ?? '')), 'kind' => $kind, 'course_id' => null, 'site_title' => '',
+            'action' => 'new', 'reason' => '', 'differences' => [], 'started' => false];
+        $existing = CourseCode::isValid($code) ? $this->repository->findByCode($code) : null;
+        if ($existing !== null) {
+            $courseId = (int) $existing['id'];
+            $row['course_id'] = $courseId;
+            $row['site_title'] = (string) $existing['title'];
+            $row['started'] = $this->portability->hasStartedLearners($courseId);
+            $content = $kind === 'json'
+                ? $this->contentDifference($courseId, (array) (json_decode((string) file_get_contents($staged['path']), true) ?: []), [])
+                : $this->htmlContentDifference($courseId, $analysis);
+            $found = $content === null ? [] : [['kind' => 'content', 'words' => $content, 'problem' => $row['started'] ? 'Learners have started it, so its content is kept.' : null]];
+            // The file's own related courses only: a course file holds no other course, so the site's other relations stay.
+            $related = array_key_exists('related', $block) ? [$code => array_map('strval', (array) $block['related'])] : [];
+            $row['differences'] = self::choosable(array_merge($found, $this->settings->differences($existing, $block, $related, [])));
+            $row['action'] = $row['differences'] === [] ? 'unchanged' : 'update';
+        } elseif (CourseCode::isValid($code) && $this->repository->bundleWithCode($code) !== null) {
+            $row = ['action' => 'skip', 'reason' => 'The code ' . $code . ' is a bundle\'s here. A code names one course or one bundle, so give the course a code of its own in the file and import it again.'] + $row;
+        } else {
+            $conflicts = array_values(array_map('strval', (array) ($analysis['key_conflicts'] ?? [])));
+            $holderId = $conflicts === [] ? null : $this->portability->courseHoldingConflicts($analysis);
+            $holder = $holderId === null ? null : $this->repository->findById($holderId);
+            $where = $kind === 'html' ? 'in the file\'s head as <meta name="cattolms:course-code" content="' . ($holder['code'] ?? '') . '">' : 'as the course\'s code in the file';
+            if ($holder !== null) {
+                $row = ['action' => 'skip', 'course_id' => (int) $holder['id'], 'reason' => 'Its content is already on the site as “' . $holder['title'] . '” (' . $holder['code'] . '). An import knows a course by its code alone, so it would make a second copy. To update that course from this file, put its code, ' . $holder['code'] . ', ' . $where . ', and import it again.'] + $row;
+            } elseif ($conflicts !== []) {
+                $row = ['action' => 'skip', 'reason' => implode(' ', $conflicts)] + $row;
+            }
+        }
+        $row['fingerprint'] = hash('sha256', (string) json_encode([$row['code'], $row['course_id'], $row['action'], $row['reason'], array_column($row['differences'], 'words'), array_column($row['differences'], 'choosable')], JSON_THROW_ON_ERROR));
+        return $row;
+    }
+
+    /**
+     * Imports one staged course file as its review chose (reviewCourseFile()), and answers what was done: a new course
+     * as a draft, with the file's settings; a course already here given the file's version of every difference but those
+     * kept (keep: content, cover, tags, category, prices, position, page_layout, related, status), nothing replaced kept.
+     * An import whose review is out of date is refused and changes nothing.
+     *
+     * @param array{fingerprint?:string,keep?:list<string>,may_price?:bool,may_publish?:bool,category_id?:int,code?:string} $choices
+     * @return array{course_id:int,code:string,outcome:string,details:list<string>}
+     */
+    public function importCourseFile(string $key, array $choices, int $userId): array
+    {
+        $row = $this->reviewCourseFile($key);
+        if (isset($choices['fingerprint']) && !hash_equals($row['fingerprint'], (string) $choices['fingerprint'])) {
+            throw new InvalidArgumentException('Something on this site changed after the review was drawn, so nothing was imported. Check the review again, then import.');
+        }
+        if ($row['action'] === 'skip') throw new InvalidArgumentException($row['reason']);
+        if ($row['action'] === 'new') {
+            $courseId = $this->portability->commitImport($key, (int) ($choices['category_id'] ?? 0), $userId, null, (string) ($choices['code'] ?? ''));
+            $code = (string) ($this->repository->findById($courseId)['code'] ?? '');
+            $this->audit->record($userId, 'course.file_imported', ['course_id' => $courseId, 'code' => $code, 'outcome' => 'imported']);
+            return ['course_id' => $courseId, 'code' => $code, 'outcome' => 'imported', 'details' => []];
+        }
+        $courseId = (int) $row['course_id'];
+        $kinds = self::taken($row, array_map('strval', (array) ($choices['keep'] ?? [])), (bool) ($choices['may_price'] ?? true), (bool) ($choices['may_publish'] ?? true));
+        $analysis = $this->portability->reanalyseImport($key);
+        $block = is_array($analysis['catalogue'] ?? null) ? $analysis['catalogue'] : [];
+        $details = [];
+        if (in_array('content', $kinds, true)) {
+            if ($this->portability->hasStartedLearners($courseId)) throw new InvalidArgumentException('Learners have started this course, so its content is not replaced.');
+            $current = $this->repository->findById($courseId) ?? throw new InvalidArgumentException('The course is no longer on the site.');
+            // Its own category stays unless the file's is taken below; its status is kept by the replace.
+            $this->portability->commitImport($key, (int) ($current['category_id'] ?? 0), $userId, $courseId, $row['code'], false);
+            $details[] = 'Content replaced with the file\'s';
+        } else {
+            $this->portability->discardImport($key);
+        }
+        $details = array_merge($details, $this->settings->applyChosen($courseId, $block, $kinds, $userId));
+        if (in_array('related', $kinds, true)) {
+            $related = $this->settings->replaceRelated($courseId, $block, [$row['code'] => array_map('strval', (array) ($block['related'] ?? []))]);
+            if ($related !== null) $details[] = $related;
+        }
+        $status = (string) ($block['status'] ?? '');
+        if (in_array('status', $kinds, true) && $status !== '') {
+            try {
+                $this->courses->changeStatus($courseId, $status, $userId, true);
+                $details[] = 'Status: ' . $status;
+            } catch (InvalidArgumentException|RuntimeException $refused) {
+                $details[] = 'Left ' . (string) ($this->repository->findById($courseId)['status'] ?? '') . ': ' . $refused->getMessage();
+            }
+        }
+        $outcome = $details === [] ? 'unchanged' : (in_array('content', $kinds, true) ? 'content replaced' : 'updated');
+        $this->audit->record($userId, 'course.file_imported', ['course_id' => $courseId, 'code' => $row['code'], 'outcome' => $outcome, 'kept' => array_values(array_diff(array_column($row['differences'], 'kind'), $kinds))]);
+        return ['course_id' => $courseId, 'code' => $row['code'], 'outcome' => $outcome, 'details' => $details];
+    }
+
+    /**
+     * Whether an HTML course file's content is this course's here: the file and the course's own course file read the
+     * same way (CoursePortabilityService::analyseCourseHtml), so like is compared with like, field by field, part by part,
+     * with the order of the parts, their names, its grades and the page of the file. Only what the file states is
+     * compared (CoursePortabilityService::statedByHtml). Null when it is the same, else the words for the review.
+     *
+     * @param array<string,mixed> $file the file's analysis
+     */
+    private function htmlContentDifference(int $courseId, array $file): ?string
+    {
+        if ($this->courseFile === null) return 'Content: the file\'s replaces this site\'s';
+        $site = $this->portability->analyseCourseHtml($this->courseFile->fromCourse($courseId)['html'], 'site.html');
+        $said = [];
+        $fileCourse = array_diff_key(CoursePortabilityService::statedByHtml((array) ($file['course'] ?? [])), ['code' => true, 'source_filename' => true]);
+        foreach ($fileCourse as $field => $value) {
+            if (self::canon($site['course'][$field] ?? null) !== self::canon($value)) $said[] = self::COURSE_FIELDS[$field] ?? str_replace('_', ' ', (string) $field);
+        }
+        $keyed = static function (array $analysis): array {
+            $items = [];
+            foreach ((array) ($analysis['course_items'] ?? []) as $item) if (is_array($item)) $items[(string) ($item['item_key'] ?? '')] = self::part($item, [], null);
+            return $items;
+        };
+        [$fileItems, $siteItems] = [$keyed($file), $keyed($site)];
+        $changed = $added = [];
+        foreach ($fileItems as $key => $item) {
+            if (!isset($siteItems[$key])) { $added[] = self::partName($item); continue; }
+            if (self::canon($siteItems[$key]) !== self::canon($item)) $changed[] = self::partName($item);
+        }
+        $removed = array_values(array_map(self::partName(...), array_diff_key($siteItems, $fileItems)));
+        if ($changed !== []) $said[] = self::counted(count($changed), 'part', 'parts') . ' (' . self::shortList($changed) . ')';
+        if ($added !== []) $said[] = self::counted(count($added), 'part', 'parts') . ' it adds (' . self::shortList($added) . ')';
+        if ($removed !== []) $said[] = self::counted(count($removed), 'part', 'parts') . ' it takes away (' . self::shortList($removed) . ')';
+        if (self::canon(self::structure((array) ($site['structure'] ?? []))) !== self::canon(self::structure((array) ($file['structure'] ?? [])))) $said[] = 'the order of its parts';
+        if (self::canon((array) ($site['part_names'] ?? [])) !== self::canon((array) ($file['part_names'] ?? []))) $said[] = 'the names of its parts';
+        if (self::canon($site['grade_bands'] ?? []) !== self::canon($file['grade_bands'] ?? [])) $said[] = 'its grades';
+        if (self::canon($this->portability->exportCourse($courseId)['file_frame'] ?? null) !== self::canon($file['file_frame'] ?? null)) $said[] = 'the page of its HTML file';
+        return $said === [] ? null : 'Content: the file\'s differs in ' . self::andList(array_values(array_unique($said)));
+    }
+
+    /**
+     * The differences of a course already here that take the file's version: all but those kept, those with a problem,
+     * and the price and status without the permission to change them.
+     *
+     * @param array<string,mixed> $row
+     * @param list<string> $keep
+     * @return list<string>
+     */
+    private static function taken(array $row, array $keep, bool $mayPrice, bool $mayPublish): array
+    {
+        $kinds = [];
+        foreach ((array) $row['differences'] as $difference) {
+            $kind = (string) $difference['kind'];
+            // A file is the package's, not one course's: installFiles() replaces it or keeps it by its name.
+            if (str_starts_with($kind, 'file:') || $difference['problem'] !== null || in_array($kind, $keep, true)) continue;
+            if (($kind === 'prices' && !$mayPrice) || ($kind === 'status' && !$mayPublish)) continue;
+            $kinds[] = $kind;
+        }
+        return $kinds;
     }
 
     /**
@@ -379,20 +662,23 @@ final class CataloguePackage
     }
 
     /**
-     * One course of the package: new, already here (with what would change), or left out and why.
+     * One course of the package: new, already here (with every difference from the file, in words), or left out and why.
      *
-     * @param array<string,mixed> $data
+     * @param array<string,mixed> $data its package, its files' references already this site's where the site has them
      * @param array<string,true> $inPackage the files the package carries, by public id
      * @param array<string,true> $codes the codes seen so far in the package
      * @param array<string,true> $slugs the slugs seen so far in the package
+     * @param array<string,list<string>> $packageRelated by the code of every course in the package, the codes it relates to
+     * @param array<string,string> $narrations the package's narration clips, by public id
+     * @param array<string,array<string,mixed>> $files planFiles()
      * @return array<string,mixed>
      */
-    private function planCourse(string $name, array $data, array $inPackage, array &$codes, array &$slugs): array
+    private function planCourse(string $name, array $data, array $inPackage, array &$codes, array &$slugs, array $packageRelated, array $narrations, array $files): array
     {
         $course = is_array($data['course'] ?? null) ? $data['course'] : [];
         $block = is_array($data['catalogue'] ?? null) ? $data['catalogue'] : [];
         $row = ['file' => $name, 'code' => CourseCode::normalise((string) ($course['code'] ?? '')), 'title' => trim((string) ($course['title'] ?? '')) ?: $name,
-            'slug' => (string) ($course['slug'] ?? ''), 'action' => 'skip', 'reason' => '', 'changes' => [], 'course_id' => null, 'started' => false,
+            'slug' => (string) ($course['slug'] ?? ''), 'action' => 'skip', 'reason' => '', 'changes' => [], 'differences' => [], 'notes' => [], 'course_id' => null, 'started' => false,
             'category' => (string) ($block['category'] ?? ''), 'status' => (string) ($block['status'] ?? 'draft')];
         try {
             $analysis = $this->portability->analysePackage($data, $name);
@@ -405,13 +691,23 @@ final class CataloguePackage
         }
         if (isset($codes[$row['code']])) return ['reason' => 'Another course in this package has the code ' . $row['code'] . '.'] + $row;
         $codes[$row['code']] = true;
+        // The files it uses, said once, under the first of the package's courses that uses each.
+        foreach ($files as $file) {
+            if (($file['courses'][0] ?? null) !== $row['code']) continue;
+            $others = array_values(array_diff($file['used_by'], [$row['code']]));
+            $also = $others === [] ? '' : ' (also used by ' . self::andList($others) . ')';
+            if ($file['state'] === 'differs') $row['differences'][] = ['kind' => 'file:' . $file['key'], 'file' => $file['name'], 'words' => $file['name'] . ' differs and will be replaced' . $also, 'problem' => null];
+            if ($file['state'] === 'new') $row['notes'][] = $file['name'] . ' is new here and is added';
+        }
 
         $existing = $this->repository->findByCode($row['code']);
         if ($existing !== null) {
             $row['course_id'] = (int) $existing['id'];
             $row['started'] = $this->portability->hasStartedLearners((int) $existing['id']);
-            $row['changes'] = $this->settings->changes($existing, $block, false);
-            if ($this->portability->lacksFileFrame((int) $existing['id'], $data)) $row['changes'][] = self::FILE_FRAME;
+            $content = $this->contentDifference((int) $existing['id'], $data, $narrations);
+            $found = $content === null ? [] : [['kind' => 'content', 'words' => $content, 'problem' => $row['started'] ? 'Learners have started it, so its content is kept.' : null]];
+            $row['differences'] = self::choosable(array_merge($found, $this->settings->differences($existing, $block, $packageRelated, $this->packageCategoryPaths), $row['differences']));
+            $row['changes'] = array_column($row['differences'], 'words');
             $row['action'] = $row['changes'] === [] ? 'unchanged' : 'update';
             $row['site_title'] = (string) $existing['title'];
             return $row;
@@ -432,14 +728,364 @@ final class CataloguePackage
                 : implode(' ', $conflicts)] + $row;
         }
         $row['action'] = 'new';
-        $row['changes'] = [$row['category'] !== '' ? 'Category: ' . $row['category'] . ($this->settings->categoryIdByPath($row['category']) === null && !$this->categoryInPackage($row['category']) ? ' (not in the package: uncategorised)' : '') : 'Uncategorised'];
+        // A new course has nothing here to differ from but the files it shares with courses here.
+        $row['differences'] = self::choosable($row['differences']);
+        $row['changes'] = [$row['category'] !== '' ? 'Category: ' . $row['category'] . ($this->settings->categoryIdByPath($row['category']) === null ? ' (made by this import)' : '') : 'Uncategorised'];
         return $row;
     }
 
-    /** Whether the package's own categories include this path (the package read last). */
-    private function categoryInPackage(string $path): bool
+    /**
+     * Each difference marked whether the file's version can be chosen: not when it has a problem here.
+     *
+     * @param list<array<string,mixed>> $differences
+     * @return list<array<string,mixed>>
+     */
+    private static function choosable(array $differences): array
     {
-        return in_array($path, $this->packageCategoryPaths, true);
+        return array_map(static fn(array $difference): array => $difference + ['choosable' => ($difference['problem'] ?? null) === null], $differences);
+    }
+
+    /**
+     * Whether the file's content is this course's here (owner, 2026-11-06: "The identifier for a json course file is its
+     * course code not its contents"): its words and settings, its parts, their order and its grades, as the file states
+     * them, its files by the names the parts link and its narration by what each clip holds. Null when it is the same,
+     * else the words for the review.
+     *
+     * @param array<string,mixed> $file the course's package
+     * @param array<string,string> $narrations the package's clips, by public id
+     */
+    private function contentDifference(int $courseId, array $file, array $narrations): ?string
+    {
+        $site = json_decode(self::json($this->portability->exportCourse($courseId)), true, 512, JSON_THROW_ON_ERROR);
+        $said = [];
+        $fileCourse = array_diff_key((array) ($file['course'] ?? []), ['public_id' => true, 'code' => true]);
+        if (($fileCourse['estimated_minutes'] ?? null) === null) unset($fileCourse['estimated_minutes']);
+        foreach ($fileCourse as $field => $value) {
+            if (self::canon(self::project($site['course'][$field] ?? null, $value)) !== self::canon($value)) $said[] = self::COURSE_FIELDS[$field] ?? str_replace('_', ' ', (string) $field);
+        }
+        $fileNames = self::resourceNames((array) ($file['resources'] ?? []));
+        $siteNames = self::resourceNames((array) ($site['resources'] ?? []));
+        $fileItems = [];
+        foreach ((array) ($file['course_items'] ?? []) as $item) if (is_array($item)) $fileItems[(string) ($item['item_key'] ?? '')] = self::part($item, $fileNames, $narrations);
+        $siteItems = [];
+        foreach ((array) ($site['course_items'] ?? []) as $item) if (is_array($item)) $siteItems[(string) ($item['item_key'] ?? '')] = self::part($item, $siteNames, null);
+        $changed = [];
+        $added = [];
+        foreach ($fileItems as $key => $item) {
+            if (!isset($siteItems[$key])) { $added[] = self::partName($item); continue; }
+            if (self::canon(self::project($siteItems[$key], $item)) !== self::canon($item)) $changed[] = self::partName($item);
+        }
+        $removed = array_values(array_map(self::partName(...), array_diff_key($siteItems, $fileItems)));
+        if ($changed !== []) $said[] = self::counted(count($changed), 'part', 'parts') . ' (' . self::shortList($changed) . ')';
+        if ($added !== []) $said[] = self::counted(count($added), 'part', 'parts') . ' it adds (' . self::shortList($added) . ')';
+        if ($removed !== []) $said[] = self::counted(count($removed), 'part', 'parts') . ' it takes away (' . self::shortList($removed) . ')';
+        $fileStructure = self::structure((array) ($file['structure'] ?? []));
+        if (self::canon(self::project(self::structure((array) ($site['structure'] ?? [])), $fileStructure)) !== self::canon($fileStructure)) $said[] = 'the order of its parts';
+        if (array_key_exists('grade_bands', $file) && self::canon(self::project($site['grade_bands'] ?? [], $file['grade_bands'])) !== self::canon($file['grade_bands'])) $said[] = 'its grades';
+        // A package that carries no frame leaves the course none (2026-11-07): a frame from an earlier file is never kept.
+        if (self::canon($site['file_frame'] ?? null) !== self::canon($file['file_frame'] ?? null)) $said[] = 'the page of its HTML file';
+        return $said === [] ? null : 'Content: the file\'s differs in ' . self::andList(array_values(array_unique($said)));
+    }
+
+    /** What each of a course's own fields is called in the review. */
+    private const COURSE_FIELDS = ['slug' => 'its address', 'title' => 'the title', 'subtitle' => 'the subtitle', 'summary' => 'the summary', 'description_html' => 'the description',
+        'level' => 'the level', 'estimated_minutes' => 'the study time', 'default_access_period_seconds' => 'the access period', 'first_module_number' => 'the first module\'s number',
+        'introduction_html' => 'the introduction', 'certificate_enabled' => 'whether it gives a certificate', 'certificate_accreditation' => 'the accreditation line',
+        'course_style_key' => 'the course style', 'presentation_css' => 'the styling on its CSS tab'];
+
+    /**
+     * A part as it is compared: its file by name, its narration by what each clip holds (the package's clips only those
+     * it carries), never the ids and times an import makes anew.
+     *
+     * @param array<string,mixed> $item
+     * @param array<string,string> $names
+     * @param array<string,string>|null $carried the package's clips, by public id; null for the site's own
+     * @return array<string,mixed>
+     */
+    private static function part(array $item, array $names, ?array $carried): array
+    {
+        foreach (['resource_public_id'] as $field) {
+            if (!empty($item[$field])) $item[$field] = $names[(string) $item[$field]] ?? (string) $item[$field];
+        }
+        foreach (['poster_resource_public_id', 'subtitle_resource_public_id'] as $field) {
+            if (is_array($item['type_config'] ?? null) && !empty($item['type_config'][$field])) $item['type_config'][$field] = $names[(string) $item['type_config'][$field]] ?? (string) $item['type_config'][$field];
+        }
+        if (array_key_exists('narrations', $item)) {
+            $clips = [];
+            foreach ((array) $item['narrations'] as $clip) {
+                if (!is_array($clip) || ($carried !== null && !isset($carried[(string) ($clip['public_id'] ?? '')]))) continue;
+                unset($clip['public_id']);
+                $clips[(string) ($clip['slide_id'] ?? '')] = $clip;
+            }
+            ksort($clips);
+            $item['narrations'] = array_values($clips);
+        }
+        return self::unstamped($item);
+    }
+
+    /**
+     * A part without what every import makes anew: its questions' and options' public ids and when they were made.
+     *
+     * @param array<mixed> $value
+     * @return array<mixed>
+     */
+    private static function unstamped(array $value): array
+    {
+        unset($value['public_id'], $value['created_at'], $value['updated_at']);
+        foreach ($value as $key => $inner) if (is_array($inner)) $value[$key] = self::unstamped($inner);
+        return $value;
+    }
+
+    /** @param array<string,mixed> $item */
+    private static function partName(array $item): string
+    {
+        return trim((string) ($item['name'] ?? '')) ?: (trim((string) ($item['title'] ?? '')) ?: (string) ($item['item_key'] ?? ''));
+    }
+
+    /**
+     * A course's rows with their keys made their places, which are what an import keeps.
+     *
+     * @param list<mixed> $rows
+     * @return list<array<string,mixed>>
+     */
+    private static function structure(array $rows): array
+    {
+        $place = [];
+        foreach ($rows as $index => $row) if (is_array($row) && (string) ($row['node_key'] ?? '') !== '') $place[(string) $row['node_key']] = 'row ' . ($index + 1);
+        $out = [];
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) continue;
+            $row['node_key'] = 'row ' . ($index + 1);
+            if (array_key_exists('parent_node_key', $row)) $row['parent_node_key'] = $row['parent_node_key'] === null || $row['parent_node_key'] === '' ? null : ($place[(string) $row['parent_node_key']] ?? (string) $row['parent_node_key']);
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /**
+     * Files by public id, named as the courses link them.
+     *
+     * @param list<mixed> $resources
+     * @return array<string,string>
+     */
+    private static function resourceNames(array $resources): array
+    {
+        $names = [];
+        foreach ($resources as $resource) {
+            if (is_array($resource) && (string) ($resource['public_id'] ?? '') !== '') $names[(string) $resource['public_id']] = self::fileName($resource, '');
+        }
+        return $names;
+    }
+
+    /**
+     * The site's value with only what the file states: a key the file has not is the site's own business, and an empty
+     * list in the file says nothing.
+     */
+    private static function project(mixed $site, mixed $file): mixed
+    {
+        if (is_array($file) && $file === []) return [];
+        if (!is_array($file) || !is_array($site)) return $site;
+        if (array_is_list($file) && array_is_list($site)) {
+            $out = [];
+            foreach ($site as $index => $value) $out[] = array_key_exists($index, $file) ? self::project($value, $file[$index]) : $value;
+            return $out;
+        }
+        if (array_is_list($file)) return $site;
+        $out = [];
+        foreach ($file as $key => $value) $out[$key] = array_key_exists($key, $site) ? self::project($site[$key], $value) : null;
+        return $out;
+    }
+
+    /** A value as it is compared: keys in order, nothing told apart that the site does not tell apart (null and '', 1 and '1'). */
+    private static function canon(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            if ($value === []) return [];
+            if (!array_is_list($value)) ksort($value);
+            return array_map(self::canon(...), $value);
+        }
+        if ($value === null) return '';
+        if (is_bool($value)) return $value ? '1' : '0';
+        if (is_int($value) || is_float($value)) return (string) (0 + $value);
+        return is_string($value) ? $value : (string) json_encode($value);
+    }
+
+    /** @param list<string> $names */
+    private static function shortList(array $names): string
+    {
+        return count($names) <= 3 ? implode(', ', $names) : implode(', ', array_slice($names, 0, 3)) . ' and ' . (count($names) - 3) . ' more';
+    }
+
+    /** @param list<string> $words "a, b and c" */
+    private static function andList(array $words): string
+    {
+        return count($words) < 2 ? implode('', $words) : implode(', ', array_slice($words, 0, -1)) . ' and ' . $words[count($words) - 1];
+    }
+
+    private static function counted(int $count, string $one, string $many): string
+    {
+        return $count . ' ' . ($count === 1 ? $one : $many);
+    }
+
+    /**
+     * Each course of the package read once for what the files need: its code, the files it describes and the files its
+     * parts use, by public id.
+     *
+     * @param array{courses:list<array{name:string}>} $package
+     * @return list<array{name:string,code:string,resources:array<string,array<string,mixed>>,uses:list<string>,related:list<string>}>
+     */
+    private function summaries(string $path, array $package): array
+    {
+        $summaries = [];
+        foreach ($package['courses'] as $entry) {
+            $data = $this->courseIn($path, $entry['name']);
+            $described = [];
+            foreach ((array) ($data['resources'] ?? []) as $resource) if (is_array($resource) && (string) ($resource['public_id'] ?? '') !== '') $described[(string) $resource['public_id']] = $resource;
+            $related = array_values(array_map(static fn(mixed $code): string => CourseCode::normalise((string) $code), (array) ($data['catalogue']['related'] ?? [])));
+            $summaries[] = ['name' => $entry['name'], 'code' => CourseCode::normalise((string) ($data['course']['code'] ?? '')), 'resources' => $described, 'uses' => array_keys(self::references($data)), 'related' => $related];
+        }
+        return $summaries;
+    }
+
+    /**
+     * Each of the package's courses by its code with the codes its file relates it to.
+     *
+     * @param list<array{code:string,related:list<string>}> $summaries
+     * @return array<string,list<string>>
+     */
+    private static function relatedIn(array $summaries): array
+    {
+        $related = [];
+        foreach ($summaries as $summary) if ($summary['code'] !== '') $related[$summary['code']] = $summary['related'];
+        return $related;
+    }
+
+    /**
+     * The files a course's parts use, by public id: a part's own file, and a video's poster and captions.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,true>
+     */
+    private static function references(array $data): array
+    {
+        $used = [];
+        foreach ((array) ($data['course_items'] ?? []) as $item) {
+            if (!is_array($item)) continue;
+            if ((string) ($item['resource_public_id'] ?? '') !== '') $used[(string) $item['resource_public_id']] = true;
+            foreach (['poster_resource_public_id', 'subtitle_resource_public_id'] as $field) {
+                if (is_array($item['type_config'] ?? null) && (string) ($item['type_config'][$field] ?? '') !== '') $used[(string) $item['type_config'][$field]] = true;
+            }
+        }
+        return $used;
+    }
+
+    /**
+     * Each file of the package, known by the name the courses link (owner, 2026-11-06: supporting files are identified
+     * by the name the course links, never by a hidden id): new here, the same as the site's file of that name, or
+     * different from it; with the courses of the package that use it and every course that would see a replacement.
+     *
+     * @param array{files:array<string,string>} $package
+     * @param list<array{name:string,code:string,resources:array<string,array<string,mixed>>,uses:list<string>}> $summaries
+     * @return array<string,array{key:string,name:string,public_id:string,entry:string,state:string,resource_id:?int,site_public_id:?string,used_by:list<string>,courses:list<string>,about:array<string,mixed>}>
+     */
+    private function planFiles(string $path, array $package, array $summaries): array
+    {
+        if ($package['files'] === []) return [];
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) throw new InvalidArgumentException('The catalogue package cannot be read.');
+        $files = [];
+        try {
+            foreach ($package['files'] as $publicId => $entry) {
+                $publicId = (string) $publicId;
+                $about = [];
+                $courses = [];
+                foreach ($summaries as $summary) {
+                    $about = $about === [] ? ($summary['resources'][$publicId] ?? []) : $about;
+                    if (in_array($publicId, $summary['uses'], true) && $summary['code'] !== '') $courses[] = $summary['code'];
+                }
+                $name = self::fileName($about, basename($entry));
+                $site = $this->items->resourceByFilename($name);
+                $state = 'new';
+                if ($site !== null) {
+                    $here = $this->resources->path($site);
+                    $bytes = $zip->getFromName($entry);
+                    $state = $bytes !== false && is_file($here) && hash('sha256', $bytes) === hash_file('sha256', $here) ? 'same' : 'differs';
+                }
+                $usedBy = $site === null ? [] : $this->repository->courseCodesUsingResource((int) $site['id']);
+                $files[$publicId] = ['key' => substr(hash('sha256', $name), 0, 16), 'name' => $name, 'public_id' => $publicId, 'entry' => $entry, 'state' => $state,
+                    'resource_id' => $site === null ? null : (int) $site['id'], 'site_public_id' => $site === null ? null : (string) $site['public_id'],
+                    'used_by' => array_values(array_unique(array_merge($usedBy, $courses))), 'courses' => $courses, 'about' => $about];
+            }
+        } finally {
+            $zip->close();
+        }
+        return $files;
+    }
+
+    /**
+     * The name a course links a file by: the name it was first uploaded under, else its file's name.
+     *
+     * @param array<string,mixed> $about
+     */
+    private static function fileName(array $about, string $fallback): string
+    {
+        return trim((string) ($about['original_filename'] ?? '')) ?: (trim((string) ($about['filename'] ?? '')) ?: $fallback);
+    }
+
+    /**
+     * The package's public ids of the files this site already has by name, each the site's own.
+     *
+     * @param array<string,array<string,mixed>> $files planFiles()
+     * @return array<string,string>
+     */
+    private static function siteIds(array $files): array
+    {
+        $map = [];
+        foreach ($files as $publicId => $file) if ($file['site_public_id'] !== null) $map[(string) $publicId] = (string) $file['site_public_id'];
+        return $map;
+    }
+
+    /**
+     * A course's package with its files named by the site's own public ids, as the import places them.
+     *
+     * @param array<string,mixed> $data
+     * @param array<string,string> $map the package's public id => the site's
+     * @return array<string,mixed>
+     */
+    private static function remap(array $data, array $map): array
+    {
+        if ($map === []) return $data;
+        foreach ((array) ($data['course_items'] ?? []) as $index => $item) {
+            if (!is_array($item)) continue;
+            $id = (string) ($item['resource_public_id'] ?? '');
+            if ($id !== '' && isset($map[$id])) $data['course_items'][$index]['resource_public_id'] = $map[$id];
+            foreach (['poster_resource_public_id', 'subtitle_resource_public_id'] as $field) {
+                $id = is_array($item['type_config'] ?? null) ? (string) ($item['type_config'][$field] ?? '') : '';
+                if ($id !== '' && isset($map[$id])) $data['course_items'][$index]['type_config'][$field] = $map[$id];
+            }
+        }
+        foreach ((array) ($data['resources'] ?? []) as $index => $resource) {
+            $id = is_array($resource) ? (string) ($resource['public_id'] ?? '') : '';
+            if ($id !== '' && isset($map[$id])) $data['resources'][$index]['public_id'] = $map[$id];
+        }
+        return $data;
+    }
+
+    /**
+     * What importing the package's bundles would do: each known by its code, its courses found in the package (those not
+     * left out) or on the site.
+     *
+     * @param array<string,mixed> $package
+     * @param list<array<string,mixed>> $courses the plan's courses
+     * @return list<array<string,mixed>>
+     */
+    private function planBundles(array $package, array $courses): array
+    {
+        $entries = $package['catalogue']['bundles'] ?? [];
+        if ($this->bundles === null || !is_array($entries) || $entries === []) return [];
+        $brought = [];
+        foreach ($courses as $row) if ($row['action'] !== 'skip' && $row['code'] !== '') $brought[(string) $row['code']] = true;
+        return $this->bundles->plan(array_values($entries), $brought);
     }
 
     /**
@@ -507,34 +1153,69 @@ final class CataloguePackage
     }
 
     /**
-     * Installs the package's files that are not on the site yet, for the courses that use them.
+     * Puts the package's files on the site by name, for the courses being imported (a file only courses left out use
+     * stays out): one the site lacks is added, with its public id when that is free here; one that differs has its
+     * contents replaced in place, its record and public id kept, so every course using it has the new file and the old
+     * contents are gone (owner, 2026-11-06: "Do not retain or backup what is being replaced"), unless ADMIN chose to
+     * keep this site's. Answers the package's public ids as the site's, and how many were added and replaced.
      *
-     * @param array<string,string> $files entry name by public id
-     * @param list<array{name:string}> $courses
+     * @param list<array<string,mixed>> $files the plan's files
+     * @param list<string> $taking the codes of the courses being imported
+     * @param list<string> $keep the names of the files kept as this site's
+     * @return array{0:array<string,string>,1:int,2:int}
      */
-    private function installFiles(string $path, array $files, array $courses, int $userId): int
+    private function installFiles(string $path, array $files, array $taking, array $keep, int $userId): array
     {
-        if ($files === []) return 0;
-        $described = [];
-        foreach ($courses as $entry) foreach ((array) ($this->courseIn($path, $entry['name'])['resources'] ?? []) as $resource) {
-            if (is_array($resource) && isset($resource['public_id'])) $described[(string) $resource['public_id']] = $resource;
-        }
+        if ($files === []) return [[], 0, 0];
         $zip = new ZipArchive();
         if ($zip->open($path, ZipArchive::RDONLY) !== true) throw new InvalidArgumentException('The catalogue package cannot be opened.');
+        $map = [];
         $installed = 0;
-        foreach ($files as $publicId => $entryName) {
-            if ($this->items->resourceByPublicId((string) $publicId) !== null) continue;
-            $bytes = $zip->getFromName($entryName);
-            if ($bytes === false) continue;
-            $about = $described[$publicId] ?? [];
-            $this->resources->install((string) $publicId, basename($entryName), $bytes, [
-                'title' => (string) ($about['title'] ?? basename($entryName)), 'description' => (string) ($about['description'] ?? ''),
-                'resource_type' => (string) ($about['resource_type'] ?? ''), 'original_filename' => (string) ($about['original_filename'] ?? basename($entryName)),
-            ], $userId);
-            $installed++;
+        $replaced = 0;
+        $byName = [];
+        try {
+            foreach ($files as $file) {
+                $publicId = (string) $file['public_id'];
+                if ($file['courses'] !== [] && array_intersect($file['courses'], $taking) === []) continue;
+                if (isset($byName[$file['name']])) { $map[$publicId] = $byName[$file['name']]; continue; }
+                if ($file['state'] !== 'new') {
+                    $map[$publicId] = $byName[$file['name']] = (string) $file['site_public_id'];
+                    if ($file['state'] === 'differs' && !in_array($file['name'], $keep, true)) {
+                        $bytes = $zip->getFromName((string) $file['entry']);
+                        if ($bytes === false) continue;
+                        $this->replaceContents((int) $file['resource_id'], $bytes);
+                        $replaced++;
+                    }
+                    continue;
+                }
+                $bytes = $zip->getFromName((string) $file['entry']);
+                if ($bytes === false) continue;
+                $about = (array) $file['about'];
+                $id = $this->items->resourceByPublicId($publicId) === null ? $publicId : \CattoLearning\Support\Uuid::v4();
+                $this->resources->install($id, basename((string) $file['entry']), $bytes, [
+                    'title' => (string) ($about['title'] ?? $file['name']), 'description' => (string) ($about['description'] ?? ''),
+                    'resource_type' => (string) ($about['resource_type'] ?? ''), 'original_filename' => (string) $file['name'],
+                ], $userId);
+                $map[$publicId] = $byName[$file['name']] = $id;
+                $installed++;
+            }
+        } finally {
+            $zip->close();
         }
-        $zip->close();
-        return $installed;
+        return [$map, $installed, $replaced];
+    }
+
+    /** A Resource Library file's contents replaced by the package's, the record kept and the old contents gone. */
+    private function replaceContents(int $resourceId, string $bytes): void
+    {
+        $resource = $this->items->resource($resourceId) ?? throw new InvalidArgumentException('The file is no longer on the site.');
+        $target = $this->resources->path($resource);
+        $temporary = $target . '.import-' . bin2hex(random_bytes(4));
+        if (file_put_contents($temporary, $bytes, LOCK_EX) === false || !rename($temporary, $target)) {
+            @unlink($temporary);
+            throw new RuntimeException('The file ' . $resource['filename'] . ' could not be replaced.');
+        }
+        $this->repository->recordResourceContents($resourceId, strlen($bytes), (new \finfo(FILEINFO_MIME_TYPE))->file($target) ?: (string) $resource['mime_type']);
     }
 
     /**

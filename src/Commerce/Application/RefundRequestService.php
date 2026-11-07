@@ -123,7 +123,7 @@ final class RefundRequestService
             $gross = $company ? intdiv((int) $item['amount_minor'], max(1, (int) $item['quantity'])) * (int) $row['quantity'] : $left;
             $quote = $this->refunds->quote($order, $item, $gross, (string) $row['destination']);
             $row['title'] = (string) ($snapshot['course_title'] ?? $snapshot['bundle_title'] ?? 'Order line');
-            $row['order_label'] = 'CL-' . sprintf('%08d', (int) $row['order_id']);
+            $row['order_label'] = \CattoLearning\Commerce\Domain\OrderNumber::format((int) $row['order_id']);
             $row['paid_label'] = Money::strictMinorUnits(RefundAdministrationService::paidAmount($item), (string) $row['currency'])->format();
             $row['net_label'] = Money::ofMinorUnits($quote['net'] + $quote['wallet_part'], (string) $row['currency'])->format();
             $row['quote'] = $quote;

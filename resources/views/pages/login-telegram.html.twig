@@ -1,0 +1,35 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		A Telegram sign-in's code (owner, 2026-11-05, the approved mockup). The same page whether or not the account exists or has
+		Telegram, and whether or not a message went: it says only that one is on its way if the account has Telegram connected.
+		The code works only in this browser; the link in the message works in any.
+	#}
+	{% set ph_kicker = 'Passwordless access' %}
+	{% set ph_title = 'Check your Telegram' %}
+	{% set ph_lead = 'If this account has Telegram connected, a message is on its way. Open the link in it, or type its code here.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+				{% if resent|default(false) %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p class="mb-0" role="status" data-telegram-resent>A new message is on its way. The older code no longer works.</p>{% endblock %}{% endembed %}{% endif %}
+				<form action="/login/telegram" method="post" class="cl-sign-in-code" novalidate>
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: '6-digit code', full_width: true, for: 'telegram-code'})} %}
+{% block control %}<input class="cl-input cl-input-lg cl-input-code" type="text" id="telegram-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Sign in', variant: 'primary', size: 'large', full_width: true, type: 'submit', icon: 'nav-signin'}) }}{% endblock %}{% endembed %}
+				</form>
+				<div class="cl-sign-in-links">
+					<form action="/login/telegram/again" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{{ ui('action.button', {label: 'Send a new code', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-send'}) }}
+					</form>
+					{{ ui('action.link', {label: 'Use email instead', variant: 'quiet', size: 'small', href: '/login', icon: 'action-email'}) }}
+				</div>
+
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

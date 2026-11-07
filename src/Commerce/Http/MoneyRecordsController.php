@@ -13,6 +13,9 @@ the Commerce Trail and Payment Events, each a filtered, searched, sorted and pag
 every row. MoneyRecords builds what they show; this checks the permission and draws the page.
 
 Changelog:
+2026/11/06 SAST
+- Money Reports (owner, 2026-11-06, the approved mockup): each month's report on its page, as a PDF and as an Excel file,
+  seen with the Money Ledger's permission; its two ticks save as they change, for an administrator who manages Settings.
 2026/10/18 SAST
 - Created.
 */
@@ -23,6 +26,10 @@ namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\MoneyRecords;
+use CattoLearning\Commerce\Application\MoneyReportFiles;
+use CattoLearning\Commerce\Application\MoneyReportJob;
+use CattoLearning\Commerce\Application\MoneyReports;
+use CattoLearning\Commerce\Application\MoneyReportSettings;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -31,9 +38,69 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class MoneyRecordsController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly MoneyRecords $money)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly MoneyRecords $money,
+        private readonly MoneyReports $reports, private readonly MoneyReportFiles $reportFiles, private readonly MoneyReportSettings $reportSettings,
+        private readonly MoneyReportJob $reportJob)
     {
         parent::__construct($auth, $view, $requests);
+    }
+
+    /**
+     * Money Reports: a month's money, last month unless the address names another. Choosing a month changes the page in
+     * place, and a month the site has no report for is last month's.
+     */
+    #[Route('/admin/commerce/reports', name: 'admin_money_reports', methods: ['GET'])]
+    public function reports(): Response
+    {
+        $user = $this->requirePermission('PLATFORM.PAYMENT.VIEW');
+        $asked = (string) $this->request()->query->get('month', '');
+        $month = preg_match('/^\d{4}-\d{2}$/', $asked) === 1 && $this->reports->offers($asked) ? $asked : $this->reports->lastMonth();
+        return $this->render('admin-money-reports', ['title' => 'Money Reports', 'active_nav' => 'admin', 'months' => $this->reports->months(),
+            'report' => $this->reports->report($month), 'email' => $this->reportJob->status($month), 'can_manage_settings' => $user->hasPermission('SYSTEM.SETTING.MANAGE')]);
+    }
+
+    /** A month's report as a PDF, to download. */
+    #[Route('/admin/commerce/reports/{month}.pdf', name: 'admin_money_report_pdf', requirements: ['month' => '\d{4}-(0[1-9]|1[0-2])'], methods: ['GET'])]
+    public function reportPdf(): Response
+    {
+        $report = $this->monthReport();
+        return $this->download($this->reportFiles->pdf($report), MoneyReportFiles::name($report, 'pdf'), MoneyReportFiles::PDF_TYPE);
+    }
+
+    /** A month's report as an Excel file, to download. */
+    #[Route('/admin/commerce/reports/{month}.xlsx', name: 'admin_money_report_excel', requirements: ['month' => '\d{4}-(0[1-9]|1[0-2])'], methods: ['GET'])]
+    public function reportExcel(): Response
+    {
+        $report = $this->monthReport();
+        return $this->download($this->reportFiles->excel($report), MoneyReportFiles::name($report, 'xlsx'), MoneyReportFiles::XLSX_TYPE);
+    }
+
+    /** Email me each month: the two ticks, saved as they change, with a Save button only without JavaScript. */
+    #[Route('/admin/commerce/reports/settings', name: 'admin_money_report_settings', methods: ['POST'])]
+    public function reportSettings(): Response
+    {
+        $this->requireCsrf();
+        $this->requirePermission('PLATFORM.PAYMENT.VIEW');
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->reportSettings->save(isset($_POST['email_report']), isset($_POST['telegram_summary']), $user->id);
+        if ($this->request()->headers->has('HX-Request')) return new Response('', 204);
+        $this->flash('success', 'Saved. ' . $this->reportJob->status($this->reports->lastMonth())['next']);
+        $month = (string) ($_POST['month'] ?? '');
+        $this->redirect('/admin/commerce/reports' . (preg_match('/^\d{4}-\d{2}$/', $month) === 1 ? '?month=' . $month : '') . '#money-report-email');
+    }
+
+    /** @return array<string,mixed> the report of the month the address names, or not found */
+    private function monthReport(): array
+    {
+        $this->requirePermission('PLATFORM.PAYMENT.VIEW');
+        $month = $this->param('month');
+        if (!$this->reports->offers($month)) throw $this->notFound('There is no money report for that month.');
+        return $this->reports->report($month);
+    }
+
+    private function download(string $bytes, string $name, string $type): Response
+    {
+        return new Response($bytes, 200, ['Content-Type' => $type, 'Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
     }
 
     #[Route('/admin/commerce/ledger', name: 'admin_money_ledger', methods: ['GET'])]

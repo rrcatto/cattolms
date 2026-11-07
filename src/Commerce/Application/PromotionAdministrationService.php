@@ -171,7 +171,7 @@ final class PromotionAdministrationService
     {
         $text = static fn(string $key): string => is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
         $code = Promotion::normaliseCode($text('code'));
-        if (!Promotion::isValidCode($code)) throw new RuntimeException('Use 3 to 40 letters, digits, hyphens or underscores for the code, starting with a letter or digit.');
+        if (!Promotion::isValidCode($code)) throw new RuntimeException('Use 3 to 40 letters, digits, hyphens or underscores for the code, starting with a letter or digit and holding at least one letter.');
         $name = $text('name');
         if ($name === '' || mb_strlen($name) > self::NAME_LIMIT) throw new RuntimeException('Give the promotion a name of at most ' . self::NAME_LIMIT . ' characters.');
         $description = $text('description');

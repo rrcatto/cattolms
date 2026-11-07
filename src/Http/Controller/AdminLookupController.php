@@ -22,6 +22,8 @@ The route is GET and read-only, so it carries no CSRF token. Every state-changin
 consumes a selected id remains POST + CSRF protected; this endpoint cannot change state.
 
 Changelog:
+2026/11/07 SAST
+- People and companies can be chosen by their account references for an address (owner, 2026-11-06).
 2026/08/23 04:19 SAST
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
 2026/08/20 20:02 SAST
@@ -96,6 +98,10 @@ final class AdminLookupController extends BaseController
         return $this->renderFragment('partials/entity-lookup-results', [
             'lookup_type' => $type,
             'lookup_target' => $target,
+            // A course chosen for an address (a filter's GET form, a length's htmx request) is named by its code
+            // (owner, 2026-11-06: no row id in an address); a form that posts keeps the id.
+            // A person or a company likewise by its account reference.
+            'lookup_by_code' => ($_GET['by'] ?? '') === 'code' && in_array($type, ['courses', 'assignable_courses', 'people', 'companies'], true),
             'lookup_query' => trim($query),
             'lookup_results' => $results,
             'lookup_min_length' => EntityLookupRepository::MIN_QUERY_LENGTH,

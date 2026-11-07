@@ -273,7 +273,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         foreach (['action="/checkout/promo/remove"', 'action="/checkout/promo"', 'name="promo_code"'] as $markup) self::assertStringContainsString($markup, $review['body']);
         $cart = $this->orders->cart($buyer);
         $placed = InProcessPage::run($buyer, CommerceController::class, 'place', [], ['csrf' => $_SESSION['csrf'], 'cart_id' => (string) $cart['id'], 'quote' => (string) $cart['quote'], 'accept_terms' => 'yes', 'accept_start' => 'yes'] + $forged);
-        $order = $this->records->order((int) substr((string) $placed['location'], strlen('/account/orders/')));
+        $order = $this->records->order((int) \CattoLearning\Commerce\Domain\OrderNumber::id(substr((string) $placed['location'], strlen('/account/orders/'))));
         self::assertSame([15610, 1735], [(int) $order['total_minor'], (int) $order['discount_minor']], 'The order carries the server\'s figures, not the forged ones.');
     }
 
@@ -306,8 +306,8 @@ final class PromotionCheckoutIntegrationTest extends TestCase
             foreach (['Promotion ' . $code . ' (10% off)', '−' . $this->rand(1735), $this->rand(17345), $this->rand(15610)] as $shown) self::assertStringContainsString(htmlspecialchars($shown, ENT_QUOTES), $html, $kind . ': ' . $shown);
             self::assertStringNotContainsString('Renamed offer', $html);
         }
-        $customer = InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId]);
-        $administrator = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['id' => (string) $orderId]);
+        $customer = InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]);
+        $administrator = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]);
         foreach ([$customer['body'], $administrator['body']] as $page) {
             self::assertStringContainsString(htmlspecialchars('Promo ' . $code . ' (10% off)', ENT_QUOTES), $page);
             self::assertStringContainsString(htmlspecialchars('−' . $this->rand(1735), ENT_QUOTES), $page);

@@ -129,10 +129,10 @@ final class BundlePurchaseIntegrationTest extends TestCase
             self::assertStringContainsString(htmlspecialchars($this->rand(120000), ENT_QUOTES), $html, $kind);
             self::assertStringNotContainsString(htmlspecialchars($this->rand(50000), ENT_QUOTES), $html, $kind . ': no course is shown at its own price.');
         }
-        $customer = InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId]);
+        $customer = InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]);
         self::assertStringContainsString('Office Skills Bundle', $customer['body']);
         self::assertStringContainsString('Includes: Course A, Course B, Course C', $customer['body']);
-        $admin = InProcessPage::run($this->admin(), PaymentAdministrationController::class, 'order', ['id' => (string) $orderId]);
+        $admin = InProcessPage::run($this->admin(), PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]);
         self::assertStringContainsString('Bundle: Office Skills Bundle', $admin['body']);
         self::assertSame(3, substr_count($admin['body'], 'granted by this bundle'));
 
@@ -282,7 +282,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $withDraft = BundleFixture::create($this->db, $this->owner, [$this->course['A']['id'], $draftCourse], 50000);
         foreach ([
             'This bundle is not available.' => $draft, 'This bundle is no longer sold.' => $retired, 'This bundle is not available for purchase at the moment.' => $offSale,
-            'This bundle is not on sale yet.' => $later, 'This bundle is no longer on sale.' => $over,
+            'This bundle can be bought from ' . \CattoLearning\Bundle\BundleRules::saleDate($now->modify('+1 day')) . '.' => $later, 'This bundle is no longer on sale.' => $over,
             'This bundle includes a course that is no longer available, so it cannot be bought at the moment.' => $withDraft,
         ] as $message => $unavailable) {
             try {

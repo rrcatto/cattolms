@@ -94,7 +94,7 @@
 					<tr>
 						{% if can_manage %}<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Tick'})} %}{% block control %}<input type="checkbox" name="courses[]" value="{{ course.id }}" aria-label="Tick {{ course.code }} {{ course.title }}">{% endblock %}{% endembed %}</td>{% endif %}
 						<td><code class="cl-course-code">{{ course.code }}</code></td>
-						<td class="cell-text"><a href="/admin/courses/{{ course.id }}?tab=page-layout">{{ course.title }}</a>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: course.status == 'draft' ? 'neutral' : 'warning', size: 'small'}) }}{% endif %}</td>
+						<td class="cell-text"><a href="{{ course_admin_url(course, '?tab=page-layout') }}">{{ course.title }}</a>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: course.status == 'draft' ? 'neutral' : 'warning', size: 'small'}) }}{% endif %}</td>
 						<td>{% if course.choice == 'custom' %}{{ ui('feedback.badge', {label: 'Custom · this course only', tone: 'warning'}) }}{% elseif course.choice == 'default' %}{{ ui('feedback.badge', {label: 'Default layout: ' ~ course.layout_name, tone: 'info'}) }}{% else %}{{ ui('feedback.badge', {label: course.layout_name, tone: 'neutral'}) }}{% endif %}</td>
 						<td class="cell-text">{{ course.left_out ? course.left_out|map(block => block.name ~ ' (' ~ block.reason ~ ')')|join(', ') : 'Nothing' }}</td>
 					</tr>

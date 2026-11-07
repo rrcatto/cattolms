@@ -14,6 +14,8 @@ exists is carried out when the registration link is used, one asked for before s
 used, and one that points at nothing that can be followed (a course not published) does nothing.
 
 Changelog:
+2026/11/07 SAST
+- A category and a tag are followed by their slugs through signing in; their numbers name nothing.
 2026/10/28 SAST
 - Created.
 */
@@ -63,7 +65,7 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
             $email = 'follower-' . $fixture->suffix() . '@inbox.test';
             $fixture->rememberEmail($email);
             $auth->requestRegistration(['account_type' => 'individual', 'first_name' => 'Nomvula', 'middle_names' => '', 'last_name' => 'Sithole', 'email' => $email,
-                'country' => 'ZA', 'id_number' => CheckIdNumbers::free($db), 'follow' => 'course:' . $course['id']], '/courses/' . $course['slug'] . '#follow');
+                'country' => 'ZA', 'id_number' => CheckIdNumbers::free($db), 'follow' => 'course:' . $course['code']], '/courses/' . $course['slug'] . '#follow');
             parse_str((string) parse_url(self::firstUrl($mailer), PHP_URL_QUERY), $query);
             self::assertSame('/courses/' . $course['slug'] . '#follow', $auth->consumeRegistration((string) $query['token']), 'They land back where they pressed Follow.');
             $newcomer = (int) $db->fetchOne('SELECT user_id FROM user_emails WHERE email = :email', ['email' => $email]);
@@ -75,7 +77,7 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
             // Signing in: the follow travels in the sign-in link.
             $person = $fixture->person();
             $mailer->messages = [];
-            $auth->requestLogin($person['email'], '/courses/' . $course['slug'], 'course:' . $course['id']);
+            $auth->requestLogin($person['email'], '/courses/' . $course['slug'], 'course:' . $course['code']);
             parse_str((string) parse_url(self::firstUrl($mailer), PHP_URL_QUERY), $query);
             $auth->consumeLogin((string) $query['token']);
             self::assertTrue($consents->isSubscribed($person['id'], 'course', $course['id']), 'Following once signed in.');
@@ -83,16 +85,66 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
 
             // A course not published cannot be followed, so asking for it does nothing.
             $mailer->messages = [];
-            $auth->requestLogin($person['email'], '/courses', 'course:' . $draft['id']);
+            $auth->requestLogin($person['email'], '/courses', 'course:' . $draft['code']);
             parse_str((string) parse_url(self::firstUrl($mailer), PHP_URL_QUERY), $query);
             $auth->consumeLogin((string) $query['token']);
             self::assertFalse($consents->isSubscribed($person['id'], 'course', $draft['id']));
-            self::assertNull($consents->nameOf(\CattoLearning\Mailing\FollowIntent::fromText('course:' . $draft['id'])));
-            self::assertNull(\CattoLearning\Mailing\FollowIntent::fromText('course:12; DROP TABLE'), 'Only "kind:number" is read.');
+            self::assertNull($consents->nameOf(\CattoLearning\Mailing\FollowIntent::fromText('course:' . $draft['code'])));
+            self::assertNull(\CattoLearning\Mailing\FollowIntent::fromText('course:12; DROP TABLE'), 'Only "kind:key" is read.');
+            // A course is followed by its code, never its row id (owner, 2026-11-06: no row id in an address).
+            self::assertNull(\CattoLearning\Mailing\FollowIntent::fromText('course:' . $course['id']), 'A course\'s row id is no follow.');
+            self::assertSame('course:' . $course['code'], \CattoLearning\Mailing\FollowIntent::fromText('course:' . $course['code'])?->text());
         } finally {
             if ($savedAddress === null) unset($_SERVER['REMOTE_ADDR']); else $_SERVER['REMOTE_ADDR'] = $savedAddress;
             unset($_COOKIE['catto_learning_session']);
             $db->executeStatement("DELETE FROM mailing_lists WHERE kind = 'course' AND subject_id IN (:a, :b)", ['a' => $course['id'], 'b' => $draft['id']]);
+            $fixture->cleanup();
+        }
+    }
+
+    /**
+     * A category and a tag are followed by their slugs, through the sign-in link too (owner, 2026-11-06: no row id in an
+     * address); their numbers name nothing.
+     */
+    public function testACategoryAndATagAreFollowedByTheirSlugsThroughSigningIn(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $db = $container->get(Database::class);
+        $fixture = new DevelopmentFixture($db);
+        $consents = $container->get(MailingConsents::class);
+        $courses = $container->get(\CattoLearning\Course\CourseService::class);
+        $mailer = new FakeMailer();
+        $auth = $this->auth($container, $mailer);
+        $savedAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+        $_SERVER['REMOTE_ADDR'] = '198.51.100.' . random_int(1, 254);
+        $person = $fixture->person();
+        $made = [];
+        try {
+            $suffix = strtolower($fixture->suffix());
+            $made['category'] = $courses->createCategory(['name' => 'Follow check garden ' . $suffix], $person['id']);
+            $made['tag'] = $courses->createTag(['name' => 'Follow check compost ' . $suffix], $person['id']);
+            foreach ($made as $kind => $record) {
+                self::assertNull(\CattoLearning\Mailing\FollowIntent::fromText($kind . ':' . $record['id']), 'A ' . $kind . '\'s row id is no follow.');
+                self::assertNull(\CattoLearning\Mailing\FollowIntent::of($kind, (string) $record['id']));
+                self::assertSame($kind . ':' . $record['slug'], \CattoLearning\Mailing\FollowIntent::fromText($kind . ':' . $record['slug'])?->text());
+                self::assertSame('/follow/' . $kind . '/' . $record['slug'], \CattoLearning\Support\Address\CatalogueAddress::follow($kind, $record));
+
+                $mailer->messages = [];
+                $auth->requestLogin($person['email'], '/courses', $kind . ':' . $record['slug']);
+                parse_str((string) parse_url(self::firstUrl($mailer), PHP_URL_QUERY), $query);
+                $auth->consumeLogin((string) $query['token']);
+                self::assertTrue($consents->isSubscribed($person['id'], $kind, (int) $record['id']), 'Following the ' . $kind . ' once signed in, named by its slug.');
+                unset($_COOKIE['catto_learning_session']);
+            }
+        } finally {
+            if ($savedAddress === null) unset($_SERVER['REMOTE_ADDR']); else $_SERVER['REMOTE_ADDR'] = $savedAddress;
+            unset($_COOKIE['catto_learning_session']);
+            foreach ($made as $kind => $record) {
+                $db->executeStatement('DELETE FROM mailing_lists WHERE kind = :kind AND subject_id = :id', ['kind' => $kind, 'id' => $record['id']]);
+            }
+            if (isset($made['category'])) $courses->deleteCategory((int) $made['category']['id'], null, $person['id']);
+            if (isset($made['tag'])) $courses->deleteTag((int) $made['tag']['id'], $person['id']);
+            $db->executeStatement("DELETE FROM audit_log WHERE user_id = :id AND event_key LIKE 'course%'", ['id' => $person['id']]);
             $fixture->cleanup();
         }
     }

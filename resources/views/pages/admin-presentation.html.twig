@@ -11,7 +11,7 @@
 {% block page_body %}
 {{ importmap() }}
 	{% set p = presentation %}
-	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set base = course_item_url(item) %}
 	{% set ph_back_href = crumb.href %}{% set ph_back_label = crumb.label %}
 	{% set ph_kicker = item.name %}{% set ph_title = 'Edit Course Item: Presentation' %}
 	{% set ph_badges %}{{ ui('feedback.badge', {label: p.kind_label, tone: 'info'}) }}{{ ui('feedback.badge', {label: p.theme_label ~ ' look', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.slides|length ~ (p.slides|length == 1 ? ' slide' : ' slides'), tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.recorded ~ ' of ' ~ p.slides|length ~ ' recorded', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.placements|length == 1 ? 'Placed in 1 course' : 'Placed in ' ~ p.placements|length ~ ' courses', tone: 'neutral'}) }}{% endset %}
@@ -46,7 +46,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-placed'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Where it is placed', summary: 'A shared Course Item: a change here shows wherever it is placed.'}) }}
 			{% if p.placements %}
-				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for placed in p.placements %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ placed.course_title }}</strong>{% if placed.module %}<br><span class="small cl-text-secondary">{{ placed.module }}</span>{% endif %}{% endblock %}{% block actions %}{{ ui('action.link', {label: 'Course Content', size: 'small', href: '/admin/courses/' ~ placed.course_id ~ '/content', icon: 'action-open'}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for placed in p.placements %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ placed.course_title }}</strong>{% if placed.module %}<br><span class="small cl-text-secondary">{{ placed.module }}</span>{% endif %}{% endblock %}{% block actions %}{{ ui('action.link', {label: 'Course Content', size: 'small', href: course_admin_url(placed, '/content'), icon: 'action-open'}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
 			{% else %}
 				{{ ui('feedback.empty', {heading: 'Placed nowhere yet', summary: 'Add it to a course from Course Content, with + Add here and Add existing item.'}) }}
 			{% endif %}

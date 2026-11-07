@@ -133,7 +133,10 @@ final class CourseReviewPageTest extends TestCase
         $this->post('/admin/course-reviews/' . $review['id'] . '/moderate', ['decision' => 'approve', 'revision' => (string) $review['revision'], 'note' => 'Moderator-only remark', 'return' => '/admin/course-reviews']);
         self::assertSame('approved', $this->db->fetchOne('SELECT status FROM course_reviews WHERE id=:id', ['id' => $review['id']]));
         self::assertStringNotContainsString('Thorough and well paced.', $this->html('/admin/course-reviews'), 'It has left the pending queue.');
-        self::assertStringContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=4&course_id=' . $this->course), 'The filters find it.');
+        // The course filter names the course by its code (owner, 2026-11-06: no row id in an address).
+        $code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
+        self::assertStringContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=4&course=' . rawurlencode($code)), 'The filters find it.');
+        self::assertStringNotContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=4&course=NO-SUCH-1'), 'A code no course has finds nothing.');
         self::assertStringNotContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=1'));
 
         $_COOKIE = $this->cookies;

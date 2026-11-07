@@ -11,6 +11,17 @@ Description:
 Implements Catto Learning business and application logic for auth operations.
 
 Changelog:
+2026/11/07 SAST
+- The notice of an account waiting for approval links the person's page by their account reference (owner, 2026-11-06).
+2026/11/05 SAST
+- Telegram sign-in and two-step sign-in (owner, 2026-11-05, the approved mockup). requestTelegramLogin() sends a code and a
+  link to a connected Telegram account, held until the page has answered, and only for an account that may sign in, so the
+  page tells nobody whether an account exists. The email link, the Telegram link (consumeLogin) and the Telegram code
+  (consumeTelegramCode, in the browser that asked, five tries) all end in signInWith(): the same checks, then either the
+  session or, for someone with two-step on or whom the policy names, no session yet but a sign-in waiting for its second
+  step (PendingSignIn), which passTwoStep() or the set-up at sign-in completes. consumeRegistration() waits for it too.
+  auth.login records how they came in (via) and the second step. A link that is not a sign-in link throws
+  LoginLinkNotUsableException, so only that falls through to registration and every other refusal says its own reason.
 2026/10/26 SAST
 - The company domain rule (owner, restated 2026-10-26): registering a private account with an address at a company's
   domain is refused ("Refused"), and a company account only with its own domain, never one already here; an account
@@ -85,9 +96,26 @@ final class AuthService
         private readonly ?Signup\SignupChecks $signups = null,
         private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null,
         private readonly ?IdNumbers $idNumbers = null,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null,
+        private readonly ?TwoStep\TwoStep $twoStep = null,
+        private readonly ?TwoStepPolicy $twoStepPolicy = null,
+        private readonly ?TwoStep\PendingSignIn $pending = null,
+        private readonly ?\CattoLearning\OwnerMessages\TelegramAccountRepository $telegramAccounts = null,
+        private readonly ?\CattoLearning\OwnerMessages\TelegramMessenger $telegram = null,
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSettings $telegramSettings = null
     ) {
     }
+
+    /** What an unusable sign-in link says, whichever way it came. */
+    public const LINK_INVALID = 'The sign-in link is invalid or has expired.';
+    /** What a Telegram code that does not work says, whatever the reason (owner's mockup). */
+    public const TELEGRAM_CODE_WRONG = 'That code did not work. Check it, or send a new one.';
+    public const TELEGRAM_TTL = 600;
+    public const TELEGRAM_TRIES = 5;
+    public const TELEGRAM_PURPOSE = 'telegram_login';
+    /** A sign-in waiting for its second step that ran out, or ended after five wrong codes. */
+    public const PENDING_GONE = 'That sign-in has run out. Sign in again.';
+    public const PENDING_ENDED = 'That was the fifth code that did not work, so this sign-in has ended. Sign in again.';
 
     /** What someone who lives outside South Africa is told (owner, 2026-10-27, 5A). */
     public const SOUTH_AFRICA_ONLY = 'Registration is open to people living in South Africa for now.';
@@ -228,17 +256,118 @@ final class AuthService
         $this->audit->record(null, 'auth.magic_link_requested', ['email_hash' => hash('sha256', $email)]);
     }
 
+    /**
+     * The link in a sign-in email or a Telegram message. Where to go next: where they were going, or the second step.
+     *
+     * @throws LoginLinkNotUsableException when it is no sign-in link that can be used
+     */
     public function consumeLogin(string $rawToken): string
     {
         if ($rawToken === '') {
-            throw new RuntimeException('The sign-in link is invalid or has expired.');
+            throw new LoginLinkNotUsableException(self::LINK_INVALID);
         }
+        $hash = Token::hash($rawToken);
 
-        $state = $this->transactions->run(function () use ($rawToken): array {
-            $row = $this->tokens->findUsableForUpdate(Token::hash($rawToken), 'login');
+        return $this->signInWith(function () use ($hash): array {
+            $row = $this->tokens->findUsableForUpdate($hash, 'login') ?? $this->tokens->findUsableForUpdate($hash, self::TELEGRAM_PURPOSE);
             if ($row === null) {
-                throw new RuntimeException('The sign-in link is invalid or has expired.');
+                throw new LoginLinkNotUsableException(self::LINK_INVALID);
             }
+
+            return [$row, (string) $row['purpose'] === 'login' ? 'email' : 'telegram_link'];
+        });
+    }
+
+    /** Whether people may sign in with Telegram here: ticked in Settings, with a bot key saved. */
+    public function telegramSignInOffered(): bool
+    {
+        return $this->telegramSettings?->signInOffered() ?? false;
+    }
+
+    /**
+     * Sign in with Telegram (owner, 2026-11-05): a 6-digit code and a link to the Telegram account connected to the account named
+     * by its Telegram username or one of its email addresses, lasting 10 minutes, working once, and replacing any sent before.
+     * Only for an account that exists, is active, may sign in, is not held by a suspended company and is within the limits;
+     * otherwise nothing happens, and the caller shows the same page either way. The message is held until the page has
+     * answered. The row's id, for this browser alone to type the code against, or null.
+     */
+    public function requestTelegramLogin(string $typed, string $returnPath = '/account/courses', string $follow = ''): ?int
+    {
+        if (!$this->telegramSignInOffered() || $this->telegramAccounts === null || $this->telegram === null) return null;
+        $account = $this->telegramAccounts->forSignIn($typed);
+        if ($account === null) return null;
+        $email = (string) ($this->users->findById($account['user_id'])['primary_email'] ?? '');
+        // Held, deactivated or gone: no message, as no link is sent to them by email.
+        if ($email === '' || $this->users->findByVerifiedEmail($email) === null) return null;
+        try {
+            $this->assertMaySignIn($email, $account['user_id']);
+        } catch (RuntimeException) {
+            return null;
+        }
+        if ($this->companySuspensionBlocks($account['user_id']) || !$this->withinRateLimits($email)) return null;
+
+        $rawToken = Token::generate();
+        $tokenHash = Token::hash($rawToken);
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $context = ['return_path' => $this->safeReturnPath($returnPath), 'code_hash' => self::telegramCodeHash($tokenHash, $code), 'tries' => 0]
+            + (($intent = \CattoLearning\Mailing\FollowIntent::fromText($follow)) !== null ? ['follow' => $intent->text()] : []);
+        $rowId = $this->transactions->run(function () use ($email, $tokenHash, $context, $account): int {
+            // A new request replaces the old one; the old still counts towards the limits.
+            $this->tokens->finishOpen($email, self::TELEGRAM_PURPOSE);
+
+            return $this->tokens->create($tokenHash, $email, self::TELEGRAM_PURPOSE, $account['user_id'], $context, self::TELEGRAM_TTL, ClientFingerprint::ipHash());
+        });
+        $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($rawToken);
+        $domain = \CattoLearning\OwnerMessages\OwnerMessages::domain();
+        $text = ($this->ownerMessages?->demo() ?? '') . 'Sign in to ' . $domain . "\n\nYour code is\n" . $code . "\n\nOr open this link:\n" . $url
+            . "\n\nIt lasts 10 minutes and works once. If you did not ask for this, ignore it. Nothing happens without the code or the link.";
+        // The log keeps what it was, never what it said.
+        $this->telegram->hold('sign_in', $account['chat_id'], $account['user_id'], $account['username'], $text, 'Sign-in code and link for ' . $domain . ' (not kept)',
+            [$code, $rawToken, rawurlencode($rawToken), $url]);
+        $this->audit->record(null, 'auth.telegram_sign_in_requested', ['email_hash' => hash('sha256', $email)]);
+
+        return $rowId;
+    }
+
+    /**
+     * The code from a Telegram sign-in message, typed in the browser that asked (its row). A wrong one counts, and the fifth
+     * finishes the request. Where to go next, as the link does.
+     */
+    public function consumeTelegramCode(int $rowId, string $typed): string
+    {
+        $code = (string) preg_replace('/\s+/', '', $typed);
+        $right = $rowId > 0 && $code !== '' && $this->transactions->run(function () use ($rowId, $code): bool {
+            $row = $this->tokens->findUsableByIdForUpdate($rowId, self::TELEGRAM_PURPOSE);
+            if ($row === null) return false;
+            $context = json_decode((string) ($row['context'] ?? '{}'), true);
+            $context = is_array($context) ? $context : [];
+            if (preg_match('/^\d{6}$/', $code) === 1 && hash_equals((string) ($context['code_hash'] ?? ''), self::telegramCodeHash((string) $row['token_hash'], $code))) return true;
+            $context['tries'] = (int) ($context['tries'] ?? 0) + 1;
+            $this->tokens->updateContext($rowId, $context);
+            if ($context['tries'] >= self::TELEGRAM_TRIES) $this->tokens->markUsed($rowId);
+
+            return false;
+        });
+        if (!$right) throw new RuntimeException(self::TELEGRAM_CODE_WRONG);
+
+        return $this->signInWith(function () use ($rowId): array {
+            $row = $this->tokens->findUsableByIdForUpdate($rowId, self::TELEGRAM_PURPOSE) ?? throw new RuntimeException(self::TELEGRAM_CODE_WRONG);
+
+            return [$row, 'telegram_code'];
+        });
+    }
+
+    /**
+     * Every sign-in by link or code ends here, whichever way it came: the account (made for the configured administrator at
+     * their first sign-in), Who can sign in, a suspended company, the link used up, then the session, or, when two-step
+     * applies, no session yet but a sign-in waiting for its second step.
+     *
+     * @param callable():array{0:array<string,mixed>,1:string} $find the usable row, locked, and how it came
+     */
+    private function signInWith(callable $find): string
+    {
+        $state = $this->transactions->run(function () use ($find): array {
+            [$row, $via] = $find();
 
             $created = false;
             $email = (string) $row['email'];
@@ -272,45 +401,86 @@ final class AuthService
             }
 
             $this->tokens->markUsed((int) $row['id']);
-            $this->users->markLogin((int) $user['id']);
-            // The follow they asked for before signing in (owner, 2026-10-28: "once they've signed in, action the follow").
-            $asked = json_decode((string) ($row['context'] ?? '{}'), true);
-            if (is_array($asked) && isset($asked['follow'])) $this->mailing?->followAfterSignIn((int) $user['id'], $asked['follow']);
-
-            $sessionToken = Token::generate();
-            $sessionPublicId = $this->sessions->create(
-                (int) $user['id'],
-                Token::hash($sessionToken),
-                Env::seconds('AUTH_SESSION_TTL', '1d'),
-                ClientFingerprint::ipHash(),
-                ClientFingerprint::userAgent(),
-                $email
-            );
             $context = json_decode((string) ($row['context'] ?? '{}'), true);
+            $context = is_array($context) ? $context : [];
+            $returnPath = $this->safeReturnPath((string) ($context['return_path'] ?? '/account/courses'));
+            // The follow they asked for before signing in (owner, 2026-10-28: "once they've signed in, action the follow").
+            $follow = is_string($context['follow'] ?? null) ? $context['follow'] : null;
+            $state = ['user' => $user, 'created' => $created, 'email' => $email, 'return_path' => $returnPath, 'via' => $via];
+            // Two-step sign-in (owner, 2026-11-05): no session until the second step is passed.
+            $second = $this->secondStep((int) $user['id'], $email);
+            if ($second !== null) return $state + ['second' => $second, 'follow' => $follow];
 
-            return [
-                'user' => $user,
-                'created' => $created,
-                'session_token' => $sessionToken,
-                'session_public_id' => $sessionPublicId,
-                'return_path' => $this->safeReturnPath(
-                    is_array($context)
-                        ? (string) ($context['return_path'] ?? '/account/courses')
-                        : '/account/courses'
-                ),
-            ];
+            return $state + $this->openSession((int) $user['id'], $email, $follow);
         });
 
         /** @var array<string,mixed> $user */
         $user = $state['user'];
+        if (isset($state['second'])) {
+            if ((bool) $state['created']) $this->events->dispatch('user.registered', ['user_id' => (int) $user['id']]);
+
+            return $this->pending?->begin((int) $user['id'], (string) $state['email'], (string) $state['return_path'], $state['follow'], (string) $state['via'], $state['second'] === 'setup')
+                ?? throw new RuntimeException(self::PENDING_GONE);
+        }
+
+        return $this->signedIn($state);
+    }
+
+    /**
+     * Two-step sign-in's place in a sign-in: 'verify' when it is on, 'setup' when the policy names someone who has none yet,
+     * or null.
+     */
+    private function secondStep(int $userId, string $email): ?string
+    {
+        if ($this->twoStep === null || $this->pending === null) return null;
+        if ($this->twoStep->isOn($userId)) return 'verify';
+
+        return $this->twoStepRequired($userId, $email) ? 'setup' : null;
+    }
+
+    /** Whether the policy names this person (TwoStepPolicy): everyone, or administrators, or nobody. */
+    public function twoStepRequired(int $userId, string $email): bool
+    {
+        return $this->twoStepPolicy?->requires($this->isAdministrator($email, $userId)) ?? false;
+    }
+
+    /**
+     * The session, at last: the sign-in counted, the follow they asked for carried out.
+     *
+     * @return array{session_token:string,session_public_id:string}
+     */
+    private function openSession(int $userId, string $email, ?string $follow): array
+    {
+        $this->users->markLogin($userId);
+        if ($follow !== null) $this->mailing?->followAfterSignIn($userId, $follow);
+        $sessionToken = Token::generate();
+        $sessionPublicId = $this->sessions->create(
+            $userId,
+            Token::hash($sessionToken),
+            Env::seconds('AUTH_SESSION_TTL', '1d'),
+            ClientFingerprint::ipHash(),
+            ClientFingerprint::userAgent(),
+            $email
+        );
+
+        return ['session_token' => $sessionToken, 'session_public_id' => (string) $sessionPublicId];
+    }
+
+    /** @param array<string,mixed> $state what openSession() made, with the user, how they came and where they go */
+    private function signedIn(array $state): string
+    {
+        /** @var array<string,mixed> $user */
+        $user = $state['user'];
         $this->setSessionCookie((string) $state['session_token']);
-        // The country is kept with the sign-in, so a first sign-in from another country can be flagged (owner, 2026-10-26).
+        // The country is kept with the sign-in, so a first sign-in from another country can be flagged (owner, 2026-10-26),
+        // and how they came in, with the second step when there was one (owner, 2026-11-05).
         $this->audit->record(
             (int) $user['id'],
             'auth.login',
-            ['session' => (string) $state['session_public_id'], 'country' => $this->signups?->countryOf(ClientFingerprint::ipAddress()) ?? '']
+            ['session' => (string) $state['session_public_id'], 'country' => $this->signups?->countryOf(ClientFingerprint::ipAddress()) ?? '', 'via' => (string) ($state['via'] ?? 'email')]
+                + (isset($state['two_step']) ? ['two_step' => (string) $state['two_step']] : [])
         );
-        if ((bool) $state['created']) {
+        if ((bool) ($state['created'] ?? false)) {
             $this->events->dispatch('user.registered', ['user_id' => (int) $user['id']]);
         }
         $this->events->dispatch('auth.logged_in', [
@@ -319,6 +489,104 @@ final class AuthService
         ]);
 
         return (string) $state['return_path'];
+    }
+
+    /** @return array{user_id:int,email:string,return_path:string,follow:?string,via:string,set_up:bool,expires_at:int,tries:int}|null the sign-in in this browser waiting for its second step */
+    public function pendingSignIn(): ?array
+    {
+        return $this->pending?->current();
+    }
+
+    /**
+     * The second step: a code from their authenticator app, or a recovery code, once. Where to go, signed in. A wrong one
+     * counts, and the fifth ends the sign-in.
+     */
+    public function passTwoStep(string $typed): string
+    {
+        $pending = $this->pending?->current() ?? throw new RuntimeException(self::PENDING_GONE);
+        if ($this->twoStep === null || $pending['set_up']) throw new RuntimeException(self::PENDING_GONE);
+        $how = $this->twoStep->confirm($pending['user_id'], $typed);
+        if ($how === null) {
+            throw new RuntimeException($this->pending->wrong() ? TwoStep\TwoStep::WRONG : self::PENDING_ENDED);
+        }
+
+        return $this->completePending($pending, $how);
+    }
+
+    /**
+     * Setting two-step up at sign-in, for someone the policy names: the key this browser holds, made the first time.
+     *
+     * @return array{qr:string,key:string,codes:list<string>,email:string}
+     */
+    public function twoStepSetUpAtSignIn(): array
+    {
+        $pending = $this->pending?->current() ?? throw new RuntimeException(self::PENDING_GONE);
+        if ($this->twoStep === null || !$pending['set_up']) throw new RuntimeException(self::PENDING_GONE);
+        $codes = $this->pending->recoveryCodes('sign_in');
+        if ($codes !== [] && $this->twoStep->isOn($pending['user_id'])) return ['qr' => '', 'key' => '', 'codes' => $codes, 'email' => $pending['email']];
+        $secret = $this->pending->setUpSecret('sign_in') ?? $this->pending->setUpSecret('sign_in', $this->twoStep->newSecret());
+
+        return $this->twoStep->picture($secret, $pending['email']) + ['codes' => [], 'email' => $pending['email']];
+    }
+
+    /** The first code from the app at sign-in: whether it worked, which turns two-step on and makes the recovery codes to show. */
+    public function confirmTwoStepAtSignIn(string $code): bool
+    {
+        $pending = $this->pending?->current() ?? throw new RuntimeException(self::PENDING_GONE);
+        $secret = $this->pending->setUpSecret('sign_in');
+        if ($this->twoStep === null || !$pending['set_up'] || $secret === null) throw new RuntimeException(self::PENDING_GONE);
+        $codes = $this->twoStep->turnOn($pending['user_id'], $secret, $code);
+        if ($codes === null) return false;
+        $this->pending->forgetSetUpSecret('sign_in');
+        $this->pending->recoveryCodes('sign_in', $codes);
+
+        return true;
+    }
+
+    /** They kept their recovery codes: the sign-in completes. Where to go. */
+    public function finishTwoStepAtSignIn(): string
+    {
+        $pending = $this->pending?->current() ?? throw new RuntimeException(self::PENDING_GONE);
+        if ($this->twoStep === null || !$pending['set_up'] || !$this->twoStep->isOn($pending['user_id'])) throw new RuntimeException(self::PENDING_GONE);
+
+        return $this->completePending($pending, 'set_up');
+    }
+
+    /** Ends a sign-in waiting for its second step, as Cancel does. */
+    public function cancelPendingSignIn(): void
+    {
+        $this->pending?->clear();
+    }
+
+    /**
+     * The session for a sign-in that passed its second step, after the same checks again: time has passed since the link.
+     *
+     * @param array{user_id:int,email:string,return_path:string,follow:?string,via:string,set_up:bool,expires_at:int,tries:int} $pending
+     */
+    private function completePending(array $pending, string $how): string
+    {
+        $state = $this->transactions->run(function () use ($pending, $how): array {
+            $user = $this->users->findByVerifiedEmail($pending['email']);
+            if ($user === null || (int) $user['id'] !== $pending['user_id']) {
+                throw new RuntimeException('This email is not registered. Please complete registration first.');
+            }
+            $this->assertMaySignIn($pending['email'], (int) $user['id']);
+            if ($this->companySuspensionBlocks((int) $user['id'])) {
+                throw new RuntimeException(self::SUSPENDED_COMPANY_MESSAGE);
+            }
+
+            return ['user' => $user, 'email' => $pending['email'], 'return_path' => $pending['return_path'], 'via' => $pending['via'], 'two_step' => $how]
+                + $this->openSession((int) $user['id'], $pending['email'], $pending['follow']);
+        });
+        $this->pending?->clear();
+
+        return $this->signedIn($state);
+    }
+
+    /** The keyed hash a Telegram sign-in code is kept as, tied to its row. */
+    private static function telegramCodeHash(string $tokenHash, string $code): string
+    {
+        return hash_hmac('sha256', $tokenHash . ':' . $code, 'telegram-sign-in-code:' . Env::string('APP_KEY'));
     }
 
 
@@ -675,6 +943,11 @@ final class AuthService
                 $this->audit->record((int)$user['id'], 'user.awaiting_approval', ['user_id' => (int)$user['id']]);
                 return ['user'=>$user,'awaiting'=>true,'email'=>$email,'name'=>trim(((string)($reg['first_name'] ?? '')) . ' ' . ((string)($reg['last_name'] ?? '')))];
             }
+            // Two-step sign-in (owner, 2026-11-05): a policy that names everyone sets it up before the first session.
+            if (($second = $this->secondStep((int)$user['id'], $email)) !== null) {
+                $this->tokens->markUsed((int)$row['id']);
+                return ['user'=>$user,'second'=>$second,'email'=>$email,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/courses'))];
+            }
             $this->tokens->markUsed((int)$row['id']); $this->users->markLogin((int)$user['id']);
             $sessionToken = Token::generate();
             $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::seconds('AUTH_SESSION_TTL', '1d'), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
@@ -686,12 +959,17 @@ final class AuthService
                 try {
                     $this->mailer->sendAdministratorMessage($admin, 'An account is waiting for your approval',
                         ($state['name'] !== '' ? $state['name'] . ' (' . $state['email'] . ')' : $state['email']) . ' registered' . ($this->demoHoldsRegistrations() ? ' on the demo site' : '') . " and is waiting for your approval.\n\n"
-                        . 'Approve or disable the account at ' . rtrim(Env::string('APP_URL'), '/') . '/admin/people/' . (int)$state['user']['id']);
+                        // Their page by their account reference (owner, 2026-11-06: no row id in an address).
+                        . 'Approve or disable the account at ' . rtrim(Env::string('APP_URL'), '/') . \CattoLearning\Support\Address\PersonAddress::admin((string)$state['user']['account_reference']));
                 } catch (\Throwable) {
                     // The account still waits; ADMIN sees it on the dashboard.
                 }
             }
             return self::AWAITING_APPROVAL_PATH;
+        }
+        if (isset($state['second'])) {
+            return $this->pending?->begin((int)$state['user']['id'], (string)$state['email'], (string)$state['return'], null, 'registration', $state['second'] === 'setup')
+                ?? throw new RuntimeException(self::PENDING_GONE);
         }
         $this->setSessionCookie((string)$state['token']);
         $this->events->dispatch('auth.logged_in', ['user_id'=>(int)$state['user']['id'],'session_id'=>(string)$state['session']]);

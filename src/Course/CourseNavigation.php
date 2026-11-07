@@ -29,6 +29,18 @@ final class CourseNavigation
     }
 
     /**
+     * The row of one part, or null when the structure does not hold it.
+     *
+     * @param list<array<string,mixed>> $structure
+     * @return array<string,mixed>|null
+     */
+    public static function row(array $structure, int $nodeId): ?array
+    {
+        foreach ($structure as $row) { if ((int) ($row['id'] ?? 0) === $nodeId) { return $row; } }
+        return null;
+    }
+
+    /**
      * The stops before and after a row, or null at either end or when the row is not a stop.
      *
      * @param list<array<string,mixed>> $structure

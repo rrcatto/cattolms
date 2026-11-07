@@ -11,6 +11,28 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/11/07 SAST (no row ids in addresses, stage 2)
+- course_structure_nodes.part_name: each part's name in the reader's and the public preview's addresses, unique within
+  its course (owner, 2026-11-06: "yes, do it that way"); course_item_slug() and the unique index on it, which replaces
+  the one on lower(name), so a Course Item's address names one item; a category's and a tag's slug and a promotion's
+  code hold a letter.
+2026/11/06 SAST (no row ids in addresses)
+- courses.code, bundles.code and course_items.item_key must hold a letter (owner, 2026-11-06: a course is its code in an
+  address, so no code or key may look like a row id); a category's slug is never new, inline or field, words its
+  Administration addresses use.
+2026/11/06 SAST (money reports)
+- money_report_sends: each month's money report, emailed and sent by Telegram once on the 1st (owner, 2026-11-06, the
+  approved mockup); telegram_messages.kind gains money_report.
+2026/11/06 SAST (bundles, round two)
+- bundles.code: a bundle's code, by a course code's rule (owner, 2026-11-06: "Each bundle needs its own code, like a course
+  code"); catalogue_code_unique() keeps a code to one course or one bundle, so an import can match by it.
+- bundle_favourites: the bundles a person starred, beside course_favourites (owner, 2026-11-06).
+2026/11/05 SAST (Telegram sign-in and two-step sign-in)
+- owner_messages is telegram_messages: every message the site sends by Telegram, with the chat it went to (chat_id, null
+  for the owner's own), the account on this site (to_user_id) and its Telegram username at the moment of sending
+  (to_username); the kinds gain sign_in and connected (owner, 2026-11-05).
+- telegram_accounts: the Telegram account a person connected to sign in with, one each and one person each.
+- user_two_step and user_two_step_recovery: a person's two-step sign-in key, encrypted, and their recovery codes, hashed.
 2026/11/01 SAST (parts marked complete)
 - course_part_completions: the parts of a course a learner has marked complete (owner, 2026-11-01), counted with the
   assessments they have submitted in the course's progress.
@@ -38,7 +60,7 @@ Changelog:
 2026/10/28 SAST (landing pages)
 - The "Instructor" section type removed (owner, 2026-10-28: "Remove it"; there are no lecturers, the system presents the courses).
 2026/11/04 SAST (site analytics)
-- owner_messages: the messages to the owner's Telegram, waiting or sent (owner, 2026-11-05).
+- owner_messages: the messages to the owner's Telegram, waiting or sent (owner, 2026-11-05; telegram_messages since that evening).
 - site_requests, site_flags, site_lockouts and site_refused_emails: the Site Log, flagged activity, lockouts and the
   email addresses refused; the PLATFORM.SITEANALYTICS.VIEW and PLATFORM.SITEANALYTICS.MANAGE permissions (owner, 2026-11-04).
 2026/10/28 SAST (mailing templates)
@@ -263,6 +285,7 @@ private const FOREIGN_KEY_INDEXES = [
         'assessment_sessions_structure_node_fk_idx' => 'assessment_sessions (structure_node_id)',
         'assessment_sessions_legacy_attempt_fk_idx' => 'assessment_sessions (legacy_attempt_id)',
         'auth_login_tokens_user_fk_idx' => 'auth_login_tokens (user_id)',
+        'telegram_messages_to_user_fk_idx' => 'telegram_messages (to_user_id)',
         'certificates_identity_verification_fk_idx' => 'certificates (identity_verification_id)',
         'certificates_revoked_by_user_fk_idx' => 'certificates (revoked_by_user_id)',
         'identity_verifications_revoked_by_user_fk_idx' => 'identity_verifications (revoked_by_user_id)',
@@ -910,7 +933,10 @@ CREATE TABLE course_categories (
     -- and the breadcrumb dishonest, which is exactly what the three-level rule exists to prevent.
     level SMALLINT NOT NULL DEFAULT 1 CHECK (level BETWEEN 1 AND 3),
     name VARCHAR(120) NOT NULL UNIQUE,
-    slug VARCHAR(120) NOT NULL UNIQUE,
+    -- Never a word the categories' addresses use (owner, 2026-11-06: /admin/courses/categories/new, /inline, /field), and
+    -- holding a letter, because Administration names a category by its slug (/admin/courses/categories/garden-design) and a
+    -- slug of digits would look like a row id.
+    slug VARCHAR(120) NOT NULL UNIQUE CHECK (slug NOT IN ('new', 'inline', 'field') AND slug ~ '[a-z]'),
     description TEXT NULL,
     -- The category's place among its siblings, 1..n within one parent: the order ADMIN arranged,
     -- never derived from names, ids or insertion time.
@@ -981,7 +1007,8 @@ CREATE TRIGGER course_categories_depth
 CREATE TABLE tags (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
-    slug VARCHAR(80) NOT NULL UNIQUE,
+    -- Holding a letter: Administration names a tag by its slug (/admin/courses/tags/raised-beds, owner 2026-11-06).
+    slug VARCHAR(80) NOT NULL UNIQUE CHECK (slug ~ '[a-z]'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     icon_svg TEXT NOT NULL DEFAULT ''
@@ -1022,8 +1049,9 @@ CREATE TABLE courses (
     public_id UUID NOT NULL UNIQUE,
     -- The course's own code (owner, 2026-10-23): chosen by its author, the same on every site, and what every
     -- import matches a course by. A course made without one gets a random C- code.
+    -- It holds a letter (owner, 2026-11-06: a course is its code in an address, so a code never looks like a row id).
     code VARCHAR(20) NOT NULL UNIQUE DEFAULT ('C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)))
-        CHECK (code ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND length(code) >= 2),
+        CHECK (code ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND code ~ '[A-Z]' AND length(code) >= 2),
     category_id BIGINT NULL REFERENCES course_categories(id) ON DELETE SET NULL,
     slug VARCHAR(180) NOT NULL UNIQUE,
     title VARCHAR(240) NOT NULL,
@@ -1123,10 +1151,19 @@ CREATE TABLE resources (
 CREATE UNIQUE INDEX resources_title_uq ON resources(LOWER(title));
 CREATE INDEX resources_type_title_idx ON resources(resource_type, title, id);
 
+-- The slug of a Course Item's name, its address in Administration (owner, 2026-11-06: /admin/course-items/
+-- gdn-101-module-1-presentation): apostrophes dropped, every run of anything but an ASCII letter or digit one hyphen,
+-- lower case, no hyphen at either end. Support\Address\CourseItemAddress::slug() is the same rule in PHP.
+CREATE FUNCTION course_item_slug(name TEXT) RETURNS TEXT
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+    SELECT btrim(regexp_replace(lower(regexp_replace(name, '[''’‘]', '', 'g') COLLATE "C"), '[^a-z0-9]+', '-', 'g'), '-')
+$$;
+
 CREATE TABLE course_items (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
-    item_key VARCHAR(120) NOT NULL UNIQUE CHECK (item_key ~ '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$'),
+    -- It holds a letter, so a key never looks like a row id (owner, 2026-11-06).
+    item_key VARCHAR(120) NOT NULL UNIQUE CHECK (item_key ~ '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$' AND item_key ~ '[a-zA-Z]'),
     item_type VARCHAR(32) NOT NULL CHECK (item_type IN ('html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file','slide_deck','flashcards','practical')),
     -- The name administrators know it by, never used twice (owner, 2026-10-30: many items share a title, such as "What
     -- you will learn"), such as "GDN-101 Module 1 Presentation": the Course Item Library lists and searches it. Learners see the title.
@@ -1141,11 +1178,14 @@ CREATE TABLE course_items (
     created_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     updated_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- The name's slug is its address, so it holds a letter and is never new (/admin/course-items/new).
+    CONSTRAINT course_items_name_addressable CHECK (course_item_slug(name) ~ '[a-z]' AND course_item_slug(name) <> 'new')
 );
 CREATE INDEX course_items_type_title_idx ON course_items(item_type, title, id);
 CREATE INDEX course_items_title_idx ON course_items(title, id);
-CREATE UNIQUE INDEX course_items_name_unique ON course_items (lower(name));
+-- A name is never used twice, not even as a slug, so the slug names one item and a lookup by it uses this index.
+CREATE UNIQUE INDEX course_items_name_slug_key ON course_items (course_item_slug(name));
 
 CREATE TABLE course_item_references (
     source_course_item_id BIGINT NOT NULL REFERENCES course_items(id) ON DELETE CASCADE,
@@ -1164,9 +1204,16 @@ CREATE TABLE course_structure_nodes (
     position INTEGER NOT NULL CHECK (position > 0),
     node_type VARCHAR(16) NOT NULL CHECK (node_type IN ('section','item')),
     relative_delay_minutes INTEGER NOT NULL DEFAULT 0 CHECK (relative_delay_minutes >= 0),
+    -- The part's name in the reader's and the public preview's addresses (owner, 2026-11-06, "yes, do it that way":
+    -- /learn/growing-vegetables/module-1-presentation): made from its place when it is placed, kept when it moves, unique
+    -- within its course, lowercase words holding a letter and never a word beside it in those addresses
+    -- (Support\Address\CoursePartAddress).
+    part_name VARCHAR(80) NOT NULL CHECK (part_name ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND part_name ~ '[a-z]'
+        AND part_name NOT IN ('start','review','assessment','item','preview','content','arrange','arrange-modules','insert','move-into','move-selection','placements','sections','tree','new')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE NULLS NOT DISTINCT (course_id, parent_node_id, position)
+    UNIQUE NULLS NOT DISTINCT (course_id, parent_node_id, position),
+    CONSTRAINT course_structure_nodes_part_name_key UNIQUE (course_id, part_name)
 );
 CREATE INDEX course_structure_nodes_course_parent_position_idx ON course_structure_nodes(course_id, parent_node_id, position);
 
@@ -1684,6 +1731,9 @@ $fn$;
 CREATE TABLE bundles (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
+    -- Its code, by a course code's rule (owner, 2026-11-06), never a course's (catalogue_code_unique()).
+    code VARCHAR(20) NOT NULL UNIQUE DEFAULT ('BDL-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)))
+        CHECK (code ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND code ~ '[A-Z]' AND length(code) >= 2),
     slug VARCHAR(180) NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
     title VARCHAR(240) NOT NULL CHECK (btrim(title) <> ''),
     short_description VARCHAR(320) NOT NULL DEFAULT '',
@@ -1700,6 +1750,23 @@ CREATE TABLE bundles (
     CONSTRAINT bundles_window CHECK (available_from IS NULL OR available_until IS NULL OR available_until > available_from)
 );
 CREATE INDEX bundles_status_title_idx ON bundles (status, title, id);
+
+-- A code names one thing (owner, 2026-11-06): no bundle may have a course's code and no course a bundle's, so a
+-- catalogue import matches either by its code alone. Reported as a unique violation, as each table's own key is.
+CREATE FUNCTION catalogue_code_unique() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF TG_TABLE_NAME = 'bundles' THEN
+        IF EXISTS (SELECT 1 FROM courses WHERE code = NEW.code) THEN
+            RAISE EXCEPTION 'The code % is a course''s', NEW.code USING ERRCODE = '23505', CONSTRAINT = 'bundles_code_not_a_course';
+        END IF;
+    ELSIF EXISTS (SELECT 1 FROM bundles WHERE code = NEW.code) THEN
+        RAISE EXCEPTION 'The code % is a bundle''s', NEW.code USING ERRCODE = '23505', CONSTRAINT = 'courses_code_not_a_bundle';
+    END IF;
+    RETURN NEW;
+END;
+$fn$;
+CREATE TRIGGER bundles_code_unique BEFORE INSERT OR UPDATE OF code ON bundles FOR EACH ROW EXECUTE FUNCTION catalogue_code_unique();
+CREATE TRIGGER courses_code_unique BEFORE INSERT OR UPDATE OF code ON courses FOR EACH ROW EXECUTE FUNCTION catalogue_code_unique();
 
 -- Only courses, so no bundle can contain a bundle. Positions are renumbered in one transaction.
 CREATE TABLE bundle_courses (
@@ -1728,13 +1795,25 @@ CREATE TABLE bundle_offers (
     updated_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT
 );
 
+-- The bundles a person starred (owner, 2026-11-06: "Allow bundles to be added to favourites - it must appear in course
+-- favourites"), beside course_favourites and keyed the same way, by the pair.
+CREATE TABLE bundle_favourites (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bundle_id BIGINT NOT NULL REFERENCES bundles(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, bundle_id)
+);
+CREATE INDEX bundle_favourites_user_created_idx ON bundle_favourites (user_id, created_at DESC, bundle_id DESC);
+CREATE INDEX bundle_favourites_bundle_fk_idx ON bundle_favourites (bundle_id);
+
 -- Promo codes. Canonical form only: upper case, so SAVE10, save10 and Save10 are one code. Each
 -- cart line is eligible by its own product type: course_scope and bundle_scope are independent.
 -- applies_automatically (owner, 2026-10-20): the cart applies the promotion by itself, with no code
 -- to type, and says so; one promotion applies to an order, the one that saves the most.
 CREATE TABLE promotions (
     id BIGSERIAL PRIMARY KEY,
-    code VARCHAR(40) NOT NULL UNIQUE CHECK (code ~ '^[A-Z0-9][A-Z0-9_-]{2,39}$'),
+    -- Holding a letter: Administration names a promotion by its code (/admin/promotions/SUMMER25, owner 2026-11-06).
+    code VARCHAR(40) NOT NULL UNIQUE CHECK (code ~ '^[A-Z0-9][A-Z0-9_-]{2,39}$' AND code ~ '[A-Z]'),
     name VARCHAR(120) NOT NULL CHECK (btrim(name) <> ''),
     description VARCHAR(1000) NULL CHECK (description IS NULL OR btrim(description) <> ''),
     discount_type TEXT NOT NULL CHECK (discount_type IN ('percentage','fixed_amount')),
@@ -2250,21 +2329,75 @@ CREATE INDEX site_lockouts_force_idx ON site_lockouts (until_at) WHERE lifted_at
 CREATE INDEX site_lockouts_network_idx ON site_lockouts (network, started_at DESC);
 
 -- Email addresses and domains that cannot register, ask for a sign-in link or use the contact form, from any address.
--- The messages to the owner's Telegram (owner, 2026-11-05: "yes telegram, paid orders only"): kept in the transaction of what
--- they are about and sent every minute by the owner_messages job, so Telegram being down holds nothing up. One per person
--- registering or order paid, by its reference.
-CREATE TABLE owner_messages (
+-- Every message the site sends by Telegram (owner, 2026-11-05: "yes telegram, paid orders only"; the Telegram log). The
+-- owner's own (chat_id NULL) are kept in the transaction of what they are about and sent every minute by the owner_messages
+-- job, so Telegram being down holds nothing up, one per person registering or order paid, by its reference. A person's
+-- (sign_in, connected, test) go at once and are kept as they went, with the account they went to: a sign-in message's code
+-- and link are never kept, only that it was sent.
+CREATE TABLE telegram_messages (
     id BIGSERIAL PRIMARY KEY,
     reference TEXT NOT NULL UNIQUE,
-    kind TEXT NOT NULL CHECK (kind IN ('registration','sale','test')),
+    kind TEXT NOT NULL CHECK (kind IN ('registration','order','sale','test','sign_in','connected','money_report')),
     body TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     sent_at TIMESTAMPTZ NULL,
     tries INTEGER NOT NULL DEFAULT 0 CHECK (tries >= 0),
     last_tried_at TIMESTAMPTZ NULL,
-    last_error TEXT NULL
+    last_error TEXT NULL,
+    chat_id TEXT NULL,
+    to_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    to_username TEXT NULL
 );
-CREATE INDEX owner_messages_waiting_idx ON owner_messages (created_at) WHERE sent_at IS NULL;
+CREATE INDEX telegram_messages_waiting_idx ON telegram_messages (created_at) WHERE sent_at IS NULL;
+
+-- Money Reports (owner, 2026-11-06, the approved mockup): each month's report, sent on the 1st at the start of the
+-- sending hours, once. The month is claimed here before anything goes, so a restart never sends it twice: email and
+-- telegram say what became of each (waiting, sent, off when its tick was off, not_connected without Telegram, failed
+-- after a week of failed tries), and one decided is never sent later.
+CREATE TABLE money_report_sends (
+    month DATE PRIMARY KEY CHECK (EXTRACT(DAY FROM month) = 1),
+    email TEXT NOT NULL CHECK (email IN ('waiting','sent','off','failed')),
+    emailed_to TEXT NULL,
+    emailed_at TIMESTAMPTZ NULL,
+    telegram TEXT NOT NULL CHECK (telegram IN ('waiting','sent','off','not_connected')),
+    telegram_at TIMESTAMPTZ NULL,
+    tries INTEGER NOT NULL DEFAULT 0 CHECK (tries >= 0),
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((email = 'sent') = (emailed_at IS NOT NULL)),
+    CHECK ((telegram = 'sent') = (telegram_at IS NOT NULL))
+);
+
+-- The Telegram account a person connected to sign in with (owner, 2026-11-05): the private chat the bot writes to, its
+-- username when it has one (refreshed whenever the bot hears from it) and when it was connected. One Telegram account
+-- belongs to one person, and a person has one.
+CREATE TABLE telegram_accounts (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    chat_id TEXT NOT NULL UNIQUE CHECK (chat_id ~ '^-?[0-9]{1,20}$'),
+    username TEXT NULL CHECK (username IS NULL OR username ~ '^[A-Za-z0-9_]{4,32}$'),
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX telegram_accounts_username_idx ON telegram_accounts (LOWER(username)) WHERE username IS NOT NULL;
+
+-- Two-step sign-in (owner, 2026-11-05): the key a person's authenticator app holds, encrypted with the site's key (RFC 6238),
+-- when it was set up and the last 30-second step used, so a code works once. Their recovery codes are kept hashed, each
+-- used once.
+CREATE TABLE user_two_step (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    secret_encrypted TEXT NOT NULL,
+    confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_step BIGINT NOT NULL DEFAULT 0 CHECK (last_used_step >= 0)
+);
+CREATE TABLE user_two_step_recovery (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES user_two_step(user_id) ON DELETE CASCADE,
+    code_hash CHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    used_at TIMESTAMPTZ NULL,
+    UNIQUE (user_id, code_hash)
+);
 
 CREATE TABLE site_refused_emails (
     id BIGSERIAL PRIMARY KEY,
@@ -3336,10 +3469,10 @@ SQL);
     {
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS
-    site_requests, site_flags, site_lockouts, site_refused_emails, owner_messages,
+    site_requests, site_flags, site_lockouts, site_refused_emails, telegram_messages, money_report_sends, telegram_accounts, user_two_step_recovery, user_two_step,
     document_assets, document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
-    audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,
+    audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_favourites, bundle_offers, bundles,
     certificates, transcripts, identity_verifications, identity_webhook_events, scheduled_jobs, commerce_audit_events, commerce_bundle_grants, commerce_cart_bundles,
     commerce_cart_items, commerce_carts, commerce_document_files, commerce_document_numbers,
     commerce_documents, commerce_entitlements, commerce_ledger_entries, commerce_wallets, commerce_wallet_lots,
@@ -3369,6 +3502,7 @@ DROP FUNCTION IF EXISTS commerce_guard_refunded_credit_allocation() CASCADE;
 DROP FUNCTION IF EXISTS commerce_protect_order_snapshot() CASCADE;
 DROP FUNCTION IF EXISTS commerce_protect_purchased_credit_lot() CASCADE;
 DROP FUNCTION IF EXISTS commerce_reject_history_mutation() CASCADE;
+DROP FUNCTION IF EXISTS catalogue_code_unique() CASCADE;
 DROP FUNCTION IF EXISTS commerce_refund_request_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_unmatched_payment_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_wallet_allocation_guard() CASCADE;

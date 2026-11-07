@@ -29,7 +29,7 @@ final class CoursePopularityRepository
         'purchases' => 'p.purchases', 'refunds' => 'p.refunded_units', 'rating' => 'p.weighted_rating', 'reviews' => 'p.approved_reviews', 'momentum' => 'p.momentum_growth',
     ];
 
-    private const SELECT = "SELECT c.id AS course_id, c.slug, c.title, c.status, p.rank, p.score,
+    private const SELECT = "SELECT c.id AS course_id, c.code AS course_code, c.slug, c.title, c.status, p.rank, p.score,
                 p.view_points, p.favourite_points, p.purchase_points, p.refund_penalty_points, p.rating_points, p.momentum_points,
                 p.offer, p.unique_views, p.learner_readers, p.favourites, p.purchases, p.purchased_units, p.refunds, p.refunded_units,
                 p.refund_ratio, p.approved_reviews, p.average_rating, p.weighted_rating, p.recent_views, p.previous_views, p.momentum_growth,

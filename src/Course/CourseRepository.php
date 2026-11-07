@@ -453,7 +453,7 @@ final class CourseRepository
                    JOIN courses c ON c.id = cf.course_id
                   WHERE cf.company_id = :company_id' . '';
 
-        $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status,
+        $detail = "SELECT c.id, c.code, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status,
                           cc.name AS category_name, cf.note, cf.created_at,
                           co.name AS owner_company_name,
                           (c.owner_company_id = :company_id) AS is_company_owned,
@@ -719,9 +719,11 @@ final class CourseRepository
      * happening to write the same SQL twice.
      *
      * Neither argument is ever request text: the root is a bound parameter name or a column, and the
-     * alias is a literal in this file. A category slug from a URL is resolved to a row first.
+     * alias is a literal in the calling file. A category slug from a URL is resolved to a row first.
+     * The catalogue's bundle row (BundleRepository::publishedFor) uses it too, so a category's bundles
+     * are those with a course in the same branch its courses come from.
      */
-    private static function inBranchOf(string $courseAlias, string $root): string
+    public static function inBranchOf(string $courseAlias, string $root): string
     {
         return "{$courseAlias}.category_id IN (
                     SELECT d.id FROM course_categories d
@@ -1489,6 +1491,45 @@ final class CourseRepository
      * Puts an uncategorised course in a category (the catalogue file, owner 2026-10-20). A course that already has
      * one keeps it: false then.
      */
+    /**
+     * Puts a course in a category, or in none (the canonical catalogue import, owner 2026-11-06: the file's category
+     * wins). Moving a course never changes the category tree.
+     */
+    public function setCourseCategory(int $courseId, ?int $categoryId): void
+    {
+        $this->db->executeStatement('UPDATE courses SET category_id = :category, updated_at = NOW() WHERE id = :id', ['category' => $categoryId, 'id' => $courseId]);
+    }
+
+    /**
+     * The codes of the courses whose parts use this Resource Library file, as their own file, a video's poster or its
+     * captions, in code order: what a file replaced by an import also changes.
+     *
+     * @return list<string>
+     */
+    public function courseCodesUsingResource(int $resourceId): array
+    {
+        return array_map('strval', $this->db->fetchFirstColumn(
+            "SELECT DISTINCT c.code FROM course_item_placements p JOIN course_items ci ON ci.id = p.course_item_id JOIN courses c ON c.id = p.course_id
+              WHERE ci.resource_id = :id OR ci.type_config->>'poster_resource_id' = :text OR ci.type_config->>'subtitle_resource_id' = :text ORDER BY c.code",
+            ['id' => $resourceId, 'text' => (string) $resourceId]
+        ));
+    }
+
+    /** A Resource Library file whose contents were replaced in place: its new size and type (owner, 2026-11-06). */
+    public function recordResourceContents(int $resourceId, int $byteSize, string $mimeType): void
+    {
+        $this->db->executeStatement('UPDATE resources SET byte_size = :size, mime_type = :mime, updated_at = NOW() WHERE id = :id', ['size' => $byteSize, 'mime' => $mimeType, 'id' => $resourceId]);
+    }
+
+    /**
+     * Takes a price option out of the carts still being filled, before it is removed: a cart line is no order, and a
+     * course nobody bought goes with its cart lines (owner, 2026-10-21).
+     */
+    public function dropOpenCartLinesForVariant(int $variantId): void
+    {
+        $this->db->executeStatement("DELETE FROM commerce_cart_items WHERE variant_id = :id AND cart_id IN (SELECT id FROM commerce_carts WHERE state = 'open')", ['id' => $variantId]);
+    }
+
     public function categoriseIfUncategorised(int $courseId, int $categoryId): bool
     {
         return $this->db->executeStatement('UPDATE courses SET category_id = :category, updated_at = NOW() WHERE id = :id AND category_id IS NULL',
@@ -1896,6 +1937,42 @@ final class CourseRepository
     }
 
     /**
+     * The bundle with this code, if a bundle has it (owner, 2026-11-06): a code names one course or one bundle, never
+     * both, so no course may take a bundle's.
+     *
+     * @return array{id:int,title:string}|null
+     */
+    public function bundleWithCode(string $code): ?array
+    {
+        $row = $this->db->fetchAssociative('SELECT id, title FROM bundles WHERE code = :code', ['code' => CourseCode::normalise($code)]);
+        return $row === false ? null : ['id' => (int) $row['id'], 'title' => (string) $row['title']];
+    }
+
+    /**
+     * The row id of the course with this code, exactly as written (an address names a course by its code: owner,
+     * 2026-11-06), or null. Codes are capitals, so "gdn-101" names nothing.
+     */
+    public function idForCode(string $code): ?int
+    {
+        if ($code === '' || strlen($code) > CourseCode::MAXIMUM) return null;
+        $id = $this->db->fetchOne('SELECT id FROM courses WHERE code = :code', ['code' => $code]);
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /** The code of the course with this row id, or null: for an address made where only the id is at hand. */
+    public function codeForId(int $courseId): ?string
+    {
+        $code = $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $courseId]);
+        return $code === false || $code === null ? null : (string) $code;
+    }
+
+    /** Whether a course or a bundle has this code, for a suggested code that is free. */
+    public function codeInUse(string $code): bool
+    {
+        return $this->findByCode($code) !== null || $this->bundleWithCode($code) !== null;
+    }
+
+    /**
      * The course with this code (owner, 2026-10-23), the one thing every import matches a course by.
      *
      * @return array<string,mixed>|null
@@ -2244,7 +2321,7 @@ final class CourseRepository
     {
         [$where, $bindings] = self::libraryFilter($userId, $statuses, $search);
 
-        $detail = "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.level, c.status AS course_status,
+        $detail = "SELECT ce.*, c.code AS course_code, c.slug, c.title, c.subtitle, c.summary, c.level, c.status AS course_status,
                     cc.name AS category_name,
                     part_progress.part_count,
                     part_progress.done_part_count,
@@ -2550,7 +2627,7 @@ final class CourseRepository
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT ce.id,ce.course_id,ce.user_id,ce.status,ce.assigned_at,ce.expires_at,ce.access_removed_at,
                     CASE WHEN ce.status IN ('assigned','active','completed') AND ce.expires_at<=NOW() THEN 'expired' ELSE ce.status END AS display_status,
-                    c.title AS course_title,c.slug
+                    c.title AS course_title,c.code AS course_code,c.slug
              FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id
              WHERE ce.user_id=:user AND ce.is_preview=FALSE AND ce.source_type='administrator'
                AND (ce.source_reference='test_grant' OR (ce.source_reference IS NULL AND ce.expires_at IS NOT NULL
@@ -2567,7 +2644,7 @@ final class CourseRepository
     {
         $row = $this->db->fetchAssociative(
             "SELECT ce.id,ce.course_id,ce.user_id,ce.status,ce.expires_at,ce.access_removed_at,
-                    c.title AS course_title,c.slug,ue.email
+                    c.title AS course_title,c.code AS course_code,c.slug,ue.email
              FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN LATERAL (SELECT email FROM user_emails WHERE user_id=u.id AND verified_at IS NOT NULL

@@ -4,13 +4,13 @@
 	recording, kept or removed at once by narration-recorder.js (owner, 2026-10-29: a new take is heard first, then kept
 	or discarded). Without JavaScript the form posts, an uploaded file going with the script, and Remove sends it.
 #}
-{% set narration_url = '/admin/course-items/' ~ item.id ~ '/slides/' ~ slide.id ~ '/narration' %}
+{% set narration_url = course_item_url(item, '/slides/' ~ slide.id ~ '/narration') %}
 <form id="narration-form" class="cl-narration-form" action="{{ narration_url }}" method="post" enctype="multipart/form-data" hx-post="{{ narration_url }}" hx-target="#narration-script-status" hx-swap="innerHTML">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Script', for: 'narration-script', full_width: true, help: 'What you say on this slide. Learners can read it as the transcript. Up to 2,000 characters.'})} %}{% block control %}<textarea class="cl-input" id="narration-script" name="narration" rows="4" maxlength="2000" {{ ui_field_attrs(props) }}>{{ slide.narration|default('') }}</textarea>{% endblock %}{% endembed %}
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save the script', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 <p class="cl-narration-script-status" id="narration-script-status" role="status"></p>
-<div class="cl-narration" data-narration-slide="{{ slide.id }}" data-narration-url="/admin/course-items/{{ item.id }}/narration/{{ slide.id }}">
+<div class="cl-narration" data-narration-slide="{{ slide.id }}" data-narration-url="{{ course_item_url(item, '/narration/' ~ slide.id) }}">
 <p class="cl-narration-title">Recording</p>
 <div class="cl-narration-saved">
 <p class="cl-narration-label">Saved for this slide</p>

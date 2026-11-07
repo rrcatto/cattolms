@@ -29,7 +29,7 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Address'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Why'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Since'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
 			{% block body %}{% for row in suppressions %}<tr>
-				<td class="cell-text">{% if row.user_id %}<a href="/admin/people/{{ row.user_id }}">{{ row.email }}</a>{% else %}{{ row.email }}{% endif %}</td>
+				<td class="cell-text">{% if row.user_id %}<a href="{{ person_url(row.account_reference) }}">{{ row.email }}</a>{% else %}{{ row.email }}{% endif %}</td>
 				<td class="cell-text">{{ reasons[row.reason] }}{% if row.detail %}<br><span class="small cl-text-secondary">{{ row.detail }}</span>{% endif %}</td>
 				<td>{{ row.created_at|date('j M Y') }}</td>
 				<td class="cell-actions">{% if can_manage %}<form action="/mailing/never-emailed/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="email" value="{{ row.email }}">{{ ui('action.button', {label: 'Allow again', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-enable', confirm: row.reason == 'complaint' ? 'This person marked an email as spam. Allow news to ' ~ row.email ~ ' again only if they asked for it.' : 'Allow news to ' ~ row.email ~ ' again?'}) }}</form>{% endif %}</td>

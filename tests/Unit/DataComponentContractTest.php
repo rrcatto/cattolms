@@ -44,12 +44,12 @@ final class DataComponentContractTest extends TestCase
      */
     public function testAPersonIsTheirNameAndAccountReferenceLinkedToTheirAccount(): void
     {
-        $name = ComponentHarness::render('data.person', ['name' => '<Thandi Nkosi>', 'reference' => 'CL202610200001X', 'href' => '/admin/people/7', 'email' => 'thandi@example.test']);
-        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/7"><span class="cl-ui-person-name">&lt;Thandi Nkosi&gt;</span></a></span>', $name);
+        $name = ComponentHarness::render('data.person', ['name' => '<Thandi Nkosi>', 'reference' => 'CL202610200001X', 'href' => '/admin/people/CL202610200001X', 'email' => 'thandi@example.test']);
+        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/CL202610200001X"><span class="cl-ui-person-name">&lt;Thandi Nkosi&gt;</span></a></span>', $name);
         self::assertStringNotContainsString('CL-', $name, 'A mention names the person without their reference.');
         self::assertStringNotContainsString('mailto:', $name, 'or their email.');
-        $full = ComponentHarness::render('data.person', ['name' => 'Thandi Nkosi', 'reference' => 'CL202610200001X', 'href' => '/admin/people/7', 'email' => 'thandi@example.test', 'full' => true]);
-        self::assertStringContainsString('<span class="cl-ui-person cl-ui-person--full"><span class="cl-ui-person-line"><a class="cl-ui-person-account" href="/admin/people/7"><span class="cl-ui-person-name">Thandi Nkosi</span></a></span><span class="cl-ui-person-line cl-ui-person-reference">CL-20261020-0001-X</span><span class="cl-ui-person-line"><a class="cl-ui-person-email" href="mailto:thandi@example.test">thandi@example.test</a></span></span>', $full);
+        $full = ComponentHarness::render('data.person', ['name' => 'Thandi Nkosi', 'reference' => 'CL202610200001X', 'href' => '/admin/people/CL202610200001X', 'email' => 'thandi@example.test', 'full' => true]);
+        self::assertStringContainsString('<span class="cl-ui-person cl-ui-person--full"><span class="cl-ui-person-line"><a class="cl-ui-person-account" href="/admin/people/CL202610200001X"><span class="cl-ui-person-name">Thandi Nkosi</span></a></span><span class="cl-ui-person-line cl-ui-person-reference">CL-20261020-0001-X</span><span class="cl-ui-person-line"><a class="cl-ui-person-email" href="mailto:thandi@example.test">thandi@example.test</a></span></span>', $full);
         $plain = ComponentHarness::render('data.person', ['name' => 'Sender']);
         self::assertStringNotContainsString('<a', $plain, 'No account to open: the name alone.');
     }
@@ -63,9 +63,9 @@ final class DataComponentContractTest extends TestCase
         $grid = ComponentHarness::render('data.card-grid', ['columns' => 5, 'label' => '<People>']);
         self::assertStringContainsString('<ul class="cl-ui-card-grid" data-columns="5" aria-label="&lt;People&gt;">', $grid);
         self::assertStringContainsString('data-columns="4"', ComponentHarness::render('data.card-grid', []), 'Four to a row unless five are asked for.');
-        $card = ComponentHarness::render('data.card', ['title' => '<Thandi>', 'href' => '/admin/people/7', 'picture' => 'round']);
+        $card = ComponentHarness::render('data.card', ['title' => '<Thandi>', 'href' => '/admin/people/CL202610200001X', 'picture' => 'round']);
         self::assertStringContainsString('<li class="cl-ui-card" data-picture="round">', $card);
-        self::assertStringContainsString('<h3 class="cl-ui-card-title"><a href="/admin/people/7">&lt;Thandi&gt;</a></h3>', $card);
+        self::assertStringContainsString('<h3 class="cl-ui-card-title"><a href="/admin/people/CL202610200001X">&lt;Thandi&gt;</a></h3>', $card);
         self::assertStringContainsString('<h3 class="cl-ui-card-title">Gauteng Logistics</h3>', ComponentHarness::render('data.card', ['title' => 'Gauteng Logistics', 'picture' => 'square']), 'No page: the name alone.');
         foreach ([['data.card-grid', ['columns' => 6], 'columns'], ['data.card-grid', ['columns' => 'auto'], 'columns'], ['data.card', ['title' => 'x', 'picture' => 'oval'], 'picture']] as [$component, $properties, $key]) {
             try {

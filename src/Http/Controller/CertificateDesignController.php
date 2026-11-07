@@ -18,6 +18,8 @@ The editor can be opened from a course's certificate page; it then returns there
 course certificate page is accepted).
 
 Changelog:
+2026/11/07 SAST
+- The last editor is linked by their account reference (owner, 2026-11-06).
 2026/10/07 SAST
 - Created for certificate designs, replacing the generic document template pages for certificates.
 */
@@ -279,7 +281,8 @@ final class CertificateDesignController extends BaseController
     private function returnTo(): ?string
     {
         $target = (string) ($this->request()->request->get('return_to') ?? $this->request()->query->get('return_to') ?? '');
-        return preg_match('#^/admin/courses/\d+/certificate$#D', $target) === 1 ? $target : null;
+        // A course's certificate page, by the course's code (owner, 2026-11-06).
+        return preg_match('#^/admin/courses/' . \CattoLearning\Course\CourseAddress::REQUIREMENT . '/certificate$#D', $target) === 1 ? $target : null;
     }
 
     /** @param list<array<string,mixed>> $designs */
@@ -318,7 +321,7 @@ final class CertificateDesignController extends BaseController
     private static function lastEditor(array $design): ?array
     {
         $id = (int) ($design['updated_by_user_id'] ?? 0);
-        return $id > 0 ? ['name' => (string) ($design['updated_by_name'] ?? '') ?: 'User ' . $id, 'reference' => (string) ($design['updated_by_reference'] ?? ''), 'href' => '/admin/people/' . $id] : null;
+        return $id > 0 ? ['name' => (string) ($design['updated_by_name'] ?? '') ?: 'User ' . $id, 'reference' => (string) ($design['updated_by_reference'] ?? ''), 'href' => \CattoLearning\Support\Address\PersonAddress::admin((string) $design['updated_by_reference'])] : null;
     }
 
     public static function lookImage(string $look): string

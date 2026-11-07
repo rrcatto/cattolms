@@ -64,15 +64,16 @@ async function open(browser, options = {}) {
 const ids = () => state.ids;
 const names = () => state.names;
 const pathOf = (...keys) => keys.map((key) => names()[key]).join(' › ');
-/* One picker on the page, by the id of its closed control. */
-const picker = (page, id) => ({
+/* One picker on the page, by the id of its closed control. The public catalogue's picker names each category by its slug
+   (owner, 2026-11-06: no row id in an address); a course's form posts the category's number. */
+const picker = (page, id) => { const keyed = () => (id === 'catalogue-category-picker' ? state.slugs : ids()); return ({
     toggle: page.locator(`#${id}`),
     panel: page.locator(`#${id}-options`),
-    expander: (key) => page.locator(`#${id}-options [aria-controls="${id}-branch-${ids()[key]}"]`),
-    option: (key) => { const value = key === '0' || key === '' ? key : ids()[key]; return page.locator(`#${id}-options button.cl-ui-tree-select-option[value="${value}"], #${id}-options label.cl-ui-tree-select-option:has(input[value="${value}"])`); },
+    expander: (key) => page.locator(`#${id}-options [aria-controls="${id}-branch-${keyed()[key]}"]`),
+    option: (key) => { const value = key === '0' || key === '' ? key : keyed()[key]; return page.locator(`#${id}-options button.cl-ui-tree-select-option[value="${value}"], #${id}-options label.cl-ui-tree-select-option:has(input[value="${value}"])`); },
     visible: () => page.locator(`#${id}-options .cl-ui-tree-select-option:visible`).count(),
     shown: async () => (await page.locator(`#${id} .cl-ui-tree-select-value`).textContent()).trim(),
-});
+}); };
 /* Scrolls the open list itself, as a reader does, so a lower option is in view without moving the page. */
 async function scrollList(locator) {
     await locator.evaluate((element) => { const panel = element.closest('[popover]'); panel.scrollTop = Math.max(0, element.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - panel.clientHeight / 3); });
@@ -239,7 +240,7 @@ const ROOTS = 4; // A, B, G and D
                 await p.expander('A').click();
                 await p.option('A1').click();
                 await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Create course'}).click()]);
-                assert.match(page.url(), /\/admin\/courses\/\d+/);
+                assert.match(page.url(), /\/admin\/courses\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+/, 'The course opens by its code.');
                 assert.equal(await course().shown(), pathOf('A', 'A1'), 'Saved and shown by its path on the course.');
                 await opened(course());
                 await course().expander('A1').click();
@@ -275,8 +276,8 @@ const ROOTS = 4; // A, B, G and D
                 await page.locator('#import-category-new').getByRole('button', {name: 'Create category'}).click();
                 await page.locator('#import-category-new').waitFor({state: 'hidden'});
                 assert.equal(await picker(page, 'import-category').shown(), `${names().D} › ${state.extra.imported}`);
-                await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Import into PostgreSQL'}).click()]);
-                assert.match(page.url(), /\/admin\/courses\/\d+/, `The import was committed (${(await page.locator('[data-flash-message]').allTextContents()).join(' ').trim()})`);
+                await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Import', exact: true}).click()]);
+                assert.match(page.url(), /\/admin\/courses\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+/, `The import was committed (${(await page.locator('[data-flash-message]').allTextContents()).join(' ').trim()})`);
                 assert.equal(await course().shown(), `${names().D} › ${state.extra.imported}`, 'The imported course is in the new category.');
             });
 

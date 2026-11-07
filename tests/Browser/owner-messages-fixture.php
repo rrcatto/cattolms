@@ -51,7 +51,7 @@ if ($action === 'create') {
     $admin = $fixture->person('ADMIN');
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Owner messages browser', $admin['email']);
-    $state = ['token' => $token, 'before' => $options->find(OwnerMessageSettings::OPTION), 'address_before' => $options->find(OwnerMessageSettings::ADDRESS_OPTION), 'messages_before' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM owner_messages'), 'scrub' => $fixture->seeds()];
+    $state = ['token' => $token, 'before' => $options->find(OwnerMessageSettings::OPTION), 'address_before' => $options->find(OwnerMessageSettings::ADDRESS_OPTION), 'messages_before' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM telegram_messages'), 'scrub' => $fixture->seeds()];
     $options->delete(OwnerMessageSettings::OPTION);
     $options->set(OwnerMessageSettings::ADDRESS_OPTION, 'http://127.0.0.1:' . OWNER_MESSAGES_PORT, $admin['id']);
     @unlink('/tmp/owner-messages-standin.log');
@@ -73,7 +73,7 @@ if ($action === 'create') {
     if (!is_file($statePath)) { exit(0); }
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     if ((int) ($state['pid'] ?? 0) > 0) { @shell_exec('kill ' . (int) $state['pid'] . ' 2>/dev/null'); }
-    $db->executeStatement('DELETE FROM owner_messages WHERE id > :before', ['before' => (int) ($state['messages_before'] ?? 0)]);
+    $db->executeStatement('DELETE FROM telegram_messages WHERE id > :before', ['before' => (int) ($state['messages_before'] ?? 0)]);
     foreach ([OwnerMessageSettings::OPTION => $state['before'], OwnerMessageSettings::ADDRESS_OPTION => $state['address_before']] as $name => $value) {
         if ($value === null) { $options->delete($name); } else { $options->set($name, $value); }
     }

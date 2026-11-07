@@ -9,7 +9,7 @@
 {% extends layout %}
 {% block page_body %}
 	{% set ph_back_href = '/admin/commerce/orders' %}{% set ph_back_label = 'Orders & Payments' %}
-	{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
+	{% set ph_title = 'Order ' ~ order_number(order.id) %}
 	{# The order's account under its number, once, each detail on its own line (owner, 2026-10-21); elsewhere on the page the buyer is their name alone. #}
 	{% if snapshot.company_name|default('') %}{% set ph_lead %}Account {{ account_reference }} · {{ snapshot.company_name }}<br>Placed by {{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead %}{{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
@@ -28,7 +28,7 @@
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Record the EFT payment', heading_level: 2, summary: 'Fill this in when the money shows on your bank statement with the reference ' ~ account_reference ~ '. If more than ' ~ due_label ~ ' arrived, the order is paid and the rest goes to the customer’s wallet. If less arrived, it is recorded and the order waits for the rest.'}) }}
-			<form action="/admin/commerce/orders/{{ order.id }}/confirm-bank" method="post">
+			<form action="{{ order_url(order.id, '/confirm-bank') }}" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="request_key" value="{{ confirmation_key }}">
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount that arrived (' ~ order.currency ~ ')', for: 'bank-amount', required: true})} %}{% block control %}<input id="bank-amount" name="amount" inputmode="decimal" value="{{ '%d.%02d'|format(due_minor // 100, due_minor % 100) }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
@@ -46,7 +46,7 @@
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Release the order', heading_level: 2, summary: 'Release it once you have checked the payment and who it is for. Access opens when you do.'}) }}
-			<form action="/admin/commerce/orders/{{ order.id }}/release-review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+			<form action="{{ order_url(order.id, '/release-review') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What you checked', for: 'review-reason', required: true})} %}{% block control %}<textarea id="review-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release paid order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}{% endblock %}{% endembed %}
 			</form>
@@ -112,7 +112,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Documents', heading_level: 2, summary: 'Each document stays exactly as it was issued.'}) }}
 			{% for document in documents %}
-				<p data-document-kind="{{ document.kind }}" data-design-version="{{ document.template_version_number }}">{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id ~ '/documents/' ~ document.id, new_window: true, icon: 'action-document'}) }} <a href="/admin/commerce/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download the PDF</a> <span class="small">issued {{ document.issued_at|date('j M Y \\a\\t H:i') }}</span></p>
+				<p data-document-kind="{{ document.kind }}" data-design-version="{{ document.template_version_number }}">{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: order_document_url('admin', order.id, document.number), new_window: true, icon: 'action-document'}) }} <a href="{{ order_document_url('admin', order.id, document.number) }}?download=1">Download the PDF</a> <span class="small">issued {{ document.issued_at|date('j M Y \\a\\t H:i') }}</span></p>
 			{% else %}
 				<p>No document has been issued yet. The invoice is issued when the order is placed.</p>
 			{% endfor %}
@@ -151,7 +151,7 @@
 					{% if order.company_id and not item.unissued and (not item.latest_refundable or item.latest_refundable.commerce_order_item_id != item.id) %}<p>Refund the newer unused credits for this course and period first.</p>{% else %}
 					{% if item.rule_refusals %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Outside the Refund Policy'})} %}{% block body %} {{ item.rule_refusals|join(' ') }} Approving it overrides the policy, so give your reason below.{% endblock %}{% endembed %}{% else %}<p>Within the Refund Policy: not started, and within {{ refund_window }} of the purchase.</p>{% endif %}
 					{% for quote in item.quotes %}<p class="help"><strong>{{ quote.label }}, if all of it is refunded:</strong> {{ quote.text }}</p>{% endfor %}
-					<form action="/admin/commerce/orders/{{ order.id }}/refund" method="post">
+					<form action="{{ order_url(order.id, '/refund') }}" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="request_key" value="{{ item.refund_key }}"><input type="hidden" name="item_id" value="{{ item.id }}">
 						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why the refund is given', for: 'refund-basis-' ~ item.id, required: true})} %}{% block control %}<select id="refund-basis-{{ item.id }}" name="basis" required {{ ui_field_attrs(props) }}><option value="voluntary">The customer asked</option><option value="statutory">A legal right</option><option value="service_failure">The course failed</option><option value="goodwill">Goodwill</option></select>{% endblock %}{% endembed %}

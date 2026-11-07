@@ -8,10 +8,17 @@ Date time: 2026/11/05 SAST
 Version: 1.0.9
 
 Description:
-The messages waiting to go to the owner, and the ones gone (owner_messages), which must survive Telegram being down, each
-once: its reference is unique, a person's registration or an order. Also what a message needs to know of an order.
+Every message the site sends by Telegram (telegram_messages, the Telegram log). The owner's own (chat_id NULL) wait to go and
+must survive Telegram being down, each once: its reference is unique, a person's registration or an order. A person's
+(a sign-in message, a connection, a test) go at once and are kept as they went, with the account they went to. Only the
+owner's own are counted, sent and reported by the job and Settings, so someone who blocked the bot never shows there and
+nothing goes twice. Also what a message needs to know of an order.
 
 Change log:
+2026/11/05 SAST (evening)
+- telegram_messages in place of owner_messages, each with the account it went to (owner, 2026-11-05: "The Telegram log does
+  not say which telegram account a message was sent to"): the Telegram username at the moment of sending, and for a person's
+  message their chat and their account here. logSent() keeps a person's; logPage() names who each went to.
 2026/11/05 SAST
 - Created.
 */
@@ -56,95 +63,141 @@ class OwnerMessageRepository
     public function record(string $reference, string $kind, string $body): void
     {
         $this->db->executeStatement(
-            'INSERT INTO owner_messages (reference, kind, body) VALUES (:reference, :kind, :body) ON CONFLICT (reference) DO NOTHING',
+            'INSERT INTO telegram_messages (reference, kind, body) VALUES (:reference, :kind, :body) ON CONFLICT (reference) DO NOTHING',
             ['reference' => $reference, 'kind' => $kind, 'body' => $body]
         );
     }
 
     /**
-     * The oldest messages still to send.
+     * The oldest of the owner's own messages still to send. A person's are never here: they went at once, or not at all.
      *
      * @return list<array<string,mixed>>
      */
     public function waiting(int $limit): array
     {
-        return $this->db->fetchAllAssociative("SELECT id, reference, kind, body, tries FROM owner_messages WHERE sent_at IS NULL AND kind <> 'test' ORDER BY created_at, id LIMIT " . max(1, $limit));
+        return $this->db->fetchAllAssociative("SELECT id, reference, kind, body, tries FROM telegram_messages WHERE sent_at IS NULL AND chat_id IS NULL AND kind <> 'test' ORDER BY created_at, id LIMIT " . max(1, $limit));
     }
 
-    public function markSent(int $id): void
+    /** One of the owner's own gone, to the account named when it went. */
+    public function markSent(int $id, ?string $username = null): void
     {
-        $this->db->executeStatement('UPDATE owner_messages SET sent_at = NOW(), tries = tries + 1, last_tried_at = NOW(), last_error = NULL WHERE id = :id', ['id' => $id]);
+        $this->db->executeStatement('UPDATE telegram_messages SET sent_at = NOW(), tries = tries + 1, last_tried_at = NOW(), last_error = NULL, to_username = COALESCE(:username, to_username) WHERE id = :id',
+            ['id' => $id, 'username' => self::username($username)]);
     }
 
-    public function markFailed(int $id, string $error): void
+    public function markFailed(int $id, string $error, ?string $username = null): void
     {
-        $this->db->executeStatement('UPDATE owner_messages SET tries = tries + 1, last_tried_at = NOW(), last_error = :error WHERE id = :id', ['id' => $id, 'error' => mb_substr($error, 0, 500)]);
+        $this->db->executeStatement('UPDATE telegram_messages SET tries = tries + 1, last_tried_at = NOW(), last_error = :error, to_username = COALESCE(:username, to_username) WHERE id = :id',
+            ['id' => $id, 'error' => mb_substr($error, 0, 500), 'username' => self::username($username)]);
     }
 
     public function deleteWaitingBefore(DateTimeImmutable $before): int
     {
-        return $this->db->executeStatement('DELETE FROM owner_messages WHERE sent_at IS NULL AND created_at < :before', ['before' => $before->format(DATE_ATOM)]);
+        return $this->db->executeStatement('DELETE FROM telegram_messages WHERE sent_at IS NULL AND created_at < :before', ['before' => $before->format(DATE_ATOM)]);
     }
 
     public function deleteSentBefore(DateTimeImmutable $before): int
     {
-        return $this->db->executeStatement('DELETE FROM owner_messages WHERE sent_at IS NOT NULL AND sent_at < :before', ['before' => $before->format(DATE_ATOM)]);
+        return $this->db->executeStatement('DELETE FROM telegram_messages WHERE sent_at IS NOT NULL AND sent_at < :before', ['before' => $before->format(DATE_ATOM)]);
     }
 
-    /** @return array{waiting:int,last_sent_at:?string,last_error:?string} */
+    /** @return array{waiting:int,last_sent_at:?string,last_error:?string} how the owner's own messages are going */
     public function status(): array
     {
-        $failing = $this->db->fetchOne("SELECT last_error FROM owner_messages WHERE sent_at IS NULL AND last_error IS NOT NULL AND kind <> 'test' ORDER BY last_tried_at DESC LIMIT 1");
-        $sent = $this->db->fetchOne('SELECT MAX(sent_at) FROM owner_messages');
+        $failing = $this->db->fetchOne("SELECT last_error FROM telegram_messages WHERE sent_at IS NULL AND last_error IS NOT NULL AND chat_id IS NULL AND kind <> 'test' ORDER BY last_tried_at DESC LIMIT 1");
+        $sent = $this->db->fetchOne('SELECT MAX(sent_at) FROM telegram_messages WHERE chat_id IS NULL');
 
-        return ['waiting' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM owner_messages WHERE sent_at IS NULL AND kind <> 'test'"),
+        return ['waiting' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NULL AND chat_id IS NULL AND kind <> 'test'"),
             'last_sent_at' => is_string($sent) ? $sent : null, 'last_error' => is_string($failing) ? $failing : null];
     }
 
     /**
-     * A test message, kept for the log once it has gone or failed. It goes at once and is never sent again.
+     * The owner's test message, kept for the log once it has gone or failed. It goes at once and is never sent again.
      */
-    public function logTest(string $reference, string $body, ?string $error): void
+    public function logTest(string $reference, string $body, ?string $error, ?string $username = null): void
     {
         $this->db->executeStatement(
-            "INSERT INTO owner_messages (reference, kind, body, sent_at, tries, last_tried_at, last_error)
-             VALUES (:reference, 'test', :body, CASE WHEN CAST(:error AS TEXT) IS NULL THEN NOW() END, 1, NOW(), :error)",
-            ['reference' => $reference, 'body' => $body, 'error' => $error === null ? null : mb_substr($error, 0, 500)]
+            "INSERT INTO telegram_messages (reference, kind, body, sent_at, tries, last_tried_at, last_error, to_username)
+             VALUES (:reference, 'test', :body, CASE WHEN CAST(:error AS TEXT) IS NULL THEN NOW() END, 1, NOW(), :error, :username)",
+            ['reference' => $reference, 'body' => $body, 'error' => $error === null ? null : mb_substr($error, 0, 500), 'username' => self::username($username)]
         );
     }
 
     /**
+     * A message to a person (a sign-in message, a connection, the bot's answer, their test), kept once it has gone or failed,
+     * with the chat and the account it went to at that moment. A sign-in message's body here never holds its code or link.
+     */
+    public function logSent(string $reference, string $kind, string $body, string $chatId, ?int $userId, ?string $username, ?string $error): void
+    {
+        $this->db->executeStatement(
+            'INSERT INTO telegram_messages (reference, kind, body, chat_id, to_user_id, to_username, sent_at, tries, last_tried_at, last_error)
+             VALUES (:reference, :kind, :body, :chat, :user, :username, CASE WHEN CAST(:error AS TEXT) IS NULL THEN NOW() END, 1, NOW(), :error)',
+            ['reference' => $reference, 'kind' => $kind, 'body' => $body, 'chat' => $chatId, 'user' => $userId, 'username' => self::username($username),
+                'error' => $error === null ? null : mb_substr($error, 0, 500)]
+        );
+    }
+
+    /** The Telegram log's lists, in the order its cards show them. */
+    public const LISTS = ['all', 'sign_in', 'connected', 'registration', 'order', 'sale', 'test', 'unsent'];
+
+    /**
      * How many messages each of the Telegram log's lists holds.
      *
-     * @return array{all:int,registration:int,sale:int,test:int,unsent:int}
+     * @return array{all:int,sign_in:int,connected:int,registration:int,order:int,sale:int,test:int,unsent:int}
      */
     public function logCounts(): array
     {
         $row = $this->db->fetchAssociative(
-            "SELECT COUNT(*) AS everything, COUNT(*) FILTER (WHERE kind = 'registration') AS registration, COUNT(*) FILTER (WHERE kind = 'sale') AS sale,
-                    COUNT(*) FILTER (WHERE kind = 'test') AS test, COUNT(*) FILTER (WHERE sent_at IS NULL) AS unsent FROM owner_messages"
+            "SELECT COUNT(*) AS everything, COUNT(*) FILTER (WHERE kind = 'sign_in') AS sign_in, COUNT(*) FILTER (WHERE kind = 'connected') AS connected,
+                    COUNT(*) FILTER (WHERE kind = 'registration') AS registration, COUNT(*) FILTER (WHERE kind = 'order') AS placed, COUNT(*) FILTER (WHERE kind = 'sale') AS sale,
+                    COUNT(*) FILTER (WHERE kind = 'test') AS test, COUNT(*) FILTER (WHERE sent_at IS NULL) AS unsent FROM telegram_messages"
         ) ?: [];
 
-        return ['all' => (int) ($row['everything'] ?? 0), 'registration' => (int) ($row['registration'] ?? 0), 'sale' => (int) ($row['sale'] ?? 0), 'test' => (int) ($row['test'] ?? 0), 'unsent' => (int) ($row['unsent'] ?? 0)];
+        return ['all' => (int) ($row['everything'] ?? 0), 'sign_in' => (int) ($row['sign_in'] ?? 0), 'connected' => (int) ($row['connected'] ?? 0),
+            'registration' => (int) ($row['registration'] ?? 0), 'order' => (int) ($row['placed'] ?? 0), 'sale' => (int) ($row['sale'] ?? 0), 'test' => (int) ($row['test'] ?? 0), 'unsent' => (int) ($row['unsent'] ?? 0)];
     }
 
     /**
-     * One page of the Telegram log, newest first.
+     * One page of the Telegram log, newest first, each with who it went to: the person on this site and their name, when there
+     * is one.
      *
      * @return list<array<string,mixed>>
      */
     public function logPage(string $list, int $limit, int $offset): array
     {
         $where = match ($list) {
-            'registration', 'sale', 'test' => 'WHERE kind = :list',
-            'unsent' => 'WHERE sent_at IS NULL',
+            'sign_in', 'connected', 'registration', 'order', 'sale', 'test' => 'WHERE t.kind = :list',
+            'unsent' => 'WHERE t.sent_at IS NULL',
             default => '',
         };
 
         return $this->db->fetchAllAssociative(
-            'SELECT id, kind, body, created_at, sent_at, tries, last_error FROM owner_messages ' . $where . ' ORDER BY created_at DESC, id DESC LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset),
-            $where === 'WHERE kind = :list' ? ['list' => $list] : []
+            'SELECT t.id, t.reference, t.kind, t.body, t.created_at, t.sent_at, t.tries, t.last_error, t.chat_id, t.to_user_id, t.to_username,
+                    u.first_name, u.middle_names, u.last_name, u.display_name, u.account_reference AS to_reference, (SELECT e.email FROM user_emails e WHERE e.user_id = u.id AND e.is_primary LIMIT 1) AS primary_email
+             FROM telegram_messages t LEFT JOIN users u ON u.id = t.to_user_id ' . $where . ' ORDER BY t.created_at DESC, t.id DESC LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset),
+            $where === 'WHERE t.kind = :list' ? ['list' => $list] : []
         );
+    }
+
+    /** One reader of the bot's updates at a time, across the site's processes (TelegramInbox): whether this one may read. */
+    public function takeInboxTurn(): bool
+    {
+        return in_array($this->db->fetchOne('SELECT pg_try_advisory_lock(' . self::INBOX_LOCK . ')'), [true, 1, '1', 't', 'true'], true);
+    }
+
+    public function endInboxTurn(): void
+    {
+        $this->db->fetchOne('SELECT pg_advisory_unlock(' . self::INBOX_LOCK . ')');
+    }
+
+    private const INBOX_LOCK = 7384120461;
+
+    /** A Telegram username as it is kept: without its @, or null. */
+    private static function username(?string $username): ?string
+    {
+        $username = ltrim(trim((string) $username), '@');
+
+        return $username === '' ? null : $username;
     }
 
     /** A person's primary address, or null. */

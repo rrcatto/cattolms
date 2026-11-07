@@ -31,6 +31,9 @@ Kinds, in this order, oldest first within each:
 - draft: a course not yet published (the course's page: publish it or delete it).
 
 Changelog:
+2026/11/07 SAST
+- A person is linked by their account reference (/admin/people/CL2026…, owner 2026-11-06).
+- A contact message opens at its reference (/admin/messages/MSG-000043), never its row id.
 2026/10/28 SAST
 - A course video that no longer plays (the daily video check, decision 8A).
 2026/10/21 SAST
@@ -42,6 +45,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\TransactionAttention;
 use CattoLearning\Contact\ContactReason;
@@ -106,7 +110,7 @@ final class AdminAttention
                 $from = $check !== null && $check['country_code'] !== '' ? ' from ' . \CattoLearning\Auth\Signup\SignupCountries::name($check['country_code']) : '';
                 $item = self::item('account', 'Account', self::person($person['id'], $person['name'] ?: $person['email'], $person['account_reference']), true, 'is waiting for approval',
                     'Registered ' . self::date($person['created_at']) . $from . ' with ' . $person['email'] . '. Approve the account to let them sign in, or disable it to keep them out.',
-                    '/admin/people/' . $person['id'], 'Approve or disable', $person['created_at']);
+                    PersonAddress::admin((string) $person['account_reference']), 'Approve or disable', $person['created_at']);
                 if ($check !== null) {
                     $item['risk'] = ['label' => \CattoLearning\Auth\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'], 'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band'])];
                 }
@@ -117,7 +121,7 @@ final class AdminAttention
                 $items[] = self::item('signin_country', 'Sign-in', self::person($signIn['user_id'], $signIn['name'] ?: $signIn['email'], $signIn['account_reference']), true,
                     'signed in from ' . $signIn['country_name'] . ' for the first time',
                     'On ' . self::date($signIn['at']) . ' from ' . $signIn['ip'] . '. Their earlier sign-ins came from ' . implode(', ', $signIn['earlier']) . '. Look at their recent sign-ins, then mark it as seen.',
-                    '/admin/people/' . $signIn['user_id'] . '#recent-sign-ins', 'Look at it', $signIn['at']);
+                    PersonAddress::admin((string) $signIn['account_reference'], '#recent-sign-ins'), 'Look at it', $signIn['at']);
             }
         }
         if ($admin->hasPermission('COURSE.REVIEW.MANAGE')) {
@@ -145,7 +149,7 @@ final class AdminAttention
                     : ['name' => self::name($message['sender_name']), 'reference' => '', 'href' => ''];
                 $items[] = self::item('message', 'Message', $sender, true, 'sent message ' . $message['reference'] . ': ' . ContactReason::label((string) $message['reason']),
                     'Received ' . self::date((string) $message['created_at']) . '. Read it, reply by email, then mark it answered.',
-                    '/admin/messages/' . $message['id'], 'Read and reply', (string) $message['created_at']);
+                    \CattoLearning\Support\Address\RecordAddress::message((string) $message['reference']), 'Read and reply', (string) $message['created_at']);
             }
         }
         if ($admin->hasPermission('PLATFORM.PAYMENT.VIEW')) {
@@ -158,19 +162,19 @@ final class AdminAttention
             foreach ($this->identity->inReview() as $check) {
                 $items[] = self::item('identity', 'Identity check', self::person($check['user_id'], $check['person_name'] ?? '', $check['person_reference'] ?? ''), true, 'is having their identity checked',
                     'Didit\'s reviewers are deciding it (session ' . $check['session_id'] . '). Open the person to see where it stands.',
-                    '/admin/people/' . $check['user_id'] . '#identity', 'Open the person', (string) $check['started_at']);
+                    PersonAddress::admin((string) ($check['person_reference'] ?? ''), '#identity'), 'Open the person', (string) $check['started_at']);
             }
         }
         if ($admin->hasPermission('COURSE.MANAGEMENT.VIEW')) {
             foreach ($this->videos?->failing() ?? [] as $video) {
                 $items[] = self::item('video', 'Course video', null, false, $video['title'] . ' in ' . $video['course_title'] . ' no longer plays',
                     $video['detail'] . ' Found on ' . self::date($video['failing_since']) . '. Replace the video in its item, or take it out of the course.',
-                    '/admin/course-items/' . $video['course_item_id'], 'Open the video', $video['failing_since']);
+                    \CattoLearning\Support\Address\CourseItemAddress::admin($video['item_name']), 'Open the video', $video['failing_since']);
             }
             foreach ($this->records->draftCourses() as $course) {
                 $items[] = self::item('draft', 'Draft course', null, false, $course['title'] . ' is not published',
                     'Nobody can see or buy it. Publish it when it is ready, or delete it.',
-                    '/admin/courses/' . $course['id'], 'Open the course', (string) $course['updated_at']);
+                    \CattoLearning\Course\CourseAddress::admin((string) $course['code']), 'Open the course', (string) $course['updated_at']);
             }
         }
         // An address the site flagged and the owner has not decided (site analytics, owner 2026-11-04).
@@ -205,10 +209,10 @@ final class AdminAttention
         return ['kind' => $kind, 'badge' => $badge, 'person' => $person, 'subject' => $subject && $person !== null, 'title' => $title, 'summary' => $summary, 'href' => $href, 'action' => $action, 'icon' => self::ICONS[$kind] ?? 'action-open', 'at' => $at];
     }
 
-    /** @return array{name:string,reference:string,href:string} a person with an account, for data.person */
+    /** @return array{name:string,reference:string,href:string} a person with an account, for data.person, linked by their account reference */
     private static function person(mixed $id, mixed $name, mixed $reference): array
     {
-        return ['name' => self::name($name), 'reference' => (string) $reference, 'href' => '/admin/people/' . (int) $id];
+        return ['name' => self::name($name), 'reference' => (string) $reference, 'href' => PersonAddress::admin((string) $reference)];
     }
 
     private static function name(mixed $name): string

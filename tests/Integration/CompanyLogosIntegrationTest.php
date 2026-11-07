@@ -83,8 +83,10 @@ final class CompanyLogosIntegrationTest extends TestCase
 
     public function testAPageOfCompanyRowsGetsTheirPictureAddresses(): void
     {
-        $rows = $this->logos->withPictures([['id' => $this->company, 'name' => 'Logo Company'], ['id' => 999999999, 'name' => 'Gone']]);
-        self::assertStringStartsWith('/admin/companies/' . $this->company . '/logo?v=s', (string) $rows[0]['logo_url']);
+        // By the company's account reference (owner, 2026-11-06: no row id in an address).
+        $reference = (string) $this->db->fetchOne('SELECT account_reference FROM companies WHERE id = :id', ['id' => $this->company]);
+        $rows = $this->logos->withPictures([['id' => $this->company, 'name' => 'Logo Company', 'account_reference' => $reference], ['id' => 999999999, 'name' => 'Gone', 'account_reference' => 'CL202601010002H']]);
+        self::assertStringStartsWith('/admin/companies/' . $reference . '/logo?v=s', (string) $rows[0]['logo_url']);
         self::assertFalse($rows[0]['logo_uploaded']);
         self::assertSame('', $rows[1]['logo_url'], 'A company that does not exist has none.');
     }

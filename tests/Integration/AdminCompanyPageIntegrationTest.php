@@ -13,6 +13,9 @@ name, with the logo at the top as a person's page has their picture"): the compa
 Companies list shows, and its people, each named as their own page names them, with their role in the company.
 
 Changelog:
+2026/11/06 SAST
+- The page draws with the company's credits and courses, each course linked by its code (owner, 2026-11-06: no row id in
+  an address); a credit's row once lost its code and the page answered 500.
 2026/10/26 SAST
 - Created.
 */
@@ -22,10 +25,16 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Auth\PermissionCatalog;
+use CattoLearning\Http\Controller\AdminController;
+use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\IntegrationContainer;
+use CattoLearning\Tests\Support\InProcessPage;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
+use CattoLearning\Support\Uuid;
 
 final class AdminCompanyPageIntegrationTest extends TestCase
 {
@@ -64,5 +73,25 @@ final class AdminCompanyPageIntegrationTest extends TestCase
         self::assertSame('Company Administrator', $roles[$owner], 'In the words the company\'s own person page uses.');
         self::assertSame('Student', $roles[$member]);
         self::assertNull($service->adminCompanyView(999999999), 'A company that does not exist has no page.');
+    }
+
+    /** The page draws with a course the company provides and a credit it holds, each linked by the course's code. */
+    public function testItsCoursesAndCreditsLinkEachCourseByItsCode(): void
+    {
+        $fixture = new IntegrationDataFixture($this->db);
+        $suffix = $fixture->suffix();
+        $owner = $fixture->createUser('Credit Owner', 'credit-owner-' . $suffix . '@example.test');
+        $company = $fixture->createCompany($owner, 'Credit Company ' . $suffix, 'credit-' . $suffix . '.test');
+        $course = $fixture->createCourse($owner, $company, 'credit-course-' . $suffix, 'Credit Course ' . $suffix, 'published');
+        $code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $course]);
+        IntegrationContainer::get()->get(AdministrationRepository::class)->addCredit($company, null, $course, 31536000, 2, 'qa', 'page', $owner);
+        $admin = new CurrentUser($owner, Uuid::v4(), 'credit-owner-' . $suffix . '@example.test', 'Credit Owner', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());
+
+        // The company's page is named by its account reference (owner, 2026-11-06: no row id in an address).
+        $reference = (string) $this->db->fetchOne('SELECT account_reference FROM companies WHERE id = :id', ['id' => $company]);
+        $page = InProcessPage::run($admin, AdminController::class, 'company', ['reference' => $reference]);
+        self::assertSame(200, $page['status']);
+        self::assertStringContainsString('href="/admin/courses/' . $code . '"', $page['body'], 'Its course and its credit link the course by its code.');
+        self::assertStringNotContainsString('href="/admin/courses/' . $course . '"', $page['body']);
     }
 }

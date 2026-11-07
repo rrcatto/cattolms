@@ -25,6 +25,10 @@ return. Either way the deposit leaves the list, and nothing about it changes aft
 the Commerce Trail, and each open deposit is under Transactions that need attention.
 
 Changelog:
+2026/11/07 SAST
+- An order number a payer wrote is read as before (CL-00000183 or CL00000183), then turned into the order by
+  Commerce\Domain\OrderNumber, the one place that reads an order number; links to orders take their numbers
+  (Support\Address\OrderAddress, owner 2026-11-06: no row id in an address).
 2026/10/19 SAST
 - Created.
 */
@@ -34,10 +38,12 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Domain\OrderNumber;
 use CattoLearning\Commerce\Infrastructure\BankPaymentRepository;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\AccountReference;
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use DateTimeImmutable;
@@ -223,11 +229,14 @@ final class BankPayments
         return [null, $mistyped];
     }
 
-    /** An order number such as CL-00000183 (or CL00000183) in what the payer wrote. */
+    /**
+     * An order number such as CL-00000183 (or CL00000183, as payers often leave the hyphen out) in what the payer
+     * wrote: the order it names, read back by OrderNumber, which also refuses CL-00000000.
+     */
     public static function orderNumberIn(string $typed): ?int
     {
         foreach (preg_split('/[\s,;:\/]+/', strtoupper($typed)) ?: [] as $word) {
-            if (preg_match('/^CL-?(\d{8})$/', $word, $match) === 1 && (int) $match[1] > 0) return (int) $match[1];
+            if (preg_match('/^CL-?(\d{8})$/', $word, $match) === 1 && ($id = OrderNumber::id('CL-' . $match[1])) !== null) return $id;
         }
 
         return null;
@@ -243,7 +252,7 @@ final class BankPayments
         $currency = (string) $order['currency'];
 
         return [
-            'id' => (int) $order['id'], 'number' => MoneyRecords::orderNumber((int) $order['id']), 'href' => '/admin/commerce/orders/' . (int) $order['id'],
+            'id' => (int) $order['id'], 'number' => MoneyRecords::orderNumber((int) $order['id']), 'href' => OrderAddress::admin((int) $order['id']),
             'bought' => (string) $order['bought'], 'state' => (string) $order['state'],
             'total_label' => Money::ofMinorUnits((int) $order['total_minor'], $currency)->format(),
             'due_minor' => $due, 'due_label' => Money::ofMinorUnits($due, $currency)->format(),
@@ -284,7 +293,7 @@ final class BankPayments
             'outcome' => implode('', array_map(static fn(array $part): string => $part['text'] ?? $part['person']['name'], $outcome)),
             // The same sentence with whoever resolved it as a person (owner, 2026-10-21).
             'outcome_parts' => $outcome,
-            'order_href' => $row['order_id'] === null ? '' : '/admin/commerce/orders/' . (int) $row['order_id'],
+            'order_href' => $row['order_id'] === null ? '' : OrderAddress::admin((int) $row['order_id']),
             'order_label' => $row['order_id'] === null ? '' : MoneyRecords::orderNumber((int) $row['order_id']),
         ];
     }

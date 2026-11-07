@@ -126,7 +126,7 @@ async function applyCode(page, code, keyboard = true) {
             await page.locator('input[name=accept_terms]').check();
             await page.locator('input[name=accept_start]').check();
             await submit(page, page.getByRole('button', {name: 'Place my order'}));
-            assert.match(page.url(), /\/account\/orders\/\d+/);
+            assert.match(page.url(), /\/account\/orders\/CL-\d{8,}$/, 'the order opens at its number');
             assert.deepEqual(await totals(page), discounted, 'the order shows the promotion it was placed with');
             assert.match(clean(await page.locator('main').innerText()), /Status: Fulfilled/, 'the simulated card was charged the discounted total');
             const pdf = await ctx.request.get(`${base}${await page.locator('a[href*="/documents/"]').first().getAttribute('href')}`);
@@ -172,7 +172,7 @@ async function applyCode(page, code, keyboard = true) {
         await page.locator('#promotion-value').fill('15');
         await page.locator('#promotion-max-customer').fill('1');
         await submit(page, page.getByRole('button', {name: 'Create promotion'}));
-        assert.match(page.url(), /\/admin\/promotions\/\d+$/);
+        assert.ok(page.url().endsWith(`/admin/promotions/${adminCode.toUpperCase()}`), `a new promotion opens at its code, never its number (${page.url()})`);
         assert.equal(await flash(page), 'The promotion was created.');
         assert.match(clean(await page.locator('h1').innerText()), new RegExp(adminCode.toUpperCase()), 'the code is stored in upper case');
         const editor = page.url();
@@ -238,7 +238,7 @@ async function applyCode(page, code, keyboard = true) {
      * Last, because while it is active the automatic promotion applies to every cart. */
     await scenario('ADMIN marks a course down and makes a promotion apply automatically; the learner sees both, the cart applies it and the order keeps it', 'chromium', async () => {
         const admin = await open(chromium, fixture.admin_token);
-        await admin.page.goto(`${base}/admin/courses/${fixture.courses.a.id}?tab=pricing`);
+        await admin.page.goto(`${base}/admin/courses/${fixture.courses.a.code}?tab=pricing`);
         await admin.page.locator('a[href*="edit_price="]').first().click();
         await admin.page.waitForURL(/edit_price=/);
         await admin.page.locator('input[name=was_price][form^="price-edit-"]').fill('200');

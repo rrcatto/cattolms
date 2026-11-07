@@ -22,25 +22,28 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter(slug => fs.exist
   .map(slug => JSON.parse(fs.readFileSync(path.join(root, 'themes', slug, 'theme.json'))).theme);
 const only = (process.env.CATTO_THEMES || '').split(',').filter(Boolean);
 const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
+// CATTO_ROUTES narrows a run to the named pages (comma separated), such as one new menu page in every theme.
+const routes = (process.env.CATTO_ROUTES || '').split(',').filter(Boolean);
 
-// The 71 menu pages: Account, Company, Administration and Mailing (its own menu since 2026-10-28), as their menus list
-// them (Course Page Layouts since 2026-11-01), and the fixture company's page.
+// The 75 pages: the menu pages: Account, Company, Administration and Mailing (its own menu since 2026-10-28), as their menus list
+// them (Course Page Layouts since 2026-11-01, Money Reports, Favourites and Course Requests since 2026-11-06), and the
+// fixture company's page.
 const pages = [
   '/account', '/account/dashboard', '/account/profile', '/account/billing', '/account/emails', '/account/social',
-  '/account/courses', '/account/certificates', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
+  '/account/courses', '/account/favourites', '/account/requests', '/account/certificates', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
   '/company', '/company/dashboard', '/company/profile', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
   '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/orders', '/company/wallet', '/company/billing',
   '/admin', '/admin/dashboard', '/admin/courses', '/admin/courses/page-layouts', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
   '/admin/courses/tags', '/admin/course-reviews', '/admin/bundles', '/admin/certificates/designs', '/admin/course/requests',
   '/admin/course/enrolments', '/admin/people', '/admin/people/signup-attempts', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
   '/admin/commerce/orders', '/admin/commerce/refund-requests', '/admin/wallets', '/admin/promotions', '/admin/commerce/documents',
-  '/admin/commerce/eft', '/admin/commerce/unmatched', '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
+  '/admin/commerce/eft', '/admin/commerce/unmatched', '/admin/commerce/ledger', '/admin/commerce/reports', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
   '/mailing', '/mailing/digest', '/mailing/messages', '/mailing/lists', '/mailing/subscribers', '/mailing/never-emailed', '/mailing/templates', '/mailing/automatic', '/mailing/settings', '/mailing/reports',
 ];
 const {inspect, judge} = require('./page-construction.cjs');
 // The company's own page in Administration (owner, 2026-10-26), opened from its name: the fixture's company.
-if (state.company) pages.push(`/admin/companies/${state.company}`);
+if (state.company_reference) pages.push(`/admin/companies/${state.company_reference}`);
 
 (async () => {
   fs.mkdirSync(output, {recursive: true});
@@ -53,7 +56,7 @@ if (state.company) pages.push(`/admin/companies/${state.company}`);
       await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
       const page = await context.newPage();
       const gaps = new Map();
-      for (const route of pages) {
+      for (const route of pages.filter(route => !routes.length || routes.includes(route))) {
         const label = `${theme.slug} ${width} ${route}`;
         const response = await page.goto(`${base}${route}?theme_preview=${key}`, {waitUntil: 'networkidle'});
         const r = await page.evaluate(inspect);

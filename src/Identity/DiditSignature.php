@@ -14,8 +14,14 @@ recommends, signs the body as canonical JSON: keys sorted, compact separators, U
 whole-valued numbers written as integers. X-Signature signs the exact bytes sent and is the fallback.
 X-Signature-Simple signs only the envelope, not the decision, and is not accepted. A webhook older or
 newer than 5 minutes (X-Timestamp) is refused, so an old one cannot be replayed.
+For 24 hours after a destination's secret is rotated in Didit, each webhook also carries
+X-Signature-V2-Previous and X-Signature-Previous, made with the replaced secret: either is accepted, so
+a site still holding the old secret keeps working until its DIDIT_WEBHOOK_SECRET is updated.
 
 Changelog:
+2026/11/06 SAST
+- The -Previous signatures Didit sends after a secret is rotated are accepted (checked against Didit's
+  webhook documentation that day).
 2026/10/19 SAST
 - Created.
 */
@@ -32,16 +38,23 @@ final class DiditSignature
     /** How far a webhook's timestamp may be from now, in seconds. */
     public const TOLERANCE = 300;
 
-    public static function verify(string $rawBody, string $signatureV2, string $signature, string $timestamp, string $secret, int $now): bool
+    public static function verify(string $rawBody, string $signatureV2, string $signature, string $timestamp, string $secret, int $now, string $signatureV2Previous = '', string $signaturePrevious = ''): bool
     {
         if ($secret === '' || preg_match('/^\d{1,12}$/', $timestamp) !== 1 || abs($now - (int) $timestamp) > self::TOLERANCE) {
             return false;
         }
         $canonical = self::canonical($rawBody);
-        if ($canonical !== null && $signatureV2 !== '' && hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower(trim($signatureV2)))) {
-            return true;
+        if ($canonical !== null) {
+            $expected = hash_hmac('sha256', $canonical, $secret);
+            foreach ([$signatureV2, $signatureV2Previous] as $sent) {
+                if ($sent !== '' && hash_equals($expected, strtolower(trim($sent)))) return true;
+            }
         }
-        return $signature !== '' && hash_equals(hash_hmac('sha256', $rawBody, $secret), strtolower(trim($signature)));
+        $expected = hash_hmac('sha256', $rawBody, $secret);
+        foreach ([$signature, $signaturePrevious] as $sent) {
+            if ($sent !== '' && hash_equals($expected, strtolower(trim($sent)))) return true;
+        }
+        return false;
     }
 
     /** The body as Didit signs it for X-Signature-V2, or null when it is not JSON. */

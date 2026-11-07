@@ -15,12 +15,12 @@
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 28, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 32, label: 'Now'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Becomes'}} %}</tr>{% endblock %}
 			{% block body %}{% for move in moves %}<tr>
-				<td class="cell-text">{{ ui('data.person', {name: move.name, href: '/admin/people/' ~ move.user_id}) }}</td>
+				<td class="cell-text">{{ ui('data.person', {name: move.name, href: person_url(move.account_reference)}) }}</td>
 				<td class="cell-text">{{ move.from }}</td>
 				<td class="cell-text">{{ move.to }}{% if move.taken %} {{ ui('feedback.badge', {label: 'Already an account\'s address', tone: 'danger', size: 'small'}) }}{% endif %}</td>
 			</tr>{% endfor %}{% endblock %}
 			{% endembed %}
-			<form action="/admin/companies/{{ domain_company.id }}" method="post">
+			<form action="{{ company_url(domain_company) }}" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				<input type="hidden" name="name" value="{{ new_name }}">
 				<input type="hidden" name="domain" value="{{ new_domain }}">

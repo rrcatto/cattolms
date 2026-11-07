@@ -15,6 +15,9 @@ page with everything the sender gave, links to their account, order and course, 
 Mark as answered. Seeing them needs PLATFORM.PERSON.VIEW and marking one answered PLATFORM.PERSON.MANAGE.
 
 Changelog:
+2026/11/07 SAST
+- A message is named by its reference in every address (/admin/messages/MSG-000043, /answered, /unanswered), never its
+  row id (owner, 2026-11-06: "a recogniseable code is better").
 2026/10/20 SAST
 - Created.
 */
@@ -27,6 +30,8 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Contact\ContactReason;
 use CattoLearning\Contact\ContactService;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\RecordAddress;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -35,7 +40,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class ContactMessagesController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly ContactService $contact)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly ContactService $contact, private readonly AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -64,11 +69,11 @@ final class ContactMessagesController extends BaseController
         ]);
     }
 
-    #[Route('/admin/messages/{id}', name: 'admin_contact_message', requirements: ['id' => '[0-9]+'], methods: ['GET'])]
+    #[Route('/admin/messages/{reference}', name: 'admin_contact_message', requirements: ['reference' => RecordAddress::MESSAGE], methods: ['GET'])]
     public function show(): Response
     {
         $user = $this->requirePermission('PLATFORM.PERSON.VIEW');
-        $message = $this->contact->find((int) $this->request()->attributes->get('id'));
+        $message = $this->contact->find($this->messageId());
         if ($message === null) throw $this->notFound('That message could not be found.');
         return $this->render('admin-contact-message', [
             'title' => 'Message ' . $message['reference'],
@@ -78,30 +83,38 @@ final class ContactMessagesController extends BaseController
         ]);
     }
 
-    #[Route('/admin/messages/{id}/answered', name: 'admin_contact_message_answered', requirements: ['id' => '[0-9]+'], methods: ['POST'])]
+    #[Route('/admin/messages/{reference}/answered', name: 'admin_contact_message_answered', requirements: ['reference' => RecordAddress::MESSAGE], methods: ['POST'])]
     public function answered(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $id = (int) $this->request()->attributes->get('id');
-        return $this->handle(function () use ($id, $user): void {
+        $id = $this->messageId();
+        $page = RecordAddress::message($this->param('reference'));
+        return $this->handle(function () use ($id, $user, $page): void {
             $this->contact->markAnswered($id, $user->id);
             $this->flash('success', 'The message is marked as answered.');
-            $this->redirect('/admin/messages/' . $id);
-        }, '/admin/messages/' . $id);
+            $this->redirect($page);
+        }, $page);
     }
 
     /** Undo of Mark as answered (2026-10-26 audit). */
-    #[Route('/admin/messages/{id}/unanswered', name: 'admin_contact_message_unanswered', requirements: ['id' => '[0-9]+'], methods: ['POST'])]
+    #[Route('/admin/messages/{reference}/unanswered', name: 'admin_contact_message_unanswered', requirements: ['reference' => RecordAddress::MESSAGE], methods: ['POST'])]
     public function unanswered(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $id = (int) $this->request()->attributes->get('id');
-        return $this->handle(function () use ($id, $user): void {
+        $id = $this->messageId();
+        $page = RecordAddress::message($this->param('reference'));
+        return $this->handle(function () use ($id, $user, $page): void {
             $this->contact->markUnanswered($id, $user->id);
             $this->flash('success', 'The message is open again: not answered.');
-            $this->redirect('/admin/messages/' . $id);
-        }, '/admin/messages/' . $id);
+            $this->redirect($page);
+        }, $page);
+    }
+
+    /** The message the address names by its reference, as its row id; a reference no message has is not found. */
+    private function messageId(): int
+    {
+        return $this->keys->message($this->param('reference')) ?? throw $this->notFound('That message could not be found.');
     }
 }

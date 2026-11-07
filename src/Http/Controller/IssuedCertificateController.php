@@ -16,6 +16,9 @@ opens their PDFs here and is never shown their addresses: the learner decides wh
 2026-10-19). Viewing needs CERTIFICATE.ISSUED.VIEW and revoking CERTIFICATE.ISSUED.MANAGE.
 
 Changelog:
+2026/11/07 SAST
+- A certificate is named by its certificate number in every address (/admin/certificates/CL-2026-3F9A2C1B7D4E, its PDFs
+  and Revoke), never its row id (owner, 2026-11-06: "a recogniseable code is better").
 2026/10/19 SAST
 - Created.
 - The PDFs open here, not at the certificate's and transcript's addresses, and the page says whether the
@@ -31,6 +34,8 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\Certificate\CertificateAwards;
 use CattoLearning\Course\Certificate\CertificateDocuments;
 use CattoLearning\Course\Certificate\CertificateRepository;
+use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
+use CattoLearning\Support\Address\RecordAddress;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -39,7 +44,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class IssuedCertificateController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CertificateRepository $certificates, private readonly CertificateAwards $awards, private readonly CertificateDocuments $documents)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CertificateRepository $certificates, private readonly CertificateAwards $awards, private readonly CertificateDocuments $documents, private readonly AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -63,11 +68,11 @@ final class IssuedCertificateController extends BaseController
         ]);
     }
 
-    #[Route('/admin/certificates/{id}', name: 'admin_issued_certificate', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/certificates/{number}', name: 'admin_issued_certificate', requirements: ['number' => RecordAddress::CERTIFICATE], methods: ['GET'])]
     public function show(): Response
     {
         $user = $this->requirePermission('CERTIFICATE.ISSUED.VIEW');
-        $certificate = $this->certificates->find((int) $this->param('id')) ?? throw $this->notFound('That certificate does not exist.');
+        $certificate = $this->certificates->find($this->certificateId()) ?? throw $this->notFound('That certificate does not exist.');
         return $this->render('admin-issued-certificate', [
             'title' => 'Certificate ' . (string) $certificate['certificate_number'],
             'active_nav' => 'admin',
@@ -80,11 +85,11 @@ final class IssuedCertificateController extends BaseController
      * ADMIN opens an issued certificate's or transcript's PDF here, revoked or not, private or public:
      * never at its address, which only the learner is shown (owner, 2026-10-19).
      */
-    #[Route('/admin/certificates/{id}/{document}.pdf', name: 'admin_issued_certificate_pdf', requirements: ['id' => '\d+', 'document' => 'certificate|transcript'], methods: ['GET'])]
+    #[Route('/admin/certificates/{number}/{document}.pdf', name: 'admin_issued_certificate_pdf', requirements: ['number' => RecordAddress::CERTIFICATE, 'document' => 'certificate|transcript'], methods: ['GET'])]
     public function pdf(): Response
     {
         $this->requirePermission('CERTIFICATE.ISSUED.VIEW');
-        $certificate = $this->certificates->find((int) $this->param('id')) ?? throw $this->notFound('That certificate does not exist.');
+        $certificate = $this->certificates->find($this->certificateId()) ?? throw $this->notFound('That certificate does not exist.');
         $document = (string) $this->param('document');
         $row = $document === 'transcript'
             ? ($this->certificates->transcriptForCertificate((int) $certificate['id']) ?? throw $this->notFound('That certificate has no transcript.'))
@@ -98,16 +103,23 @@ final class IssuedCertificateController extends BaseController
         ]);
     }
 
-    #[Route('/admin/certificates/{id}/revoke', name: 'admin_issued_certificate_revoke', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/admin/certificates/{number}/revoke', name: 'admin_issued_certificate_revoke', requirements: ['number' => RecordAddress::CERTIFICATE], methods: ['POST'])]
     public function revoke(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('CERTIFICATE.ISSUED.MANAGE');
-        $page = '/admin/certificates/' . (int) $this->param('id');
-        return $this->handle(function () use ($actor, $page): void {
-            $this->awards->revoke((int) $this->param('id'), $actor->id, $this->posted('reason'));
+        $id = $this->certificateId();
+        $page = RecordAddress::certificate('admin', $this->param('number'));
+        return $this->handle(function () use ($actor, $id, $page): void {
+            $this->awards->revoke($id, $actor->id, $this->posted('reason'));
             $this->flash('success', 'The certificate and its transcript were revoked. Their pages now say so, with your reason, and have no PDF.');
             $this->redirect($page);
         }, $page);
+    }
+
+    /** The certificate the address names by its number, as its row id; a number no certificate has is not found. */
+    private function certificateId(): int
+    {
+        return $this->keys->certificate($this->param('number')) ?? throw $this->notFound('That certificate does not exist.');
     }
 }

@@ -21,6 +21,8 @@ Subscriptions or with the list's join link), and chooses once how they hear abou
 or monthly; until they choose, it is one digest a week.
 
 Changelog:
+2026/11/07 SAST
+- A follow names a category or a tag by its slug, never its row id.
 2026/10/28 SAST
 - Lists ADMIN made; how each person hears about updates.
 2026/10/26 SAST
@@ -80,9 +82,27 @@ final class MailingConsents
     public function nameOf(?FollowIntent $intent): ?string
     {
         if ($intent === null) return null;
-        if ($intent->kind === 'list') return $this->mailing->ownListByToken($intent->token)['name'] ?? null;
+        if ($intent->kind === 'list') return $this->mailing->ownListByToken($intent->key)['name'] ?? null;
 
-        return $this->mailing->subjectName($intent->kind, $intent->id);
+        $id = $this->subjectId($intent);
+
+        return $id === null ? null : $this->mailing->subjectName($intent->kind, $id);
+    }
+
+    /**
+     * The row id of the category, course or tag a follow intent names (a course by its code, a category or a tag by its
+     * slug, owner 2026-11-06); null for a list or nothing.
+     */
+    public function subjectId(?FollowIntent $intent): ?int
+    {
+        if ($intent === null || $intent->kind === 'list') return null;
+        $id = match ($intent->kind) {
+            'course' => $this->mailing->courseIdForCode($intent->key),
+            'category' => $this->mailing->categoryIdForSlug($intent->key),
+            default => $this->mailing->tagIdForSlug($intent->key),
+        };
+
+        return $id === null || $id < 1 ? null : $id;
     }
 
     /**
@@ -94,11 +114,11 @@ final class MailingConsents
         $follow = FollowIntent::fromText($intent);
         if ($follow === null || $this->nameOf($follow) === null) return false;
         if ($follow->kind === 'list') {
-            $list = $this->mailing->ownListByToken($follow->token);
+            $list = $this->mailing->ownListByToken($follow->key);
 
             return $list !== null && $this->joinList($userId, (int) $list['id'], 'join_link');
         }
-        $this->subscribe($userId, $follow->kind, $follow->id, 'follow_button');
+        $this->subscribe($userId, $follow->kind, $this->subjectId($follow), 'follow_button');
 
         return true;
     }

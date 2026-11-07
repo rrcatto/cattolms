@@ -99,7 +99,7 @@ final class CategoryPickerIntegrationTest extends TestCase
 
     public function testTheFieldIsDrawnWithTheChosenCategorysPathAndAPlacePicker(): void
     {
-        $page = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'field', [], null, ['field_id' => 'category', 'field_name' => 'category_id', 'selected' => (string) $this->ids['A1x']]);
+        $page = InProcessPage::run($this->admin, AdminCourseCategoryController::class, 'field', [], null, ['field_id' => 'category', 'field_name' => 'category_id', 'selected' => (string) $this->db->fetchOne('SELECT slug FROM course_categories WHERE id = :id', ['id' => $this->ids['A1x']])]);
         self::assertSame(200, $page['status']);
         $xpath = self::xpath($page['body']);
         self::assertSame($this->label('A') . ' › ' . $this->label('A1') . ' › ' . $this->label('A1x'), trim((string) $xpath->query('//button[@id="category"]')->item(0)?->textContent), 'The closed picker shows the full path.');

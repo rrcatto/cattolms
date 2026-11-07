@@ -7,6 +7,8 @@ namespace CattoLearning\Course;
 use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Catwalk\SlideLayouts;
 use CattoLearning\Course\Parts\FlashCards;
+use CattoLearning\Support\Address\CourseItemAddress;
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\Support\Duration;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -430,8 +432,10 @@ final class CourseItemService
         $data = $this->placementData($courseId, $item, $input);
         return $this->transactions->run(function () use ($courseId, $itemId, $parent, $data, $input, $userId): int {
             $this->assertNewParent($courseId, $parent);
-            $node = $this->items->createPlacement($courseId, $itemId, $parent, $this->items->nextPosition($courseId, $parent), $data);
+            $partName = $this->carriedPartName($courseId, $input);
+            $node = $this->items->createPlacement($courseId, $itemId, $parent, $this->items->nextPosition($courseId, $parent), $data, $partName);
             $this->placeNew($courseId, $node, $parent, $input, $userId);
+            if ($partName === null && empty($input['name_part_later'])) { $this->nameParts($courseId, [$node]); }
             $this->audit->record($userId, 'course_item.placed', ['course_id' => $courseId, 'course_item_id' => $itemId, 'node_id' => $node]);
             return $node;
         });
@@ -446,8 +450,10 @@ final class CourseItemService
         $delay = $this->delay($input);
         return $this->transactions->run(function () use ($courseId, $parent, $title, $delay, $input, $userId): int {
             $this->assertNewParent($courseId, $parent);
-            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']), !empty($input['numbered']));
+            $partName = $this->carriedPartName($courseId, $input);
+            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']), !empty($input['numbered']), $partName);
             $this->placeNew($courseId, $id, $parent, $input, $userId);
+            if ($partName === null && empty($input['name_part_later'])) { $this->nameParts($courseId, [$id]); }
             $this->audit->record($userId, 'course_section.created', ['course_id' => $courseId, 'node_id' => $id]);
             return $id;
         });
@@ -715,7 +721,8 @@ final class CourseItemService
     private function validateItem(array $input, int $currentId = 0): array
     {
         $key = trim((string) ($input['item_key'] ?? '')); $type = trim((string) ($input['item_type'] ?? '')); $title = trim((string) ($input['title'] ?? ''));
-        if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $key) !== 1) { throw new InvalidArgumentException('Use a case-sensitive human-readable key containing letters, numbers, dots, underscores or hyphens.'); }
+        // A key holds a letter, so it never looks like a row id (owner, 2026-11-06).
+        if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $key) !== 1 || preg_match('/[a-zA-Z]/', $key) !== 1) { throw new InvalidArgumentException('Use a case-sensitive human-readable key containing letters, numbers, dots, underscores or hyphens, with at least one letter.'); }
         $existing = $this->items->itemByKey($key);
         if ($existing !== null && (int) $existing['id'] !== $currentId) { throw new InvalidArgumentException('Another Course Item already uses that key.'); }
         if (!in_array($type, self::TYPES, true) || $title === '') { throw new InvalidArgumentException('Course Item type and title are required.'); }
@@ -782,20 +789,36 @@ final class CourseItemService
         $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['name'] ?? '')));
         if ($name === '') { return $this->freeName(($currentId > 0 ? $this->placeName($currentId) : null) ?? $title, $currentId); }
         if (mb_strlen($name) > 160) { throw new InvalidArgumentException('A name has at most 160 characters.'); }
-        if (in_array(mb_strtolower($name), $this->items->namesLike($name, $currentId), true)) {
-            throw new InvalidArgumentException('Another Course Item is already named "' . $name . '". Names are never used twice, so choose another, or leave it empty to name it after its place.');
+        // The name is the item's address too (/admin/course-items/gdn-101-module-1-presentation, owner 2026-11-06).
+        if (!CourseItemAddress::addressable($name)) {
+            throw new InvalidArgumentException('A name needs at least one letter, and cannot be just "new": it is also the item\'s address in Administration.');
+        }
+        $other = $this->items->nameWithSlug(CourseItemAddress::slug($name), $currentId);
+        if ($other !== null) {
+            throw new InvalidArgumentException('Another Course Item is already named "' . $other . '". Names are never used twice, and names that differ only in capitals, spaces or punctuation count as the same, because the name is also the item\'s address. Choose another, or leave it empty to name it after its place.');
         }
         return $name;
     }
 
-    /** The name, or the name with the first free number after it: "GDN-101 Module 1 Video 2". */
+    /**
+     * The name, or the name with the first free number after it: "GDN-101 Module 1 Video 2". Free means its slug, the
+     * item's address, is free too; a base that could not be an address (no letter, or "new") becomes "Course item …".
+     */
     public function freeName(string $base, int $exceptId = 0): string
     {
         $base = mb_substr(trim($base), 0, 150);
-        $taken = array_flip($this->items->namesLike($base, $exceptId));
-        if (!isset($taken[mb_strtolower($base)])) { return $base; }
-        for ($n = 2; isset($taken[mb_strtolower($base . ' ' . $n)]); $n++);
+        if (!CourseItemAddress::addressable($base)) { $base = trim('Course item ' . $base); }
+        $slug = CourseItemAddress::slug($base);
+        $taken = array_flip($this->items->slugsLike($slug, $exceptId));
+        if (!isset($taken[$slug])) { return $base; }
+        for ($n = 2; isset($taken[$slug . '-' . $n]); $n++);
         return $base . ' ' . $n;
+    }
+
+    /** An item's name, which its address is made from. */
+    public function itemName(int $id): string
+    {
+        return $this->items->name($id) ?? throw new InvalidArgumentException('The Course Item does not exist.');
     }
 
     /** The name an item's place gives it, in the first course it is placed in; null while it is placed nowhere. */
@@ -843,6 +866,93 @@ final class CourseItemService
             unset($wanted[$id]);
             $this->items->rename($id, $this->freeName(self::nameOfPlace($code, $row), $id));
         }
+    }
+
+    /**
+     * Names parts after their places (owner, 2026-11-06: each part's address is its name, "yes, do it that way"): a
+     * numbered module "module-3", another section its title, an item its place without the course's code
+     * ("module-3-presentation", "final-assessment"), made free in the course (CoursePartAddress::make). A part is named
+     * once, when it is placed, and keeps its name when it moves, so an address a learner keeps goes on working.
+     *
+     * @param list<int>|null $nodeIds The parts to name; null names every part still holding a provisional name, which is
+     *                                how an import and an arrangement name every part they made, at the end.
+     * @param array<string,string> $carried The names a course file brings for parts its places would name otherwise
+     *                                      (movedPartNames()): the name a place gives => the part's own name.
+     */
+    public function nameParts(int $courseId, ?array $nodeIds = null, array $carried = []): void
+    {
+        $names = $this->items->partNames($courseId);
+        $wanted = $nodeIds === null
+            ? array_keys(array_filter($names, static fn(string $name): bool => preg_match('/^part-[0-9a-f]{8}$/', $name) === 1))
+            : array_values(array_filter($nodeIds, static fn(int $id): bool => isset($names[$id])));
+        if ($wanted === []) { return; }
+        $wanted = array_flip($wanted);
+        // The names the other parts hold are taken; those of the parts being named are free to be given again. The names
+        // places give are worked out as movedPartNames() works them out, so a name a file carries finds its part.
+        $placed = $given = array_flip(array_values(array_diff_key($names, $wanted)));
+        $made = [];
+        foreach ($this->availability($courseId, null, false) as $row) {
+            $id = (int) $row['id'];
+            if (!isset($wanted[$id])) { continue; }
+            $section = (string) $row['node_type'] === 'section';
+            $place = CoursePartAddress::make(self::partWords($row), $section, static fn(string $name): bool => isset($placed[$name]));
+            $placed[$place] = true;
+            $name = $carried[$place] ?? $place;
+            if (isset($given[$name]) || preg_match('#^(?:' . CoursePartAddress::REQUIREMENT . ')$#', $name) !== 1 || strlen($name) > CoursePartAddress::MAXIMUM) {
+                $name = CoursePartAddress::make(self::partWords($row), $section, static fn(string $name): bool => isset($given[$name]));
+            }
+            $given[$name] = true;
+            if ($name !== $names[$id]) { $made[$id] = $name; }
+        }
+        // A part may take a name another of them is giving up, so each first lets its old name go.
+        foreach (array_keys($made) as $id) { $this->items->renamePart($courseId, $id, CoursePartAddress::provisional()); }
+        foreach ($made as $id => $name) { $this->items->renamePart($courseId, $id, $name); }
+    }
+
+    /**
+     * The parts whose names are not the ones their places would give them now, because they moved or were added later:
+     * the name the place gives => the part's own name. A course file carries these (specification 6.6), so a course
+     * replaced from its file keeps every part's address; every other part is named again by its place, the same way.
+     *
+     * @return array<string,string>
+     */
+    public function movedPartNames(int $courseId): array
+    {
+        $placed = []; $moved = [];
+        foreach ($this->availability($courseId, null, false) as $row) {
+            $place = CoursePartAddress::make(self::partWords($row), (string) $row['node_type'] === 'section', static fn(string $name): bool => isset($placed[$name]));
+            $placed[$place] = true;
+            $name = (string) $row['part_name'];
+            if ($name !== $place && preg_match('/^part-[0-9a-f]{8}$/', $name) !== 1) { $moved[$place] = $name; }
+        }
+        return $moved;
+    }
+
+    /**
+     * The words a part's place gives its name: "Module 3" for a numbered module, a section's title, or an item's place
+     * name without the course's code ("Module 3 Presentation", "Final assessment").
+     *
+     * @param array<string,mixed> $row A row of availability().
+     */
+    public static function partWords(array $row): string
+    {
+        if ((string) ($row['node_type'] ?? '') === 'section') {
+            return !empty($row['numbered']) && ($row['section_number'] ?? null) !== null ? 'Module ' . $row['section_number'] : (string) ($row['section_title'] ?? '');
+        }
+        return self::nameOfPlace('', $row);
+    }
+
+    /**
+     * The part name a placement brings with it (a course file or package moving a course, so its addresses survive), when
+     * it is a part name and no other part of the course holds it; otherwise null, and the part is named after its place.
+     *
+     * @param array<string,mixed> $input
+     */
+    private function carriedPartName(int $courseId, array $input): ?string
+    {
+        $name = trim((string) ($input['part_name'] ?? ''));
+        if ($name === '' || preg_match('#^(?:' . CoursePartAddress::REQUIREMENT . ')$#', $name) !== 1 || strlen($name) > CoursePartAddress::MAXIMUM) { return null; }
+        return in_array($name, $this->items->partNames($courseId), true) ? null : $name;
     }
 
     /**

@@ -11,6 +11,9 @@
     <!-- The tests sign learners in; a site's .env admits only administrators and listed addresses unless AUTH_SIGNIN
          says EVERYONE. The tests of who can sign in set it themselves (AccountApprovalIntegrationTest). -->
     <env name="AUTH_SIGNIN" value="EVERYONE" force="true"/>
+    <!-- Two-step sign-in is each person's choice in the suite; the tests of who must use it set it themselves
+         (TwoStepIntegrationTest). -->
+    <env name="AUTH_TWO_STEP" value="CHOICE" force="true"/>
   </php>
   <testsuites>
     <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>

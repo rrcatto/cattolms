@@ -19,6 +19,9 @@ rebuilding and removes the identity. The shipped taxonomy keeps its order: a sce
 test category in front of a shipped one, and closing the gaps puts the shipped ones back to 1..n.
 
 Changelog:
+2026/11/07 SAST
+- The state holds each category's slug, which names it in its addresses and anchors; cleanup puts back when each
+  shipped category last changed, which moving a test category among them touches.
 2026/10/07 SAST
 - Also used by category-picker.cjs: `reset` and `cleanup` delete the courses the run created or imported, and their Course Items.
 - Created for the draggable category tree.
@@ -73,6 +76,10 @@ $build = static function (array $state) use ($courses): array {
     }
     return $ids;
 };
+// Each category's slug, which names it in every address and anchor (owner, 2026-11-06: no row id in an address).
+$slugs = static function (array $ids) use ($db): array {
+    return array_map(static fn(int $id): string => (string) $db->fetchOne('SELECT slug FROM course_categories WHERE id = :id', ['id' => $id]), $ids);
+};
 $save = static function (array $state) use ($statePath): void {
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
@@ -97,9 +104,12 @@ if ($command === 'create') {
     $state = ['user' => $user, 'email' => $email, 'tokens' => $tokens, 'scrub' => $fixture->seeds(),
         'extra' => array_diff_key($words, NAMES) + ['picker_course' => $titles->course()['title'], 'picker_nojs' => $titles->course()['title'], 'import' => $titles->course()],
         'max_category_id' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM course_categories'),
+        // Moving a test category among the shipped ones touches their rows: cleanup puts back when each last changed.
+        'shipped_updated' => array_column($db->fetchAllAssociative('SELECT id, updated_at::text AS updated_at FROM course_categories ORDER BY id'), 'updated_at', 'id'),
         'shipped_roots' => (int) $db->fetchOne('SELECT COUNT(*) FROM course_categories WHERE parent_id IS NULL')];
     $state['names'] = array_intersect_key($words, NAMES);
     $state['ids'] = $build($state);
+    $state['slugs'] = $slugs($state['ids']);
     $save($state);
 } elseif (in_array($command, ['reset', 'cleanup'], true)) {
     if (!is_file($statePath)) exit(0);
@@ -107,8 +117,12 @@ if ($command === 'create') {
     $clear($state);
     if ($command === 'reset') {
         $state['ids'] = $build($state);
+        $state['slugs'] = $slugs($state['ids']);
         $save($state);
         return;
+    }
+    foreach ((array) ($state['shipped_updated'] ?? []) as $id => $updated) {
+        $db->executeStatement('UPDATE course_categories SET updated_at = CAST(:at AS timestamptz) WHERE id = :id AND updated_at <> CAST(:at AS timestamptz)', ['id' => (int) $id, 'at' => (string) $updated]);
     }
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub'] ?? ['users' => [(int) $state['user']]]);
     unlink($statePath);

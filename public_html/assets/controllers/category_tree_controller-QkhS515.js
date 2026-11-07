@@ -35,13 +35,14 @@ export default class extends SortableTreeController {
         body.append('parent_id', parent);
         body.append('index', index);
         body.append('from_parent', from ? (from.dataset.parent || '') : '');
-        return { url: `/admin/courses/categories/${row.dataset.nodeId}/arrange`, body };
+        // The row's own address, by the category's slug (owner, 2026-11-06: no row id in an address).
+        return { url: row.dataset.arrangeUrl, body };
     }
 
     // The counts above the tree come back with it: moving a category between levels changes them.
     received(answer) {
-        const fresh = answer.getElementById('category-statistics');
-        const current = this.element.querySelector('#category-statistics');
+        const fresh = answer.getElementById('category-tree-statistics');
+        const current = this.element.querySelector('#category-tree-statistics');
         if (fresh && current) current.replaceWith(document.importNode(fresh, true));
     }
 
@@ -56,7 +57,7 @@ export default class extends SortableTreeController {
         body.textContent = 'Loading…';
     }
 
-    // A category opened from the address (#category-12) has its branch open and is in view.
+    // A category opened from the address (#category-garden-design) has its branch open and is in view.
     connect() {
         super.connect();
         const target = window.location.hash.startsWith('#category-') ? document.getElementById(window.location.hash.slice(1)) : null;

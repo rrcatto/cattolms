@@ -10,12 +10,12 @@
 
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: 0, lk_required: 1} %}
-			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course_id', lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: 0} %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course', lk_by_code: true, lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: 0} %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Length of access', full_width: false, help: 'The lengths the course is sold for.', for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
 				{# The lengths the chosen course is sold for, redrawn when the course is chosen (owner, 2026-10-26). #}
-				<select name="access_period_seconds" required id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course_id-value" hx-include="#course_id-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: [], course_chosen: false} %}</select>
+				<select name="access_period_seconds" required id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course-value" hx-include="#course-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: [], course_chosen: false} %}</select>
 
 {% endblock %}
 {% endembed %}
@@ -95,10 +95,10 @@
 						<tr>
 							<td>
 								{# A company holds it, or a person, named with their account reference and linked to their account (owner, 2026-10-21). #}
-								{% if credit.company_id %}<a href="/admin/companies/{{ credit.company_id }}">{{ credit.holder_name }}</a>{% else %}{{ ui('data.person', {name: credit.holder_name, reference: credit.holder_reference, href: '/admin/people/' ~ credit.user_id}) }}{% endif %}
+								{% if credit.company_id %}<a href="{{ company_url(credit.company_reference) }}">{{ credit.holder_name }}</a>{% else %}{{ ui('data.person', {name: credit.holder_name, reference: credit.holder_reference, href: person_url(credit.holder_reference)}) }}{% endif %}
 							</td>
 							<td>
-								{% if credit.course_id|default(0) %}<a href="/admin/courses/{{ credit.course_id }}">{{ credit.course_title }}</a>{% else %}{{ credit.course_title }}{% endif %}
+								{% if credit.course_id|default(0) %}<a href="{{ course_admin_url(credit) }}">{{ credit.course_title }}</a>{% else %}{{ credit.course_title }}{% endif %}
 							</td>
 							<td>
 								{{ credit.access_period_label }}

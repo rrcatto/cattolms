@@ -7,7 +7,7 @@
      no words on the page texture, the first card's edge on the page head's text edge, no sideways scrolling, nothing
      standing out of a table and no action cut off by its cell;
    - an answer below 400.
-   Pages that differ only in an id are visited twice at most. Home, course landing pages, the course reader (/learn/)
+   Pages that differ only in an id or a course code are visited twice at most. Home, course landing pages, the course reader (/learn/)
    and its public preview are built another way on purpose; downloads, exports, PDFs and signing out are not pages. results.json goes to CATTO_BROWSER_OUTPUT.
    Fixture: php tests/Browser/section-pages-fixture.php create|cleanup (in env_php_1), the same ADMIN session. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
@@ -16,7 +16,7 @@ const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-every-page';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-section-pages-state.json'));
 const LIMIT = Number(process.env.CATTO_EVERY_PAGE_LIMIT || 600);
-const SKIP = /^\/(learn\/|logout|auth\/|webhooks\/|api\/|mcp)|\/(download|export|delete|remove|reset|revoke|cancel)(\/|$)|\.(pdf|csv|xml|txt|json|svg|png|jpe?g|webp|zip)$|^\/sitemap|^\/robots/;
+const SKIP = /^\/(learn\/|logout|auth\/|webhooks\/|api\/|mcp)|\/(download|export|delete|remove|reset|revoke|cancel)(\/|$)|\.(pdf|xlsx|csv|xml|txt|json|svg|png|jpe?g|webp|zip)$|^\/sitemap|^\/robots/;
 const {inspect, judge} = require('./page-construction.cjs');
 // Built another way on purpose: Home and course landing pages are full-width marketing pages, and the course reader and
 // its public preview are Core's reader (UX rule 1.7; the reader is never a theme's page).
@@ -33,8 +33,17 @@ function normal(href) {
     for (const name of ['tab', 'preview']) if (url.searchParams.get(name)) kept.set(name, url.searchParams.get(name));
     return url.pathname + (kept.size ? `?${kept}` : '');
 }
-/** Pages that differ only in an id share a pattern. */
-const pattern = (address) => address.replace(/\/[0-9]+(?=\/|\?|$)/g, '/{id}').replace(/\/[0-9a-f]{16,}(?=\/|\?|$)/g, '/{key}');
+/** Pages that differ only in an id, or a record's code, number, reference or slug, share a pattern (owner, 2026-11-06:
+    no row id in an address; a course is its code in Administration's addresses, /admin/courses/GDN-101/content, a
+    person their account reference, /admin/people/CL2026011510423Z, an order its number, /admin/commerce/orders/
+    CL-00000689, a promotion its code, SUMMER_25). A code is capitals, digits, hyphens and underscores with a letter.
+    Administration names a Course Item, a category and a tag by a slug, and the public preview a course's part by its
+    part name: those are one page each too. */
+const pattern = (address) => address.replace(/\/[0-9]+(?=\/|\?|$)/g, '/{id}')
+    .replace(/\/(?=[A-Z0-9_-]*[A-Z])[A-Z0-9]+(?:[-_][A-Z0-9]+)*(?=\/|\?|$)/g, '/{code}')
+    .replace(/^\/admin\/(course-items|courses\/categories|courses\/tags)\/(?!new(?=\/|\?|$)|inline(?=\/|\?|$)|field(?=\/|\?|$))[a-z0-9-]+/, '/admin/$1/{slug}')
+    .replace(/^\/courses\/(?!category\/|tag\/)([a-z0-9-]+)\/preview\/(?!assessment\/)[a-z0-9-]+/, '/courses/$1/preview/{part}')
+    .replace(/\/[0-9a-f]{16,}(?=\/|\?|$)/g, '/{key}');
 
 async function crawl(browser, who, cookie, width) {
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}});

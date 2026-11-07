@@ -4,6 +4,10 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/11/05 SAST (Telegram sign-in and two-step sign-in)
+- Sign in by email or Telegram (.cl-sign-in-form, .cl-sign-in-how), a code typed in large spaced figures (.cl-input-code),
+  the QR code on a white ground in every theme (.cl-two-step-qr), the recovery codes (.cl-recovery-codes), Account > Sign-in
+  and security's cards (.cl-security-*) and the Telegram card in Settings that names what it does ticked or not.
 2026/10/17 SAST (tables on phones)
 - Nothing in a table or a toolbar stands out of its card at any width: a table with an action column gives that column at least its control's width (automatic layout, every other cell at max-width 0), row actions outside a table wrap, and the Activity search field keeps room to type.
 - Tables on a phone: only the essential columns (data-phone="hide" on the others), 7pt text, one Actions menu for several actions kept in a row (action.row narrow_menu), and a tooltip with the whole row.
@@ -1412,6 +1416,16 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-bundle-courses li > span:first-child { margin-right:.75rem; }
 .cl-bundle-course-actions { display:inline-flex; flex-wrap:wrap; gap:.25rem; vertical-align:middle; }
 .cl-catalogue-bundles { margin:0 0 1rem; }
+/* Bundles above the catalogue's courses (owner, 2026-11-06, the approved mockup): the row's head with its link to every
+   bundle, the bundles' cards, then the Courses head, all inside the results card. */
+.cl-catalogue-bundle-row{display:grid;gap:.25rem;min-width:0;margin:0 0 1.5rem}
+/* A bundle the course is in, under the buy button of its Course access card (the approved mockup): each one after a rule. */
+.cl-course-bundles{display:grid;min-width:0}
+.cl-course-bundle{display:grid;gap:.5rem;min-width:0;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--cl-border,#dfe4ea)}
+/* Inside the card, so a theme's paragraph spacing does not open the note up: the grid's gap spaces it. */
+.cl-ui-surface .cl-course-bundle>p{margin:0;overflow-wrap:anywhere}
+.cl-ui-surface .cl-course-bundle>.cl-course-bundle-title{font-weight:700}
+.cl-course-card-saving{margin:0}
 .cl-public-cart-bar { display:flex; align-items:center; max-width:1200px; margin:auto; padding:.75rem 1rem; }
 @media (max-width:700px) { .cl-cart-prompt { display:none; } }/* Platform UI: canonical functional geometry; themes own its visual treatment. */
 
@@ -1544,6 +1558,8 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 
 @media (max-width:1100px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:1fr}}
+/* Three to a row (Money Reports, Site Analytics) is one to a row on a phone, as four to a row is (2026-11-06). */
+@media (max-width:640px){.cl-ui-stat-grid[data-columns="3"]{grid-template-columns:1fr}}
 /* Compact stat grid: many small counts (the course editor's ten Course Item types) keep two or more to a row on a phone. */
 .cl-ui-stat-grid[data-density="compact"]{grid-template-columns:repeat(auto-fill,minmax(min(100%,8.5rem),1fr));gap:.65rem}
 
@@ -2420,6 +2436,12 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 tr[data-course-saved],.cl-ui-card:has([data-course-saved]){animation:cl-course-saved 2.4s ease-out}
 @keyframes cl-course-saved{from{background-color:color-mix(in srgb,var(--cl-accent,#2563eb) 20%,transparent)}}
 @media (prefers-reduced-motion:reduce){tr[data-course-saved],.cl-ui-card:has([data-course-saved]){animation:none}}
+/* A bundle's row or card edited in place (owner, 2026-11-06) lights as a course's does; its status cards stack in the cell. */
+tr[data-bundle-saved],.cl-ui-card:has([data-bundle-saved]){animation:cl-course-saved 2.4s ease-out}
+@media (prefers-reduced-motion:reduce){tr[data-bundle-saved],.cl-ui-card:has([data-bundle-saved]){animation:none}}
+/* Room for the status cards and the two dates while a row is edited; a phone keeps the table's own widths (UX rule 2.9). */
+@media (min-width:701px){.cl-bundle-quick-status{min-width:14.5rem}.cl-bundle-quick-when{min-width:10.75rem}.cl-bundle-quick-access{min-width:7.5rem}}
+.cl-bundle-quick-status .cl-ui-picture-choice-note,.cl-bundle-quick-status .cl-ui-picture-choice-label{white-space:normal}
 /* Course Page Layouts (owner, 2026-11-01, the accepted mockup): the three kinds a course may use, each layout's card with
    its sketch, the blocks a course's page leaves out, Apply to the ticked courses, and a course's Page layout tab with
    its custom layout in a dashed frame. */
@@ -2454,3 +2476,27 @@ tr[data-course-saved],.cl-ui-card:has([data-course-saved]){animation:cl-course-s
 .cl-landing-sketch h3{margin:0 0 .5rem}
 .cl-landing-sketch p{margin:.6rem 0 0;font-size:.82rem;color:var(--cl-muted,#5f6b7a)}
 .cl-page-sketch>[data-block="pricing"],.cl-page-sketch>[data-block="cta"]{background:var(--cl-accent,#2563eb);color:var(--cl-on-color-1,#fff)}
+/* Sign in by email or Telegram, two-step sign-in and Account > Sign-in and security (owner, 2026-11-05, the approved mockup). */
+.cl-sign-in-form{display:grid;gap:1.25rem}
+.cl-sign-in-how{display:grid;gap:1rem;min-width:0;margin:0;padding:0;border:0}
+.cl-sign-in-how>p{margin:0}
+.cl-sign-in-code{display:grid;gap:1rem;margin:0}
+.cl-input-code{font-size:1.6rem;letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums}
+.cl-security-card .cl-input-code,.cl-two-step-steps .cl-input-code{max-width:16rem}
+.cl-sign-in-links,.cl-security-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.25rem}
+.cl-sign-in-links{margin-top:1.25rem}
+.cl-sign-in-links form,.cl-security-actions form{margin:0}
+.cl-security-cards{display:grid;gap:var(--cl-section-space,1.5rem)}
+.cl-security-card{display:grid;gap:1rem;min-width:0}
+.cl-security-card>.cl-ui-section-head{margin:0}
+.cl-two-step-setup{display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start}
+.cl-two-step-qr{flex:none;max-width:100%;padding:.5rem;line-height:0;background:#fff;border:1px solid var(--cl-border,#dfe4ea)}
+.cl-two-step-qr svg{display:block;width:15rem;height:15rem;max-width:100%}
+.cl-two-step-steps{display:grid;flex:1 1 20rem;gap:.75rem;min-width:0}
+.cl-two-step-key{overflow-wrap:anywhere;font-size:1rem}
+.cl-recovery-codes{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:.5rem 1rem;margin:0;padding:1rem;list-style:none;font-family:var(--cl-font-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:1.05rem;font-variant-numeric:tabular-nums;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,.5rem)}
+/* A tick card that names what it does in either state: its words follow the tick, without JavaScript. */
+.cl-ui-picture-choice-item:has(input:checked) .cl-tick-words-off,.cl-ui-picture-choice-item:has(input:not(:checked)) .cl-tick-words-on{display:none}
+/* The Telegram log: on a phone, who a message went to sits under it, its own column hidden. */
+.cl-ui-table .cl-telegram-to-inline{display:none;font-size:.875em}
+@media(max-width:700px){.cl-ui-table .cl-telegram-to-inline{display:block;margin-top:.25rem}}

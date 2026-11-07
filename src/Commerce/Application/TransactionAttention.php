@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Domain\OrderNumber;
 use CattoLearning\Commerce\Infrastructure\AttentionRepository;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Wallet\LedgerKind;
@@ -12,6 +13,7 @@ use CattoLearning\Commerce\Wallet\WalletRepository;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\AccountReference;
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
@@ -148,8 +150,8 @@ final class TransactionAttention
      */
     private function item(string $kind, string $reference, string $title, string $summary, string $at, ?string $href = null, array $row = []): array
     {
-        $person = isset($row['person_id']) ? ['name' => trim((string) $row['person_name']) ?: 'Someone', 'reference' => (string) ($row['person_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['person_id']] : null;
-        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => $href ?? '/admin/commerce/attention/' . $kind . '/' . $reference, 'person' => $person];
+        $person = isset($row['person_id']) ? ['name' => trim((string) $row['person_name']) ?: 'Someone', 'reference' => (string) ($row['person_reference'] ?? ''), 'href' => \CattoLearning\Support\Address\PersonAddress::admin((string) $row['person_reference'])] : null;
+        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => $href ?? OrderAddress::attention($kind, (int) $reference), 'person' => $person];
     }
 
     private static function startingText(string $kind, string $name, string $order, string $summary, string $reference): string
@@ -174,7 +176,7 @@ final class TransactionAttention
 
     private static function order(int $id): string
     {
-        return 'CL-' . sprintf('%08d', $id);
+        return OrderNumber::format($id);
     }
 
     private static function date(string $at): string

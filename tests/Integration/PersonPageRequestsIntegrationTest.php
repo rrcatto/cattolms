@@ -12,6 +12,9 @@ Course Requests block is supposed to be hidden or the html for it not even rende
 course requests are sent to a company, so a private account's page renders no block at all.
 
 Changelog:
+2026/11/07 SAST
+- A person's and a company's pages open by their account references, and a row id or a near miss is not found (owner,
+  2026-11-06: "a recogniseable code is better").
 2026/10/21 SAST
 - First version.
 */
@@ -61,8 +64,8 @@ final class PersonPageRequestsIntegrationTest extends TestCase
         $company = $this->fixture->createCompany($admin, 'Requests company ' . $suffix, 'requests-' . $suffix . '.seed.test');
         $this->fixture->addCompanyMember($company, $member);
         $this->signIn($admin);
-        self::assertStringNotContainsString('Course requests', $this->html('/admin/people/' . $private), 'A private account has no course requests block.');
-        self::assertStringContainsString('Course requests', $this->html('/admin/people/' . $member), 'A company account has one.');
+        self::assertStringNotContainsString('Course requests', $this->html('/admin/people/' . $this->reference($private)), 'A private account has no course requests block.');
+        self::assertStringContainsString('Course requests', $this->html('/admin/people/' . $this->reference($member)), 'A company account has one.');
     }
 
     /**
@@ -82,7 +85,7 @@ final class PersonPageRequestsIntegrationTest extends TestCase
         $reference = \CattoLearning\Support\AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $person]));
         foreach (['Nomsa' . $suffix => 'a middle name', 'Zandile Nomsa' . $suffix . ' Mokoena' => 'the whole name', 'second-' . $suffix . '@elsewhere' => 'a second email address', $reference => 'the account reference typed as shown'] as $term => $what) {
             $page = (string) $this->response('/admin/people?people_q=' . rawurlencode($term))->getContent();
-            self::assertStringContainsString('href="/admin/people/' . $person . '"', $page, 'The People search finds ' . $what . '.');
+            self::assertStringContainsString('href="/admin/people/' . $this->reference($person) . '"', $page, 'The People search finds ' . $what . '.');
         }
         self::assertSame(404, $this->response('/admin/people/find?q=' . rawurlencode('Nomsa' . $suffix))->getStatusCode(), 'Find a person is gone.');
     }
@@ -96,21 +99,60 @@ final class PersonPageRequestsIntegrationTest extends TestCase
         $learner = $this->fixture->createUser('Library learner ' . $suffix, 'library-learner-' . $suffix . '@seed.test');
         $company = $this->fixture->createCompany($admin, 'Library page ' . $suffix, 'library-page-' . $suffix . '.seed.test');
         $course = $this->fixture->createCourse($admin, $company, 'library-page-' . $suffix, 'Library page course ' . $suffix);
+        $courseCode = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $course]);
         $enrolment = (int) $this->db->fetchOne(
             "INSERT INTO course_enrolments (public_id,user_id,course_id,status,access_period_seconds,assigned_by_user_id,is_preview) VALUES (:p,:u,:c,'assigned',31536000,:a,FALSE) RETURNING id",
             ['p' => \CattoLearning\Support\Uuid::v4(), 'u' => $learner, 'c' => $course, 'a' => $admin]);
         $this->signIn($admin);
-        $page = $this->html('/admin/people/' . $learner);
-        self::assertStringContainsString('<a href="/admin/courses/' . $course . '">Library page course ' . $suffix . '</a>', $page, 'The course opens in Administration.');
+        $page = $this->html('/admin/people/' . $this->reference($learner));
+        self::assertStringContainsString('<a href="/admin/courses/' . $courseCode . '">Library page course ' . $suffix . '</a>', $page, 'The course opens in Administration.');
         self::assertStringContainsString('action="/admin/course/enrolments/' . $enrolment . '/remove"', $page);
         self::assertStringNotContainsString("href: '/admin/course/enrolments'", $page);
         $_SESSION['csrf'] = str_repeat('c', 64);
-        $_POST = ['csrf' => $_SESSION['csrf'], 'return' => '/admin/people/' . $learner];
+        $_POST = ['csrf' => $_SESSION['csrf'], 'return' => '/admin/people/' . $this->reference($learner)];
         $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
         try { $removed = $kernel->handle(Request::create('/admin/course/enrolments/' . $enrolment . '/remove', 'POST', $_POST)); } finally { $kernel->shutdown(); $_POST = []; }
-        self::assertSame('/admin/people/' . $learner, $removed->headers->get('Location'), 'Back on their page.');
+        self::assertSame('/admin/people/' . $this->reference($learner), $removed->headers->get('Location'), 'Back on their page.');
         self::assertSame('cancelled', $this->db->fetchOne('SELECT status FROM course_enrolments WHERE id = :id', ['id' => $enrolment]));
         $this->db->executeStatement('DELETE FROM course_enrolments WHERE id = :id', ['id' => $enrolment]);
+    }
+
+    /**
+     * A person's page, a company's, a person's wallet and a subscriber's page open by the account reference as the site
+     * stores it, and nothing else names them: the row id, the reference in lower case, written with hyphens as it is
+     * shown, or one character off, is not found (owner, 2026-11-06: no row id in an address).
+     */
+    public function testAPersonAndACompanyAreOpenedByTheirAccountReferencesAlone(): void
+    {
+        $suffix = $this->fixture->suffix();
+        $admin = $this->fixture->createUser('Reference admin ' . $suffix, 'reference-admin-' . $suffix . '@seed.test');
+        $this->fixture->grantRole($admin, 'ADMIN');
+        $person = $this->fixture->createUser('Reference learner ' . $suffix, 'reference-learner-' . $suffix . '@seed.test');
+        $company = $this->fixture->createCompany($admin, 'Reference company ' . $suffix, 'reference-' . $suffix . '.seed.test');
+        $this->signIn($admin);
+        $personReference = $this->reference($person);
+        $companyReference = (string) $this->db->fetchOne('SELECT account_reference FROM companies WHERE id = :id', ['id' => $company]);
+
+        $page = $this->html('/admin/people/' . $personReference);
+        self::assertStringContainsString('action="/admin/people/' . $personReference . '/status"', $page, 'Its forms name the person by reference too.');
+        self::assertStringNotContainsString('/admin/people/' . $person . '"', $page);
+        self::assertStringContainsString('Reference company ' . $suffix, $this->html('/admin/companies/' . $companyReference));
+        $this->html('/admin/wallets/person/' . $personReference);
+        $this->html('/admin/wallets/company/' . $companyReference);
+        $this->html('/mailing/subscribers/' . $personReference);
+
+        $shown = \CattoLearning\Support\AccountReference::format($personReference);
+        $offByOne = substr($personReference, 0, -1) . (substr($personReference, -1) === 'A' ? 'B' : 'A');
+        foreach (['/admin/people/' . $person => 'the row id', '/admin/people/' . strtolower($personReference) => 'lower case', '/admin/people/' . $shown => 'hyphens as shown',
+            '/admin/people/' . $offByOne => 'one character off', '/admin/companies/' . $company => 'a company\'s row id', '/admin/companies/' . $personReference => 'a person\'s reference for a company',
+            '/admin/people/' . $companyReference => 'a company\'s reference for a person', '/admin/wallets/person/' . $person => 'a wallet by row id', '/mailing/subscribers/' . $person => 'a subscriber by row id'] as $url => $what) {
+            self::assertSame(404, $this->response($url)->getStatusCode(), $url . ' (' . $what . ') must be not found.');
+        }
+    }
+
+    private function reference(int $user): string
+    {
+        return (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $user]);
     }
 
     private function signIn(int $user): void

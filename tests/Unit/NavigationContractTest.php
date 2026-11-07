@@ -60,6 +60,9 @@ final class NavigationContractTest extends TestCase
             if (($group['key'] ?? '') === 'admin-group-commerce') $commerce = array_column((array) $group['children'], 'href', 'label');
         }
         self::assertSame('/admin/commerce/ledger', $commerce['Money Ledger'] ?? null);
+        // Each month's money in one report, after the Money Ledger (owner, 2026-11-06).
+        self::assertSame('/admin/commerce/reports', $commerce['Money Reports'] ?? null);
+        self::assertSame(array_search('Money Ledger', array_keys($commerce), true) + 1, array_search('Money Reports', array_keys($commerce), true));
         self::assertSame('/admin/commerce/eft', $commerce['Record EFT Payment'] ?? null);
         self::assertSame('/admin/commerce/unmatched', $commerce['Unmatched Money'] ?? null);
         self::assertArrayNotHasKey('Payment Events', $commerce);
@@ -91,7 +94,10 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/orders', $accountChildren['account-orders']['href'] ?? null);
         // Title case like every other menu group (owner's decision, 2026-10-17).
         self::assertSame('Courses', $accountChildren['account-courses-group']['label'] ?? null);
-        self::assertCount(4, $accountChildren['account-courses-group']['children'], 'My Orders, My Wallet, My Courses and My Certificates.');
+        // Favourites straight after My Courses, its own page (owner, 2026-11-06); Course Requests only for a company account.
+        self::assertSame(['account-orders', 'account-wallet', 'account-learning', 'account-favourites', 'account-certificates'], array_column((array) $accountChildren['account-courses-group']['children'], 'key'), 'My Orders, My Wallet, My Courses, Favourites and My Certificates.');
+        self::assertSame('/account/favourites', $accountChildren['account-favourites']['href'] ?? null);
+        self::assertArrayNotHasKey('account-requests', $accountChildren, 'Course Requests is a company account\'s page only.');
         self::assertSame('/account/certificates', $accountChildren['account-certificates']['href'] ?? null);
         self::assertSame('/account/wallet', $accountChildren['account-wallet']['href'] ?? null);
         self::assertArrayNotHasKey('commerce', $byKey);
@@ -454,6 +460,7 @@ final class NavigationContractTest extends TestCase
                 'account-dashboard',
                 'account-profile-group',
                 'account-courses-group',
+                'account-security',
                 'account-sessions',
                 'account-activity',
             ],
@@ -464,6 +471,25 @@ final class NavigationContractTest extends TestCase
         // Third place is only correct while Profile is still a pop-out; flattened, it would be
         // three more siblings sitting between the dashboard and the library.
         self::assertCount(5, (array) ($account[2]['children'] ?? []));
+    }
+
+    /** A company account's Courses group has Course Requests after Favourites (owner, 2026-11-06); a private account's has none. */
+    public function testACompanyAccountHasCourseRequestsAfterFavourites(): void
+    {
+        $method = new ReflectionMethod(ThemeRenderer::class, 'navigation');
+        $group = static function (array $items): array {
+            foreach ($items as $item) {
+                if ((string) $item['key'] !== 'account') continue;
+                foreach ((array) $item['children'] as $child) {
+                    if ((string) $child['key'] === 'account-courses-group') return array_column((array) $child['children'], 'href');
+                }
+            }
+            return [];
+        };
+        $reader = ['active_nav' => 'account', 'is_authenticated' => true, 'permissions' => (new PermissionCatalog())->keys()];
+        self::assertSame(['/account/orders', '/account/wallet', '/account/courses', '/account/favourites', '/account/requests', '/account/certificates'],
+            $group($method->invoke($this->renderer(), $reader + ['is_company_account' => true], 'csrf-example')));
+        self::assertNotContains('/account/requests', $group($method->invoke($this->renderer(), $reader + ['is_company_account' => false], 'csrf-example')));
     }
 
     public function testNavigationDocumentationDefinesAccountCompanyAndAdministrationMenus(): void

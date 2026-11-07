@@ -19,14 +19,27 @@
 							{% if navigation.subcategories %}
 								{% set category_cards = [] %}
 								{% for sub in navigation.subcategories %}
-									{% set category_cards = category_cards|merge([sub.description ? {value: sub.id, label: sub.label, icon: sub.icon, note: sub.description} : {value: sub.id, label: sub.label, icon: sub.icon}]) %}
+									{% set category_cards = category_cards|merge([sub.description ? {value: sub.slug, label: sub.label, icon: sub.icon, note: sub.description} : {value: sub.slug, label: sub.label, icon: sub.icon}]) %}
 								{% endfor %}
-								<form class="cl-catalogue-categories" method="get" action="/courses" data-choose-submits>
+								<form class="cl-catalogue-categories" method="get" action="/courses" data-choose-submits data-named-pages="/courses/category/">
 									{{ ui('form.picture-choice', {name: 'category', legend: navigation.label, id: 'catalogue-categories', size: 'small', columns: 4, items: category_cards}) }}
 									<noscript>{{ ui('action.button', {label: 'Show courses', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 								</form>
 							{% endif %}
 						</div>
+					{% endif %}
+					{# Bundles first, above the courses (owner, 2026-11-06, the approved mockup): on All courses every bundle on sale,
+					   on a category's page those with a course in its branch, the larger saving first. The row replaces the line
+					   about bundles; the line stays where no row shows (a search, a later page, a category without bundles). Both
+					   are inside the results, so a search or a page turned in place brings the right one. #}
+					{% if workspace.bundles|default(null) %}
+						<div class="cl-catalogue-bundle-row" id="catalogue-bundles">
+							{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Save with a bundle', summary: workspace.bundles.summary, heading_level: 3})} %}{% block section_actions %}{{ ui('action.link', {label: 'View all bundles', variant: 'secondary', size: 'small', href: '/bundles', icon: 'action-view-all'}) }}{% endblock %}{% endembed %}
+							{{ ui('catalogue.course-grid', {courses: workspace.bundles.cards}) }}
+						</div>
+						{{ ui('layout.section-head', {heading: 'Courses', heading_level: 3}) }}
+					{% elseif workspace.bundles_line|default(false) %}
+						<p class="cl-catalogue-bundles">Several courses for one price: <a href="/bundles">browse course bundles</a>.</p>
 					{% endif %}
 					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
 					{% if courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region'} %}</div>{% endif %}

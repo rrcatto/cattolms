@@ -11,6 +11,9 @@ Description:
 Provides course-domain functionality for legacy html course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/11/07 SAST
+- Reads <meta name="cattolms:part-names"> (specification 4.11, section 6.6): the parts whose names their places would not
+  give them, so a course replaced from its file keeps its parts' addresses.
 2026/11/01 SAST
 - The grading check reads the introduction's prose only: a table of an exam's domains and their weights had been
   taken for grading weights.
@@ -53,6 +56,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Slug;
@@ -442,6 +446,9 @@ final class LegacyHtmlCourseImporter
             'modules' => $modules,
             // The course preview, a presentation of its own outside the modules (owner, 2026-11-03: everything is exported).
             'files' => $this->courseFiles($xpath),
+            // The names of the parts whose places would not give them those names (specification 6.6), so a course replaced
+            // from its own file keeps its parts' addresses.
+            'part_names' => $this->partNames($xpath),
             'trailer' => $this->presentation(is_array($presentations['trailer'] ?? null) ? ['kind' => 'trailer'] + $presentations['trailer'] : null, 'The course preview', false, $warnings),
             // The course's cover, an SVG drawing in the masthead's .course-cover (owner, 2026-11-01), set after import.
             'catalogue' => ($cover = $this->cover($xpath, $title, $warnings)) === null ? null : ['cover' => $cover],
@@ -577,6 +584,22 @@ final class LegacyHtmlCourseImporter
         $nodes = $xpath->query('//meta[@name="cattolms:final-time-limit"]/@content');
         $minutes = $nodes->length > 0 ? (int) $nodes->item(0)?->nodeValue : 0;
         return $minutes >= 1 && $minutes <= 1440 ? $minutes * 60 : 7200;
+    }
+
+    /**
+     * The parts the file names (specification 6.6): <meta name="cattolms:part-names" content="module-1=module-3 …">, the
+     * name a part's place gives it and the part's own name. Anything that is not a pair of part names is left out.
+     *
+     * @return array<string,string>
+     */
+    private function partNames(DOMXPath $xpath): array
+    {
+        $nodes = $xpath->query('//meta[@name="cattolms:part-names"]/@content');
+        $names = [];
+        foreach (preg_split('/\s+/', trim($nodes->length > 0 ? (string) $nodes->item(0)?->nodeValue : '')) ?: [] as $pair) {
+            if (preg_match('#^(' . CoursePartAddress::REQUIREMENT . ')=(' . CoursePartAddress::REQUIREMENT . ')$#', $pair, $part) === 1) { $names[$part[1]] = $part[2]; }
+        }
+        return $names;
     }
 
     /** The whole course's study time, in hours in the file's head (specification 6.5), or null: the page adds up its parts. */

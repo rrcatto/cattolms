@@ -17,6 +17,16 @@ period; a row opens its own page; that page links to the order, the account, the
 that belong with it.
 
 Changelog:
+2026/11/07 SAST
+- A person and a wallet are linked by their account references (owner, 2026-11-06).
+- An order is named by its number in every address (owner, 2026-11-06: no row id in an address): its page
+  (/admin/commerce/orders/CL-00000689, Support\Address\OrderAddress) and the lists filtered to it (?order=CL-00000689);
+  orderNumber() is Commerce\Domain\OrderNumber::format.
+2026/11/06 SAST
+- Money Reports (owner, 2026-11-06, the approved mockup) count each figure as the list it opens counts it: ledgerTotalsFor(),
+  orderCountFor() and the lists' lines read the same filters as the Money Ledger and Orders & Payments. The ledger takes
+  Card fees (both fee kinds) as a kind and the orders Paid in full, Still to be paid and Refunded as a state; the
+  dashboard's Payment fees, Awaiting payment and Refunded open those, so each lists what it counts.
 2026/10/21 SAST
 - The dashboard's money (owner, 2026-10-21: periods "today, past week, past month, 3,6,9,12 months, YTD, 2 years, All time
   (in a drop down selector)", and the owner's choices of columns with method bars, Dates kept, a comparison with the
@@ -37,10 +47,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Application;
 
+use CattoLearning\Support\Address\AddressKey;
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Commerce\Domain\OrderNumber;
 use CattoLearning\Commerce\Infrastructure\MoneyRecordsRepository;
 use CattoLearning\Commerce\Wallet\LedgerKind;
 use CattoLearning\Support\AccountReference;
+use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
@@ -57,6 +72,20 @@ final class MoneyRecords
     /** Each step a payment can reach, in words, for the Payment Events filter. */
     public const PAYMENT_STATE_WORDS = ['created' => 'Started', 'pending' => 'Waiting', 'paid' => 'Went through', 'failed' => 'Failed', 'cancelled' => 'Cancelled',
         'disputed' => 'Disputed', 'reversed' => 'Reversed', 'partially_refunded' => 'Partly refunded', 'refunded' => 'Refunded'];
+    /**
+     * Kinds of ledger line that make one figure, chosen like a kind (owner, 2026-11-06, Money Reports): a figure and the list
+     * it opens count the same lines.
+     */
+    public const LEDGER_KIND_GROUPS = ['card_fees' => ['label' => 'Card fees, to pay and to refund', 'kinds' => ['processor_fee', 'processor_refund_fee']]];
+    /**
+     * Order states that make one figure, chosen like a state (owner, 2026-11-06, Money Reports): an order paid in full stays
+     * paid in full when it is refunded later, and one held for review is paid.
+     */
+    public const ORDER_STATE_GROUPS = [
+        'paid_in_full' => ['label' => 'Paid in full, refunded or not', 'states' => ['manual_review', 'paid', 'fulfilled', 'partially_refunded', 'refunded']],
+        'to_pay' => ['label' => 'Still to be paid', 'states' => ['placed', 'awaiting_payment']],
+        'refunded_any' => ['label' => 'Refunded, in full or in part', 'states' => ['partially_refunded', 'refunded']],
+    ];
     /** The dashboard's periods (owner, 2026-10-21), and Dates for any range, such as a VAT period. */
     public const PERIODS = ['today' => 'Today', 'week' => 'Past week', 'month' => 'Past month', '3m' => 'Past 3 months', '6m' => 'Past 6 months',
         '9m' => 'Past 9 months', '12m' => 'Past 12 months', 'ytd' => 'Year to date', '2y' => 'Past 2 years', 'all' => 'All time', 'custom' => 'Dates'];
@@ -140,7 +169,8 @@ final class MoneyRecords
     public static function person(int $userId, string $name, string $reference = '', string $email = ''): array
     {
         $name = trim($name);
-        return ['name' => $name !== '' ? $name : 'Someone', 'reference' => $reference, 'href' => $userId > 0 ? '/admin/people/' . $userId : '', 'email' => $email];
+        // Linked by their account reference (owner, 2026-11-06: no row id in an address).
+        return ['name' => $name !== '' ? $name : 'Someone', 'reference' => $reference, 'href' => $userId > 0 && AddressKey::fits($reference, PersonAddress::REQUIREMENT) ? PersonAddress::admin($reference) : '', 'email' => $email];
     }
 
     /**
@@ -202,7 +232,19 @@ final class MoneyRecords
 
     public static function orderNumber(int $id): string
     {
-        return 'CL-' . str_pad((string) $id, 8, '0', STR_PAD_LEFT);
+        return OrderNumber::format($id);
+    }
+
+    /**
+     * The order a list is filtered to, from ?order=CL-00000689: the order's row id and its number, or none. A number
+     * written any other way filters nothing.
+     *
+     * @return array{order_id:int,order:string}
+     */
+    private static function orderFilter(mixed $value): array
+    {
+        $id = is_string($value) ? OrderNumber::id($value) : null;
+        return $id === null ? ['order_id' => 0, 'order' => ''] : ['order_id' => $id, 'order' => (string) $value];
     }
 
     /**
@@ -401,7 +443,20 @@ final class MoneyRecords
         return ['account_reference_label' => (string) ($row['account_reference'] ?? '') === '' ? '' : AccountReference::format((string) $row['account_reference']),
             'account_label' => (string) ($row['account_name'] ?? ''),
             'account_person' => self::accountPerson($row),
-            'account_href' => $company > 0 ? '/admin/wallets/company/' . $company : ($person > 0 ? '/admin/wallets/person/' . $person : '')];
+            'account_href' => self::walletHref($row, $company, $person)];
+    }
+
+    /**
+     * The wallet page of the account a money row belongs to, by the account's reference (owner, 2026-11-06: no row id in
+     * an address): a company's or a person's, or none.
+     *
+     * @param array<string,mixed> $row with account_reference
+     */
+    private static function walletHref(array $row, int $company, int $person): string
+    {
+        $reference = (string) ($row['account_reference'] ?? '');
+        if (!AddressKey::fits($reference, PersonAddress::REQUIREMENT)) return '';
+        return $company > 0 ? CompanyAddress::to('wallet', $reference) : ($person > 0 ? PersonAddress::to('wallet', $reference) : '');
     }
 
     /**
@@ -488,11 +543,54 @@ final class MoneyRecords
             'wallet_change_label' => (int) $row['wallet_effect'] === 0 ? '' : self::signed((int) $row['wallet_effect'], (int) $row['amount_minor'], $currency),
             'amount_label' => self::money((int) $row['amount_minor'], $currency),
             'reference_label' => (string) $row['account_reference'] === '' ? '' : AccountReference::format((string) $row['account_reference']),
-            'account_href' => $company > 0 ? '/admin/wallets/company/' . $company : ($person > 0 ? '/admin/wallets/person/' . $person : ''),
+            'account_href' => self::walletHref($row, $company, $person),
             'order_label' => $row['order_id'] === null ? '' : self::orderNumber((int) $row['order_id']),
-            'order_href' => $row['order_id'] === null ? '' : '/admin/commerce/orders/' . (int) $row['order_id'],
+            'order_href' => $row['order_id'] === null ? '' : OrderAddress::admin((int) $row['order_id']),
             'reference' => (string) ($row['external_reference'] ?? $row['document_number'] ?? '') !== '' ? (string) ($row['external_reference'] ?? $row['document_number']) : '',
         ];
+    }
+
+    /**
+     * The Money Ledger's filters from an address, every value checked against its list. A group of kinds (card fees) is
+     * chosen like a kind and read by the SQL as its kinds.
+     *
+     * @param array<string,mixed> $query
+     * @return array<string,mixed>
+     */
+    private function ledgerFilters(array $query): array
+    {
+        $f = $this->commonFilters($query) + [
+            'kind' => self::choice($query['kind'] ?? '', [...array_keys(LedgerKind::KINDS), ...array_keys(self::LEDGER_KIND_GROUPS)]),
+            'method' => self::choice($query['method'] ?? '', array_keys(self::METHODS)),
+            'money' => self::choice($query['money'] ?? '', ['in', 'out', 'none']),
+            'wallet' => self::choice($query['wallet'] ?? '', ['in', 'out']),
+            'account' => self::choice($query['account'] ?? '', ['person', 'company']),
+        ] + self::orderFilter($query['order'] ?? '');
+        return isset(self::LEDGER_KIND_GROUPS[$f['kind']]) ? ['kind' => '', 'kinds' => self::LEDGER_KIND_GROUPS[$f['kind']]['kinds'], 'kind_group' => $f['kind']] + $f : $f;
+    }
+
+    /**
+     * What the Money Ledger's lines for an address add up to, counted as its Totals card counts them (Money Reports'
+     * figures, owner 2026-11-06).
+     *
+     * @param array<string,mixed> $query
+     * @return array{entries:int,money_in:int,money_out:int,wallet_in:int,wallet_out:int}
+     */
+    public function ledgerTotalsFor(array $query): array
+    {
+        return $this->records->ledgerTotals($this->ledgerFilters($query));
+    }
+
+    /**
+     * The Money Ledger's lines for an address, oldest first, as stored: a report's list of every line (Money Reports'
+     * Excel file).
+     *
+     * @param array<string,mixed> $query
+     * @return list<array<string,mixed>>
+     */
+    public function ledgerEntriesFor(array $query, int $limit = 100000): array
+    {
+        return $this->records->ledgerPage($this->ledgerFilters($query), 'occurred', SortOrder::ASCENDING, $limit, 0);
     }
 
     /**
@@ -503,20 +601,14 @@ final class MoneyRecords
      */
     public function ledger(array $query): array
     {
-        $f = $this->commonFilters($query) + [
-            'kind' => self::choice($query['kind'] ?? '', array_keys(LedgerKind::KINDS)),
-            'method' => self::choice($query['method'] ?? '', array_keys(self::METHODS)),
-            'money' => self::choice($query['money'] ?? '', ['in', 'out', 'none']),
-            'wallet' => self::choice($query['wallet'] ?? '', ['in', 'out']),
-            'account' => self::choice($query['account'] ?? '', ['person', 'company']),
-            'order_id' => max(0, (int) ($query['order'] ?? 0)),
-        ];
-        $carried = self::carried($f + ['order' => $f['order_id']], ['from', 'to', 'kind', 'method', 'money', 'wallet', 'account', 'order', 'q']);
+        $f = $this->ledgerFilters($query);
+        $carried = self::carried(['kind' => $f['kind_group'] ?? $f['kind']] + $f, ['from', 'to', 'kind', 'method', 'money', 'wallet', 'account', 'order', 'q']);
         $sort = SortOrder::create($query['ledger_sort'] ?? null, $query['ledger_dir'] ?? null, array_keys(MoneyRecordsRepository::LEDGER_SORTS), 'occurred', SortOrder::DESCENDING);
         $pagination = Pagination::create($query['ledger_page'] ?? null, $query['ledger_page_size'] ?? null, $this->records->ledgerCount($f), 50);
         $totals = $this->records->ledgerTotals($f);
         return [
-            'filters' => $f, 'kinds' => array_map(static fn(array $k): string => $k[2], LedgerKind::KINDS), 'methods' => self::METHODS,
+            'filters' => ['kind' => $f['kind_group'] ?? $f['kind']] + $f,
+            'kinds' => array_map(static fn(array $k): string => $k[2], LedgerKind::KINDS) + array_map(static fn(array $g): string => $g['label'], self::LEDGER_KIND_GROUPS), 'methods' => self::METHODS,
             'rows' => array_map(fn(array $r): array => $this->ledgerRow($r), $this->records->ledgerPage($f, $sort->key, $sort->direction, $pagination->pageSize, $pagination->offset)),
             'totals' => $totals + ['money_in_label' => self::money($totals['money_in']), 'money_out_label' => self::money($totals['money_out']),
                 'net_label' => ($totals['money_in'] - $totals['money_out'] < 0 ? '−' : '') . self::money(abs($totals['money_in'] - $totals['money_out'])),
@@ -542,8 +634,8 @@ final class MoneyRecords
         $view['payment_events_href'] = $entry['payment_id'] === null ? '' : '/admin/commerce/payment-events?payment=' . rawurlencode((string) $entry['payment_id']);
         $view['corrects_href'] = $entry['corrects_entry_id'] === null ? '' : '/admin/commerce/ledger/' . (int) $entry['corrects_entry_id'];
         $view['related'] = array_map(fn(array $r): array => $this->ledgerRow($r), $this->records->ledgerRelated($entry));
-        $view['order_ledger_href'] = $entry['order_id'] === null ? '' : '/admin/commerce/ledger?order=' . (int) $entry['order_id'];
-        $view['order_trail_href'] = $entry['order_id'] === null ? '' : '/admin/commerce/trail?order=' . (int) $entry['order_id'];
+        $view['order_ledger_href'] = $entry['order_id'] === null ? '' : '/admin/commerce/ledger?' . OrderAddress::query((int) $entry['order_id']);
+        $view['order_trail_href'] = $entry['order_id'] === null ? '' : '/admin/commerce/trail?' . OrderAddress::query((int) $entry['order_id']);
         return $view;
     }
 
@@ -558,7 +650,7 @@ final class MoneyRecords
             'when' => self::when((string) $row['created_at']),
             'event_label' => self::eventLabel((string) $row['event']),
             'order_label' => $row['order_id'] === null ? '' : self::orderNumber((int) $row['order_id']),
-            'order_href' => $row['order_id'] === null ? '' : '/admin/commerce/orders/' . (int) $row['order_id'],
+            'order_href' => $row['order_id'] === null ? '' : OrderAddress::admin((int) $row['order_id']),
             'actor_label' => (string) ($row['actor_name'] ?? '') !== '' ? (string) $row['actor_name'] : 'The system',
             'summary' => self::summary((string) $row['payload']),
             'sentence' => self::trailSentence($row),
@@ -576,8 +668,8 @@ final class MoneyRecords
     public function trail(array $query): array
     {
         $events = $this->records->trailEventNames();
-        $f = $this->commonFilters($query) + ['event' => self::choice($query['event'] ?? '', $events), 'order_id' => max(0, (int) ($query['order'] ?? 0))];
-        $carried = self::carried($f + ['order' => $f['order_id']], ['from', 'to', 'event', 'order', 'q']);
+        $f = $this->commonFilters($query) + ['event' => self::choice($query['event'] ?? '', $events)] + self::orderFilter($query['order'] ?? '');
+        $carried = self::carried($f, ['from', 'to', 'event', 'order', 'q']);
         $sort = SortOrder::create($query['trail_sort'] ?? null, $query['trail_dir'] ?? null, array_keys(MoneyRecordsRepository::TRAIL_SORTS), 'created', SortOrder::DESCENDING);
         $pagination = Pagination::create($query['trail_page'] ?? null, $query['trail_page_size'] ?? null, $this->records->trailCount($f), 50);
         return [
@@ -597,8 +689,8 @@ final class MoneyRecords
         if ($event === null) return null;
         $view = $this->trailRow($event);
         $view['lines'] = self::payloadLines((string) $event['payload']);
-        $view['order_ledger_href'] = $event['order_id'] === null ? '' : '/admin/commerce/ledger?order=' . (int) $event['order_id'];
-        $view['order_trail_href'] = $event['order_id'] === null ? '' : '/admin/commerce/trail?order=' . (int) $event['order_id'];
+        $view['order_ledger_href'] = $event['order_id'] === null ? '' : '/admin/commerce/ledger?' . OrderAddress::query((int) $event['order_id']);
+        $view['order_trail_href'] = $event['order_id'] === null ? '' : '/admin/commerce/trail?' . OrderAddress::query((int) $event['order_id']);
         return $view;
     }
 
@@ -615,7 +707,7 @@ final class MoneyRecords
             'method_label' => self::METHODS[LedgerKind::methodForGateway((string) $row['gateway'])] ?? (string) $row['gateway'],
             'amount_label' => self::money((int) $row['amount_minor'], (string) $row['currency']),
             'order_label' => self::orderNumber((int) $row['order_id']),
-            'order_href' => '/admin/commerce/orders/' . (int) $row['order_id'],
+            'order_href' => OrderAddress::admin((int) $row['order_id']),
             'payment_short' => substr((string) $row['payment_id'], 0, 8),
             'sentence' => self::paymentEventSentence($row),
             'sentence_parts' => self::paymentEventSentenceParts($row),
@@ -633,8 +725,8 @@ final class MoneyRecords
         $gateways = $this->records->paymentGateways();
         $payment = is_string($query['payment'] ?? null) && preg_match('/^[0-9a-f-]{36}$/i', (string) $query['payment']) === 1 ? strtolower((string) $query['payment']) : '';
         $f = $this->commonFilters($query) + ['state' => self::choice($query['state'] ?? '', self::PAYMENT_STATES), 'gateway' => self::choice($query['gateway'] ?? '', $gateways),
-            'payment_id' => $payment, 'order_id' => max(0, (int) ($query['order'] ?? 0))];
-        $carried = self::carried($f + ['payment' => $payment, 'order' => $f['order_id']], ['from', 'to', 'state', 'gateway', 'payment', 'order', 'q']);
+            'payment_id' => $payment] + self::orderFilter($query['order'] ?? '');
+        $carried = self::carried($f + ['payment' => $payment], ['from', 'to', 'state', 'gateway', 'payment', 'order', 'q']);
         $sort = SortOrder::create($query['payments_sort'] ?? null, $query['payments_dir'] ?? null, array_keys(MoneyRecordsRepository::PAYMENT_EVENT_SORTS), 'created', SortOrder::DESCENDING);
         $pagination = Pagination::create($query['payments_page'] ?? null, $query['payments_page_size'] ?? null, $this->records->paymentEventCount($f), 50);
         return [
@@ -657,8 +749,47 @@ final class MoneyRecords
         $view['lines'] = self::payloadLines((string) $event['payload']);
         $view['payment_state_label'] = ucfirst(str_replace('_', ' ', (string) $event['payment_state']));
         $view['payment_events_href'] = '/admin/commerce/payment-events?payment=' . rawurlencode((string) $event['payment_id']);
-        $view['order_ledger_href'] = '/admin/commerce/ledger?order=' . (int) $event['order_id'];
+        $view['order_ledger_href'] = '/admin/commerce/ledger?' . OrderAddress::query((int) $event['order_id']);
         return $view;
+    }
+
+    /**
+     * Orders & Payments' filters from an address. A group of states (paid in full, still to be paid, refunded) is chosen
+     * like a state and read by the SQL as its states.
+     *
+     * @param array<string,mixed> $query
+     * @return array<string,mixed>
+     */
+    private function orderFilters(array $query): array
+    {
+        // `search` is the address the list had before it was filtered and paged; it still works.
+        $query['q'] ??= $query['search'] ?? '';
+        $f = $this->commonFilters($query) + ['state' => self::choice($query['state'] ?? '', [...array_keys(self::ORDER_STATES), ...array_keys(self::ORDER_STATE_GROUPS)]),
+            'account' => self::choice($query['account'] ?? '', ['person', 'company'])];
+        return isset(self::ORDER_STATE_GROUPS[$f['state']]) ? ['state' => '', 'states' => self::ORDER_STATE_GROUPS[$f['state']]['states'], 'state_group' => $f['state']] + $f : $f;
+    }
+
+    /**
+     * How many orders Orders & Payments lists for an address, counted as its pages count them (Money Reports' figures).
+     *
+     * @param array<string,mixed> $query
+     */
+    public function orderCountFor(array $query): int
+    {
+        return $this->records->orderCount($this->orderFilters($query));
+    }
+
+    /**
+     * The orders Orders & Payments lists for an address, oldest first, as stored, with where each stands in words (Money
+     * Reports' Excel file).
+     *
+     * @param array<string,mixed> $query
+     * @return list<array<string,mixed>>
+     */
+    public function orderEntriesFor(array $query, int $limit = 100000): array
+    {
+        return array_map(static fn(array $row): array => $row + ['status' => self::orderStatus($row)],
+            $this->records->orderPage($this->orderFilters($query), 'placed', SortOrder::ASCENDING, $limit, 0));
     }
 
     /**
@@ -669,24 +800,23 @@ final class MoneyRecords
      */
     public function orders(array $query): array
     {
-        // `search` is the address the list had before it was filtered and paged; it still works.
-        $query['q'] ??= $query['search'] ?? '';
-        $f = $this->commonFilters($query) + ['state' => self::choice($query['state'] ?? '', array_keys(self::ORDER_STATES)), 'account' => self::choice($query['account'] ?? '', ['person', 'company'])];
-        $carried = self::carried($f, ['from', 'to', 'state', 'account', 'q']);
+        $f = $this->orderFilters($query);
+        $carried = self::carried(['state' => $f['state_group'] ?? $f['state']] + $f, ['from', 'to', 'state', 'account', 'q']);
         $sort = SortOrder::create($query['orders_sort'] ?? null, $query['orders_dir'] ?? null, array_keys(MoneyRecordsRepository::ORDER_SORTS), 'placed', SortOrder::DESCENDING);
         $pagination = Pagination::create($query['orders_page'] ?? null, $query['orders_page_size'] ?? null, $this->records->orderCount($f), 50);
         $rows = [];
         foreach ($this->records->orderPage($f, $sort->key, $sort->direction, $pagination->pageSize, $pagination->offset) as $row) {
             $status = self::orderStatus($row);
             $rows[] = $row + ['status_label' => $status['label'], 'status_note' => $status['note'], 'status_tone' => $status['tone'],
-                'href' => '/admin/commerce/orders/' . (int) $row['id'], 'number' => self::orderNumber((int) $row['id']), 'when' => self::when((string) $row['placed_at']),
+                'href' => OrderAddress::admin((int) $row['id']), 'number' => self::orderNumber((int) $row['id']), 'when' => self::when((string) $row['placed_at']),
                 'state_label' => self::ORDER_STATES[(string) $row['state']] ?? (string) $row['state'], 'total_label' => self::money((int) $row['total_minor'], (string) $row['currency']),
                 'paid_label' => self::money((int) $row['paid_minor'], (string) $row['currency']), 'reference_label' => AccountReference::format((string) $row['account_reference']),
                 // Who placed it, always a person: a company's order is placed by its administrator (owner, 2026-10-21).
                 'purchaser_person' => self::person((int) $row['purchaser_user_id'], (string) $row['purchaser_name'], (string) ($row['purchaser_reference'] ?? ''), (string) ($row['purchaser_email'] ?? ''))];
         }
         return [
-            'filters' => $f, 'states' => self::ORDER_STATES, 'rows' => $rows, 'filtered' => $carried !== [],
+            'filters' => ['state' => $f['state_group'] ?? $f['state']] + $f, 'states' => self::ORDER_STATES + array_map(static fn(array $g): string => $g['label'], self::ORDER_STATE_GROUPS),
+            'rows' => $rows, 'filtered' => $carried !== [],
             'orders_pagination' => PlatformAdministrationService::paginationPayload('orders', $pagination, '/admin/commerce/orders', 'Orders', $carried + $sort->toPrefixedArray('orders')),
         ] + PlatformAdministrationService::sortViewFor('orders', $sort, '/admin/commerce/orders',
             ['purchaser' => 'Account|22', 'placed' => 'Order|16', 'bought' => 'What was bought|27', 'total' => 'Amount|11', 'state' => 'Status|17', 'actions' => '|7'],
@@ -788,7 +918,7 @@ final class MoneyRecords
                 $amount('Money paid out', 'out', 'Refunds and payment fees', $ledger(['money' => 'out']), 'figure-money-out'),
                 $amount('Net money', 'net', 'Received less paid out', $ledger(), 'figure-net'),
                 $amount('Refunds paid out', 'refunds', $now['refunds_count'] . ' payouts', $ledger(['kind' => 'refund_paid']), 'figure-refunds'),
-                $amount('Payment fees', 'fees', 'Stitch transaction and refund fees', $ledger(['kind' => 'processor_fee']), 'figure-fees'),
+                $amount('Payment fees', 'fees', 'Stitch transaction and refund fees', $ledger(['kind' => 'card_fees']), 'figure-fees'),
             ]],
             ['label' => 'Wallet credit', 'columns' => 4, 'figures' => [
                 $amount('Wallet credit added', 'wallet_in', 'Refunds, overpayments and returns', $ledger(['wallet' => 'in']), 'figure-wallet-in'),
@@ -798,10 +928,10 @@ final class MoneyRecords
             ]],
             ['label' => 'Orders', 'columns' => 5, 'figures' => [
                 $count('Orders placed', array_sum(array_column($states, 'orders')), self::money(array_sum(array_column($states, 'total'))) . ' in total', $orders(), 'figure-orders'),
-                $count('Awaiting payment', $state('awaiting_payment', 'placed'), 'Placed in the period, not yet paid', $orders(['state' => 'awaiting_payment']), 'figure-awaiting'),
+                $count('Awaiting payment', $state('awaiting_payment', 'placed'), 'Placed in the period, not yet paid', $orders(['state' => 'to_pay']), 'figure-awaiting'),
                 $count('Fulfilled', $state('paid', 'fulfilled'), 'Paid in full', $orders(['state' => 'fulfilled']), 'figure-fulfilled'),
                 $count('Cancelled', $state('cancelled'), 'Not paid in time', $orders(['state' => 'cancelled']), 'figure-cancelled'),
-                $count('Refunded', $state('refunded', 'partially_refunded'), 'In full or in part', $orders(['state' => 'refunded']), 'figure-refunded'),
+                $count('Refunded', $state('refunded', 'partially_refunded'), 'In full or in part', $orders(['state' => 'refunded_any']), 'figure-refunded'),
             ]],
         ];
         $methods = [];

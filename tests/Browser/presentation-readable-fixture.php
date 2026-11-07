@@ -75,7 +75,7 @@ if ($action === 'create') {
     }
 
     $decks = $db->fetchAllAssociative(
-        "SELECT c.id AS course_id, c.code, c.title AS course, c.slug, n.id AS node, ci.id AS item, ci.title, ci.type_config->>'kind' AS kind, ci.type_config->>'theme' AS look
+        "SELECT c.id AS course_id, c.code, c.title AS course, c.slug, n.id AS node, n.part_name AS part, ci.id AS item, ci.title, ci.type_config->>'kind' AS kind, ci.type_config->>'theme' AS look
            FROM course_items ci JOIN course_item_placements p ON p.course_item_id = ci.id JOIN course_structure_nodes n ON n.id = p.node_id JOIN courses c ON c.id = n.course_id
           WHERE ci.item_type = 'slide_deck' ORDER BY c.code NULLS LAST, c.id, n.id"
     );
@@ -87,15 +87,17 @@ if ($action === 'create') {
     // The presentation that introduces the site belongs to no course.
     $site = $container->get(\CattoLearning\Course\CourseItemRepository::class)->sitePresentation();
     if ($site !== null) {
-        $decks[] = ['course_id' => 0, 'code' => '', 'course' => 'the site', 'slug' => '', 'node' => 0, 'item' => $site['id'], 'title' => $site['title'], 'kind' => 'site', 'look' => $site['type_config']['theme'] ?? 'light'];
+        $decks[] = ['course_id' => 0, 'code' => '', 'course' => 'the site', 'slug' => '', 'node' => 0, 'part' => '', 'item' => $site['id'], 'title' => $site['title'], 'kind' => 'site', 'look' => $site['type_config']['theme'] ?? 'light'];
     }
     foreach ($decks as &$deck) {
         // A trailer is for visitors: someone who has the course never sees it in their outline.
         $deck['url'] = $deck['kind'] === 'site' ? '/presentation' : ($deck['kind'] === 'trailer'
-            ? '/courses/' . $deck['slug'] . '/preview/' . $deck['node'] . '/content'
-            : '/learn/' . $deck['slug'] . '/item/' . $deck['node'] . '/content?preview=1');
+            ? \CattoLearning\Support\Address\CoursePartAddress::preview((string) $deck['slug'], (string) $deck['part'])
+            : \CattoLearning\Support\Address\CoursePartAddress::reader((string) $deck['slug'], (string) $deck['part']) . '?preview=1');
         $deck['own'] = (int) $deck['course_id'] === (int) $own['id'];
-        if ($deck['own'] && $deck['kind'] === 'trailer') { $deck['url'] .= '?preview=1'; }
+        // A draft course, the check's own or one not yet published, has no public preview: ADMIN's preview plays its trailer.
+        $draft = $deck['own'] || ($deck['kind'] === 'trailer' && $db->fetchOne('SELECT status FROM courses WHERE id = :id', ['id' => (int) $deck['course_id']]) === 'draft');
+        if ($draft && $deck['kind'] === 'trailer') { $deck['url'] .= '?preview=1'; }
     }
     unset($deck);
 

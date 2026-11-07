@@ -14,6 +14,9 @@ that account's chat and no one else's, sends a test message at once so the owner
 The key is never given back to the page.
 
 Change log:
+2026/11/05 SAST (evening)
+- While people can sign in with Telegram, the bot's updates are used up as they are read (TelegramInbox), so Connect to
+  Telegram also looks among the chats the inbox saw lately. The test message is kept with the account it went to.
 2026/11/05 SAST
 - Created.
 */
@@ -38,7 +41,8 @@ class OwnerMessageSetup
         private readonly OwnerMessageSettings $settings,
         private readonly OwnerMessageRepository $messages,
         private readonly OwnerMessages $owner,
-        private readonly TelegramClient $telegram
+        private readonly TelegramClient $telegram,
+        private readonly ?TelegramInbox $inbox = null
     ) {
     }
 
@@ -60,7 +64,7 @@ class OwnerMessageSetup
         return ['state' => $state, 'has_key' => $saved['key'] !== '', 'connected' => $connected, 'disconnected' => $saved['disconnected'], 'bot_name' => $saved['bot_name'], 'username' => $saved['username'],
             'title' => match ($state) { 'connected' => 'Connected: ' . $link, 'failing' => 'Not getting through: ' . $link, default => 'Not connected' },
             'title_tone' => match ($state) { 'connected' => 'success', 'failing' => 'danger', default => 'neutral' },
-            'on_register' => $saved['on_register'], 'on_sale' => $saved['on_sale'], 'waiting' => $status['waiting'], 'last_error' => $status['last_error']];
+            'on_register' => $saved['on_register'], 'on_order' => $saved['on_order'], 'on_sale' => $saved['on_sale'], 'sign_in' => $saved['sign_in'], 'waiting' => $status['waiting'], 'last_error' => $status['last_error']];
     }
 
     /**
@@ -87,16 +91,23 @@ class OwnerMessageSetup
         // The two usernames are easily confused (owner, 2026-11-05: "the one I registered for the bot or my personal one?"), and a bot cannot message itself. A new key is kept, so it need not be pasted again.
         if (strcasecmp($username, $this->settings->saved()['bot_name']) === 0) throw new InvalidArgumentException('That is the bot. Type your own username.');
         $this->settings->setUsername($username, $actor);
-        $chat = $this->telegram->chatOf($this->settings->address(), $this->settings->key(), $username);
+        // While people sign in with Telegram, what the bot is sent is read and used up every minute: read it now, then look
+        // among the chats seen lately as well as among what is still unread.
+        try {
+            $this->inbox?->read();
+        } catch (TelegramFailed) {
+        }
+        $chat = $this->telegram->chatOf($this->settings->address(), $this->settings->key(), $username) ?? $this->inbox?->seenChat($username);
         if ($chat === null) return ['connected' => false, 'key_changed' => $changed];
         $this->settings->setChat($chat, $actor);
 
         return ['connected' => true, 'key_changed' => $changed];
     }
 
-    public function saveChoices(bool $onRegister, bool $onSale, int $actor): void
+    public function saveChoices(bool $onRegister, bool $onSale, int $actor, ?bool $signIn = null, ?bool $onOrder = null): void
     {
-        $this->settings->setChoices($onRegister, $onSale, $actor);
+        $this->settings->setChoices($onRegister, $onSale, $actor, $onOrder);
+        if ($signIn !== null) $this->settings->setSignIn($signIn, $actor);
     }
 
     /** Goes at once, not by the queue, so what Telegram says is shown on the page. */
@@ -108,10 +119,10 @@ class OwnerMessageSetup
         try {
             $this->telegram->send($this->settings->address(), $this->settings->key(), $this->settings->saved()['chat_id'], $body);
         } catch (TelegramFailed $failed) {
-            $this->messages->logTest($reference, $body, $failed->getMessage());
+            $this->messages->logTest($reference, $body, $failed->getMessage(), $this->settings->saved()['username']);
             throw $failed;
         }
-        $this->messages->logTest($reference, $body, null);
+        $this->messages->logTest($reference, $body, null, $this->settings->saved()['username']);
     }
 
     public function disconnect(int $actor): void

@@ -14,6 +14,9 @@ paged as one dataset whose links keep the choice, and the search offered only fr
 narrowing the list.
 
 Changelog:
+2026/11/06 SAST
+- My Courses holds current and completed courses only (owner, 2026-11-06); Course Requests is a page of its own, for a
+  company account, and Favourites too (AccountFavouritesIntegrationTest).
 2026/10/21 SAST
 - First version.
 */
@@ -54,14 +57,13 @@ final class AccountLibraryListsIntegrationTest extends TestCase
         if ($this->db->isTransactionActive()) $this->db->rollBack();
     }
 
-    public function testFourCardsSayWhatEachListHoldsAndTheChosenListFillsTheTable(): void
+    public function testTwoCardsSayWhatEachListHoldsAndTheChosenListFillsTheTable(): void
     {
-        $view = $this->view([], true);
+        $view = $this->view([]);
         self::assertSame('current', $view['library_list'], 'Current courses unless another list is chosen.');
-        self::assertSame(['current', 'completed', 'favourites', 'requests'], array_column($view['library_lists'], 'value'));
-        self::assertSame(['Current courses', 'Completed courses', 'Favourite courses', 'Course requests'], array_column($view['library_lists'], 'label'));
-        self::assertSame(['6 under way or waiting to start', '1 finished, with results and certificates', 'None marked to come back to', 'None asked for, and where each stands'],
-            array_column($view['library_lists'], 'note'));
+        self::assertSame(['current', 'completed'], array_column($view['library_lists'], 'value'), 'My Courses: the courses being taken and those finished, nothing else.');
+        self::assertSame(['Current courses', 'Completed courses'], array_column($view['library_lists'], 'label'));
+        self::assertSame(['6 under way or waiting to start', '1 finished, with results and certificates'], array_column($view['library_lists'], 'note'));
         self::assertCount(6, $view['library_rows']);
         self::assertTrue($view['library_searchable'], 'Six courses: the search is offered.');
 
@@ -69,21 +71,27 @@ final class AccountLibraryListsIntegrationTest extends TestCase
         self::assertSame('completed', $completed['library_list']);
         self::assertCount(1, $completed['library_rows']);
         self::assertFalse($completed['library_searchable'], 'One course: no search field.');
-        $this->assertRefused(['list' => 'everything'], true, 'A list that does not exist is refused, never replaced by another.');
+        foreach (['everything', 'favourites', 'requests'] as $gone) $this->assertRefused(['list' => $gone], 'Not a list of My Courses: refused, never replaced by another (' . $gone . ').');
     }
 
-    public function testAPrivateAccountHasNoCourseRequests(): void
+    public function testCourseRequestsAreTheirOwnList(): void
     {
-        self::assertSame(['current', 'completed', 'favourites'], array_column($this->view([], false)['library_lists'], 'value'), 'Course requests are a company account\'s list.');
-        $this->assertRefused(['list' => 'requests'], false, 'A private account has no requests list to show.');
-        self::assertSame('requests', $this->view(['list' => 'requests'], true)['library_list']);
+        $course = (int) $this->db->fetchOne('SELECT course_id FROM course_enrolments WHERE user_id = :u ORDER BY id LIMIT 1', ['u' => $this->learner]);
+        IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AdministrationRepository::class)->createRequest($this->learner, null, $course, 31536000, '');
+        $administration = IntegrationContainer::get()->get(PlatformAdministrationService::class);
+        $requests = IntegrationContainer::get()->get(LearningService::class)->courseRequestsView($this->learner, [],
+            fn(string $dataset, array $req, int $total) => $administration->paginationFor($dataset, $req, $total),
+            fn(string $dataset, $pagination, string $label, string $search) => $administration->paginationView($dataset, $pagination, '/account/requests', $label));
+        self::assertCount(1, $requests['requests_rows']);
+        self::assertFalse($requests['requests_searchable'], 'One request: no search field.');
+        self::assertSame('/account/requests', $requests['requests_pagination']['base'] ?? null, 'Its paging stays on its own page.');
     }
 
     /** @param array<string,string> $request */
-    private function assertRefused(array $request, bool $companyAccount, string $message): void
+    private function assertRefused(array $request, string $message): void
     {
         try {
-            $this->view($request, $companyAccount);
+            $this->view($request);
         } catch (\InvalidArgumentException $refused) {
             self::assertSame('There is no such list of courses.', $refused->getMessage(), $message);
             return;
@@ -105,12 +113,11 @@ final class AccountLibraryListsIntegrationTest extends TestCase
      * @param array<string,string> $request
      * @return array<string,mixed>
      */
-    private function view(array $request, bool $companyAccount = true): array
+    private function view(array $request): array
     {
         $administration = IntegrationContainer::get()->get(PlatformAdministrationService::class);
         return IntegrationContainer::get()->get(LearningService::class)->courseLibraryView(
             $this->learner,
-            $companyAccount,
             $request,
             fn(string $dataset, array $req, int $total) => $administration->paginationFor($dataset, $req, $total),
             fn(string $dataset, $pagination, string $label, string $search, string $list) => $administration->paginationView($dataset, $pagination, '/account/courses', $label,

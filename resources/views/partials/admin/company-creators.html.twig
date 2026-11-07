@@ -36,7 +36,7 @@
 								<tr>
 									<td title="{{ company.name }} · {{ company.domain }}">
 										{# The name opens the company's page (owner, 2026-10-26). #}
-										<strong><a href="/admin/companies/{{ company.id }}">{{ company.name }}</a></strong>
+										<strong><a href="{{ company_url(company) }}">{{ company.name }}</a></strong>
 									</td>
 									<td>
 										{{ company.owned_course_count }}
@@ -56,7 +56,7 @@
 													</form>
 												{% endif %}
 												{% if can_manage_companies %}
-													{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ (company.id), icon: 'action-edit'}) }}
+													{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ company.account_reference, icon: 'action-edit'}) }}
 												{% endif %}
 
 {% endblock %}

@@ -18,6 +18,8 @@ a diagnostic and the final assessment stay where they are. Nothing is changed in
 modules, and nothing is written at all when any step is refused.
 
 Changelog:
+2026/11/07 SAST
+- The parts an arrangement makes are named after where they then sit, for their addresses (CourseItemService::nameParts).
 2026/11/01 SAST
 - An import that lifts out the practical work and its answers removes the box they sat in when nothing else is left in
   it, as a later arrangement already did, so a file built like the original courses (<div class="blocks">) leaves no
@@ -96,9 +98,10 @@ final class CourseRestructurer
     }
 
     /**
+     * @param array<string,string> $carriedPartNames The part names a course file brought (CourseItemService::nameParts).
      * @return array{modules:int,videos:int,practicals:int,outcomes:int,summaries:int,review_aids:int,review:bool,sections:list<int>} What was done.
      */
-    public function arrange(int $courseId, int $userId): array
+    public function arrange(int $courseId, int $userId, array $carriedPartNames = []): array
     {
         if ($this->courses->findById($courseId) === null) { throw new InvalidArgumentException('The course does not exist.'); }
         $what = $this->arrangement($courseId);
@@ -107,10 +110,15 @@ final class CourseRestructurer
         // parts made here, are named after where they now sit ("GDN-101 Module 1 Lesson"); a name typed by hand stays.
         $automatic = $this->items->automaticallyNamed($courseId);
         $newest = $this->records->highestItemId();
+        $parts = $this->records->partNames($courseId);
         // An arranged course is finished in one step: its summaries, then its review study aids.
         $report = $what === 'modules' ? $this->arrangeModules($courseId, $userId) : $this->separateParts($courseId, $userId);
         $made = array_values(array_filter($this->records->placedItemIds($courseId), static fn(int $id): bool => $id > $newest));
         $this->items->nameFromPlacements($courseId, array_merge($automatic, $made));
+        // The parts made here, and any still waiting for a name (a course just imported), are named after where they now
+        // sit ("module-1-summary"); a part that was already named keeps its name, and so its address.
+        $waiting = array_keys(array_filter($parts, static fn(string $name): bool => preg_match('/^part-[0-9a-f]{8}$/', $name) === 1));
+        $this->items->nameParts($courseId, array_merge(array_keys(array_diff_key($this->records->partNames($courseId), $parts)), $waiting), $carriedPartNames);
         return $report;
     }
 
@@ -206,7 +214,7 @@ final class CourseRestructurer
     {
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $this->records->siblings($courseId, $section));
         $index = array_search($lessonNode, $ids, true);
-        $this->items->createAttached($courseId, [
+        $this->items->createAttached($courseId, ['name_part_later' => true,
             'item_key' => $this->freeKey($lessonKey . '-summary'), 'item_type' => 'html_lesson', 'title' => 'Summary', 'lesson_role' => 'summary',
             'content_source' => $summary, 'parent_node_id' => (string) $section, 'insert_index' => (string) ($index === false ? count($ids) : $index + 1),
         ], $userId);
@@ -274,7 +282,7 @@ final class CourseRestructurer
         foreach ($parts as $i => $row) {
             if (in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true) || ($row['type_config']['presentation_role'] ?? '') === 'review_study_aid') { $index = $i; break; }
         }
-        $this->items->createAttached($courseId, [
+        $this->items->createAttached($courseId, ['name_part_later' => true,
             'item_key' => $this->freeKey($lessonKey . '-practical'), 'item_type' => 'practical', 'title' => 'Practical work',
             'content_source' => $tasks, 'answer_html' => $answers, 'parent_node_id' => (string) $section, 'insert_index' => (string) $index,
         ], $userId);
@@ -288,7 +296,7 @@ final class CourseRestructurer
         foreach ($parts as $i => $row) {
             if (in_array((string) ($row['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) { $index = $i; break; }
         }
-        $this->items->createAttached($courseId, [
+        $this->items->createAttached($courseId, ['name_part_later' => true,
             'item_key' => $this->freeKey($lessonKey . '-review-aid'), 'item_type' => 'html_lesson', 'title' => 'Review Study Aid', 'lesson_role' => 'review_study_aid',
             'content_source' => $aid, 'parent_node_id' => (string) $section, 'insert_index' => (string) $index,
         ], $userId);
@@ -316,7 +324,7 @@ final class CourseRestructurer
             $report['outcomes']++;
         }
         $position = $this->siblingIndex($courseId, (int) $lesson['id']);
-        $section = $this->items->addSection($courseId, [
+        $section = $this->items->addSection($courseId, ['name_part_later' => true,
             'title' => $review ? ($title === 'Review Study Aid' ? 'Review' : $title) : $title,
             'introduction_html' => $introduction,
             'show_outline' => '1',
@@ -329,7 +337,7 @@ final class CourseRestructurer
             $this->items->arrange($courseId, [(int) $deck['id']], $section, null, $userId);
         }
         if ($parts['video'] !== null) {
-            $this->items->createAttached($courseId, [
+            $this->items->createAttached($courseId, ['name_part_later' => true,
                 'item_key' => $this->freeKey($key . '-video'), 'item_type' => 'youtube', 'title' => $parts['video']['title'] ?: 'Video',
                 'youtube_id' => $parts['video']['id'], 'caption' => $parts['video']['caption'], 'parent_node_id' => (string) $section,
             ], $userId);
@@ -341,7 +349,7 @@ final class CourseRestructurer
         $this->items->update((int) $lesson['course_item_id'], ['content_source' => $content, 'estimated_minutes' => (string) (CourseItemService::readingMinutes($content) ?? '')] + $item, $userId);
         $this->items->arrange($courseId, [(int) $lesson['id']], $section, null, $userId);
         if (!$review && $parts['summary'] !== null) {
-            $this->items->createAttached($courseId, [
+            $this->items->createAttached($courseId, ['name_part_later' => true,
                 'item_key' => $this->freeKey($key . '-summary'), 'item_type' => 'html_lesson', 'title' => 'Summary', 'lesson_role' => 'summary',
                 'content_source' => $parts['summary'], 'parent_node_id' => (string) $section,
             ], $userId);
@@ -351,14 +359,14 @@ final class CourseRestructurer
             $this->items->arrange($courseId, [(int) $set['id']], $section, null, $userId);
         }
         if ($parts['practical'] !== null) {
-            $this->items->createAttached($courseId, [
+            $this->items->createAttached($courseId, ['name_part_later' => true,
                 'item_key' => $this->freeKey($key . '-practical'), 'item_type' => 'practical', 'title' => 'Practical work',
                 'content_source' => $parts['practical']['tasks'], 'answer_html' => $parts['practical']['answers'], 'parent_node_id' => (string) $section,
             ], $userId);
             $report['practicals']++;
         }
         if (!$review && $parts['review_aid'] !== null) {
-            $this->items->createAttached($courseId, [
+            $this->items->createAttached($courseId, ['name_part_later' => true,
                 'item_key' => $this->freeKey($key . '-review-aid'), 'item_type' => 'html_lesson', 'title' => 'Review Study Aid', 'lesson_role' => 'review_study_aid',
                 'content_source' => $parts['review_aid'], 'parent_node_id' => (string) $section,
             ], $userId);

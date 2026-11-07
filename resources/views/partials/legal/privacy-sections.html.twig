@@ -40,7 +40,9 @@
 	<li><strong>Learning records.</strong> The courses you are enrolled on, your progress, every answer you give in an assessment and how long you took to answer, your marks and results, course requests and their notes, and your certificates and transcripts, with whether you have made each one public.</li>
 	<li><strong>Reviews.</strong> Your rating and what you write. Once a review is approved it is shown publicly with your first name and the first letter of your surname.</li>
 	<li><strong>Activity log.</strong> A record of actions on your account, such as signing in or changing your details. The activity log stores the IP address of each recorded action, and for a sign-in the country it came from. You can see your own activity in your account.</li>
-	<li><strong>Sessions.</strong> Each browser session and each sign-in session stores a hashed IP address and your browser's user agent. This applies to every visitor, signed in or not. A request for a sign-in link also stores a hashed IP address.</li>
+	<li><strong>Sessions.</strong> Each browser session and each sign-in session stores a hashed IP address and your browser's user agent. This applies to every visitor, signed in or not. A request for a sign-in link or code also stores a hashed IP address.</li>
+	<li><strong>A messaging account.</strong> If you connect an account on a messaging service so that you can sign in with it, we keep that account's number, its username if it has one, and when you connected it, so that we can send your sign-in messages to it. Disconnecting it in your account forgets them.</li>
+	<li><strong>Two-step sign-in.</strong> If you turn on two-step sign-in, we keep the key your authenticator app holds, encrypted, when you set it up, and your recovery codes in a form that cannot be read back.</li>
 	<li><strong>Registration checks.</strong> When you register, we record the IP address you register from, the country and network it belongs to, your browser's user agent and time zone, how long the registration form was open, and a risk score worked out from these and your email address, to keep out automated and fraudulent registrations. It is kept with your account. A registration that never became an account is kept for 5 years.</li>
 	<li><strong>Site log.</strong> Each page asked for on this site, by anyone, signed in or not: the IP address and the country and network it belongs to, your browser's user agent, your user number if you are signed in, the page and what the site answered, and the name of the site you came from. The secret part of a link and anything after a question mark in an address are never kept. If a form is refused as automated, the email address typed into it is kept too. We use it to see what is happening on the site and to keep out people who attack it, and an address that behaves like an attacker's may be flagged and kept off the site. It is kept on our own server and shared with nobody.</li>
 	<li><strong>Analytics events.</strong> Our own record of events such as a course page being viewed, a checkout being started or a course being bought. An event stores your user number if you are signed in, or a random visitor number kept only for your browser session, with the course or order concerned and any campaign tags in the address you arrived by. Analytics events store neither an IP address nor a user agent.</li>
@@ -54,7 +56,7 @@
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'why', eyebrow: 'Section 3', icon: icons['why'], heading: 'Why we use it'})} %}{% block body %}
 <p>We use personal information only for these purposes:</p>
 <ul>
-	<li>to give you an account, sign you in and give you access to your courses</li>
+	<li>to give you an account, sign you in by email or, if you connect one, through a messaging account, and give you access to your courses</li>
 	<li>to take orders, confirm payments, make refunds and issue invoices, receipts and credit notes</li>
 	<li>to mark your assessments, record your results and issue certificates and transcripts</li>
 	<li>to ask you once, by email a few days after you finish a course, to review it, unless you already have</li>
@@ -104,7 +106,7 @@
 	<li><strong>A video service.</strong> Some course videos are embedded from a video service in its privacy-enhanced mode. When you open a page with such a video, your browser connects to that service.</li>
 	<li><strong>Your company.</strong> Your Company Administrator sees the information set out in <a href="#what-we-collect">section 2</a>.</li>
 	<li><strong>The public.</strong> An approved review, as <a href="#what-we-collect">section 2</a> explains, and a certificate or transcript you have made public, as <a href="#identity">section 5</a> explains.</li>
-	<li><strong>A messaging service.</strong> When you register or an order is paid, your name and country, or the order number, what was bought, the amount and how it was paid, are sent to the site's owner through a messaging service. It may process personal information outside South Africa.</li>
+	<li><strong>A messaging service.</strong> When you register, and when an order is placed or paid, your name and country, or the order number, what was bought, the amount and how it is paid, are sent to the site's owner through a messaging service. If you connect a messaging account to sign in with, your sign-in messages, each with a one-time code and link, and the messages about connecting it pass through that service. It may process personal information outside South Africa.</li>
 </ul>
 <p>We also disclose personal information when the law requires it.</p>
 	{% endblock %}{% endembed %}
@@ -119,14 +121,17 @@
 	{label: 'Registrations that never became an account', value: '5 years'},
 	{label: 'Records of the news emails sent to you', value: '5 years'},
 	{label: 'Sign-in links', value: '30 minutes'},
+	{label: 'Sign-in codes and links sent to a messaging account', value: '10 minutes'},
+	{label: 'Records of the messages sent to a messaging account', value: '30 days'},
 	{label: 'Sessions', value: '24 hours'},
 ]}) }}
-<p>Your account details, your ID number and date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day. Your email choices are kept for as long as you have an account, so that we can always show what you agreed to.</p>
+<p>Your account details, your ID number and date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day. Your email choices are kept for as long as you have an account, so that we can always show what you agreed to. A connected messaging account is kept until you disconnect it, and two-step sign-in until you turn it off.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'security', eyebrow: 'Section 9', icon: icons['security'], heading: 'How we protect it'})} %}{% block body %}
 <ul>
-	<li>The site has no passwords. You sign in with a one-time link that expires after 30 minutes.</li>
-	<li>Sign-in links and sign-in sessions are stored only in hashed form.</li>
+	<li>The site has no passwords. You sign in with a one-time link that expires after 30 minutes, or, if you connect a messaging account, with a one-time code or link sent to it that expires after 10 minutes.</li>
+	<li>Sign-in links, sign-in codes and sign-in sessions are stored only in hashed form. A sign-in code or link is never written in a log.</li>
+	<li>You can turn on two-step sign-in in your account, so that signing in also asks for a code from an app on your phone. Its key is stored encrypted.</li>
 	<li>Card details and banking logins are entered on our payment provider's pages and never reach this site.</li>
 	<li>Identity documents and selfies are checked on the identity verification provider's page. This site never receives or keeps an image of them.</li>
 	<li>You can see your active sessions in your account and end any of them.</li>

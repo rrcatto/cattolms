@@ -28,6 +28,8 @@ written with the example's comments, in its order.
 install.
 
 Changelog:
+2026/11/05 SAST
+- AUTH_TWO_STEP is checked (CHOICE, ADMINS or EVERYONE): who must use two-step sign-in.
 2026/10/26 SAST
 - Every length of time is written the one way (owner, 2026-10-26; Support\Duration, loaded on its own: no Composer
   packages): the sign-in link, session, session touch, request window and PHP session lifetimes (30m, 1d, 5m, 15m,
@@ -131,6 +133,7 @@ function refuse(string $key, string $value): ?string
         in_array($key, ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'], true) && $value === '' => 'This cannot be empty.',
         $key === 'APP_ENV' && !in_array(strtolower($value), ['development', 'production'], true) => 'Enter development or production.',
         $key === 'AUTH_SIGNIN' && !in_array(strtoupper($value), ['ADMIN', 'EVERYONE'], true) => 'Enter ADMIN (administrators and the listed addresses only) or EVERYONE.',
+        $key === 'AUTH_TWO_STEP' && !in_array(strtoupper($value), ['CHOICE', 'ADMINS', 'EVERYONE'], true) => 'Enter CHOICE (anyone may use two-step sign-in), ADMINS (administrators must) or EVERYONE (everyone must).',
         $key === 'AUTH_SIGNIN_ALLOWED_EMAILS' && array_filter(preg_split('/[\s,;]+/', $value) ?: [], static fn(string $email): bool => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) !== []
             => 'Enter email addresses separated by commas, or nothing.',
         in_array($key, ['DB_NAME', 'DB_USER'], true) && preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $value) !== 1 => 'Use lower-case letters, digits and underscores, starting with a letter.',

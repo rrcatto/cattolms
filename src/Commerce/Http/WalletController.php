@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Http;
 
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\MoneyRecords;
@@ -35,7 +37,8 @@ final class WalletController extends BaseController
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests,
         private readonly WalletService $wallets, private readonly WalletRepository $walletRecords,
         private readonly CommerceSettings $settings, private readonly SelectedCompanyContext $companyContext,
-        private readonly CommerceRepository $records, private readonly TransactionManager $transactions)
+        private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -76,7 +79,8 @@ final class WalletController extends BaseController
         foreach ($rows as &$row) {
             $row['balance_label'] = Money::ofMinorUnits(max(0, (int) $row['balance_minor']), (string) $row['currency'])->format();
             $row['reference_label'] = AccountReference::format((string) $row['account_reference']);
-            $row['href'] = '/admin/wallets/' . ($row['owner_company_id'] !== null ? 'company/' . (int) $row['owner_company_id'] : 'person/' . (int) $row['owner_user_id']);
+            // By the owner's account reference (owner, 2026-11-06: no row id in an address).
+            $row['href'] = $row['owner_company_id'] !== null ? CompanyAddress::to('wallet', (string) $row['account_reference']) : PersonAddress::to('wallet', (string) $row['account_reference']);
             // A person's wallet names its owner as a person (owner, 2026-10-21); a company's stays its name.
             $row['owner_person'] = $row['owner_user_id'] !== null ? MoneyRecords::person((int) $row['owner_user_id'], (string) $row['owner_name'], (string) $row['account_reference'], (string) ($row['owner_email'] ?? '')) : null;
         }
@@ -86,12 +90,12 @@ final class WalletController extends BaseController
             'wallets_pagination' => PlatformAdministrationService::paginationPayload('wallets', $pagination, '/admin/wallets', 'wallets', $search === '' ? [] : ['wallets_q' => $search])]);
     }
 
-    #[Route('/admin/wallets/{type}/{id}', name: 'admin_wallet', requirements: ['type' => 'person|company', 'id' => '[0-9]+'], methods: ['GET'])]
+    #[Route('/admin/wallets/{type}/{reference}', name: 'admin_wallet', requirements: ['type' => 'person|company', 'reference' => PersonAddress::REQUIREMENT], methods: ['GET'])]
     public function one(): Response
     {
         $actor = $this->requirePermission('PLATFORM.WALLET.VIEW');
         $owner = $this->ownerFromRoute();
-        $base = '/admin/wallets/' . $this->param('type') . '/' . $this->param('id');
+        $base = $this->walletAddress();
 
         return $this->wallet('admin-wallet', $owner, $base, [
             'title' => 'Wallet', 'active_nav' => 'admin',
@@ -102,13 +106,13 @@ final class WalletController extends BaseController
         ]);
     }
 
-    #[Route('/admin/wallets/{type}/{id}/correct', name: 'admin_wallet_correct', requirements: ['type' => 'person|company', 'id' => '[0-9]+'], methods: ['POST'])]
+    #[Route('/admin/wallets/{type}/{reference}/correct', name: 'admin_wallet_correct', requirements: ['type' => 'person|company', 'reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
     public function correct(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.WALLET.MANAGE');
         $owner = $this->ownerFromRoute();
-        $back = '/admin/wallets/' . $this->param('type') . '/' . $this->param('id');
+        $back = $this->walletAddress();
 
         return $this->handle(function () use ($actor, $owner, $back): void {
             $value = trim($this->posted('amount'));
@@ -142,10 +146,15 @@ final class WalletController extends BaseController
         ]);
     }
 
+    /** The person or company whose wallet the address names by their account reference, or not found. */
     private function ownerFromRoute(): WalletOwner
     {
-        $id = (int) $this->param('id');
+        return $this->param('type') === 'company' ? WalletOwner::company($this->companyIdFromAddress($this->keys)) : WalletOwner::person($this->personIdFromAddress($this->keys));
+    }
 
-        return $this->param('type') === 'company' ? WalletOwner::company($id) : WalletOwner::person($id);
+    /** The wallet's own page: /admin/wallets/person/CL… or /admin/wallets/company/CL…. */
+    private function walletAddress(): string
+    {
+        return $this->param('type') === 'company' ? CompanyAddress::to('wallet', $this->param('reference')) : PersonAddress::to('wallet', $this->param('reference'));
     }
 }

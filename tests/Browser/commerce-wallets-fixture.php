@@ -107,7 +107,9 @@ if ($action === 'create') {
     $state['learners'][] = $learner['id'];
     $state['scrub']['users'][] = $learner['id'];
     $writeState($state);
-    echo json_encode(['id' => $learner['id'], 'email' => $learner['email'], 'name' => $learner['name'], 'token' => $session($learner['id'], $learner['email']), 'reference' => $reference], JSON_THROW_ON_ERROR) . "\n";
+    echo json_encode(['id' => $learner['id'], 'email' => $learner['email'], 'name' => $learner['name'], 'token' => $session($learner['id'], $learner['email']), 'reference' => $reference,
+        // The reference as the site stores it, which names the person in an address (owner, 2026-11-06).
+        'account_reference' => (string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner['id']])], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'company-learner') {
     $state = $readState();
     // A member of a client company's staff: the company made with its founding administrator, the learner at its domain.

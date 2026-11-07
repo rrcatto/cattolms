@@ -10,7 +10,7 @@
 #}
 {% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
 {% set pl_now = pl.choice == 'custom' ? 'its custom layout' : (pl.choice == 'default' ? 'the default layout, ' ~ pl.shared.name : pl.shared.name) %}
-<form id="page-layout-form" class="cl-page-layout-form" action="/admin/courses/{{ course.id }}/page-layout" method="post" autocomplete="off"
+<form id="page-layout-form" class="cl-page-layout-form" action="{{ course_admin_url(course, '/page-layout') }}" method="post" autocomplete="off"
 	data-controller="page-layout-choice unsaved-changes"
 	data-page-layout-choice-layouts-value="{{ pl.layouts_json }}" data-page-layout-choice-default-id-value="{{ pl.default.id }}" data-page-layout-choice-present-value="{{ pl.present }}"
 	data-unsaved-changes-leave-value="nav[aria-label='Course tools'] a, [data-page-layout-leave] a, a[data-page-layout-leave]">
@@ -87,6 +87,6 @@
 
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'normal', name: 'action', value: 'save', icon: 'action-save-changes'}) }}{% endblock %}
-{% block secondary_actions %}{% if course.status == 'published' %}<span data-page-layout-leave>{{ ui('action.link', {label: 'View the page', variant: 'secondary', size: 'normal', href: '/courses/' ~ course.slug, icon: 'action-preview'}) }}</span>{% endif %}<span data-page-layout-leave>{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: '/admin/courses/' ~ course.id ~ '?tab=page-layout', icon: 'action-cancel'}) }}</span>{% endblock %}
+{% block secondary_actions %}{% if course.status == 'published' %}<span data-page-layout-leave>{{ ui('action.link', {label: 'View the page', variant: 'secondary', size: 'normal', href: '/courses/' ~ course.slug, icon: 'action-preview'}) }}</span>{% endif %}<span data-page-layout-leave>{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: course_admin_url(course, '?tab=page-layout'), icon: 'action-cancel'}) }}</span>{% endblock %}
 {% endembed %}
 </form>

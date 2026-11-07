@@ -1,0 +1,57 @@
+{#
+	The Telegram card of Sign-in and security (owner, 2026-11-05, the approved mockup). A bot can only write to someone who has
+	started it, so Connect Telegram gives a button to the bot; the page notices by itself when Start is pressed (the card asks
+	again every 5 seconds while it waits, which is not a visit) and has I have pressed Start for a page without JavaScript.
+	Shown while the site offers Telegram, or while the person still has one connected, so they can disconnect it.
+#}
+{% set tg = security.telegram %}
+{% if tg.offered or tg.state == 'on' %}
+{% set manage = can_manage_security|default(false) %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'security-telegram', section_spacing: true})} %}{% block surface_body %}
+	<div class="cl-security-card" data-security-telegram="{{ tg.state }}"{% if tg.state == 'waiting' %} hx-get="/account/security" hx-trigger="every 5s" hx-target="#security-telegram" hx-select="#security-telegram" hx-swap="outerHTML" hx-headers='{"X-Live-Refresh":"1"}' hx-status:4xx="swap:none" hx-status:5xx="swap:none"{% endif %}>
+	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Telegram'})} %}{% block section_actions %}{{ ui('feedback.badge', tg.state == 'on' ? {label: tg.username ? 'Connected to @' ~ tg.username : 'Connected', tone: 'success'} : {label: 'Not connected', tone: 'neutral'}) }}{% endblock %}{% endembed %}
+	{% if tg.note %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: tg.note.tone})} %}{% block body %}<p class="mb-0" role="status" data-security-note>{{ tg.note.words }}</p>{% endblock %}{% endembed %}{% endif %}
+	{% if tg.state == 'on' %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success'})} %}{% block body %}<p class="mb-0"><strong>Connected.</strong> {{ tg.offered ? 'You can now choose Telegram account on the Sign in page.' : 'Signing in with Telegram is switched off on this site for now, so sign in by email.' }}</p>{% endblock %}{% endembed %}
+		{% if manage %}
+		<div class="cl-security-actions">
+			{% if tg.offered %}
+			<form action="/account/security/telegram/test" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/telegram/test', hx_card: 'security-telegram'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Send a test message', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-send'}) }}
+			</form>
+			{% endif %}
+			<form action="/account/security/telegram/disconnect" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/telegram/disconnect', hx_card: 'security-telegram'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Disconnect', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disconnect your Telegram account? You will sign in by email.', icon: 'action-disconnect'}) }}
+			</form>
+		</div>
+		{% endif %}
+	{% elseif tg.state == 'waiting' %}
+		<p class="mb-0"><strong>Step 1.</strong> Open our bot in Telegram. <strong>Step 2.</strong> Press Start at the bottom of the chat. This page notices by itself.</p>
+		<div class="cl-security-actions">
+			{{ ui('action.link', {label: 'Open @' ~ tg.bot_name, variant: 'primary', size: 'normal', href: tg.link, new_window: true, rel: 'noopener noreferrer', icon: 'action-send'}) }}
+			<form action="/account/security/telegram/check" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/telegram/check', hx_card: 'security-telegram'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'I have pressed Start', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-done'}) }}
+			</form>
+			<form action="/account/security/telegram/cancel" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/telegram/cancel', hx_card: 'security-telegram'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-cancel'}) }}
+			</form>
+		</div>
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info'})} %}{% block body %}<p class="mb-0" role="status">Waiting for Telegram. The link in this button works for 10 minutes.</p>{% endblock %}{% endembed %}
+	{% else %}
+		<p class="mb-0">Connect your Telegram account and you can sign in with it instead of email. We message you only about this account.</p>
+		{% if manage %}
+		<div class="cl-security-actions">
+			<form action="/account/security/telegram/connect" method="post" {% include '@platform/partials/account/security-hx.html.twig' with {hx_action: '/account/security/telegram/connect', hx_card: 'security-telegram'} only %}>
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Connect Telegram', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-connect'}) }}
+			</form>
+		</div>
+		{% endif %}
+	{% endif %}
+	</div>
+{% endblock %}{% endembed %}
+{% endif %}

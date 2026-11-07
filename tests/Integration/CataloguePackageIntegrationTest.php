@@ -12,15 +12,18 @@ The catalogue package (owner, 2026-10-23: "the current catalogue we have built h
 icons and svg covers but no proper mechanism to import it into a new installation"; "1A 2A 3A 4B 5A"): a zip of
 catalogue.json and one course package per course, each course known by its code alone.
 
-  A new course comes in with its content, code, category, tags, cover, position, the file's prices (new courses only)
-  and, published where it came from, is published here; the files it uses come with it, keeping their public ids.
-  The same package again changes nothing; a course already here is updated, never priced, and its content replaced
-  only when asked.
+  A new course comes in with its content, code, category, tags, cover, position, the file's prices and, published where
+  it came from, is published here; the files it uses come with it, keeping their public ids when those are free.
+  The same package again changes nothing; a course already here takes the file's version of everything that differs
+  (owner, 2026-11-06: the import is canonical; CanonicalCatalogueImportIntegrationTest holds each rule).
   A course the package cannot match by code is left out with the reason: no code, or an address or content already
   another course's here.
   The site's own export holds each course's code and catalogue settings.
 
 Changelog:
+2026/11/06 SAST
+- The import is canonical (owner, 2026-11-06): a course or bundle already here takes the file's price and status too,
+  and its content when it differs.
 2026/10/23 SAST
 - Created with the catalogue package.
 */
@@ -83,9 +86,10 @@ final class CataloguePackageIntegrationTest extends TestCase
         $plan = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
         self::assertSame(['new' => 1, 'update' => 0, 'unchanged' => 0, 'skip' => 0], $plan['counts'], 'The review finds one new course, its file brought by the package.');
         self::assertSame([2, 1, 1], [count($plan['catalogue']['categories_new']), count($plan['catalogue']['tags_new']), $plan['files_new']]);
-        self::assertSame('Category: ' . $this->path(), $plan['courses'][0]['changes'][0]);
+        self::assertSame('Category: ' . $this->path() . ' (made by this import)', $plan['courses'][0]['changes'][0]);
 
         $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => true], $this->admin);
+        $this->files[] = IntegrationContainer::get()->get(\CattoLearning\Course\ResourceLibraryService::class)->path(['filename' => 'guide-' . $this->suffix . '.txt']);
         self::assertSame([1, 0, 1], [$report['counts']['imported'], $report['counts']['failed'], $report['files_installed']], json_encode($report['courses']) ?: '');
         $course = $this->courses->findByCode($code);
         self::assertNotNull($course, 'The course is known by its code.');
@@ -105,15 +109,17 @@ final class CataloguePackageIntegrationTest extends TestCase
         self::assertSame([[], [], 0], [$again['catalogue']['categories_new'], $again['catalogue']['tags_new'], $again['files_new']]);
         $twice = $this->package->apply($again['key'], [], $this->admin);
         self::assertSame([0, 1], [$twice['counts']['imported'], $twice['counts']['unchanged']]);
-        self::assertCount(1, $this->courses->priceVariants($id), 'A course already here is never priced again.');
+        self::assertCount(1, $this->courses->priceVariants($id), 'The same prices: no second price option.');
 
-        // A tag removed and the price changed on this site: the package puts the tag back, never the price.
+        // A tag removed and the price changed on this site: the package puts both back (owner, 2026-11-06: the file wins).
         IntegrationContainer::get()->get(CourseService::class)->setCourseTagsByName($id, [], $this->admin);
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units = 99900 WHERE course_id = :c', ['c' => $id]);
         $changed = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
-        self::assertSame(['update', ['Tags: Pkg tag ' . $this->suffix]], [$changed['courses'][0]['action'], $changed['courses'][0]['changes']]);
+        self::assertSame(['update', ['tags', 'prices']], [$changed['courses'][0]['action'], array_column($changed['courses'][0]['differences'], 'kind')]);
         $this->package->apply($changed['key'], [], $this->admin);
-        self::assertSame(99900, (int) $this->courses->priceVariants($id)[0]['price_minor_units']);
+        self::assertSame(95000, (int) $this->courses->priceVariants($id)[0]['price_minor_units']);
+        self::assertCount(1, $this->courses->priceVariants($id), 'Changed in place.');
+        $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units = 99900 WHERE course_id = :c', ['c' => $id]);
 
         // The site's own export holds the course with its code and settings, listed in catalogue.json.
         $export = $this->files[] = $this->package->export($this->admin);
@@ -138,8 +144,10 @@ final class CataloguePackageIntegrationTest extends TestCase
         $before = $this->courses->findByCode($code);
         self::assertSame('published', $before['status'] ?? null);
 
+        // Its lesson changed here: the package's content differs, and replaces it.
+        $this->db->executeStatement("UPDATE course_items SET content_source = '<p>Changed here.</p>' WHERE item_key LIKE :k", ['k' => 'pkg-' . $this->suffix . '-%-lesson']);
         $zip = $this->zip($this->catalogue([$code]), [$code => $this->course($code, 'pkg-course-' . $this->suffix)], []);
-        $report = $this->package->apply($this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin))['key'], ['replace' => [$code]], $this->admin);
+        $report = $this->package->apply($this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin))['key'], [], $this->admin);
         self::assertSame(1, $report['counts']['replaced'], json_encode($report['courses']) ?: '');
         $after = $this->courses->findByCode($code);
         self::assertSame([$before['status'], $before['publication_approval_status']], [$after['status'] ?? null, $after['publication_approval_status'] ?? null], 'Its new content does not take it out of the catalogue.');
@@ -314,6 +322,115 @@ final class CataloguePackageIntegrationTest extends TestCase
         $item = array_values(array_filter($exported['course_items'], static fn(array $item): bool => $item['item_key'] === $deckKey))[0];
         self::assertSame([['public_id' => (string) $rows[0]['public_id'], 'slide_id' => 'a1b2c3d4e5f6']], array_map(static fn(array $c): array => ['public_id' => $c['public_id'], 'slide_id' => $c['slide_id']], $item['narrations']));
         self::assertSame($wav, $bytes, 'The clip goes out in the site’s own export.');
+    }
+
+    public function testBundlesTravelInThePackageKnownByTheirCodes(): void
+    {
+        // Owner, 2026-11-06: bundles "backed up as part of the catalogue". A new bundle takes the package's price and
+        // status; one already here keeps them and takes its words and courses; the same package again changes nothing.
+        $first = 'PBA-' . strtoupper(substr($this->suffix, 0, 6));
+        $second = 'PBB-' . strtoupper(substr($this->suffix, 0, 6));
+        $bundle = 'BDL-P' . strtoupper(substr($this->suffix, 0, 6));
+        $catalogue = $this->catalogue([$first, $second]) + ['bundles' => [
+            $this->bundleEntry($bundle, [$first, $second]),
+            $this->bundleEntry('BDL-Q' . strtoupper(substr($this->suffix, 0, 6)), [$first, 'NOPE-' . strtoupper(substr($this->suffix, 0, 6))]),
+            $this->bundleEntry($first, [$first, $second]),
+        ]];
+        $courses = [$first => $this->course($first, 'pkg-ba-' . $this->suffix), $second => $this->course($second, 'pkg-bb-' . $this->suffix)];
+        $courses[$second]['course']['title'] = 'Second bundled course ' . $this->suffix;
+        $zip = $this->zip($catalogue, $courses, []);
+
+        $plan = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        self::assertSame(['new' => 1, 'update' => 0, 'unchanged' => 0, 'skip' => 2], $plan['bundle_counts']);
+        self::assertSame(['new', 'skip', 'skip'], array_column($plan['bundles'], 'action'));
+        self::assertStringContainsString('neither in this package nor on this site', $plan['bundles'][1]['reason']);
+        self::assertStringContainsString('is a course\'s in this package', $plan['bundles'][2]['reason'], 'A code names one course or one bundle.');
+        // The review lists them with a tick each, after the courses, for whoever manages bundles.
+        $reader = new \CattoLearning\Auth\CurrentUser($this->admin, \CattoLearning\Support\Uuid::v4(), 'catalogue@example.test', 'Catalogue', ['ADMIN'], (new \CattoLearning\Auth\PermissionCatalog())->keys(), \CattoLearning\Support\Uuid::v4());
+        $review = \CattoLearning\Tests\Support\InProcessPage::run($reader, \CattoLearning\Http\Controller\AdminCatalogueController::class, 'review', [], null, ['key' => $plan['key']])['body'];
+        foreach (['name="bundles[]" value="' . $bundle . '" checked', 'New bundles', 'neither in this package nor on this site'] as $shown) self::assertStringContainsString($shown, $review, $shown);
+
+        $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => true], $this->admin);
+        self::assertSame([1, 2, 0], [$report['bundle_counts']['imported'], $report['bundle_counts']['skipped'], $report['bundle_counts']['failed']], json_encode($report['bundles']) ?: '');
+        $records = IntegrationContainer::get()->get(\CattoLearning\Bundle\BundleRepository::class);
+        $made = $records->findByCode($bundle);
+        self::assertNotNull($made, 'The bundle is known by its code.');
+        self::assertSame(['pkg-bundle-' . $this->suffix, 'Package bundle ' . $this->suffix, 'published', 150000, 200000, 31536000, true],
+            [$made['slug'], $made['title'], $made['status'], (int) $made['price_minor_units'], (int) $made['was_price_minor_units'], (int) $made['access_period_seconds'], (bool) $made['offer_active']],
+            'A new bundle takes the package\'s words, price and status: published, as its courses are published here.');
+        self::assertSame('2026-12-01T08:00:00+02:00', (new \DateTimeImmutable((string) $made['available_from']))->setTimezone(new \DateTimeZone('+02:00'))->format(DATE_ATOM), 'And its sale dates.');
+        self::assertSame([$first, $second], array_map(fn(array $c): string => (string) $this->courses->findById((int) $c['course_id'])['code'], $records->courses((int) $made['id'])), 'Its courses, in order.');
+
+        $again = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        self::assertSame(['new' => 0, 'update' => 0, 'unchanged' => 1, 'skip' => 2], $again['bundle_counts'], 'The same package again changes nothing.');
+        $this->package->apply($again['key'], [], $this->admin);
+
+        // Changed on this site: the package puts its words, status and price back, except where this site's is kept.
+        $this->db->executeStatement("UPDATE bundles SET title = 'Renamed here', status = 'retired' WHERE id = :id", ['id' => (int) $made['id']]);
+        $this->db->executeStatement('UPDATE bundle_offers SET price_minor_units = 140000 WHERE bundle_id = :id', ['id' => (int) $made['id']]);
+        $changed = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        self::assertSame(['update', ['title', 'price', 'status']], [$changed['bundles'][0]['action'], array_column($changed['bundles'][0]['differences'], 'kind')]);
+        $this->package->apply($changed['key'], ['bundles' => [$bundle], 'keep_bundles' => [$bundle => ['status', 'price']]], $this->admin);
+        $kept = $records->findByCode($bundle);
+        self::assertSame(['Package bundle ' . $this->suffix, 'retired', 140000], [$kept['title'], $kept['status'], (int) $kept['price_minor_units']], 'The status and price kept as chosen.');
+
+        // Unticked on the review: left out.
+        $this->db->executeStatement("UPDATE bundles SET title = 'Renamed again' WHERE id = :id", ['id' => (int) $made['id']]);
+        $unticked = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        self::assertSame(1, $this->package->apply($unticked['key'], ['bundles' => []], $this->admin)['bundle_counts']['left_out']);
+        self::assertSame('Renamed again', $records->findByCode($bundle)['title']);
+
+        // The export carries a bundle only when every course of it is ticked.
+        $ids = [(int) $this->courses->findByCode($first)['id'], (int) $this->courses->findByCode($second)['id']];
+        $both = $this->exportedCatalogue($ids);
+        $entry = array_values(array_filter($both['bundles'] ?? [], static fn(array $b): bool => $b['code'] === $bundle))[0] ?? null;
+        self::assertNotNull($entry, 'Both its courses ticked: it is in the package.');
+        self::assertSame([[$first, $second], 140000, 200000, 31536000, true, 'retired', 'pkg-bundle-' . $this->suffix, 'Renamed again'],
+            [$entry['courses'], $entry['price_minor_units'], $entry['was_price_minor_units'], $entry['access_period_seconds'], $entry['on_sale'], $entry['status'], $entry['slug'], $entry['title']]);
+        self::assertArrayNotHasKey('bundles', $this->exportedCatalogue([$ids[0]]), 'One of its courses left out: so is the bundle.');
+    }
+
+    public function testANewBundleWhoseCoursesAreNotPublishedHereStaysADraft(): void
+    {
+        $first = 'PBC-' . strtoupper(substr($this->suffix, 0, 6));
+        $second = 'PBD-' . strtoupper(substr($this->suffix, 0, 6));
+        $bundle = 'BDL-R' . strtoupper(substr($this->suffix, 0, 6));
+        $courses = [$first => $this->course($first, 'pkg-bc-' . $this->suffix), $second => $this->course($second, 'pkg-bd-' . $this->suffix)];
+        $courses[$second]['course']['title'] = 'Fourth bundled course ' . $this->suffix;
+        $plan = $this->package->plan($this->package->stageFile($this->zip($this->catalogue([$first, $second]) + ['bundles' => [$this->bundleEntry($bundle, [$first, $second])]], $courses, []), 'catalogue.zip', $this->admin));
+        $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => false], $this->admin);
+        self::assertSame('draft', IntegrationContainer::get()->get(\CattoLearning\Bundle\BundleRepository::class)->findByCode($bundle)['status']);
+        self::assertContains('Left as a draft: ' . $first . ', ' . $second . ' are not published here', $report['bundles'][0]['details']);
+    }
+
+    /**
+     * A bundle as a package's catalogue.json lists it.
+     *
+     * @param list<string> $courses
+     * @return array<string,mixed>
+     */
+    private function bundleEntry(string $code, array $courses): array
+    {
+        return ['code' => $code, 'slug' => 'pkg-bundle-' . $this->suffix . (str_starts_with($code, 'BDL-P') ? '' : '-' . strtolower(substr(md5($code), 0, 4))), 'title' => 'Package bundle ' . $this->suffix,
+            'short_description' => 'Two courses together.', 'description_html' => '<p>Both.</p>', 'cover_svg' => self::COVER, 'courses' => $courses,
+            'price_minor_units' => 150000, 'was_price_minor_units' => 200000, 'currency' => 'ZAR', 'access_period_seconds' => 31536000, 'on_sale' => true,
+            'status' => 'published', 'available_from' => '2026-12-01T08:00:00+02:00', 'available_until' => null];
+    }
+
+    /**
+     * The catalogue.json of an export of these courses.
+     *
+     * @param list<int> $courseIds
+     * @return array<string,mixed>
+     */
+    private function exportedCatalogue(array $courseIds): array
+    {
+        $export = $this->files[] = $this->package->export($this->admin, $courseIds);
+        $archive = new ZipArchive();
+        self::assertTrue($archive->open($export));
+        $catalogue = json_decode((string) $archive->getFromName('catalogue.json'), true);
+        $archive->close();
+        return is_array($catalogue) ? $catalogue : [];
     }
 
     private function path(): string

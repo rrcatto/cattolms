@@ -13,6 +13,8 @@ trying to gain access"): each registration form sent, with what the sign-up chec
 attempts behind a page of people; the list Administration > Sign-up Attempts searches, filters, sorts and pages.
 
 Changelog:
+2026/11/07 SAST
+- An attempt carries its account's reference for the address (owner, 2026-11-06).
 2026/10/26 SAST
 - Created.
 */
@@ -160,7 +162,7 @@ final class SignupAttemptRepository
             COALESCE(a.home_country, '') AS home_country, a.network_asn, a.network_name, a.user_agent, a.browser_time_zone, a.form_seconds, a.score, a.band, a.signals::text AS signals,
             a.hold_reasons::text AS hold_reasons, a.outcome, a.refusal, a.held, a.user_id,
             to_char(a.completed_at, 'YYYY-MM-DD HH24:MI') AS completed_at,
-            u.status AS user_status, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS user_name
+            u.status AS user_status, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS user_name, u.account_reference AS user_reference
         FROM signup_attempts a LEFT JOIN users u ON u.id = a.user_id";
 
     /** @return array{0:string,1:array<string,mixed>} */

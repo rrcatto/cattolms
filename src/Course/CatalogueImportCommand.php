@@ -15,7 +15,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Loads a catalogue package or catalogue file (CataloguePackage), as Administration -> Courses -> Import & Export
  * Catalogue does without the review (owner, 2026-10-23: the page is the way; this is for scripts): every course, the
- * package's prices for new courses and new courses published as they were, unless told otherwise. With no argument, the
+ * package's prices for new courses and new courses published as they were, unless told otherwise, and for a course,
+ * file or bundle already here the file's version of every difference (owner, 2026-11-06: the import is canonical; only
+ * the review page offers to keep this site's). With no argument, the
  * starter categories and tags published with the code, resources/catalogue/catalogue.json:
  *
  *     php bin/console catalogue:import
@@ -60,14 +62,20 @@ final class CatalogueImportCommand extends Command
         } finally {
             if ($temporary !== null) @unlink($temporary);
         }
-        $output->writeln(sprintf('Categories: %d created, %d already there. Tags: %d created, %d already there. Files installed: %d.',
-            $report['catalogue']['categories_created'], $report['catalogue']['categories_kept'], $report['catalogue']['tags_created'], $report['catalogue']['tags_kept'], $report['files_installed']));
+        $output->writeln(sprintf('Categories: %d created, %d already there. Tags: %d created, %d already there. Files: %d added, %d replaced.',
+            $report['catalogue']['categories_created'], $report['catalogue']['categories_kept'], $report['catalogue']['tags_created'], $report['catalogue']['tags_kept'], $report['files_installed'], $report['files_replaced'] ?? 0));
         foreach ($report['courses'] as $course) {
             $output->writeln(sprintf('%s %s: %s%s', $course['code'], $course['title'], $course['outcome'], $course['details'] === [] ? '' : ' (' . implode('; ', $course['details']) . ')'));
+        }
+        foreach ((array) ($report['bundles'] ?? []) as $bundle) {
+            $output->writeln(sprintf('Bundle %s %s: %s%s', $bundle['code'], $bundle['title'], $bundle['outcome'], $bundle['details'] === [] ? '' : ' (' . implode('; ', $bundle['details']) . ')'));
         }
         $counts = $report['counts'];
         $output->writeln(sprintf('Courses: %d imported, %d updated, %d content replaced, %d unchanged, %d skipped, %d failed.',
             $counts['imported'], $counts['updated'], $counts['replaced'], $counts['unchanged'], $counts['skipped'], $counts['failed']));
-        return $counts['failed'] > 0 ? Command::FAILURE : Command::SUCCESS;
+        $bundles = (array) ($report['bundle_counts'] ?? []);
+        if (($report['bundles'] ?? []) !== []) $output->writeln(sprintf('Bundles: %d imported, %d updated, %d unchanged, %d skipped, %d failed.',
+            $bundles['imported'] ?? 0, $bundles['updated'] ?? 0, $bundles['unchanged'] ?? 0, $bundles['skipped'] ?? 0, $bundles['failed'] ?? 0));
+        return $counts['failed'] > 0 || ($bundles['failed'] ?? 0) > 0 ? Command::FAILURE : Command::SUCCESS;
     }
 }

@@ -7,7 +7,7 @@
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 3})} %}{% block body %}{{ ui('data.stat-card', {label: 'Pending', value: counts.pending}) }}{{ ui('data.stat-card', {label: 'Approved', value: counts.approved}) }}{{ ui('data.stat-card', {label: 'Rejected', value: counts.rejected}) }}{% endblock %}{% endembed %}
 <form class="cl-review-filter" action="/admin/course-reviews" method="get">
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'review-status'})} %}{% block control %}<select class="cl-select" id="review-status" name="status" {{ ui_field_attrs(props) }}>{% for value, label in {pending: 'Pending', approved: 'Approved', rejected: 'Rejected', all: 'All reviews'} %}<option value="{{ value }}"{% if filter.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'review-course'})} %}{% block control %}<select class="cl-select" id="review-course" name="course_id" {{ ui_field_attrs(props) }}><option value="">All courses</option>{% for reviewed in courses %}<option value="{{ reviewed.id }}"{% if filter.course_id == reviewed.id ~ '' %} selected{% endif %}>{{ reviewed.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'review-course'})} %}{% block control %}<select class="cl-select" id="review-course" name="course" {{ ui_field_attrs(props) }}><option value="">All courses</option>{% for reviewed in courses %}<option value="{{ reviewed.code }}"{% if filter.course == reviewed.code %} selected{% endif %}>{{ reviewed.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Rating', for: 'review-rating'})} %}{% block control %}<select class="cl-select" id="review-rating" name="rating" {{ ui_field_attrs(props) }}><option value="">Any rating</option>{% for stars in 5..1 %}<option value="{{ stars }}"{% if filter.rating == stars ~ '' %} selected{% endif %}>{{ stars }} {{ stars == 1 ? 'star' : 'stars' }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 {{ ui('action.button', {label: 'Show reviews', type: 'submit', icon: 'action-filter'}) }}
 </form>
@@ -19,10 +19,10 @@
 {# Each review has its own anchor, which the dashboard's Needs your attention opens (owner, 2026-10-21); the learner's name and account reference open their account. #}
 <li class="cl-review" id="review-{{ review.id }}">
 	<div class="cl-review-head">
-		<strong><a href="/admin/courses/{{ review.course_id }}">{{ review.course_title }}</a></strong>
+		<strong><a href="{{ course_admin_url(review) }}">{{ review.course_title }}</a></strong>
 		{{ ui('feedback.badge', {label: review.status == 'pending' ? 'Pending' : (review.status == 'approved' ? 'Approved' : 'Rejected'), tone: review.status == 'pending' ? 'warning' : (review.status == 'approved' ? 'success' : 'danger')}) }}
 	</div>
-	<p class="cl-review-byline">{{ ui('data.person', {name: review.learner_name, reference: review.learner_reference, href: '/admin/people/' ~ review.user_id}) }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>
+	<p class="cl-review-byline">{{ ui('data.person', {name: review.learner_name, reference: review.learner_reference, href: person_url(review.learner_reference)}) }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>
 	<p class="cl-review-rating"><span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= review.rating ? 'is-filled' : '' }}">{{ stars <= review.rating ? '★' : '☆' }}</span>{% endfor %}</span> <span>{{ review.rating }} of 5</span></p>
 	{% if review.comment %}<p class="cl-review-comment">{{ review.comment|nl2br }}</p>{% else %}<p class="cl-review-comment"><em>No comment, rating only.</em></p>{% endif %}
 	{% if review.published_rating is not null and (review.published_rating != review.rating or review.published_comment != review.comment) %}
@@ -33,7 +33,7 @@
 	{% elseif review.status == 'rejected' and review.published_rating is null %}
 		<p class="cl-review-byline">Not published.</p>
 	{% endif %}
-	{% if review.moderated_at %}<p class="cl-review-byline">Last decision {{ review.moderated_at|date('j M Y H:i') }}{% if review.moderated_by_user_id %} by {{ ui('data.person', {name: review.moderator_name ?: 'User ' ~ review.moderated_by_user_id, reference: review.moderator_reference, href: '/admin/people/' ~ review.moderated_by_user_id}) }}{% endif %}{% if review.moderation_note %} · Note: {{ review.moderation_note }}{% endif %}</p>{% endif %}
+	{% if review.moderated_at %}<p class="cl-review-byline">Last decision {{ review.moderated_at|date('j M Y H:i') }}{% if review.moderated_by_user_id %} by {{ ui('data.person', {name: review.moderator_name ?: 'User ' ~ review.moderated_by_user_id, reference: review.moderator_reference, href: person_url(review.moderator_reference)}) }}{% endif %}{% if review.moderation_note %} · Note: {{ review.moderation_note }}{% endif %}</p>{% endif %}
 	<form class="cl-review-moderation" action="/admin/course-reviews/{{ review.id }}/moderate" method="post">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		<input type="hidden" name="revision" value="{{ review.revision }}">

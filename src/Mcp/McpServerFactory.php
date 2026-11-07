@@ -75,7 +75,7 @@ final class McpServerFactory
             ->addTool(
                 handler: [$tools, 'setCourseStatus'],
                 name: 'set_course_status',
-                description: 'Changes a course publication state. Requires courses:publish and the current identity’s course-publish permission.'
+                description: 'Changes a course publication state, the course named by its code (such as GDN-101). Requires courses:publish and the current identity’s course-publish permission.'
             )
             ->build();
     }

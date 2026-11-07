@@ -10,7 +10,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Tag details', heading_level: 2, summary: 'Renaming a tag changes it on every course that carries it.'}) }}
-			<form action="/admin/courses/tags/{{ tag.id }}" method="post" enctype="multipart/form-data">
+			<form action="{{ tag_admin_url(tag) }}" method="post" enctype="multipart/form-data">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
@@ -24,7 +24,7 @@
 			</form>
 {% endblock %}
 {% endembed %}
-		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: tag.icon_svg|default(''), ic_kind: 'tag', ic_choice: icon_choice, ic_save: '/admin/courses/tags/' ~ tag.id ~ '/icon'} %}
+		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: tag.icon_svg|default(''), ic_kind: 'tag', ic_choice: icon_choice, ic_save: tag_admin_url(tag, '/icon')} %}
 	</section>
 	{% include '@platform/partials/admin/followers-card.html.twig' %}
 {% endblock %}

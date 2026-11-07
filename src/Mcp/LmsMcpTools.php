@@ -151,14 +151,20 @@ final class LmsMcpTools
         return $this->courses->adminCourse($courseId);
     }
 
-    /** @return array<string,mixed> */
-    public function setCourseStatus(int $courseId, string $status): array
+    /**
+     * The course is named by its code, such as GDN-101 (owner, 2026-11-06: a course is its code, never its row id).
+     *
+     * @return array<string,mixed>
+     */
+    public function setCourseStatus(string $courseCode, string $status): array
     {
         $this->authorization->requireBusinessAccess(
             $this->identity,
             ApiScope::COURSES_PUBLISH,
             'COURSE.PUBLISH'
         );
+        $courseId = $this->courses->courseIdForCode(\CattoLearning\Course\CourseCode::normalise($courseCode))
+            ?? throw new \InvalidArgumentException('No course has the code ' . $courseCode . '.');
         $this->courses->changeStatus(
             $courseId,
             $status,

@@ -1,8 +1,14 @@
 {% extends layout %}
 {% block page_body %}
+	{#
+		Sign in. While Settings offers Telegram (owner, 2026-11-05, the approved mockup), the page asks how to reach the person,
+		Email address or Telegram account, as feature cards, each way in its own fieldset with its own button. Without
+		JavaScript both fieldsets show, and the button pressed, or else the card chosen, says which one is read. With it, only
+		the chosen one shows. Otherwise the page is as it always was: the email address alone.
+	#}
 	{% set ph_kicker = 'Passwordless access' %}
 	{% set ph_title = 'Sign in' %}
-	{% set ph_lead = 'Enter the email address on your account. We will send a one-time sign-in link that expires after 30 minutes.' %}
+	{% set ph_lead = telegram_offered|default(false) ? 'Choose how we reach you. There is no password to remember.' : 'Enter the email address on your account. We will send a one-time sign-in link that expires after 30 minutes.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
@@ -10,11 +16,33 @@
 
 				{# A follow asked for before signing in (owner, 2026-10-28, decision 8B): it is carried out once they are in. #}
 				{% if follow|default('') and follow_name|default('') %}{% set fa_verb = follow starts with 'list:' ? 'join' : 'follow' %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'You will ' ~ fa_verb ~ ' ' ~ follow_name})} %}{% block body %}<p>Once you have signed in, you {{ fa_verb }} {{ follow_name }} straight away and its news comes to you by email.</p>{% endblock %}{% endembed %}{% endif %}
-				<form action="/login" method="post" novalidate>
+				<form action="/login" method="post" novalidate{% if telegram_offered|default(false) %} class="cl-sign-in-form" data-sign-in-form{% endif %}>
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="return_path" value="{{ return_path }}">
 					<input type="hidden" name="follow" value="{{ follow|default('') }}">
 					<div class="cl-honeypot" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+					{% if telegram_offered|default(false) %}
+					{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+					{{ ui('form.picture-choice', {name: 'how', legend: 'How should we reach you?', id: 'sign-in-how', selected: sign_in_how|default('email'), items: [
+						{value: 'email', label: 'Email address', icon: '<svg ' ~ a ~ '><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>', note: 'We email you a sign-in link.'},
+						{value: 'telegram', label: 'Telegram account', icon: '<svg ' ~ a ~ '><path d="M21 4 3 11l6 2.5L19 7l-7.5 8 6 4.5z"/></svg>', note: 'We message you a link and a code.'},
+					]}) }}
+					<fieldset class="cl-sign-in-how" data-sign-in-how="email">
+						<legend class="visually-hidden">By email</legend>
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: true, for: 'email'})} %}
+{% block control %}<input class="cl-input cl-input-lg" type="email" id="email" name="email" value="{{ email|default('') }}" placeholder="you@example.com" autocomplete="email" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{{ ui('action.button', {label: 'Email my secure link', variant: 'primary', size: 'large', full_width: true, type: 'submit', name: 'how', value: 'email', icon: 'action-email'}) }}
+					</fieldset>
+					<fieldset class="cl-sign-in-how" data-sign-in-how="telegram">
+						<legend class="visually-hidden">By Telegram</legend>
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your Telegram username, or your account\'s email address', full_width: true, for: 'sign-in-telegram'})} %}
+{% block control %}<input class="cl-input cl-input-lg" type="text" id="sign-in-telegram" name="telegram" value="" placeholder="@your_username" autocomplete="username" spellcheck="false" maxlength="254" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{{ ui('action.button', {label: 'Send to my Telegram', variant: 'primary', size: 'large', full_width: true, type: 'submit', name: 'how', value: 'telegram', icon: 'action-send'}) }}
+						<p class="small cl-text-secondary mb-0">Telegram has to be connected to your account first, from your account page. Until then, sign in by email.</p>
+					</fieldset>
+					{% else %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: false, for: 'email', required: true})} %}
 {% block control %}
 
@@ -29,10 +57,19 @@
 
 {% endblock %}
 {% endembed %}
+					{% endif %}
 				</form>
+				{% if telegram_offered|default(false) %}
+				{# Only the chosen way shows, and only its button carries its name, so Enter in either field sends the chosen way. #}
+				<script>(()=>{const form=document.querySelector('[data-sign-in-form]');if(!form)return;const sync=()=>{const chosen=form.querySelector('input[name=how]:checked')?.value||'email';form.querySelectorAll('[data-sign-in-how]').forEach((set)=>{const on=set.dataset.signInHow===chosen;set.hidden=!on;const button=set.querySelector('button[value]');if(button){if(on)button.name='how';else button.removeAttribute('name');}});};form.querySelectorAll('input[name=how]').forEach((card)=>card.addEventListener('change',()=>{sync();form.querySelector('[data-sign-in-how]:not([hidden]) input')?.focus();}));sync();})();</script>
+				<p class="small cl-text-secondary mt-5 mb-0">
+					New here? <a href="/register{{ follow|default('') ? '?follow=' ~ follow|url_encode ~ '&return=' ~ return_path|url_encode : '' }}">Register</a>
+				</p>
+				{% else %}
 				<p class="small cl-text-secondary mt-5 mb-0">
 					New here? <a href="/register{{ follow|default('') ? '?follow=' ~ follow|url_encode ~ '&return=' ~ return_path|url_encode : '' }}">Register an account</a>.
 				</p>
+				{% endif %}
 
 {% endblock %}
 {% endembed %}

@@ -417,7 +417,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertStringStartsWith('%PDF-', $confirmations[0]['receipts'][$receipt['number']]);
         self::assertSame([['title' => 'Frozen course title', 'detail' => '1 day of access', 'amount' => Money::ofMinorUnits(12345, 'ZAR')->format()]], $confirmations[0]['order']['lines']);
         self::assertSame('Paid in full on 12 September 2026: ' . Money::ofMinorUnits(12345, 'ZAR')->format() . ' by card.', $confirmations[0]['order']['paid']);
-        self::assertStringEndsWith('/account/orders/' . $order, $confirmations[0]['order']['url']);
+        self::assertStringEndsWith('/account/orders/' . $number, $confirmations[0]['order']['url'], 'The email links the order by its number (owner, 2026-11-06: no row id in an address).');
 
         $started = array_values(array_filter($mailer->messages, static fn(array $m): bool => $m['type'] === 'courses_started' && $m['email'] === $buyer));
         self::assertCount(1, $started, 'One email naming the courses that started.');

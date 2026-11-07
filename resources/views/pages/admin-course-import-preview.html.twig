@@ -135,7 +135,7 @@
 					{{ ui('layout.section-head', {heading: 'Course Item structure and keys', heading_level: 2, summary: 'Key collisions must be resolved before import; CattoLMS does not rename or guess.'}) }}
 					{% if analysis.display_format == 'HTML' %}{{ ui('feedback.notice', {tone: 'info', heading: 'This course arrives with one lesson per module. When it is imported, each module becomes a numbered section holding its lesson, video, practical work and assessment, as Course Content shows them.', section_spacing: true}) }}{% endif %}
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in analysis.course_items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|item_type_label }}</div>{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
-					{% if existing_course %}{{ ui('feedback.notice', {tone: 'info', heading: 'These Course Items belong to “' ~ existing_course.title ~ '”, which is already on the site. Importing replaces that course.', section_spacing: true}) }}{% elseif analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Resolve Course Item key conflicts before importing', section_spacing: true}) }}{% endif %}
+					{% if review.course_id and review.action != 'skip' %}{{ ui('feedback.notice', {tone: 'info', heading: 'These Course Items are ' ~ review.code ~ '\'s, the course this file updates.', section_spacing: true}) }}{% elseif review.action == 'skip' and analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'These Course Items are already another course\'s on this site', section_spacing: true}) }}{% endif %}
 					{% if analysis.modules|default([]) %}
 					<h3>Legacy source components</h3>
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
@@ -251,20 +251,36 @@
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-										<h2 class="h4">
-											Commit import
-						</h2>
-										<p>
-											Create a new draft, or replace an existing course. Replacement removes test grants and course work for this course, including attempts, results and certificates. Purchased enrolments remain, with their old course work cleared.
-						</p>
-						{% if existing_course %}
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'This course is already on the site'})} %}{% block body %}<p class="mb-0">{% if existing_course.by_code %}“{{ existing_course.title }}” has this file's course code, {{ existing_course.code }}.{% else %}“{{ existing_course.title }}” was imported before, and this file's {{ analysis.key_conflicts|length }} Course Items use its keys.{% endif %} It is chosen below under Replace existing course shell, so importing updates it instead of creating a second copy.</p>{% if existing_course.file_parts|default([]) %}<p class="mb-0">It also holds files this import cannot carry: {{ existing_course.file_parts|join(', ') }}. Replacing it from this file removes them. To keep them, use Download with its files (.zip) on its page, and import that at Import and Export Catalogue.</p>{% endif %}{% endblock %}{% endembed %}
+										{# Administration > Courses > Import by the catalogue's canonical rules (owner, 2026-11-06: "By default, what is in
+										   the import file wins"): the file's code names the course it updates, each difference is the file's unless
+										   Keep this site's is chosen, and nothing replaced is kept. A new course is given its code and category here. #}
+										<h2 class="h4">Import</h2>
+						{% if review.action == 'skip' %}
+							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This file cannot be imported'})} %}{% block body %}<p class="mb-0">{{ review.reason }}</p>{% endblock %}{% endembed %}
+						{% elseif review.course_id %}
+							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'This file updates ' ~ review.code})} %}{% block body %}<p class="mb-0">An import knows a course by its code alone, so this file updates <a href="{{ course_admin_url(review.code) }}">{{ review.site_title }}</a>. {% if review.action == 'unchanged' %}Nothing in the file differs from it, so importing changes nothing.{% else %}Each difference below takes the file's version unless you choose Keep this site's. What is replaced is not kept. Nothing changes until you choose Import.{% endif %}{% if review.kind == 'html' %} An HTML course file holds no prices, related courses or other catalogue settings, so the course keeps its own.{% endif %}</p>{% if file_parts|default([]) %}<p class="mb-0">It also holds files this import cannot carry: {{ file_parts|join(', ') }}. Replacing its content from this file removes them. To keep them, use Download with its files (.zip) on its page, and import that at Import and Export Catalogue.</p>{% endif %}{% endblock %}{% endembed %}
+							{% for difference in review.differences %}
+								{% include '@platform/partials/admin/catalogue-difference.html.twig' with {cd: {
+									name: 'choice[' ~ difference.kind ~ ']',
+									form: 'course-import',
+									difference: difference,
+									allowed: difference.choosable and (difference.kind != 'prices' or can_price) and (difference.kind != 'status' or can_publish),
+									why_not: not difference.choosable ? difference.problem : (difference.kind == 'prices' ? 'Changing prices needs the course pricing permission.' : 'Changing a course\'s status needs the course publishing permission.'),
+									file_note: difference.kind == 'content' ? 'Its lessons, parts and assessments are replaced with the file\'s. Each part keeps its address, the course stays published if it is, and what is open before buying stays open.' : 'The file\'s replaces this site\'s, which is not kept.',
+								}} %}
+							{% endfor %}
+						{% else %}
+							<p>A new course, made as a draft with the file's code and the category you choose.</p>
 						{% endif %}
-						<form action="/admin/courses/import/commit" method="post"><div>{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+						{% if review.action != 'skip' %}
+						<form id="course-import" action="/admin/courses/import/commit" method="post"><div>{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="import_key" value="{{ analysis.import_key }}">
+							{# What the review showed: an import after the site has changed since is refused. #}
+							<input type="hidden" name="fingerprint" value="{{ review.fingerprint }}">
+							{% if not review.course_id %}
 							{# The course's code (owner, 2026-10-23): the file's own, else a suggestion to keep or change. #}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course code', for: 'import-code', required: true, help: import_code_from_file ? 'From the file. Every site and catalogue file knows the course by this code.' : 'The file names no code, so one is suggested from the title. Put it in the file\'s head as <meta name="cattolms:course-code" content="' ~ import_code ~ '"> so every import knows the course by it.'})} %}
 {% block control %}<input class="cl-input text-uppercase" id="import-code" name="code" value="{{ import_code }}" maxlength="20" required autocomplete="off" {{ ui_field_attrs(props) }}>{% endblock %}
@@ -276,22 +292,16 @@
 
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', help: 'Courses you own or administer are listed. Replacement resets their learner test work; purchased entitlements retain their financial history.', for: 'field-admin-course-import-preview', required: false})} %}
-{% block control %}
-<select id="field-admin-course-import-preview" class="cl-select mb-5" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
-							{% for existing in replaceable_courses %}
-								<option value="{{ existing.id }}"{% if existing_course and existing_course.id == existing.id %} selected{% endif %}>{{ existing.title }}</option>
-							{% endfor %}
-							</select>
-{% endblock %}
-{% endembed %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+							{% endif %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Import into PostgreSQL', variant: 'primary', size: 'normal', full_width: true, type: 'submit', icon: 'action-import'}) }}
+{{ ui('action.button', {label: 'Import', variant: 'primary', size: 'normal', full_width: true, type: 'submit', icon: 'action-import'}) }}
 {% endblock %}
 {% endembed %}
 
 {% endblock %}
 {% endembed %}</div></form>
+						{% endif %}
 
 {% endblock %}
 {% endembed %}

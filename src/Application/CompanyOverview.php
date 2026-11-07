@@ -17,6 +17,8 @@ its orders; and beside them its details and Company Administrators, wallet, bill
 Disable. A part the reader may not see is left out, and its figure with it.
 
 Changelog:
+2026/11/07 SAST
+- The company's page and wallet and its people are linked by their account references (owner, 2026-11-06).
 2026/10/27 SAST
 - Created.
 */
@@ -25,6 +27,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Support\Address\CompanyAddress;
+use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\BillingProfileService;
 use CattoLearning\Commerce\Wallet\WalletOwner;
@@ -69,7 +73,8 @@ class CompanyOverview
         if ($base === null) return null;
         $company = $base['admin_company'];
         $can = static fn(string $permission): bool => $reader->hasPermission($permission);
-        $address = '/admin/companies/' . $companyId;
+        // The company's page by its account reference (owner, 2026-11-06: no row id in an address).
+        $address = CompanyAddress::admin($company);
 
         $data = ['admin_company' => $company, 'company_badges' => $this->badges($company)];
         $data['company_admins'] = $this->overview->administrators($companyId);
@@ -79,7 +84,7 @@ class CompanyOverview
         $data['company_learning'] = $this->learning($companyId);
         $data['company_credits'] = $can('PLATFORM.CREDIT.VIEW') ? $this->credits($companyId) : null;
         $data['company_orders_section'] = $can('PLATFORM.ORDER.VIEW') ? $this->orders($companyId) : null;
-        $data['company_wallet'] = $can('PLATFORM.WALLET.VIEW') ? $this->wallet($companyId) : null;
+        $data['company_wallet'] = $can('PLATFORM.WALLET.VIEW') ? $this->wallet($companyId, CompanyAddress::to('wallet', $company)) : null;
         $billing = $this->billing?->forCompany($companyId);
         $data['company_billing'] = $billing === null ? [] : $billing->documentLines();
         $data['company_activity'] = $can('PLATFORM.ACTIVITY.VIEW') ? $this->administration->activityEvents(['company_id' => $companyId], 6) : null;
@@ -178,6 +183,7 @@ class CompanyOverview
     {
         return array_map(static fn(array $row): array => [
             'id' => (int) $row['id'],
+            'code' => (string) $row['code'],
             'title' => (string) $row['title'],
             'on' => (int) $row['enrolments'],
             'not_started' => max(0, (int) $row['enrolments'] - (int) $row['started']),
@@ -200,13 +206,15 @@ class CompanyOverview
             $credits[] = [
                 'id' => (int) $row['id'],
                 'course_id' => (int) $row['course_id'],
+                // Its address names the course by its code (owner, 2026-11-06).
+                'course_code' => (string) $row['course_code'],
                 'course_title' => (string) $row['course_title'],
                 'held' => $held,
                 'used' => $used,
                 'left' => (int) $row['available_count'],
                 'length' => AccessPeriod::label((int) $row['access_period_seconds']),
                 'order_id' => $order,
-                'source' => $order !== null ? 'Bought, order CL-' . str_pad((string) $order, 8, '0', STR_PAD_LEFT) : 'Given by hand',
+                'source' => $order !== null ? 'Bought, order ' . \CattoLearning\Commerce\Domain\OrderNumber::format((int) $order) : 'Given by hand',
                 'can_take_back' => $order === null && (int) $row['available_count'] > 0,
             ];
         }
@@ -224,14 +232,14 @@ class CompanyOverview
             [$label, $tone] = self::ORDER_STATES[(string) $row['state']] ?? [ucfirst((string) $row['state']), 'neutral'];
             $orders[] = [
                 'id' => (int) $row['id'],
-                'number' => 'CL-' . str_pad((string) $row['id'], 8, '0', STR_PAD_LEFT),
+                'number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $row['id']),
                 'placed' => (new DateTimeImmutable((string) $row['placed_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('j M Y'),
                 'what' => $what[(int) $row['id']] ?? '',
                 'amount' => Money::ofMinorUnits((int) $row['total_minor'], (string) $row['currency'])->format(),
                 'due' => (int) $row['due_minor'] > 0 ? Money::ofMinorUnits((int) $row['due_minor'], (string) $row['currency'])->format() : '',
                 'state' => $label,
                 'tone' => $tone,
-                'buyer' => $row['purchaser_user_id'] !== null ? ['name' => (string) ($row['purchaser_name'] ?? ''), 'reference' => (string) ($row['purchaser_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['purchaser_user_id']] : null,
+                'buyer' => $row['purchaser_user_id'] !== null ? ['name' => (string) ($row['purchaser_name'] ?? ''), 'reference' => (string) ($row['purchaser_reference'] ?? ''), 'href' => PersonAddress::admin((string) $row['purchaser_reference'])] : null,
             ];
         }
         $money = $this->overview->orderMoney($companyId);
@@ -244,7 +252,7 @@ class CompanyOverview
     }
 
     /** @return array<string,mixed>|null */
-    private function wallet(int $companyId): ?array
+    private function wallet(int $companyId, string $href): ?array
     {
         if ($this->wallets === null) return null;
         $owner = WalletOwner::company($companyId);
@@ -256,7 +264,7 @@ class CompanyOverview
             'movements' => array_map(static fn(array $row): array => ['label' => (string) $row['label'] . ((string) $row['order_label'] !== '' ? ', ' . $row['order_label'] : ''), 'in' => (string) $row['in_label'], 'out' => (string) $row['out_label'],
                 'when' => (new DateTimeImmutable((string) ($row['occurred_at'] ?? $row['created_at'] ?? 'now')))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('j M Y')], $statement['rows']),
             'entries' => (int) $statement['total'],
-            'href' => '/admin/wallets/company/' . $companyId,
+            'href' => $href,
         ];
     }
 
@@ -267,7 +275,7 @@ class CompanyOverview
         if ($reader->hasPermission('PLATFORM.REQUEST.MANAGE')) {
             foreach ($this->overview->pendingRequests($companyId) as $request) {
                 $items[] = ['kind' => 'request', 'badge' => 'Course request', 'subject' => true,
-                    'person' => ['name' => (string) $request['name'], 'reference' => (string) $request['account_reference'], 'href' => '/admin/people/' . (int) $request['user_id']],
+                    'person' => ['name' => (string) $request['name'], 'reference' => (string) $request['account_reference'], 'href' => PersonAddress::admin((string) $request['account_reference'])],
                     'title' => 'asked for ' . $request['course_title'],
                     'summary' => 'On ' . (new DateTimeImmutable((string) $request['requested_at']))->format('j F Y') . '. Approve it to give them the course, or reject it.',
                     'href' => '/admin/course/requests?requests_status=pending#request-' . (int) $request['id'], 'action' => 'Approve or reject', 'icon' => 'action-approve'];
@@ -278,9 +286,9 @@ class CompanyOverview
                 if ((int) $order['due_minor'] < 1) continue;
                 $due = $order['payment_due_at'] !== null ? ', due by ' . (new DateTimeImmutable((string) $order['payment_due_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('j F Y') : '';
                 $items[] = ['kind' => 'money', 'badge' => 'Order', 'subject' => false, 'person' => null,
-                    'title' => 'Order CL-' . str_pad((string) $order['id'], 8, '0', STR_PAD_LEFT) . ' waits for payment',
+                    'title' => 'Order ' . \CattoLearning\Commerce\Domain\OrderNumber::format((int) $order['id']) . ' waits for payment',
                     'summary' => Money::ofMinorUnits((int) $order['due_minor'], (string) $order['currency'])->format() . ' to pay' . $due . '.',
-                    'href' => '/admin/commerce/orders/' . (int) $order['id'], 'action' => 'Open the order', 'icon' => 'action-view'];
+                    'href' => \CattoLearning\Support\Address\OrderAddress::admin((int) $order['id']), 'action' => 'Open the order', 'icon' => 'action-view'];
             }
         }
 

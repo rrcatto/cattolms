@@ -45,6 +45,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class LandingPageIntegrationTest extends TestCase
 {
+    private string $code = '';
     private Database $db;
     private IntegrationDataFixture $fixture;
     private LandingPageService $landing;
@@ -80,6 +81,7 @@ final class LandingPageIntegrationTest extends TestCase
         $this->fixture->grantRole($this->owner, 'COURSE_OWNER');
         $this->slug = 'landing-course-' . $s;
         $this->course = $this->fixture->createCourse($this->owner, $company, $this->slug, 'Landing Course ' . $s);
+        $this->code = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $this->course]);
         $this->db->executeStatement("UPDATE courses SET subtitle='The course subtitle', summary='The course summary for search results.', certificate_accreditation='LPC CPD: 2 points' WHERE id=:id", ['id' => $this->course]);
         $this->other = $this->fixture->createCourse($this->admin, $company, 'landing-other-' . $s, 'Other Course ' . $s);
         $this->variant = $this->price($this->course, 120000);
@@ -228,14 +230,14 @@ final class LandingPageIntegrationTest extends TestCase
 
         $this->signIn($this->owner);
         $order = array_map('strval', $this->order());
-        $response = $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $order[1] . '/arrange', ['index' => '0', 'order' => $order], true);
+        $response = $this->post('/admin/courses/' . $this->code . '/landing/sections/' . $order[1] . '/arrange', ['index' => '0', 'order' => $order], true);
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('id="landing-section-list"', (string) $response->getContent(), 'The drag answer is the saved list.');
         self::assertSame((int) $order[1], $this->order()[0]);
-        $stale = $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $order[2] . '/arrange', ['index' => '0', 'order' => $order], true);
+        $stale = $this->post('/admin/courses/' . $this->code . '/landing/sections/' . $order[2] . '/arrange', ['index' => '0', 'order' => $order], true);
         self::assertSame(422, $stale->getStatusCode());
         self::assertStringContainsString('changed elsewhere', (string) $stale->getContent());
-        $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $order[1] . '/move', ['direction' => 'bottom']);
+        $this->post('/admin/courses/' . $this->code . '/landing/sections/' . $order[1] . '/move', ['direction' => 'bottom']);
         self::assertSame((int) $order[1], $this->order()[count($ids) - 1], 'The no-JavaScript menu moves through the same service.');
     }
 
@@ -331,8 +333,8 @@ final class LandingPageIntegrationTest extends TestCase
         $this->landing->create($this->course, $this->owner);
         $this->complete();
         $this->signIn($this->owner);
-        $this->html('/admin/courses/' . $this->course . '/landing');
-        $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        $this->html('/admin/courses/' . $this->code . '/landing');
+        $this->html('/admin/courses/' . $this->code . '/landing/preview');
         $this->send('/landing/' . $this->slug);
         self::assertSame(0, $this->events('landing_page_view'), 'The editor, the preview and a draft record nothing.');
 
@@ -400,7 +402,7 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertStringContainsString('<meta property="og:description" content="Learn to transfer property.">', $html);
 
         $this->signIn($this->owner);
-        $preview = $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        $preview = $this->html('/admin/courses/' . $this->code . '/landing/preview');
         self::assertStringContainsString('<meta name="robots" content="noindex, nofollow">', $preview);
         self::assertStringNotContainsString('rel="canonical"', $preview);
         self::assertStringNotContainsString('og:url', $preview);
@@ -414,28 +416,28 @@ final class LandingPageIntegrationTest extends TestCase
         $this->landing->create($this->course, $this->owner);
         $this->complete();
         $this->signIn($this->student);
-        self::assertSame(403, $this->send('/admin/courses/' . $this->course . '/landing')->getStatusCode(), 'A learner cannot open the editor.');
+        self::assertSame(403, $this->send('/admin/courses/' . $this->code . '/landing')->getStatusCode(), 'A learner cannot open the editor.');
         $editor = $this->fixture->createUser('Other Editor ' . $this->suffix, 'landing-editor-' . $this->suffix . '@seed.test');
         $this->fixture->grantRole($editor, 'COURSE_OWNER');
         $this->signIn($editor);
-        self::assertSame(403, $this->send('/admin/courses/' . $this->course . '/landing')->getStatusCode(), 'A course owner cannot edit another owner’s course.');
-        self::assertSame(403, $this->send('/admin/courses/' . $this->course . '/landing/preview')->getStatusCode());
+        self::assertSame(403, $this->send('/admin/courses/' . $this->code . '/landing')->getStatusCode(), 'A course owner cannot edit another owner’s course.');
+        self::assertSame(403, $this->send('/admin/courses/' . $this->code . '/landing/preview')->getStatusCode());
 
         $this->signIn($this->owner);
-        $editorPage = $this->html('/admin/courses/' . $this->course . '/landing');
+        $editorPage = $this->html('/admin/courses/' . $this->code . '/landing');
         self::assertStringContainsString('An administrator publishes landing pages.', $editorPage);
         self::assertStringContainsString('Hero', $editorPage);
         $faq = $this->sectionOfType('faq');
-        $form = $this->html('/admin/courses/' . $this->course . '/landing/sections/' . $faq);
-        self::assertStringContainsString('action="/admin/courses/' . $this->course . '/landing/sections/' . $faq . '"', $form, 'The section form posts to its own address.');
-        self::assertStringContainsString('href="/admin/courses/' . $this->course . '/landing#landing-section-' . $faq . '"', $form, 'Cancel returns to the section in the list.');
+        $form = $this->html('/admin/courses/' . $this->code . '/landing/sections/' . $faq);
+        self::assertStringContainsString('action="/admin/courses/' . $this->code . '/landing/sections/' . $faq . '"', $form, 'The section form posts to its own address.');
+        self::assertStringContainsString('href="/admin/courses/' . $this->code . '/landing#landing-section-' . $faq . '"', $form, 'Cancel returns to the section in the list.');
         self::assertStringNotContainsString('Array', $form);
-        $this->post('/admin/courses/' . $this->course . '/landing/publish', []);
+        $this->post('/admin/courses/' . $this->code . '/landing/publish', []);
         self::assertSame('draft', $this->landing->page($this->course)['status'], 'COURSE.PUBLISH is needed to publish.');
-        self::assertStringContainsString('Landing page: draft', $this->html('/admin/courses/' . $this->course));
+        self::assertStringContainsString('Landing page: draft', $this->html('/admin/courses/' . $this->code));
 
         $this->signIn($this->admin);
-        $this->post('/admin/courses/' . $this->course . '/landing/publish', []);
+        $this->post('/admin/courses/' . $this->code . '/landing/publish', []);
         self::assertSame('published', $this->landing->page($this->course)['status']);
     }
 
@@ -453,7 +455,7 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertSame(404, $this->send($url)->getStatusCode(), 'Not public while the page is a draft.');
         $this->signIn($this->owner);
         self::assertSame(200, $this->send($url)->getStatusCode(), 'The course’s managers see it in the preview.');
-        self::assertStringContainsString($url, $this->html('/admin/courses/' . $this->course . '/landing/preview'));
+        self::assertStringContainsString($url, $this->html('/admin/courses/' . $this->code . '/landing/preview'));
 
         $this->landing->publish($this->course, $this->admin);
         $_COOKIE = $this->cookies;
@@ -493,7 +495,7 @@ final class LandingPageIntegrationTest extends TestCase
 
         self::assertSame(404, $this->send($narration)->getStatusCode(), 'Not public while the page is a draft.');
         $this->signIn($this->owner);
-        $preview = $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        $preview = $this->html('/admin/courses/' . $this->code . '/landing/preview');
         self::assertStringContainsString('class="cw-deck', $preview, 'The preview plays it.');
         self::assertSame(200, $this->send($narration)->getStatusCode(), 'The course’s managers hear it.');
 
@@ -533,13 +535,13 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_edit_history WHERE course_id=:c AND event_key='landing_page.section_width'", ['c' => $this->course]));
 
         $this->signIn($this->owner);
-        $response = $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $outcomes . '/width', ['width' => 'half'], true);
+        $response = $this->post('/admin/courses/' . $this->code . '/landing/sections/' . $outcomes . '/width', ['width' => 'half'], true);
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('id="landing-section-list"', (string) $response->getContent(), 'A script\'s change answers with the saved list.');
         self::assertStringContainsString('cl-landing-sketch', (string) $response->getContent(), 'And its sketch.');
         self::assertSame('half', $this->section($outcomes)['width']);
 
-        $page = $this->html('/admin/courses/' . $this->course . '/landing/preview');
+        $page = $this->html('/admin/courses/' . $this->code . '/landing/preview');
         $grid = strpos($page, 'class="cl-ui-section-grid" data-columns="2"');
         $first = strpos($page, 'cl-landing-section--audience');
         $second = strpos($page, 'cl-landing-section--outcomes');
@@ -547,10 +549,10 @@ final class LandingPageIntegrationTest extends TestCase
         // The row holds the two of them alone: no second row starts before Course contents.
         self::assertTrue($grid !== false && $first > $grid && $second > $first && $next > $second && strpos(substr($page, $grid + 30, $next - $grid - 30), 'cl-ui-section-grid') === false, 'Who it is for and what they learn share one row.');
 
-        $this->post('/admin/courses/' . $this->course . '/landing/sections/' . $outcomes . '/width', ['width' => 'full']);
+        $this->post('/admin/courses/' . $this->code . '/landing/sections/' . $outcomes . '/width', ['width' => 'full']);
         self::assertSame('full', $this->section($outcomes)['width'], 'Without JavaScript the form saves the width.');
 
-        $editor = $this->html('/admin/courses/' . $this->course . '/landing');
+        $editor = $this->html('/admin/courses/' . $this->code . '/landing');
         self::assertStringContainsString(LandingSectionType::Benefits->label() . ' (on the page, you can add another)', $editor, 'A kind that may repeat says it is on the page.');
         self::assertStringContainsString(LandingSectionType::Audience->label() . ' (already on the page)', $editor);
         $this->refusedSql(fn() => $this->db->executeStatement("UPDATE course_landing_sections SET width = 'half' WHERE id = :id", ['id' => $hero]), 'course_landing_sections_hero_full');
@@ -592,8 +594,8 @@ final class LandingPageIntegrationTest extends TestCase
     private function node(?int $parent, int $position, string $type): int
     {
         return (int) $this->db->fetchOne(
-            'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type) VALUES (:p,:c,:parent,:position,:type) RETURNING id',
-            ['p' => Uuid::v4(), 'c' => $this->course, 'parent' => $parent, 'position' => $position, 'type' => $type]
+            'INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,part_name) VALUES (:p,:c,:parent,:position,:type,:part) RETURNING id',
+            ['p' => Uuid::v4(), 'c' => $this->course, 'parent' => $parent, 'position' => $position, 'type' => $type, 'part' => \CattoLearning\Support\Address\CoursePartAddress::provisional()]
         );
     }
 

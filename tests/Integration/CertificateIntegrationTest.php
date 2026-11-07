@@ -292,7 +292,7 @@ final class CertificateIntegrationTest extends TestCase
         }
         $own = InProcessPage::run($learner, CertificateController::class, 'show', $id);
         self::assertSame(200, $own['status']);
-        foreach (['Private: only you can see this page.', 'View transcript', '/transcripts/' . $tid['public_id'], '/account/certificates#certificate-' . $certificate['id'], 'My Certificates'] as $text) {
+        foreach (['Private: only you can see this page.', 'View transcript', '/transcripts/' . $tid['public_id'], '/account/certificates#certificate-' . $certificate['certificate_number'], 'My Certificates'] as $text) {
             self::assertStringContainsString($text, $own['body']);
         }
         self::assertStringStartsWith('%PDF-', InProcessPage::run($learner, CertificateController::class, 'pdf', $id)['body']);
@@ -370,15 +370,18 @@ final class CertificateIntegrationTest extends TestCase
             self::assertStringContainsString($text, $panel['body']);
         }
 
-        $made = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateVisibility', ['id' => $certificateId], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript', 'public' => '1']);
-        self::assertSame('/account/certificates#certificate-' . $certificateId, $made['location']);
+        // Named by its number, never its row id (owner, 2026-11-06).
+        $number = (string) $certificate['certificate_number'];
+        foreach (['action="/account/certificates/' . $number . '/visibility"', 'action="/account/certificates/' . $number . '/address"', 'id="certificate-' . $number . '"'] as $shown) self::assertStringContainsString($shown, $panel['body']);
+        $made = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateVisibility', ['number' => $number], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript', 'public' => '1']);
+        self::assertSame('/account/certificates#certificate-' . $number, $made['location']);
         $row = $this->certificates->find($certificateId);
         self::assertNotNull($row);
         self::assertTrue((bool) $row['transcript_is_public'], 'The transcript is public.');
         self::assertFalse((bool) $row['is_public'], 'The certificate stays private: each is decided separately.');
 
-        $moved = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateAddress', ['id' => $certificateId], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript']);
-        self::assertSame('/account/certificates#certificate-' . $certificateId, $moved['location']);
+        $moved = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateAddress', ['number' => $number], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript']);
+        self::assertSame('/account/certificates#certificate-' . $number, $moved['location']);
         $transcript = $this->certificates->transcriptForCertificate($certificateId);
         self::assertNotNull($transcript);
         $new = (string) $transcript['public_id'];
@@ -413,12 +416,26 @@ final class CertificateIntegrationTest extends TestCase
             self::assertSame('That certificate is not one of yours.', $refused->getMessage());
         }
         self::assertFalse((bool) $this->certificates->find($certificateId)['is_public']);
-        $adminPage = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['id' => $certificateId]);
-        foreach (['Private: only the learner', 'Public: anyone who has its address', '/admin/certificates/' . $certificateId . '/certificate.pdf', '/admin/certificates/' . $certificateId . '/transcript.pdf'] as $text) {
+        // Another learner who has the number is simply not found, and so is a number written another way or the row id.
+        [, , $otherId] = $this->completedEnrolment('Other Learner', 'Other Course');
+        foreach ([[$this->learner($otherId), $number], [$learner, strtolower($number)], [$learner, (string) $certificateId], [$learner, 'CL-2026-000000000000']] as [$who, $key]) {
+            foreach (['certificateVisibility' => ['document' => 'certificate', 'public' => '1'], 'certificateAddress' => ['document' => 'certificate']] as $method => $post) {
+                try {
+                    InProcessPage::run($who, \CattoLearning\Http\Controller\AccountController::class, $method, ['number' => $key], ['csrf' => $_SESSION['csrf']] + $post);
+                    self::fail($method . ' ' . $key . ' is not theirs to change.');
+                } catch (NotFoundHttpException) {
+                    $this->addToAssertionCount(1);
+                }
+            }
+        }
+        self::assertFalse((bool) $this->certificates->find($certificateId)['is_public'], 'Nothing changed.');
+        self::assertSame($old, (string) $this->certificates->find($certificateId)['public_id']);
+        $adminPage = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['number' => $number]);
+        foreach (['Private: only the learner', 'Public: anyone who has its address', '/admin/certificates/' . $number . '/certificate.pdf', '/admin/certificates/' . $number . '/transcript.pdf'] as $text) {
             self::assertStringContainsString($text, $adminPage['body']);
         }
         foreach ([$old, $new] as $code) self::assertStringNotContainsString($code, $adminPage['body'], 'ADMIN is never shown an address.');
-        self::assertStringStartsWith('%PDF-', InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'pdf', ['id' => $certificateId, 'document' => 'transcript'])['body']);
+        self::assertStringStartsWith('%PDF-', InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'pdf', ['number' => $number, 'document' => 'transcript'])['body']);
     }
 
     /** Administration > Courses > Issued Certificates lists, finds and opens each certificate, and revokes it with a reason. */
@@ -429,10 +446,21 @@ final class CertificateIntegrationTest extends TestCase
         $list = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'index', [], null, ['q' => 'Listed Learner']);
         self::assertStringContainsString((string) $certificate['certificate_number'], $list['body']);
         self::assertStringContainsString('In force', $list['body']);
-        $one = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['id' => (int) $certificate['id']]);
+        $number = (string) $certificate['certificate_number'];
+        self::assertStringContainsString('href="/admin/certificates/' . $number . '"', $list['body'], 'Each certificate opens at its number.');
+        $one = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['number' => $number]);
         self::assertStringContainsString('Revoke this certificate', $one['body']);
-        $revoked = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'revoke', ['id' => (int) $certificate['id']], ['csrf' => $_SESSION['csrf'], 'reason' => 'The learner shared the account.']);
-        self::assertSame('/admin/certificates/' . (int) $certificate['id'], $revoked['location']);
+        self::assertStringContainsString('action="/admin/certificates/' . $number . '/revoke"', $one['body']);
+        foreach ([(string) $certificate['id'], strtolower($number), 'CL-2026-000000000000'] as $other) {
+            try {
+                InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['number' => $other]);
+                self::fail($other . ' names no certificate.');
+            } catch (NotFoundHttpException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        $revoked = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'revoke', ['number' => $number], ['csrf' => $_SESSION['csrf'], 'reason' => 'The learner shared the account.']);
+        self::assertSame('/admin/certificates/' . $number, $revoked['location']);
         $row = $this->certificates->find((int) $certificate['id']);
         self::assertNotNull($row);
         self::assertSame('The learner shared the account.', $row['revocation_reason']);
@@ -442,7 +470,7 @@ final class CertificateIntegrationTest extends TestCase
     public function testTheCoursePageChoosesADesignAndPreviewsWhatIssuingWillDraw(): void
     {
         $courseId = $this->fixture->createCourse($this->adminId, $this->companyId, 'qa-certificate-page-' . $this->fixture->suffix(), 'Certificate Page Course', 'draft');
-        $page = InProcessPage::run($this->admin, CourseCertificateController::class, 'show', ['id' => $courseId]);
+        $page = InProcessPage::run($this->admin, CourseCertificateController::class, 'show', ['code' => (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $courseId])]);
         self::assertSame(200, $page['status']);
         foreach (['Give learners a certificate', 'name="certificate_design_id"', 'Classic', 'Professional CPD', 'Edit this design', 'New design', 'Accreditation or CPD line', 'cl-certificate-preview-frame', '/certificate/preview.pdf'] as $text) {
             self::assertStringContainsString($text, $page['body']);
@@ -452,30 +480,31 @@ final class CertificateIntegrationTest extends TestCase
         }
 
         $modern = $this->designNamed('Modern');
-        $saved = InProcessPage::run($this->admin, CourseCertificateController::class, 'update', ['id' => $courseId], [
+        $courseCode = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $courseId]);
+        $saved = InProcessPage::run($this->admin, CourseCertificateController::class, 'update', ['code' => $courseCode], [
             'csrf' => $_SESSION['csrf'], 'certificate_enabled' => '1', 'certificate_design_id' => (string) $modern['id'], 'certificate_accreditation' => 'NQF level 4',
         ]);
-        self::assertSame('/admin/courses/' . $courseId . '/certificate', $saved['location']);
+        self::assertSame('/admin/courses/' . $courseCode . '/certificate', $saved['location']);
         $course = $this->db->fetchAssociative('SELECT certificate_enabled, certificate_design_id, certificate_accreditation FROM courses WHERE id = :id', ['id' => $courseId]);
         self::assertNotFalse($course);
         self::assertSame([true, $modern['id'], 'NQF level 4'], [$course['certificate_enabled'], (int) $course['certificate_design_id'], $course['certificate_accreditation']]);
 
-        $preview = InProcessPage::run($this->admin, CourseCertificateController::class, 'preview', ['id' => $courseId]);
+        $preview = InProcessPage::run($this->admin, CourseCertificateController::class, 'preview', ['code' => $courseCode]);
         self::assertStringStartsWith('%PDF-', $preview['body']);
         self::assertSame(1, self::pages($preview['body']));
-        $form = InProcessPage::run($this->admin, CourseCertificateController::class, 'previewForm', ['id' => $courseId], ['csrf' => $_SESSION['csrf'], 'certificate_design_id' => (string) $this->designNamed('Gold Frame')['id'], 'certificate_accreditation' => 'Unsaved line']);
+        $form = InProcessPage::run($this->admin, CourseCertificateController::class, 'previewForm', ['code' => $courseCode], ['csrf' => $_SESSION['csrf'], 'certificate_design_id' => (string) $this->designNamed('Gold Frame')['id'], 'certificate_accreditation' => 'Unsaved line']);
         self::assertStringStartsWith('%PDF-', $form['body']);
         self::assertSame($modern['id'], (int) $this->db->fetchOne('SELECT certificate_design_id FROM courses WHERE id = :id', ['id' => $courseId]), 'A preview saves nothing.');
 
         unset($_SESSION['flash']);
-        InProcessPage::run($this->admin, CourseCertificateController::class, 'update', ['id' => $courseId], ['csrf' => $_SESSION['csrf'], 'certificate_design_id' => '999999']);
+        InProcessPage::run($this->admin, CourseCertificateController::class, 'update', ['code' => $courseCode], ['csrf' => $_SESSION['csrf'], 'certificate_design_id' => '999999']);
         self::assertSame($modern['id'], (int) $this->db->fetchOne('SELECT certificate_design_id FROM courses WHERE id = :id', ['id' => $courseId]), 'An unknown design changes nothing.');
 
         $learnerId = $this->fixture->createUser('Not a manager', 'certificate-outsider-' . $this->fixture->suffix() . '@example.test');
         $learner = new CurrentUser($learnerId, Uuid::v4(), 'outsider@example.test', 'Not a manager', ['STUDENT'], ['ACCOUNT.VIEW'], Uuid::v4());
         foreach (['show', 'preview'] as $method) {
             try {
-                InProcessPage::run($learner, CourseCertificateController::class, $method, ['id' => $courseId]);
+                InProcessPage::run($learner, CourseCertificateController::class, $method, ['code' => $courseCode]);
                 self::fail('A learner cannot open ' . $method . '.');
             } catch (AccessDeniedHttpException) {
                 self::addToAssertionCount(1);
@@ -510,8 +539,8 @@ final class CertificateIntegrationTest extends TestCase
         self::assertMatchesRegularExpression('#^/admin/certificates/designs/\d+$#', (string) $created['location'], 'Saving opens the new design.');
         $id = (int) $this->db->fetchOne("SELECT id FROM document_templates WHERE document_type = 'certificate' AND name = 'CPD for conveyancers'");
         $version = (int) $this->designs->find($id)['published_version_id'];
-        $updated = InProcessPage::run($this->admin, CertificateDesignController::class, 'update', ['id' => $id], ['csrf' => $_SESSION['csrf'], 'return_to' => '/admin/courses/1/certificate'] + $this->form('CPD for conveyancers', CertificateLooks::defaultWording('legal-seal') . '<p>Second line</p>', 'legal-seal'));
-        self::assertSame('/admin/courses/1/certificate', $updated['location'], 'Saving returns to the course it was opened from.');
+        $updated = InProcessPage::run($this->admin, CertificateDesignController::class, 'update', ['id' => $id], ['csrf' => $_SESSION['csrf'], 'return_to' => '/admin/courses/GDN-101/certificate'] + $this->form('CPD for conveyancers', CertificateLooks::defaultWording('legal-seal') . '<p>Second line</p>', 'legal-seal'));
+        self::assertSame('/admin/courses/GDN-101/certificate', $updated['location'], 'Saving returns to the course it was opened from, by its code.');
         self::assertNotSame($version, (int) $this->designs->find($id)['published_version_id'], 'A save is a new version.');
         self::assertStringContainsString('Second line', $this->designs->find($id)['design']->wording);
 

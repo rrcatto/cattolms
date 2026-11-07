@@ -13,8 +13,8 @@
 	{% endblock %}{% endembed %}
 	{% if can_manage %}
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-		<form action="/admin/promotions/{{ promotion.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="active" value="{{ promotion.active ? '0' : '1' }}">{{ ui('action.button', {label: promotion.active ? 'Deactivate' : 'Activate', variant: promotion.active ? 'secondary' : 'primary', type: 'submit', icon: (promotion.active ? 'action-disable' : 'action-enable')}) }}</form>
-		{% if usage.deletable %}<form action="/admin/promotions/{{ promotion.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete promotion', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ promotion.code ~ '? No order has used it.', icon: 'action-remove'}) }}</form>{% endif %}
+		<form action="{{ promotion_url(promotion.code, '/status') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="active" value="{{ promotion.active ? '0' : '1' }}">{{ ui('action.button', {label: promotion.active ? 'Deactivate' : 'Activate', variant: promotion.active ? 'secondary' : 'primary', type: 'submit', icon: (promotion.active ? 'action-disable' : 'action-enable')}) }}</form>
+		{% if usage.deletable %}<form action="{{ promotion_url(promotion.code, '/delete') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete promotion', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ promotion.code ~ '? No order has used it.', icon: 'action-remove'}) }}</form>{% endif %}
 	{% endblock %}{% endembed %}
 	{% if not usage.deletable %}<p class="help">Orders were placed with this promotion, so it is kept for their history and cannot be deleted. Deactivate it to stop new uses. Changes apply to checkouts from now on; orders already placed keep the promotion as it was.</p>{% endif %}
 	{% endif %}
@@ -24,7 +24,7 @@
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: promotion ? 'Promotion details' : 'Create a promotion', heading_level: 2, summary: 'Amounts are in ' ~ currency ~ '. Dates and times are in the platform time zone, ' ~ timezone ~ '.'}) }}
 {% if can_manage %}
-<form action="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}" method="post">
+<form action="{{ promotion ? promotion_url(promotion.code) : '/admin/promotions' }}" method="post">
 	<input type="hidden" name="csrf" value="{{ csrf }}">
 	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Code', for: 'promotion-code', required: true, help: 'Letters, digits, hyphens and underscores. Case does not matter: SAVE10, save10 and Save10 are one code.'})} %}{% block control %}<input id="promotion-code" name="code" value="{{ form.code }}" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
@@ -61,7 +61,7 @@
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_bundle_id', lk_type: 'bundles', lk_label: 'Add a bundle', lk_empty: 'Search for a bundle to add', lk_selected: 0, lk_required: 0} %}
 	</fieldset>
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-		{{ ui('action.button', {label: promotion ? 'Save promotion' : 'Create promotion', variant: 'primary', type: 'submit', icon: (promotion ? 'action-save-changes' : 'action-add')}) }}<a href="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}">Cancel</a>
+		{{ ui('action.button', {label: promotion ? 'Save promotion' : 'Create promotion', variant: 'primary', type: 'submit', icon: (promotion ? 'action-save-changes' : 'action-add')}) }}<a href="{{ promotion ? promotion_url(promotion.code) : '/admin/promotions' }}">Cancel</a>
 	{% endblock %}{% endembed %}
 </form>
 {% else %}
@@ -89,8 +89,8 @@
 {% block body %}
 {% for order in usage.orders %}
 <tr>
-	<td><a href="/admin/commerce/orders/{{ order.id }}">{{ order.number }}</a></td>
-	<td>{{ ui('data.person', {name: order.purchaser_name, reference: order.purchaser_reference, href: '/admin/people/' ~ order.purchaser_user_id, email: order.purchaser_email|default('')}) }}</td>
+	<td><a href="{{ order_url(order.id) }}">{{ order.number }}</a></td>
+	<td>{{ ui('data.person', {name: order.purchaser_name, reference: order.purchaser_reference, href: person_url(order.purchaser_reference), email: order.purchaser_email|default('')}) }}</td>
 	<td>{{ order.placed_at|date('j M Y H:i') }}</td>
 	<td>{{ order.state|replace({'_': ' '})|capitalize }}</td>
 	<td>{{ order.discount_label }}</td>

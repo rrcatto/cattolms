@@ -15,6 +15,9 @@ dashboard warns when the commerce job is, because without it no buyer is emailed
 is cancelled.
 
 Changelog:
+2026/11/06 SAST
+- Money Reports (owner, 2026-11-06): last month's report emailed and its line sent by Telegram on the 1st, from the start
+  of the sending hours, each once; the job looks every minute.
 2026/11/05 SAST
 - Messages to you (owner, 2026-11-05): the waiting messages sent to the owner's Telegram every minute.
 2026/11/04 SAST
@@ -47,6 +50,7 @@ enum ScheduledJob: string
     case VideoCheck = 'video_check';
     case SiteProtection = 'site_protection';
     case OwnerMessages = 'owner_messages';
+    case MoneyReport = 'money_report';
 
     /** How often the job runs, in seconds. */
     public function interval(): int
@@ -62,6 +66,7 @@ enum ScheduledJob: string
             self::VideoCheck => 86400,
             self::SiteProtection => 60,
             self::OwnerMessages => 60,
+            self::MoneyReport => 60,
         };
     }
 
@@ -103,6 +108,7 @@ enum ScheduledJob: string
             self::VideoCheck => 3 * 86400,
             self::SiteProtection => 300,
             self::OwnerMessages => 300,
+            self::MoneyReport => 300,
         };
     }
 
@@ -119,6 +125,7 @@ enum ScheduledJob: string
             self::VideoCheck => 'Course videos',
             self::SiteProtection => 'Site protection',
             self::OwnerMessages => 'Messages to you',
+            self::MoneyReport => 'Money reports',
         };
     }
 
@@ -135,7 +142,8 @@ enum ScheduledJob: string
             self::ReviewRequests => 'Every hour: emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review.',
             self::VideoCheck => 'Every day: asks YouTube whether each course video can still be played, and lists any that cannot under Needs your attention.',
             self::SiteProtection => 'Every minute: checks what each address did against the rules in Site protection settings, flags it and times it out, and takes off the server\'s firewall any lockout that has ended.',
-            self::OwnerMessages => 'Every minute: sends the waiting messages to your Telegram, tries again any that could not go, and drops one still unsent after 7 days.',
+            self::OwnerMessages => 'Every minute: sends the waiting messages to your Telegram, tries again any that could not go, and drops one still unsent after 7 days. While people can sign in with Telegram, it also reads what they send the bot.',
+            self::MoneyReport => 'Every minute: on the 1st of each month, from the start of the sending hours, emails last month\'s money report to the administrator address with its PDF and Excel file, and sends its one line by Telegram, each once and only while its tick is on.',
         };
     }
 }

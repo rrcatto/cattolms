@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CattoLearning\Bundle;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Infrastructure\CommerceRepository;
+use CattoLearning\Course\CourseCode;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -32,44 +34,79 @@ final class BundleService
 {
     private const LIMITS = ['title' => 240, 'short_description' => 320, 'description_html' => 100000, 'cover_svg' => 200000];
 
+    /** A small number of courses in words on a page ("the five beside it"); ten and more stay figures. */
+    private const NUMBER_WORDS = [1 => 'one', 2 => 'two', 3 => 'three', 4 => 'four', 5 => 'five', 6 => 'six', 7 => 'seven', 8 => 'eight', 9 => 'nine'];
+
     public function __construct(
         private readonly BundleRepository $bundles,
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         private readonly ClockInterface $clock,
         private readonly CourseService $courses,
+        private readonly CommerceRepository $commerce,
+        private readonly ?\CattoLearning\Search\SharePictures $sharePictures = null,
     ) {}
 
-    /** @param array<string,mixed> $input */
-    public function create(CurrentUser $actor, array $input): int
+    /**
+     * Makes a bundle as a draft. A status chosen on the form (owner, 2026-11-06: "On the bundle form (new or edit), I can't
+     * set the status ... use radio buttons") is then set by the same rules as ever: one the publish checks refuse leaves
+     * the new bundle a draft, and $refused says why.
+     *
+     * @param array<string,mixed> $input
+     * @param-out string|null $refused
+     */
+    public function create(CurrentUser $actor, array $input, ?string &$refused = null): int
     {
         self::require($actor, 'BUNDLE.MANAGE');
+        $refused = null;
         $fields = $this->validateDetails($input, null);
-        return $this->transactions->run(function () use ($actor, $fields): int {
+        $status = self::chosenStatus($input);
+        $id = $this->transactions->run(function () use ($actor, $fields): int {
             try {
                 $id = $this->bundles->create($fields, $actor->id, $this->now());
             } catch (UniqueConstraintViolationException) {
-                throw self::slugTaken((string) $fields['slug']);
+                throw $this->taken($fields, null);
             }
-            $this->audit->record($actor->id, 'bundle.created', ['bundle_id' => $id, 'slug' => $fields['slug'], 'title' => $fields['title']]);
+            $this->audit->record($actor->id, 'bundle.created', ['bundle_id' => $id, 'code' => $fields['code'], 'slug' => $fields['slug'], 'title' => $fields['title']]);
             return $id;
         });
+        if ($status !== null && $status !== 'draft') {
+            try {
+                $this->setStatus($actor, $id, $status);
+            } catch (RuntimeException $notYet) {
+                $refused = $notYet->getMessage();
+            }
+        }
+        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; Search\SharePictures).
+        $this->sharePictures?->make($fields['cover_svg']);
+        return $id;
     }
 
-    /** @param array<string,mixed> $input */
+    /**
+     * Saves the bundle's details and, when the form chose one, its status, together or not at all: a status the publish
+     * checks refuse leaves everything as it was, with why.
+     *
+     * @param array<string,mixed> $input
+     */
     public function updateDetails(CurrentUser $actor, int $id, array $input): void
     {
         self::require($actor, 'BUNDLE.MANAGE');
         $fields = $this->validateDetails($input, $id);
-        $this->transactions->run(function () use ($actor, $id, $fields): void {
+        $status = self::chosenStatus($input);
+        $this->transactions->run(function () use ($actor, $id, $fields, $status): void {
             $before = $this->bundles->find($id, true) ?? throw self::missing();
+            // Refused before anything is written, so the details and the status go together or not at all.
+            if ($status === 'published' && $before['status'] !== 'published') {
+                $refusal = $this->publishRefusal($id, $before['offer_id'] !== null);
+                if ($refusal !== null) throw new RuntimeException($refusal);
+            }
             try {
                 $this->bundles->update($id, $fields, $actor->id, $this->now());
             } catch (UniqueConstraintViolationException) {
-                throw self::slugTaken((string) $fields['slug']);
+                throw $this->taken($fields, $id);
             }
             $changed = [];
-            foreach (['slug', 'title', 'available_from', 'available_until'] as $field) {
+            foreach (['code', 'slug', 'title', 'available_from', 'available_until'] as $field) {
                 $old = $before[$field] === null ? null : (in_array($field, ['available_from', 'available_until'], true) ? (new DateTimeImmutable((string) $before[$field]))->format(DATE_ATOM) : (string) $before[$field]);
                 if ($old !== $fields[$field]) $changed[$field] = ['from' => $old, 'to' => $fields[$field]];
             }
@@ -78,6 +115,93 @@ final class BundleService
                 if ((string) $before[$field] !== $fields[$field]) $changed[$field] = 'changed';
             }
             if ($changed !== []) $this->audit->record($actor->id, 'bundle.updated', ['bundle_id' => $id, 'changed' => $changed]);
+            if ($status !== null) $this->setStatus($actor, $id, $status);
+        });
+        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; Search\SharePictures).
+        $this->sharePictures?->make($fields['cover_svg']);
+    }
+
+    /**
+     * A person stars or unstars a bundle (owner, 2026-11-06: "Allow bundles to be added to favourites"), as a course is
+     * starred: the state asked for, so a repeated request changes nothing, and only a bundle the catalogue shows (not a
+     * draft) can be starred. Answers whether anything changed.
+     */
+    public function setFavourite(int $userId, int $bundleId, bool $favourite): bool
+    {
+        return $this->transactions->run(function () use ($userId, $bundleId, $favourite): bool {
+            $bundle = $this->bundles->find($bundleId);
+            if ($favourite && ($bundle === null || $bundle['status'] === 'draft')) throw new RuntimeException('That bundle could not be added to your favourites.');
+            if (!$this->bundles->setFavourite($userId, $bundleId, $favourite)) return false;
+            $this->audit->record($userId, $favourite ? 'bundle.favourited' : 'bundle.unfavourited', ['bundle_id' => $bundleId]);
+            return true;
+        });
+    }
+
+    /**
+     * Marks each bundle card with whether this person starred it, for its star. With nobody signed in every card is left
+     * as it is.
+     *
+     * @param list<array<string,mixed>> $cards cards as card() gives them
+     * @return list<array<string,mixed>>
+     */
+    public function markFavourites(?int $userId, array $cards): array
+    {
+        if ($userId === null || $cards === []) return $cards;
+        $starred = array_flip($this->bundles->favouriteIds($userId, array_map(static fn(array $card): int => (int) $card['bundle_id'], $cards)));
+        foreach ($cards as &$card) $card['is_favourite'] = isset($starred[(int) $card['bundle_id']]);
+        unset($card);
+        return $cards;
+    }
+
+    /**
+     * Bundles as catalogue cards, in the order given, leaving out drafts and any no longer here (a person's Favourites).
+     *
+     * @param list<int> $ids
+     * @return list<array<string,mixed>>
+     */
+    public function cardsByIds(array $ids): array
+    {
+        $cards = [];
+        $courses = $this->bundles->coursesOf($ids);
+        foreach ($ids as $id) {
+            $bundle = $this->bundles->find($id);
+            if ($bundle === null || $bundle['status'] === 'draft') continue;
+            $cards[] = self::card($this->present($bundle, [], $courses[$id] ?? []));
+        }
+        return $cards;
+    }
+
+    /**
+     * Saves a bundle edited in place in the ADMIN list (owner, 2026-11-06: "In the bundle list, it must be editable, just
+     * like courses are. these fields must be editable: bundle code, title, status, price, start & end dates, access
+     * period"): its code, title and sale dates as the bundle form saves them (its web address and words kept), its price,
+     * was price and access period as Price and access saves them (whether it is on sale kept; a bundle with no price and
+     * none typed stays without one), then its status by the same checks as ever. Everything is saved together or nothing is.
+     *
+     * @param array<string,mixed> $input
+     */
+    public function saveRow(CurrentUser $actor, int $id, array $input): void
+    {
+        self::require($actor, 'BUNDLE.MANAGE');
+        $this->transactions->run(function () use ($actor, $id, $input): void {
+            $bundle = $this->bundles->find($id, true) ?? throw self::missing();
+            $form = $this->form($bundle);
+            $typed = static fn(string $key): string => is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
+            $details = ['code' => $typed('code'), 'title' => $typed('title'), 'slug' => $form['slug'], 'short_description' => $form['short_description'],
+                'description_html' => $form['description_html'], 'cover_svg' => $form['cover_svg'], 'available_from' => $typed('available_from'), 'available_until' => $typed('available_until')];
+            $offer = $bundle['offer_id'] !== null || $typed('price') !== '' || $typed('was_price') !== '' ? ['price' => $typed('price'), 'was_price' => $typed('was_price'),
+                'access_period_value' => $typed('access_period_value'), 'access_period_unit' => $typed('access_period_unit'), 'is_active' => $form['is_active'] ? '1' : ''] : null;
+            $status = self::chosenStatus($input);
+            // Everything is checked before anything is written, so a refusal leaves the bundle as it was.
+            $this->validateDetails($details, $id);
+            if ($offer !== null) self::offerInput($offer);
+            if ($status === 'published' && $bundle['status'] !== 'published') {
+                $refusal = $this->publishRefusal($id, $offer !== null);
+                if ($refusal !== null) throw new RuntimeException($refusal);
+            }
+            $this->updateDetails($actor, $id, $details);
+            if ($offer !== null) $this->saveOffer($actor, $id, $offer);
+            if ($status !== null) $this->setStatus($actor, $id, $status);
         });
     }
 
@@ -134,6 +258,25 @@ final class BundleService
     public function saveOffer(CurrentUser $actor, int $id, array $input): void
     {
         self::require($actor, 'BUNDLE.MANAGE');
+        [$minor, $was, $period, $active] = self::offerInput($input);
+        $this->transactions->run(function () use ($actor, $id, $minor, $was, $period, $active): void {
+            $before = $this->bundles->find($id, true) ?? throw self::missing();
+            $this->bundles->saveOffer($id, $minor, Money::platformCurrency(), $period, $active, $actor->id, $this->now(), $was);
+            $previous = $before['offer_id'] === null ? null : ['price_minor' => (int) $before['price_minor_units'], 'was_price_minor' => $before['was_price_minor_units'] === null ? null : (int) $before['was_price_minor_units'], 'access_period_seconds' => (int) $before['access_period_seconds'], 'on_sale' => (bool) $before['offer_active']];
+            $current = ['price_minor' => $minor, 'was_price_minor' => $was, 'access_period_seconds' => $period, 'on_sale' => $active];
+            if ($previous !== $current) $this->audit->record($actor->id, 'bundle.offer_updated', ['bundle_id' => $id, 'from' => $previous, 'to' => $current, 'currency' => Money::platformCurrency()]);
+        });
+    }
+
+    /**
+     * An offer as typed, checked: the price and was price in minor units, the access period in seconds, whether it is on
+     * sale.
+     *
+     * @param array<string,mixed> $input
+     * @return array{0:int,1:?int,2:int,3:bool}
+     */
+    private static function offerInput(array $input): array
+    {
         $price = trim(str_replace([',', ' '], '', is_scalar($input['price'] ?? null) ? (string) $input['price'] : ''));
         if (preg_match('/^\d{1,10}(?:\.\d{1,2})?$/D', $price) !== 1) throw new RuntimeException('Enter the bundle price as an amount with no more than two decimal places.');
         $minor = Money::ofMajorUnits($price, Money::platformCurrency())->minorUnits;
@@ -148,14 +291,7 @@ final class BundleService
         } catch (\InvalidArgumentException $invalid) {
             throw new RuntimeException($invalid->getMessage());
         }
-        $active = ($input['is_active'] ?? '') === '1';
-        $this->transactions->run(function () use ($actor, $id, $minor, $was, $period, $active): void {
-            $before = $this->bundles->find($id, true) ?? throw self::missing();
-            $this->bundles->saveOffer($id, $minor, Money::platformCurrency(), $period, $active, $actor->id, $this->now(), $was);
-            $previous = $before['offer_id'] === null ? null : ['price_minor' => (int) $before['price_minor_units'], 'was_price_minor' => $before['was_price_minor_units'] === null ? null : (int) $before['was_price_minor_units'], 'access_period_seconds' => (int) $before['access_period_seconds'], 'on_sale' => (bool) $before['offer_active']];
-            $current = ['price_minor' => $minor, 'was_price_minor' => $was, 'access_period_seconds' => $period, 'on_sale' => $active];
-            if ($previous !== $current) $this->audit->record($actor->id, 'bundle.offer_updated', ['bundle_id' => $id, 'from' => $previous, 'to' => $current, 'currency' => Money::platformCurrency()]);
-        });
+        return [$minor, $was, $period, ($input['is_active'] ?? '') === '1'];
     }
 
     /**
@@ -170,17 +306,26 @@ final class BundleService
             $bundle = $this->bundles->find($id, true) ?? throw self::missing();
             if ($bundle['status'] === $status) return false;
             if ($status === 'published') {
-                $courses = $this->bundles->courses($id);
-                if (count($courses) < BundleRules::MINIMUM_COURSES) throw new RuntimeException('Add at least two courses before publishing the bundle.');
-                foreach ($courses as $course) {
-                    if ($course['status'] !== 'published') throw new RuntimeException((string) $course['title'] . ' is not published. A published bundle may contain published courses only.');
-                }
-                if ($bundle['offer_id'] === null) throw new RuntimeException('Set the bundle price before publishing it.');
+                $refusal = $this->publishRefusal($id, $bundle['offer_id'] !== null);
+                if ($refusal !== null) throw new RuntimeException($refusal);
             }
             $this->bundles->setStatus($id, $status, $actor->id, $this->now());
             $this->audit->record($actor->id, $status === 'retired' ? 'bundle.retired' : 'bundle.status_changed', ['bundle_id' => $id, 'from' => $bundle['status'], 'to' => $status]);
             return true;
         });
+    }
+
+    /**
+     * Why the bundle cannot be published: fewer than two courses, a course not published, or no price; null when it can.
+     */
+    private function publishRefusal(int $id, bool $priced): ?string
+    {
+        $courses = $this->bundles->courses($id);
+        if (count($courses) < BundleRules::MINIMUM_COURSES) return 'Add at least two courses before publishing the bundle.';
+        foreach ($courses as $course) {
+            if ($course['status'] !== 'published') return (string) $course['title'] . ' is not published. A published bundle may contain published courses only.';
+        }
+        return $priced ? null : 'Set the bundle price before publishing it.';
     }
 
     /** Deletes an unused draft. A bundle anyone bought is kept for its order history; retire it instead. */
@@ -205,22 +350,32 @@ final class BundleService
      *
      * @param array<string,mixed> $bundle a bundle row with its offer
      * @param list<int> $ownedCourseIds courses the viewer already has open access to
+     * @param list<array<string,mixed>>|null $courses its courses when already read (BundleRepository::coursesOf)
      * @return array<string,mixed>
      */
-    public function present(array $bundle, array $ownedCourseIds = []): array
+    public function present(array $bundle, array $ownedCourseIds = [], ?array $courses = null): array
     {
-        $courses = $this->bundles->courses((int) $bundle['id']);
+        $courses ??= $this->bundles->courses((int) $bundle['id']);
         $currency = (string) ($bundle['currency_code'] ?? Money::platformCurrency());
         $price = $bundle['offer_id'] === null ? null : (int) $bundle['price_minor_units'];
         $owned = array_values(array_intersect(array_map(static fn(array $c): int => (int) $c['course_id'], $courses), $ownedCourseIds));
+        $comparison = self::comparison($courses, $price, $currency);
+        $save = self::saving($price, $bundle['was_price_minor_units'] ?? null, $comparison);
         return $bundle + [
             'courses' => $courses,
             'course_count' => count($courses),
             'price_label' => $price === null ? null : Money::strictMinorUnits($price, $currency)->format(),
         ] + ($price === null ? ['was_label' => null, 'saving_label' => null, 'saving_percent' => null] : WasPrice::labels($price, $bundle['was_price_minor_units'] ?? null, $currency)) + [
             'access_label' => $bundle['offer_id'] === null ? null : AccessPeriod::label((int) $bundle['access_period_seconds']),
-            'comparison' => self::comparison($courses, $price, $currency),
+            'comparison' => $comparison,
+            'save_minor' => $save,
+            'save_label' => $save === null ? null : Money::strictMinorUnits($save, $currency)->format(),
             'unavailable' => BundleRules::unavailableReason($bundle, $courses, $this->clock->now()),
+            // A published bundle whose sale starts later is shown with when (owner, 2026-11-06): the long form on its page,
+            // the short one on a card or a note.
+            'on_sale_from' => ($start = BundleRules::startsLater($bundle, $courses, $this->clock->now())) === null ? null : $start->format(DATE_ATOM),
+            'on_sale_from_label' => $start === null ? null : 'On sale from ' . BundleRules::saleDate($start),
+            'on_sale_from_short' => $start === null ? null : 'On sale from ' . BundleRules::saleDate($start, true),
             'owned_count' => count($owned),
         ];
     }
@@ -231,16 +386,107 @@ final class BundleService
      *
      * @return list<array<string,mixed>>
      */
-    public function catalogue(int $limit, int $offset): array
+    public function catalogue(int $limit, int $offset, ?CurrentUser $viewer = null): array
     {
-        return array_map(function (array $bundle): array {
-            $presented = $this->present($bundle);
-            $facts = [['label' => 'Courses', 'value' => $presented['course_count']], ['label' => 'Access', 'value' => $presented['access_label'] ?? '—'], ['label' => 'Price', 'value' => $presented['price_label'] ?? '—', 'was' => $presented['was_label']]];
-            if ($presented['unavailable'] !== null) $facts[] = ['label' => 'Availability', 'value' => 'Not available now'];
-            return ['title' => (string) $bundle['title'], 'slug' => (string) $bundle['slug'], 'href' => '/bundles/' . $bundle['slug'], 'link_label' => 'View bundle',
-                'summary' => (string) $bundle['short_description'], 'cover_svg' => (string) $bundle['cover_svg'], 'cover_media_public_id' => null,
-                'cover_initial' => mb_strtoupper(mb_substr((string) $bundle['title'], 0, 1)), 'facts' => $facts, 'saving_percent' => $presented['saving_percent']];
-        }, $this->bundles->published($limit, $offset));
+        $rows = $this->bundles->published($limit, $offset);
+        $courses = $this->bundles->coursesOf(array_map(static fn(array $row): int => (int) $row['id'], $rows));
+        return $this->markFavourites($viewer?->id, array_map(fn(array $bundle): array => self::card($this->present($bundle, [], $courses[(int) $bundle['id']] ?? [])), $rows));
+    }
+
+    /**
+     * The bundles a course's page offers under its buy button (owner, 2026-11-06, the approved mockup):
+     * each published bundle holding the course that this visitor could buy now, the larger saving
+     * first. A company account is offered none, since a bundle is never sold to one
+     * (OrderService::COMPANY_ACCOUNT), and no visitor is offered one BundleRules would not sell now
+     * (off sale, outside its dates, no price) or one an order of theirs already holds, which checkout
+     * would refuse (OrderService::validateBundle). A visitor who already has some of its courses is
+     * offered it at the same price and told how many, as the bundle's own page does. One whose sale starts later is
+     * offered too, saying when (owner, 2026-11-06), the rest as BundleRules says.
+     *
+     * @return list<array<string,mixed>> each as present() gives it, with its address ('href') and the
+     *         number of its other courses in words ('others_words')
+     */
+    public function forCourse(int $courseId, ?CurrentUser $viewer): array
+    {
+        if ($viewer !== null && $this->commerce->isCompanyAccount($viewer->id)) return [];
+        $notes = [];
+        foreach ($this->buyable($this->bundles->publishedFor(['course' => $courseId]), $viewer) as $bundle) {
+            if ($viewer !== null && $this->commerce->hasPayableBundle($viewer->id, (int) $bundle['id'])) continue;
+            $others = (int) $bundle['course_count'] - 1;
+            $notes[] = $bundle + ['href' => '/bundles/' . $bundle['slug'], 'others_words' => self::NUMBER_WORDS[$others] ?? (string) $others];
+        }
+        return $notes;
+    }
+
+    /**
+     * The catalogue's "Save with a bundle" row (owner, 2026-11-06, the approved mockup): on All courses
+     * (no category) every published bundle that can be bought now, on a category's page those holding a
+     * course in its branch, drawn with the Bundles page's cards, the larger saving first. A company
+     * account sees none. The catalogue decides where the row shows: never with a search, on a tag's
+     * page or after the first page.
+     *
+     * @return list<array<string,mixed>> course cards, as catalogue() gives them
+     */
+    public function catalogueRow(?int $categoryId, ?CurrentUser $viewer): array
+    {
+        if ($viewer !== null && $this->commerce->isCompanyAccount($viewer->id)) return [];
+        return $this->markFavourites($viewer?->id, array_map(static fn(array $bundle): array => self::card($bundle), $this->buyable($this->bundles->publishedFor($categoryId === null ? [] : ['category' => $categoryId]), null)));
+    }
+
+    /**
+     * What a bundle saves, for its "Save R..." (the approved mockup): its was price less its price when it
+     * has one, so the price struck through beside it adds up; otherwise what its courses cost more one by
+     * one at their current prices, as its page's comparison says; null when it saves nothing either way.
+     *
+     * @param array{saving_minor:?int}|null $comparison
+     */
+    public static function saving(?int $priceMinor, mixed $wasMinor, ?array $comparison): ?int
+    {
+        if ($priceMinor === null) return null;
+        if (is_numeric($wasMinor) && (int) $wasMinor > $priceMinor) return (int) $wasMinor - $priceMinor;
+        return $comparison['saving_minor'] ?? null;
+    }
+
+    /**
+     * These published bundles presented, keeping those that can be bought now or once their sale starts, the larger saving first
+     * (in the order given where two save the same). Their courses are read at once, and what the viewer
+     * already has once.
+     *
+     * @param list<array<string,mixed>> $rows bundle rows with their offer
+     * @return list<array<string,mixed>>
+     */
+    private function buyable(array $rows, ?CurrentUser $viewer): array
+    {
+        $courses = $this->bundles->coursesOf(array_map(static fn(array $row): int => (int) $row['id'], $rows));
+        $courseIds = array_values(array_unique(array_merge([], ...array_map(static fn(array $list): array => array_map(static fn(array $c): int => (int) $c['course_id'], $list), array_values($courses)))));
+        $owned = $viewer === null ? [] : $this->bundles->ownedCourseIds($viewer->id, $courseIds);
+        $presented = [];
+        foreach ($rows as $row) {
+            $bundle = $this->present($row, $owned, $courses[(int) $row['id']] ?? []);
+            if ($bundle['unavailable'] === null || $bundle['on_sale_from'] !== null) $presented[] = $bundle;
+        }
+        usort($presented, static fn(array $a, array $b): int => ($b['save_minor'] ?? 0) <=> ($a['save_minor'] ?? 0));
+        return $presented;
+    }
+
+    /**
+     * A bundle as a catalogue card: the course card with its own address, link and facts, and what it
+     * saves as a "Save R..." under its price while it can be bought (the approved mockup, 2026-11-06).
+     *
+     * @param array<string,mixed> $presented as present() gives it
+     * @return array<string,mixed>
+     */
+    private static function card(array $presented): array
+    {
+        $facts = [['label' => 'Courses', 'value' => $presented['course_count']], ['label' => 'Access', 'value' => $presented['access_label'] ?? '—'], ['label' => 'Price', 'value' => $presented['price_label'] ?? '—', 'was' => $presented['was_label']]];
+        $later = $presented['on_sale_from'] !== null;
+        if ($presented['unavailable'] !== null && !$later) $facts[] = ['label' => 'Availability', 'value' => 'Not available now'];
+        // bundle_id gives the card its star (owner, 2026-11-06), and a bundle on sale later says when, under its price.
+        return ['bundle_id' => (int) $presented['id'], 'title' => (string) $presented['title'], 'slug' => (string) $presented['slug'], 'href' => '/bundles/' . $presented['slug'], 'link_label' => 'View bundle',
+            'summary' => (string) $presented['short_description'], 'cover_svg' => (string) $presented['cover_svg'], 'cover_media_public_id' => null,
+            'cover_initial' => mb_strtoupper(mb_substr((string) $presented['title'], 0, 1)), 'facts' => $facts,
+            'saving_badge' => ($presented['unavailable'] === null || $later) && $presented['save_label'] !== null ? 'Save ' . $presented['save_label'] : null,
+            'availability_badge' => $later ? (string) $presented['on_sale_from_short'] : null];
     }
 
     /**
@@ -256,6 +502,8 @@ final class BundleService
         $courseIds = $this->courseIds((int) $bundle['id']);
         $presented = $this->present($bundle, $viewer === null ? [] : $this->bundles->ownedCourseIds($viewer->id, $courseIds));
         $presented['course_cards'] = $this->courses->cardsByIds($courseIds);
+        $presented['bundle_id'] = (int) $bundle['id'];
+        $presented['is_favourite'] = $viewer !== null && $this->bundles->favouriteIds($viewer->id, [(int) $bundle['id']]) !== [];
         return $presented;
     }
 
@@ -270,6 +518,7 @@ final class BundleService
         $time = static fn(mixed $value): string => $value === null ? '' : (new DateTimeImmutable((string) $value))->setTimezone(self::timezone())->format('Y-m-d\TH:i');
         [$value, $unit] = AccessPeriod::decompose((int) ($bundle['access_period_seconds'] ?? 31536000));
         return [
+            'code' => (string) ($bundle['code'] ?? ''), 'status' => (string) ($bundle['status'] ?? 'draft'),
             'title' => (string) ($bundle['title'] ?? ''), 'slug' => (string) ($bundle['slug'] ?? ''), 'short_description' => (string) ($bundle['short_description'] ?? ''),
             'description_html' => (string) ($bundle['description_html'] ?? ''), 'cover_svg' => (string) ($bundle['cover_svg'] ?? ''),
             'available_from' => $time($bundle['available_from'] ?? null), 'available_until' => $time($bundle['available_until'] ?? null),
@@ -317,7 +566,7 @@ final class BundleService
         $slug = $text('slug') === '' ? BundleRules::slug($title) : strtolower($text('slug'));
         if (preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/D', $slug) !== 1 || strlen($slug) > 180) throw new RuntimeException('Use lower-case letters, digits and single hyphens for the web address.');
         if ($this->bundles->slugTaken($slug, $id)) throw self::slugTaken($slug);
-        $fields = ['title' => $title, 'slug' => $slug];
+        $fields = ['code' => $this->code($text('code'), $title, $id), 'title' => $title, 'slug' => $slug];
         foreach (['short_description', 'description_html', 'cover_svg'] as $field) {
             $value = $text($field);
             if (mb_strlen($value) > self::LIMITS[$field]) throw new RuntimeException('The ' . str_replace(['_html', '_'], ['', ' '], $field) . ' is too long.');
@@ -329,6 +578,52 @@ final class BundleService
         $until = self::time($text('available_until'), 'available until');
         if ($from !== null && $until !== null && $until <= $from) throw new RuntimeException('The end of the sales period must be after its start.');
         return $fields + ['available_from' => $from?->format(DATE_ATOM), 'available_until' => $until?->format(DATE_ATOM)];
+    }
+
+    /**
+     * The bundle's code (owner, 2026-11-06: "Each bundle needs its own code, like a course code"): the one typed, tidied
+     * and checked by a course code's rule, else a suggestion from the title. A code names one thing: no course and no
+     * other bundle may have it, so a catalogue import can match a bundle by its code alone.
+     */
+    public function code(string $input, string $title, ?int $id = null): string
+    {
+        $taken = fn(string $code): bool => $this->bundles->codeTaken($code, $id) || $this->bundles->courseWithCode($code) !== null;
+        try {
+            $code = trim($input) === '' ? BundleRules::suggestCode($title, $taken) : CourseCode::validate($input);
+        } catch (\InvalidArgumentException $invalid) {
+            throw new RuntimeException(str_replace('A course code is', 'A bundle code is', $invalid->getMessage()));
+        }
+        $course = $this->bundles->courseWithCode($code);
+        if ($course !== null) throw new RuntimeException('The code ' . $code . ' is a course\'s: ' . $course['title'] . '. A code names one course or one bundle, so give the bundle a code of its own.');
+        if ($this->bundles->codeTaken($code, $id)) throw new RuntimeException('Another bundle already has the code ' . $code . '. Each bundle has a code of its own.');
+        return $code;
+    }
+
+    /**
+     * The status a form chose, or null when it sent none.
+     *
+     * @param array<string,mixed> $input
+     */
+    private static function chosenStatus(array $input): ?string
+    {
+        if (!isset($input['status'])) return null;
+        $status = is_scalar($input['status']) ? (string) $input['status'] : '';
+        if (!in_array($status, BundleRules::STATUSES, true)) throw new RuntimeException('Choose draft, published or retired.');
+        return $status;
+    }
+
+    /**
+     * What a unique key refused: the code or the web address another bundle (or a course) took meanwhile.
+     *
+     * @param array<string,mixed> $fields
+     */
+    private function taken(array $fields, ?int $id): RuntimeException
+    {
+        $code = (string) $fields['code'];
+        if ($this->bundles->codeTaken($code, $id) || $this->bundles->courseWithCode($code) !== null) {
+            return new RuntimeException('The code ' . $code . ' is taken. Each bundle has a code of its own, never a course\'s.');
+        }
+        return self::slugTaken((string) $fields['slug']);
     }
 
     private static function time(string $value, string $which): ?DateTimeImmutable

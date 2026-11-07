@@ -7,11 +7,14 @@
 ARG PHP_IMAGE=docker.io/library/php:8.5.12-fpm-bookworm
 FROM ${PHP_IMAGE}
 
+# librsvg2-bin is rsvg-convert (librsvg, LGPL-2.1-or-later), which draws each course cover's share picture, a PNG at 1200
+# by 630 (Search\SharePictures, 2026-11-06); fonts-dejavu-core gives it fonts for any words in a cover.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       git unzip ca-certificates tzdata \
       libonig-dev libpq-dev libxslt1-dev libzip-dev libicu-dev \
       libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
+      librsvg2-bin fonts-dejavu-core \
  && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
  && docker-php-ext-install -j"$(nproc)" calendar exif gd gettext intl mbstring pcntl pdo_pgsql pgsql sockets xsl zip \
  && rm -rf /var/lib/apt/lists/*

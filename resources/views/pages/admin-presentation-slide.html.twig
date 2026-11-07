@@ -10,7 +10,7 @@
 {% extends layout %}
 {% block page_body %}
 {{ importmap() }}
-	{% set base = '/admin/course-items/' ~ item.id %}
+	{% set base = course_item_url(item) %}
 	{% set is_new = after is not null %}
 	{% set slide_url = is_new ? base ~ '/slides/new' : base ~ '/slides/' ~ slide.id %}
 	{% set layout_url = is_new ? base ~ '/slides/new/layout?' ~ {after: after, layout: slide_layout.name}|url_encode : base ~ '/slides/' ~ slide.id ~ '/layout' %}

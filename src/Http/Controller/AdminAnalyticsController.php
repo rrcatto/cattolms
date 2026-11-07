@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Analytics\AnalyticsEventRepository;
+use CattoLearning\Course\CourseAddress;
 use CattoLearning\Analytics\AnalyticsEventType;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
@@ -40,6 +41,7 @@ final class AdminAnalyticsController extends BaseController
         private readonly AnalyticsEventRepository $events,
         private readonly ClockInterface $clock,
         private readonly CoursePopularityRepository $popularity,
+        private readonly \CattoLearning\Course\CourseService $courses,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -49,17 +51,19 @@ final class AdminAnalyticsController extends BaseController
     {
         $this->requirePermission('PLATFORM.REPORT.VIEW');
         $type = AnalyticsEventType::tryFrom((string) ($_GET['type'] ?? ''))?->value;
-        $course = ctype_digit((string) ($_GET['course_id'] ?? '')) && (int) $_GET['course_id'] > 0 ? (int) $_GET['course_id'] : null;
+        // The course by its code (owner, 2026-11-06: no row id in an address); a code that names no course matches nothing.
+        $code = \CattoLearning\Course\CourseCode::normalise(is_string($_GET['course'] ?? null) ? $_GET['course'] : '');
+        $course = $code === '' ? null : ($this->courses->courseIdForCode($code) ?? 0);
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $total = $this->events->recentCount($type, $course);
         $rows = array_map(static fn(array $row): array => $row + ['metadata_pairs' => self::pairs((string) $row['metadata'])], $this->events->recent($type, $course, self::PAGE_SIZE, ($page - 1) * self::PAGE_SIZE));
-        $query = array_filter(['type' => $type, 'course_id' => $course]);
+        $query = array_filter(['type' => $type, 'course' => $code]);
         return $this->render('admin-analytics-events', [
             'title' => 'Analytics events',
             'events' => $rows,
             'counts' => $this->events->countsByType($this->clock->now()->modify('-30 days')),
             'event_types' => array_map(static fn(AnalyticsEventType $case): string => $case->value, AnalyticsEventType::cases()),
-            'filter' => ['type' => $type ?? '', 'course_id' => $course === null ? '' : (string) $course],
+            'filter' => ['type' => $type ?? '', 'course' => $code],
             'total' => $total,
             'page' => $page,
             'newer_href' => $page > 1 ? '/admin/analytics/events?' . http_build_query($query + ['page' => $page - 1]) : '',
@@ -88,11 +92,11 @@ final class AdminAnalyticsController extends BaseController
         ] + PlatformAdministrationService::sortViewFor('popularity', $sort, self::POPULARITY, self::POPULARITY_COLUMNS, array_keys(self::POPULARITY_COLUMNS), $filters, $natural));
     }
 
-    #[Route('/admin/reports/popularity/{id}', name: 'admin_course_popularity_detail', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/admin/reports/popularity/{code}', name: 'admin_course_popularity_detail', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['GET'])]
     public function popularityDetail(): Response
     {
         $this->requirePermission('PLATFORM.REPORT.VIEW');
-        $course = $this->popularity->forCourse((int) $this->param('id'));
+        $course = $this->popularity->forCourse($this->courseIdFromAddress($this->courses));
         if ($course === null) { throw $this->notFound('This course has no popularity: it is not published, or popularity has not been calculated since it was.'); }
         return $this->render('admin-course-popularity-detail', ['title' => 'Popularity: ' . $course['title'], 'course' => $course, 'run' => $this->popularity->currentRun()]);
     }

@@ -12,7 +12,7 @@
 {% endblock %}
 {% endembed %}
 {% for cert in account_certificates %}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificate-' ~ cert.id})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: certificate_anchor(cert)})} %}
 	{% block surface_body %}
 		{{ ui('layout.section-head', {heading: cert.course_title, summary: 'Certificate ' ~ cert.certificate_number ~ ' · completed ' ~ cert.completed_at|date('j F Y')}) }}
 		{% if cert.revoked_at %}
@@ -37,7 +37,7 @@
 				{% endblock %}
 				{% block actions %}
 					{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: document.path, aria_label: 'Open your ' ~ document.noun ~ ' for ' ~ cert.course_title, icon: 'action-open'}) }}
-					<form action="/account/certificates/{{ cert.id }}/visibility" method="post">
+					<form action="{{ certificate_url('account', cert, '/visibility') }}" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						<input type="hidden" name="document" value="{{ document.key }}">
 						<input type="hidden" name="public" value="{{ document.public ? '0' : '1' }}">
@@ -47,7 +47,7 @@
 							{{ ui('action.button', {label: 'Make public', variant: 'primary', size: 'small', type: 'submit', aria_label: 'Make your ' ~ document.noun ~ ' for ' ~ cert.course_title ~ ' public', confirm: 'Make your ' ~ document.noun ~ ' public? Anyone who has its address will be able to see it.', icon: 'action-publish'}) }}
 						{% endif %}
 					</form>
-					<form action="/account/certificates/{{ cert.id }}/address" method="post">
+					<form action="{{ certificate_url('account', cert, '/address') }}" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						<input type="hidden" name="document" value="{{ document.key }}">
 						{{ ui('action.button', {label: 'New address', variant: 'secondary', size: 'small', type: 'submit', aria_label: 'Give your ' ~ document.noun ~ ' for ' ~ cert.course_title ~ ' a new address', confirm: 'Give your ' ~ document.noun ~ ' a new address? The old address will stop working at once.', icon: 'action-refresh'}) }}

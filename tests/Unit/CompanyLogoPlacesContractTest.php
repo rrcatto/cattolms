@@ -39,7 +39,7 @@ final class CompanyLogoPlacesContractTest extends TestCase
         self::assertStringNotContainsString('logo', strtolower($read('partials/company/billing.html.twig')), 'Billing Details holds only billing.');
         self::assertStringNotContainsString('type="file"', $read('partials/admin/company-modals.html.twig'), 'The Edit window sends the logo to the company\'s page.');
         foreach (['partials/admin/companies.html.twig', 'partials/admin/company-creators.html.twig'] as $list) {
-            self::assertStringContainsString('<a href="/admin/companies/{{ company.id }}">{{ company.name }}</a>', $read($list), $list . ': the name opens the company\'s page.');
+            self::assertStringContainsString('<a href="{{ company_url(company) }}">{{ company.name }}</a>', $read($list), $list . ': the name opens the company\'s page.');
         }
         self::assertSame('profile', (new CompanySectionRegistry())->all()[1]['key'], 'Company Profile comes straight after the Dashboard.');
     }

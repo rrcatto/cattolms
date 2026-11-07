@@ -271,24 +271,24 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $this->payments->purchase($buyer, $orderId, Uuid::v4(), 'demo_success');
         $invoice = $this->only($orderId, 'invoice');
         $receipt = $this->only($orderId, 'receipt');
-        $own = InProcessPage::run($buyer, CommerceController::class, 'document', ['id' => $orderId, 'document' => (int) $receipt['id']]);
+        $own = InProcessPage::run($buyer, CommerceController::class, 'document', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId), 'document' => (string) $receipt['number']]);
         self::assertSame(200, $own['status']);
         self::assertSame($this->documents->pdf($receipt), $own['body'], 'The download is the stored PDF.');
         try {
-            InProcessPage::run($this->buyer('Someone Else'), CommerceController::class, 'document', ['id' => $orderId, 'document' => (int) $invoice['id']]);
+            InProcessPage::run($this->buyer('Someone Else'), CommerceController::class, 'document', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId), 'document' => (string) $invoice['number']]);
             self::fail('Another person opened the invoice.');
         } catch (NotFoundHttpException $notFound) {
             // Not found, as an order that does not exist: nothing says whose it is (owner, 2026-10-23).
             self::assertSame('We could not find that order in your account.', $notFound->getMessage());
         }
         $orders = $this->staff(['PLATFORM.ORDER.VIEW']);
-        self::assertSame($this->documents->pdf($invoice), InProcessPage::run($orders, PaymentAdministrationController::class, 'document', ['id' => $orderId, 'document' => (int) $invoice['id']])['body']);
+        self::assertSame($this->documents->pdf($invoice), InProcessPage::run($orders, PaymentAdministrationController::class, 'document', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId), 'document' => (string) $invoice['number']])['body']);
         try {
-            InProcessPage::run($orders, PaymentAdministrationController::class, 'document', ['id' => $orderId, 'document' => (int) $receipt['id']]);
+            InProcessPage::run($orders, PaymentAdministrationController::class, 'document', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId), 'document' => (string) $receipt['number']]);
             self::fail('A receipt needs PLATFORM.PAYMENT.VIEW.');
         } catch (NotFoundHttpException) {
         }
-        $page = InProcessPage::run($this->staff(['PLATFORM.ORDER.VIEW', 'PLATFORM.PAYMENT.VIEW']), PaymentAdministrationController::class, 'order', ['id' => $orderId]);
+        $page = InProcessPage::run($this->staff(['PLATFORM.ORDER.VIEW', 'PLATFORM.PAYMENT.VIEW']), PaymentAdministrationController::class, 'order', ['number' => \CattoLearning\Commerce\Domain\OrderNumber::format((int) $orderId)]);
         self::assertStringContainsString('data-document-kind="invoice" data-design-version="' . $invoice['template_version_number'] . '"', $page['body'], 'The page records which design version drew each document, out of sight.');
         self::assertStringContainsString('data-document-kind="receipt" data-design-version="' . $receipt['template_version_number'] . '"', $page['body']);
 
@@ -297,6 +297,52 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $sent = array_values(array_filter($mailer->messages, static fn(array $m): bool => ($m['number'] ?? '') === $invoice['number']));
         self::assertCount(1, $sent);
         self::assertSame($this->documents->pdf($invoice), $sent[0]['pdf'], 'The emailed invoice is the same document as the download.');
+    }
+
+    /**
+     * An order and its documents open by their numbers only (owner, 2026-11-06: no row id in an address): the order's row
+     * id, a number written another way, or another order's document is not found, for the buyer and in Administration.
+     */
+    public function testAnOrderAndItsDocumentsOpenByTheirNumbersOnly(): void
+    {
+        $buyer = $this->buyer('Lindiwe Mokoena');
+        $orderId = $this->place($buyer, ['Deeds Office Practice'], null, [], 'dummy', true);
+        $this->payments->purchase($buyer, $orderId, Uuid::v4(), 'demo_success');
+        $other = $this->place($buyer, ['Bonds'], null, [], 'dummy', true);
+        $number = \CattoLearning\Commerce\Domain\OrderNumber::format($orderId);
+        $invoice = $this->only($orderId, 'invoice');
+        $otherInvoice = $this->only($other, 'invoice');
+        $admin = $this->staff(['PLATFORM.ORDER.VIEW', 'PLATFORM.PAYMENT.VIEW']);
+
+        $page = InProcessPage::run($buyer, CommerceController::class, 'order', ['number' => $number]);
+        self::assertSame(200, $page['status']);
+        self::assertStringContainsString('Order ' . $number, $page['body'], 'The page is titled with the number.');
+        self::assertStringContainsString('href="/account/orders/' . $number . '/documents/' . $invoice['number'] . '"', $page['body'], 'Its invoice opens by the invoice\'s own number.');
+        self::assertDoesNotMatchRegularExpression('#/account/orders/\d+[/"?]#', $page['body'], 'No address on the page names the order by its row id.');
+        $adminPage = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['number' => $number]);
+        self::assertStringContainsString('href="/admin/commerce/orders/' . $number . '/documents/' . $invoice['number'] . '"', $adminPage['body']);
+        self::assertDoesNotMatchRegularExpression('#/admin/commerce/orders/\d+[/"?]#', $adminPage['body']);
+
+        foreach ([(string) $orderId, 'CL-' . $orderId, 'CL-0' . substr($number, 3), strtolower($number)] as $near) {
+            foreach ([[$buyer, CommerceController::class], [$admin, PaymentAdministrationController::class]] as [$who, $controller]) {
+                try {
+                    InProcessPage::run($who, $controller, 'order', ['number' => $near]);
+                    self::fail('"' . $near . '" opened the order.');
+                } catch (NotFoundHttpException) {
+                }
+            }
+        }
+        foreach ([[$buyer, CommerceController::class], [$admin, PaymentAdministrationController::class]] as [$who, $controller]) {
+            self::assertSame($this->documents->pdf($invoice), InProcessPage::run($who, $controller, 'document', ['number' => $number, 'document' => (string) $invoice['number']])['body']);
+            foreach ([(string) $otherInvoice['number'], (string) $invoice['id']] as $wrong) {
+                try {
+                    InProcessPage::run($who, $controller, 'document', ['number' => $number, 'document' => $wrong]);
+                    self::fail('"' . $wrong . '" opened a document of this order.');
+                } catch (NotFoundHttpException $notFound) {
+                    self::assertSame('Document not found.', $notFound->getMessage(), 'Another order\'s invoice, or a document\'s row id, is not this order\'s document.');
+                }
+            }
+        }
     }
 
     public function testTheDesignPageShowsPreviewsAndSavesTheDesignForThoseAllowed(): void

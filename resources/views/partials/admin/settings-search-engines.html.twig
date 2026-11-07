@@ -1,0 +1,76 @@
+{#
+	Settings, Search engines and AI (owner, 2026-11-06, choices 2A and 3A): what AI crawlers may do, the codes that prove
+	the site is the owner's to Google Search Console and Bing Webmaster Tools with the exact steps to get them, the share
+	pictures, and the site's addresses for search engines and AI assistants. Search\SearchEnginesAdministration gives
+	it everything it shows; AdminSearchEnginesController saves it.
+#}
+{% set se = search_engines %}
+{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Search engines and AI', summary: se.summary, id: 'settings-search-engines', open: settings_open_section|default('') == 'search-engines'})} %}
+{% block body %}
+
+			<p>What search engines and AI assistants may read on this site, and the codes that prove to Google and Bing that the site is yours. robots.txt and the home page follow what is saved here at once, and every course, bundle and landing page tells them what it is.</p>
+			{% if can_manage_settings|default(false) %}
+			<form action="/admin/settings/search-engines" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {name: 'ai_crawlers', legend: 'AI crawlers', id: 'search-engines-ai-crawlers', size: 'small', selected: se.ai_crawlers, help: 'robots.txt names ' ~ se.crawler_total ~ ' AI crawlers, as their companies documented them on ' ~ se.crawlers_checked ~ ': ' ~ se.crawler_counts.training ~ ' that collect pages to train models, ' ~ se.crawler_counts.search ~ ' for AI search and answers, and ' ~ se.crawler_counts.user ~ ' that fetch a page a person asks an assistant for. Google Search and Bing are never kept out, so the site stays in their results, AI Overviews and Copilot included.', items: [
+					{value: 'all', label: 'Allow all AI crawlers', icon: lucide('bot'), note: 'Every one may read the public pages, to answer from them, cite them and train on them. The best chance of being recommended by AI.'},
+					{value: 'search', label: 'Allow AI search and answer assistants, block training-only crawlers', icon: lucide('scan-search'), note: 'ChatGPT search, Claude, Perplexity, Gemini and the others may read and cite the pages. Crawlers that only collect pages to train models are kept out.'},
+					{value: 'none', label: 'Block all AI crawlers', icon: lucide('bot-off'), note: 'Every AI crawler is asked to stay out. A few assistants still fetch a page a person asks them for, as their companies say they may.'},
+				]}) }}
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Google Search Console code', full_width: true, for: 'search-engines-google'})} %}
+{% block control %}<input class="cl-input" type="text" id="search-engines-google" name="google" value="{{ se.google }}" maxlength="400" autocomplete="off" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% block help_content %}
+					Paste the code, or the whole meta tag. The home page then carries it as google-site-verification. To get it:
+					<ol>
+						<li>Open <a href="https://search.google.com/search-console/welcome" target="_blank" rel="noopener noreferrer">search.google.com/search-console/welcome</a> and sign in with your Google account. If you use Search Console already, open the property menu at the top left and choose + Add property.</li>
+						<li>In the URL prefix box (not Domain), type {{ se.addresses.site ?: 'the site\'s address' }} and press Continue.</li>
+						<li>In Verify ownership, open HTML tag under Other verification methods and press Copy.</li>
+						<li>Paste it here and press Save search engines and AI. Then press Verify in Search Console. Keep the code here afterwards: Google checks it again from time to time.</li>
+					</ol>
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bing Webmaster Tools code', full_width: true, for: 'search-engines-bing'})} %}
+{% block control %}<input class="cl-input" type="text" id="search-engines-bing" name="bing" value="{{ se.bing }}" maxlength="400" autocomplete="off" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% block help_content %}
+					Paste the code, or the whole meta tag. The home page then carries it as msvalidate.01. Once the site is verified in Google Search Console, Bing's Import your sites from GSC needs no code at all. To get one:
+					<ol>
+						<li>Open <a href="https://www.bing.com/webmasters" target="_blank" rel="noopener noreferrer">bing.com/webmasters</a> and sign in. If you have sites there already, press Add a site.</li>
+						<li>Under Add your site manually, type {{ se.addresses.site ?: 'the site\'s address' }} in Enter your site URL and press Add.</li>
+						<li>In Verify ownership, choose HTML Meta Tag and copy the tag it shows.</li>
+						<li>Paste it here and press Save search engines and AI. Then press Verify in Bing Webmaster Tools, and keep the code here afterwards.</li>
+					</ol>
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save search engines and AI', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+			<div class="mt-12">
+			{{ ui('layout.section-head', {heading: 'Share pictures', heading_level: 3, summary: 'When a course, bundle or landing page is shared on Facebook, LinkedIn, X or WhatsApp, or listed by Google, it shows its cover. Covers are SVG, which those sites do not accept, so each gets a PNG copy at 1200 by 630, made when a cover is uploaded, a course is imported or a bundle is saved.'}) }}
+			<p>{{ se.pictures.drawable == 0 ? 'No published course or bundle has a cover yet.' : se.pictures.made ~ ' of the ' ~ se.pictures.drawable ~ ' published courses and bundles with a cover have their share picture.' }}{% if se.pictures.without_cover %} {{ se.pictures.without_cover == 1 ? '1 has no cover, so it has no share picture.' : se.pictures.without_cover ~ ' have no cover, so they have no share picture.' }}{% endif %}</p>
+			{% if not se.pictures.tool %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'This server cannot draw share pictures yet'})} %}{% block body %}It needs rsvg-convert, from librsvg. A site the Podman kit installed has it once it is updated to this release, because the kit's image includes it. On another server, install it with apt install librsvg2-bin (Debian and Ubuntu), then press Make the missing share pictures.{% endblock %}{% endembed %}
+			{% endif %}
+			{% if can_manage_settings|default(false) %}
+			<form action="/admin/settings/search-engines/share-pictures" method="post" class="cl-mt-3">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the missing share pictures', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-generate'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+			</div>
+			<div class="mt-12">
+			{{ ui('layout.section-head', {heading: 'What search engines and AI assistants read', heading_level: 3}) }}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Crawl rules', value: se.addresses.robots},
+				{label: 'Sitemap', value: se.addresses.sitemap ?: 'Only on a live site: a demo site has none.'},
+				{label: 'Summary for AI assistants', value: se.addresses.llms ?: 'Only on a live site: a demo site has none.'},
+			]}) }}
+			</div>
+
+{% endblock %}
+{% endembed %}
