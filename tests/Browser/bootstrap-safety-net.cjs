@@ -17,6 +17,8 @@
  * Uses the isolated identity from ui-stabilisation-fixture.php: create it and copy its state to the host first
  * (README). The site's active theme is never changed. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -84,12 +86,12 @@ const colours = ({scheme, ...rest}) => rest;
  * position first (owner, 2026-10-20), so every course of the first pages is tried, not only the first few. */
 async function readerRoute(page) {
     for (let number = 1; number <= 5; number++) {
-        await page.goto(`${base}/courses?page=${number}`, {waitUntil: 'networkidle'});
+        await arrive(page, `${base}/courses?page=${number}`);
         const courses = [...new Set(await page.locator('main a[href^="/courses/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href'))))]
             .filter((href) => /^\/courses\/[a-zA-Z0-9_-]+$/.test(href));
         if (courses.length === 0) break;
         for (const href of courses) {
-            await page.goto(`${base}${href}`, {waitUntil: 'networkidle'});
+            await arrive(page, `${base}${href}`);
             if (await page.locator(`a[href="${href}/preview"]`).count()) return `${href}/preview`;
         }
     }
@@ -148,7 +150,7 @@ const invalidateTokens = (page) => page.evaluate(() => {
             if (reader) pages.push(['reader', reader, `${base}${reader}`]);
             for (const [label, route, url] of pages) {
                 await check(`${name} ${label} ${route}`, async () => {
-                    const response = await light.goto(url, {waitUntil: 'networkidle'});
+                    const response = await arrive(light, url);
                     assert.equal(response.status(), 200, 'the page answers');
                     assert.equal(await light.locator('html').getAttribute('data-bs-theme'), 'light', 'the page states its colour scheme');
                     if (label === 'reader') assert.equal(await light.locator('body[data-cl-course-reader]').count(), 1, 'Core\'s reader');
@@ -163,18 +165,18 @@ const invalidateTokens = (page) => page.evaluate(() => {
                         const canvas = await light.evaluate(() => [document.documentElement, document.body].map((e) => getComputedStyle(e).backgroundColor).find((c) => !/^rgba\(.*, 0\)$|^transparent$/.test(c)) || null);
                         assert.ok(canvas, 'the canvas behind the scrollbar gutter has a colour');
                     }
-                    await dark.goto(url, {waitUntil: 'networkidle'});
+                    await arrive(dark, url);
                     same(await read(dark), served, 'a dark operating system changes nothing');
                     assert.equal(await removeBootstrap(light), 3, 'Bootstrap\'s three files were served');
                     same(colours(await read(light)), colours(served), 'without Bootstrap 6 (no cascade layers) the colours stay');
-                    await light.goto(url, {waitUntil: 'networkidle'});
+                    await arrive(light, url);
                     assert.ok(await invalidateTokens(light) > 100, 'Bootstrap\'s tokens were found');
                     same(colours(await read(light)), colours(served), 'without its tokens (no light-dark()) the colours stay');
                 }, light);
             }
             // The check must catch what it guards against: a body colour drawn only from Bootstrap 6's tokens.
             await check(`${name} mutation: a colour drawn only from a token is caught`, async () => {
-                await light.goto(`${base}/admin/system/ui-components?theme_preview=${themes[0].key}`, {waitUntil: 'networkidle'});
+                await arrive(light, `${base}/admin/system/ui-components?theme_preview=${themes[0].key}`);
                 await light.addStyleTag({content: 'body{color:var(--bs-fg-body)!important;background-color:var(--bs-bg-body)!important}'});
                 const served = await read(light);
                 await invalidateTokens(light);

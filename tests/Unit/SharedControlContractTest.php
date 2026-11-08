@@ -37,6 +37,8 @@ final class SharedControlContractTest extends TestCase
 {
     public function testThemesCannotGenerateTheirOwnDatasetControls(): void
     {
+        // Saharan Sunset, the one bundled theme since 2026-11-07, ships no script at all; any theme's script is read here.
+        self::assertDirectoryExists(dirname(__DIR__, 2) . '/themes');
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(dirname(__DIR__, 2) . '/themes'));
         foreach ($files as $file) {
             if (!$file->isFile() || $file->getExtension() !== 'js') continue;

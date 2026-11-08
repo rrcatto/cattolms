@@ -37,7 +37,10 @@ final class InProcessPage
         $identity = new ReflectionProperty(AuthService::class, 'currentUser');
         $previous = $identity->getValue($auth);
         $identity->setValue($auth, $user);
-        $request = $post === null ? Request::create('/', 'GET', $query) : Request::create('/', 'POST', $post);
+        // At the action's own address, its route's values filled in, as a browser asks for it: a refused form keeps what
+        // was typed under the address it was sent to (Http\TypedForm).
+        $path = self::path($controller, $method, $attributes);
+        $request = $post === null ? Request::create($path, 'GET', $query) : Request::create($path, 'POST', $post);
         foreach ($attributes as $key => $value) $request->attributes->set($key, $value);
         $stack = new RequestStack();
         $stack->push($request);
@@ -66,5 +69,20 @@ final class InProcessPage
             [$_POST, $_GET] = [$savedPost, $savedGet];
             $identity->setValue($auth, $previous);
         }
+    }
+
+    /**
+     * The action's address from its route, each {value} taken from $attributes; / for an action without a route.
+     *
+     * @param class-string $controller
+     * @param array<string,mixed> $attributes
+     */
+    private static function path(string $controller, string $method, array $attributes): string
+    {
+        foreach ((new \ReflectionMethod($controller, $method))->getAttributes(\Symfony\Component\Routing\Attribute\Route::class) as $route) {
+            $path = (string) $route->newInstance()->path;
+            return (string) preg_replace_callback('/\{([a-z_]+)\}/', static fn(array $name): string => rawurlencode((string) ($attributes[$name[1]] ?? $name[0])), $path);
+        }
+        return '/';
     }
 }

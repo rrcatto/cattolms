@@ -274,7 +274,8 @@ final class NavigationContractTest extends TestCase
                 self::assertStringNotContainsString('link.key != \'contact\'', $source, $theme . ' has no contact form button, so its footer keeps Contact.');
             }
         }
-        self::assertSame(2, $buttons, 'Saharan Sunset and Gilded Noir have the contact form button.');
+        // Saharan Sunset, the one bundled theme since 2026-11-07, has the contact form button.
+        self::assertGreaterThanOrEqual(1, $buttons, 'Saharan Sunset has the contact form button.');
         self::assertStringNotContainsString('filter(', (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/site-footer.html.twig'), 'The Core footer lists every footer link.');
     }
 
@@ -319,20 +320,19 @@ final class NavigationContractTest extends TestCase
         }
     }
 
-    public function testFactoryResetRendersCoreNavigationArraysInsteadOfHardCodedMenus(): void
+    public function testTheDefaultThemeRendersCoreNavigationArraysInsteadOfHardCodedMenus(): void
     {
-        $root = dirname(__DIR__, 2) . '/themes/factory-reset';
+        $root = dirname(__DIR__, 2) . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
         $base = (string) file_get_contents($root . '/base.html.twig');
         $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/navigation.html.twig');
         $footer = (string) file_get_contents($root . '/partials/footer.html.twig');
-        self::assertStringContainsString('navigation', $base);
+        self::assertStringContainsString('@platform/partials/navigation.html.twig', $base);
         self::assertStringContainsString('navigation', $nav);
 
-        // The footer is core's markup now, so the theme delegates rather than repeating it. What
-        // this asserted before - that the theme's own footer read footer_navigation - was a proxy
-        // for "the footer is not a hard-coded menu", and delegation satisfies that more strongly:
-        // there is no theme markup left to hard-code anything into.
-        self::assertStringContainsString('@platform/partials/site-footer.html.twig', $footer);
+        // The footer's destinations are core's footer_navigation, never a hard-coded menu: the default theme (Saharan
+        // Sunset) draws that array among its own art, and the core footer draws it for a theme that delegates.
+        self::assertStringContainsString('footer_navigation', $footer);
+        self::assertDoesNotMatchRegularExpression('#href="/(courses|help|faq|contact|terms|refunds|privacy)"#', $footer, 'The default theme\'s footer hard-codes a destination.');
         $coreFooter = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/site-footer.html.twig');
         self::assertStringContainsString('footer_navigation', $coreFooter);
         self::assertStringNotContainsString('href="/admin" data-nav-item="administration"', $nav);
@@ -341,7 +341,7 @@ final class NavigationContractTest extends TestCase
     /**
      * The third navigation level is a flyout, and it is reachable without a mouse.
      *
-     * A menu child may itself hold children, and Factory Reset must render that level rather than
+     * A menu child may itself hold children, and a theme must render that level rather than
      * flattening it - a theme that ignores it shows twelve Administration sections as one
      * undifferentiated list, which is the problem the grouping exists to solve.
      *

@@ -205,7 +205,9 @@ final class PaginationUiContractTest extends TestCase
 
         self::assertStringContainsString('hx-target="#{{ pg.region }}"', $markup);
         self::assertStringContainsString('hx-select="#{{ pg.results }}"', $markup);
-        self::assertStringContainsString('hx-swap="innerHTML"', $markup);
+        // innerHTML unless the list says otherwise (the catalogue morphs its two sections, owner 2026-11-07).
+        self::assertStringContainsString("{% set pg_swap = pg.swap|default('innerHTML') %}", $markup);
+        self::assertStringContainsString('hx-swap="{{ pg_swap }}"', $markup);
         self::assertStringContainsString('hx-push-url="true"', $markup, 'A reload or a back button must land on the page the reader was on.');
 
         // Progressive enhancement: the links carry a real href and the forms a real method and

@@ -52,7 +52,9 @@ final class SymfonyKernelRouteTest extends TestCase
 
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('v1', $payload['data']['api_version'] ?? null);
-        self::assertSame('1.1.0', $payload['data']['application_version'] ?? null);
+        // The release is composer.json's, so this never needs editing when the version changes.
+        $composer = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame((string) $composer['version'], $payload['data']['application_version'] ?? null);
         self::assertSame('Bearer token', $payload['data']['authentication'] ?? null);
         self::assertNotSame('', (string) ($payload['data']['name'] ?? ''));
     }

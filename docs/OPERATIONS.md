@@ -34,7 +34,7 @@ php bin/console popularity:recalculate --no-debug
 php bin/console cache:clear
 ```
 
-Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the instance web root. On a clean database the ADMIN account is made by the first sign-in with `APP_ADMIN_EMAIL` (the link arrives in Mailpit). Make your theme active and your certificate design the default again, and build test data through the pages (`tests/Browser/one-learner-scenario.cjs`): test data is made through the application's own workflows, never inserted.
+Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the instance web root. On a clean database the ADMIN account is made by the first sign-in with `APP_ADMIN_EMAIL` (the link arrives in Mailpit). A clean database starts on Saharan Sunset, the bundled theme: make another theme active again if you use one, make your certificate design the default again, and build test data through the pages (`tests/Browser/one-learner-scenario.cjs`): test data is made through the application's own workflows, never inserted.
 
 The baseline ships no categories. `resources/catalogue/catalogue.json` holds the starter categories and tags, each with its icon. After ADMIN's first sign-in, load it from Administration → System → Setup. A site's catalogue (the courses ADMIN ticks, each with its content, course code, cover, tags, position, related courses among the ticked ones and prices, and only their categories and tags) is one catalogue package: Administration → Courses → Import & Export Catalogue downloads it, and imports it on a rebuilt or new site after a review that shows each course as new, updated, unchanged or left out. Courses are matched by their course code only (`courses.code`, such as GDN-101). Keep a site's package privately. For scripts, `php bin/console catalogue:export <file.zip>` and `catalogue:import <file>` do the same without the review. A package carries the Resource Library files its courses use. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources`, or import the site's package, which brings them with their courses.
 
@@ -201,13 +201,13 @@ Owner, 2026-11-05, the approved mockup (`REPORTS/telegram-sign-in-mockup/`). Set
 
 Releases are made by the maintainer of the repository:
 
-1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.0`).
+1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with Saharan Sunset, the bundled theme, active: integration tests draw pages through the active theme, and the browser checks check the bundled theme without switching the active one. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.1`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.1.0  # the tag being released
+   V=v1.1.1  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
@@ -218,15 +218,17 @@ Publishing a release deploys no site. `install/install.sh` installs a release on
 
 ## Bundled themes
 
-The platform ships six themes as source trees under `themes/` in the code root: Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default, Radiant Learning and Saharan Sunset. They are versioned and committed with the code.
+The platform ships one theme, Saharan Sunset, as a source tree under `themes/saharan-sunset` in the code root, versioned and committed with the code, with its package in `extras/themes/`. It is the default theme: ThemeManager reads it from the code root and never copies it into the instance, it cannot be uninstalled, a fresh database's active theme is Saharan Sunset (the baseline migration), and the installer, the Podman kit and the setup wizard all start on it.
+
+The five other themes that were bundled until v1.1.0 (Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default and Radiant Learning) and their packages were taken out of the code on 2026-11-07. They remain in the Git history at v1.1.0. A theme can still be added: Administration → Themes uploads and installs a theme package (a child theme needs its exact parent installed first), and a theme tree copied back into `themes/` is installed by `composer themes:install`.
 
 ```bash
-composer themes:install            # install any that are missing, and publish every one's assets
-composer themes:install -- --force # replace installed themes at the same version - development only
+composer themes:install            # publish Saharan Sunset's assets, and install any other tree in themes/ that is missing
+composer themes:install -- --force # replace installed copies of other trees at the same version - development only
 composer themes:package            # rebuild extras/themes/*.zip from the trees
 ```
 
-`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all six. On an existing instance run `themes:install` after deploying a release: it leaves every already-installed theme exactly as it is and republishes browser assets, which is what a deployment that overlays the code root but not the public web root needs.
+`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up on Saharan Sunset with its assets published. On an existing instance run `themes:install` after deploying a release: it leaves every already-installed theme exactly as it is and republishes browser assets, which is what a deployment that overlays the code root but not the public web root needs.
 
 **`--force` is not an upgrade path.** An installed theme is an immutable release; replacing one at the same version produces two builds wearing one version number. On a server whose themes are accepted releases, use a new version instead.
 
@@ -245,7 +247,7 @@ CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `publ
 
 - **Source.** A separate Composer project outside the code tree requires `twbs/bootstrap` 6.0.0-alpha.1 (commit `780627306eb517ca210310a24e10f8186003c127`). The files are copied unchanged from its `vendor/twbs/bootstrap/dist/css/` and `LICENSE`. The application's `composer.json` does not require Bootstrap.
 - **Loading.** `ThemeRenderer` loads the reboot first, because it declares the cascade layer order, then the grid, the utilities and `catto-platform.css`, on every page. No other Bootstrap file and no Bootstrap JavaScript is loaded (`BootstrapSixContractTest`). Each file names its MIT licence in a banner. Each also names a source map, which is not shipped; a browser asks for one only with its developer tools open.
-- **Updating.** Change the version in that project's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in every theme before and after, as Part C did, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
+- **Updating.** Change the version in that project's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in the bundled theme before and after, as Part C did, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
 - **The 5.3.8 files.** A web root that served 5.3.8 still holds `css/bootstrap.min.css` and `js/bootstrap.bundle.min.js`. Nothing loads them under 6.0. Keep them while a 5.3.8 tree may still be served from that web root, and delete them once a release with 6.0 is deployed there.
 
 ## Static validators
@@ -372,7 +374,7 @@ At minimum review:
 /privacy
 ```
 
-The browser checks in `tests/Browser/` cover most of these in every bundled theme; see its README.
+The browser checks in `tests/Browser/` cover most of these in the bundled theme; see its README.
 
 Also validate the accepted external theme at desktop and mobile widths.
 
@@ -490,7 +492,7 @@ Only people with a valid South African ID number register (owner, 2026-10-27; `A
 
 ## Theme re-sync diagnostics
 
-Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` should reconcile filesystem releases with the rebuildable registry. A skipped filesystem theme should have an actionable diagnostic rather than being silently suppressed.
+An installed theme's source under `/home/<site-user>/themes/` is authoritative (the bundled Saharan Sunset is read from the code root). `themes:sync` should reconcile filesystem releases with the rebuildable registry. A skipped filesystem theme should have an actionable diagnostic rather than being silently suppressed.
 
 ## Seed Database
 

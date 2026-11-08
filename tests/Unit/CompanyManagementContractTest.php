@@ -151,7 +151,9 @@ final class CompanyManagementContractTest extends TestCase
                 $attribute . ' must be on the search input, not on the surrounding form.'
             );
         }
-        self::assertStringContainsString('hx-include="closest form"', $input, 'The rest of the form must travel with the search.');
+        // The rest of the form travels with the search, and any part of the page a list names besides (the catalogue's
+        // bundles' page, owner 2026-11-07).
+        self::assertStringContainsString('hx-include="closest form{% if ds_include|default(\'\') %}, {{ ds_include }}{% endif %}"', $input, 'The rest of the form must travel with the search.');
     }
 
     /** Manage hands one company to the Company workspace, as a POST. */

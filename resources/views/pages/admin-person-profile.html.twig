@@ -196,11 +196,13 @@
 					{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: person_url(target_reference), ds_push_url: true, ds_help: 'Searches every course in the catalogue by title.'} %}
 					<div id="grant_courses-region"><div id="grant_courses-results">
 					{% if grant_course_search|length >= 2 %}
+						{# A refused grant comes back to the same courses, the one chosen and the days typed (2026-11-07). #}
+						{% set typed = typed_for(person_url(target_reference, '/courses/grant')) %}
 						<form action="{{ person_url(target_reference, '/courses/grant') }}" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
+							<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="grant_courses_q" value="{{ grant_course_search }}">
 							{% if grant_courses %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}">{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="30" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}"{{ (grant_course.id ~ '') == typed.course_id|default('') ? ' selected' : '' }}>{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="{{ typed.access_days|default('30') }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 								{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}{% endembed %}
 							{% else %}<p>No courses match this search.</p>{% endif %}
 						</form>

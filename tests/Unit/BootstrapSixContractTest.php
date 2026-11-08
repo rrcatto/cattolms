@@ -184,7 +184,7 @@ final class BootstrapSixContractTest extends TestCase
             if (preg_match('/<html\b[^>]*>/', (string) file_get_contents($file), $html) === 1) self::assertStringContainsString('data-bs-theme=', $html[0], $file . ' writes the colour scheme on <html>.');
         }
         $validator = new ThemePackageValidator();
-        $manifest = json_decode((string) file_get_contents(self::root() . '/themes/factory-reset/theme.json'), true, 512, JSON_THROW_ON_ERROR);
+        $manifest = json_decode((string) file_get_contents(self::root() . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         $manifest['theme']['color_scheme'] = 'auto';
         $this->expectException(RuntimeException::class);
         $validator->validateManifest($manifest);

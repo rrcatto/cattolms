@@ -11,6 +11,9 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/11/07 SAST (one theme)
+- A fresh database's active theme is Saharan Sunset 1.0.7 (saharan-sunset-v1.0.7), the one theme the code now bundles
+  and its default (owner, 2026-11-07: the other themes "on ice until further notice").
 2026/11/07 SAST (no row ids in addresses, stage 2)
 - course_structure_nodes.part_name: each part's name in the reader's and the public preview's addresses, unique within
   its course (owner, 2026-11-06: "yes, do it that way"); course_item_slug() and the unique index on it, which replaces
@@ -803,7 +806,7 @@ CREATE TABLE app_options (
     updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO app_options (option_key, option_value) VALUES
-    ('active_theme', 'factory-reset-v2.0.3'),
+    ('active_theme', 'saharan-sunset-v1.0.7'),
     ('acl_revision', '1');
 
 CREATE TABLE theme_registry (

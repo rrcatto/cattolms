@@ -634,7 +634,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
             self::assertLessThanOrEqual(24, $second->query('//article[contains(@class,"cl-course-card")]')->length);
         }
         // The catalogue opens on every course, a page at a time, not a featured few (owner, 2026-10-19). The bundles above
-        // them are cards too (owner, 2026-11-06), in their own row and not among the 24.
+        // them have cards of their own (owner, 2026-11-07), in their own section and not among the 24.
         $root = $this->page('/courses');
         self::assertSame(24, $root->query('//article[contains(@class,"cl-course-card") and not(ancestor::*[@id="catalogue-bundles"])]')->length);
         self::assertSame(2, $root->query('//nav[@data-pagination="catalogue"]')->length);

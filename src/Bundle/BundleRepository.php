@@ -30,6 +30,16 @@ final class BundleRepository
         return $this->db->fetchAssociative(self::WITH_OFFER . ' WHERE b.slug = :slug', ['slug' => $slug]) ?: null;
     }
 
+    /**
+     * A bundle's own drawing, for its card and its page (owner, 2026-11-07, the approved mockup): null for a draft, an
+     * unknown address or a bundle without one. A retired bundle's stays, as its page does.
+     */
+    public function publicCover(string $slug): ?string
+    {
+        $cover = $this->db->fetchOne("SELECT cover_svg FROM bundles WHERE slug = :slug AND status IN ('published', 'retired') AND cover_svg LIKE '<svg%'", ['slug' => $slug]);
+        return is_string($cover) ? $cover : null;
+    }
+
     public function slugTaken(string $slug, ?int $exceptId = null): bool
     {
         return (bool) $this->db->fetchOne('SELECT 1 FROM bundles WHERE slug = :slug AND id IS DISTINCT FROM :id', ['slug' => $slug, 'id' => $exceptId]);
@@ -347,6 +357,26 @@ final class BundleRepository
             $params['category'] = $holding['category'];
         }
         return $this->db->fetchAllAssociative(self::WITH_OFFER . ' WHERE ' . $where . ' ORDER BY b.published_at DESC NULLS LAST, b.title, b.id', $params);
+    }
+
+    /**
+     * Which of these courses have a cover anyone may see, each with a version of it for its address: a published course's
+     * drawn cover, served at /courses/{slug}/cover.svg (a bundle's card shows its courses' covers, the approved mockup of
+     * 2026-11-07). A course without one is left out.
+     *
+     * @param list<int> $courseIds
+     * @return array<int,string> course id => version
+     */
+    public function coverVersions(array $courseIds): array
+    {
+        if ($courseIds === []) return [];
+        $versions = [];
+        foreach ($this->db->fetchAllAssociative(
+            "SELECT id, substr(md5(cover_svg), 1, 12) AS version FROM courses
+              WHERE id = ANY(CAST(:ids AS BIGINT[])) AND status = 'published' AND cover_svg LIKE '<svg%'",
+            ['ids' => '{' . implode(',', array_map('intval', $courseIds)) . '}']
+        ) as $row) $versions[(int) $row['id']] = (string) $row['version'];
+        return $versions;
     }
 
     /**

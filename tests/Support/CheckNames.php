@@ -15,7 +15,18 @@ surname (Lerato Dlamini), courses a real course title (Payroll Basics); none car
 name is checked against the database and never one already in use, so two checks, or a check and the owner's own test
 data, never clash. The checks remove everything they make when they finish (CheckScrub).
 
+A name a fixture hands its check to make later (a course title the check types into Create course) is not in the database
+until the check makes it, so it is held: every check's fixtures, side by side in the release gate's lanes, skip a name
+another holds. A name asked for with $later is held until the fixture's clean-up releases it (release(), with the keys
+held() lists), or for twenty minutes should no clean-up come. A name made at once is not held: its row is written a moment
+later, and holding it as well left a run that makes many courses one after another (the Integration suite) without a
+title to choose. The holds are a file in the PHP container's temporary folder, changed under a lock.
+
 Changelog:
+2026/11/07 SAST
+- Names held for a check that makes them later (2026-11-07: a release gate's category-picker typed the course title
+  Reading Financial Statements that its fixture had chosen a minute before, which the reader-preview fixture in another
+  lane had chosen and made in the meantime, so Create course was refused).
 2026/10/27 SAST
 - Created.
 */
@@ -67,20 +78,58 @@ final class CheckNames
     public const PROMOTIONS = ['SAVE10', 'WELCOME15', 'SPRING20', 'WINTER10', 'LEARN15', 'TEAM10', 'OFFICE20', 'BUNDLE10', 'FIRSTCOURSE', 'STUDY15',
         'GROWTH10', 'SKILLS20'];
 
+    /** The file of held names, in the PHP container's temporary folder: a key and the time its hold ends. */
+    private const HELD = 'catto-check-names-held.json';
+
+    /** How long a name a check makes later is held, should its fixture never clean up: longer than any check runs. */
+    private const HELD_FOR_LATER = 1200;
+
+    /** @var list<string> the keys this instance held for later, for the fixture's state and its clean-up */
+    private array $heldForLater = [];
+
+    /** Another file of held names, for a test of the holds that must not touch the checks' own. */
+    private static ?string $heldFile = null;
+
     public function __construct(private readonly Database $db)
     {
     }
 
-    /** @return array{first:string,last:string} a person's name nobody on the site has */
-    public function person(): array
+    /** Keeps the held names in another file (a test of the holds), or back in the checks' own with null. */
+    public static function keepHeldIn(?string $path): void
     {
-        foreach (self::shuffled(self::FIRST) as $first) {
-            foreach (self::shuffled(self::LAST) as $last) {
-                if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE first_name = :f AND last_name = :l', ['f' => $first, 'l' => $last]) === 0) return ['first' => $first, 'last' => $last];
-            }
-        }
+        self::$heldFile = $path;
+    }
 
-        throw new RuntimeException('Every check name for a person is in use.');
+    /** @return list<string> the keys of the names this instance holds for its check, to save in the fixture's state for release() */
+    public function held(): array
+    {
+        return $this->heldForLater;
+    }
+
+    /**
+     * Lets every check have these names again: a fixture's clean-up releases what it held for its check.
+     *
+     * @param list<string> $keys
+     */
+    public static function release(array $keys): void
+    {
+        if ($keys === []) return;
+        self::holding(static fn(callable $held): array => [null, []], 0, $keys);
+    }
+
+    /** @return array{first:string,last:string} a person's name nobody on the site has and no check holds */
+    public function person(bool $later = false): array
+    {
+        return $this->hold(function (callable $held): array {
+            foreach (self::shuffled(self::FIRST) as $first) {
+                foreach (self::shuffled(self::LAST) as $last) {
+                    if ($held('person:' . $first . '|' . $last)) continue;
+                    if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE first_name = :f AND last_name = :l', ['f' => $first, 'l' => $last]) === 0) return [['first' => $first, 'last' => $last], ['person:' . $first . '|' . $last]];
+                }
+            }
+
+            throw new RuntimeException('Every check name for a person is in use.');
+        }, $later);
     }
 
     /**
@@ -88,49 +137,62 @@ final class CheckNames
      *
      * @return list<array{first:string,last:string}>
      */
-    public function people(int $count): array
+    public function people(int $count, bool $later = false): array
     {
-        $out = [];
-        $taken = [];
-        foreach (self::shuffled(self::FIRST) as $first) {
-            foreach (self::shuffled(self::LAST) as $last) {
-                // A first name or surname once each, so no two of them look alike either.
-                if (isset($taken[$first]) || isset($taken[$last])) continue;
-                if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE first_name = :f AND last_name = :l', ['f' => $first, 'l' => $last]) > 0) continue;
-                $out[] = ['first' => $first, 'last' => $last];
-                $taken[$first] = $taken[$last] = true;
-                if (count($out) === $count) return $out;
-                break;
+        return $this->hold(function (callable $held) use ($count): array {
+            $out = [];
+            $taken = [];
+            foreach (self::shuffled(self::FIRST) as $first) {
+                foreach (self::shuffled(self::LAST) as $last) {
+                    // A first name or surname once each, so no two of them look alike either.
+                    if (isset($taken[$first]) || isset($taken[$last]) || $held('person:' . $first . '|' . $last)) continue;
+                    if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE first_name = :f AND last_name = :l', ['f' => $first, 'l' => $last]) > 0) continue;
+                    $out[] = ['first' => $first, 'last' => $last];
+                    $taken[$first] = $taken[$last] = true;
+                    if (count($out) === $count) return [$out, array_map(static fn(array $name): string => 'person:' . $name['first'] . '|' . $name['last'], $out)];
+                    break;
+                }
             }
-        }
 
-        throw new RuntimeException('Not enough unused check names for people.');
+            throw new RuntimeException('Not enough unused check names for people.');
+        }, $later);
     }
 
-    /** @return array{name:string,domain:string} a company name and its domain that no company has */
-    public function company(): array
+    /** @return array{name:string,domain:string} a company name and its domain that no company has and no check holds */
+    public function company(bool $later = false): array
     {
-        foreach (self::shuffled(self::PLACE) as $place) {
-            foreach (self::shuffled(self::TRADE) as $trade) {
-                $name = $place . ' ' . $trade;
-                $domain = strtolower((string) preg_replace('/[^a-z]+/i', '', $name)) . '.test';
-                if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM companies WHERE lower(name) = lower(:n) OR domain = :d', ['n' => $name, 'd' => $domain]) === 0) return ['name' => $name, 'domain' => $domain];
+        return $this->hold(function (callable $held): array {
+            foreach (self::shuffled(self::PLACE) as $place) {
+                foreach (self::shuffled(self::TRADE) as $trade) {
+                    $name = $place . ' ' . $trade;
+                    $domain = strtolower((string) preg_replace('/[^a-z]+/i', '', $name)) . '.test';
+                    if ($held('company:' . strtolower($name))) continue;
+                    if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM companies WHERE lower(name) = lower(:n) OR domain = :d', ['n' => $name, 'd' => $domain]) === 0) return [['name' => $name, 'domain' => $domain], ['company:' . strtolower($name)]];
+                }
             }
-        }
 
-        throw new RuntimeException('Every check name for a company is in use.');
+            throw new RuntimeException('Every check name for a company is in use.');
+        }, $later);
     }
 
-    /** @return array{title:string,slug:string,code:string} a course title, address and code that no course has */
-    public function course(): array
+    /**
+     * A course title, address and code that no course has and no check holds; with $later, held for the check that
+     * makes the course itself through the pages.
+     *
+     * @return array{title:string,slug:string,code:string}
+     */
+    public function course(bool $later = false): array
     {
-        foreach (self::shuffled(self::COURSES) as $title) {
-            $slug = trim((string) preg_replace('/[^a-z]+/', '-', strtolower($title)), '-');
-            $code = self::code($title);
-            if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM courses WHERE lower(title) = lower(:t) OR slug = :s OR code = :c', ['t' => $title, 's' => $slug, 'c' => $code]) === 0) return ['title' => $title, 'slug' => $slug, 'code' => $code];
-        }
+        return $this->hold(function (callable $held): array {
+            foreach (self::shuffled(self::COURSES) as $title) {
+                if ($held('course:' . strtolower($title))) continue;
+                $slug = trim((string) preg_replace('/[^a-z]+/', '-', strtolower($title)), '-');
+                $code = self::code($title);
+                if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM courses WHERE lower(title) = lower(:t) OR slug = :s OR code = :c', ['t' => $title, 's' => $slug, 'c' => $code]) === 0) return [['title' => $title, 'slug' => $slug, 'code' => $code], ['course:' . strtolower($title)]];
+            }
 
-        throw new RuntimeException('Every check title for a course is in use.');
+            throw new RuntimeException('Every check title for a course is in use.');
+        }, $later);
     }
 
     /**
@@ -139,28 +201,35 @@ final class CheckNames
      * @param list<string> $keys
      * @return array<string,string>
      */
-    public function categories(array $keys): array
+    public function categories(array $keys, bool $later = false): array
     {
-        $free = array_values(array_filter(self::shuffled(self::CATEGORIES), fn(string $name): bool => (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_categories WHERE lower(name) = lower(:n)', ['n' => $name]) === 0));
-        if (count($free) < count($keys)) throw new RuntimeException('Not enough unused check category names.');
+        return $this->hold(function (callable $held) use ($keys): array {
+            $free = array_values(array_filter(self::shuffled(self::CATEGORIES), fn(string $name): bool => !$held('category:' . strtolower($name)) && (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_categories WHERE lower(name) = lower(:n)', ['n' => $name]) === 0));
+            if (count($free) < count($keys)) throw new RuntimeException('Not enough unused check category names.');
+            $chosen = array_slice($free, 0, count($keys));
 
-        return array_combine($keys, array_slice($free, 0, count($keys))) ?: [];
+            return [array_combine($keys, $chosen) ?: [], array_map(static fn(string $name): string => 'category:' . strtolower($name), $chosen)];
+        }, $later);
     }
 
-    /** A bundle title no bundle has. */
-    public function bundle(): string
+    /** A bundle title no bundle has and no check holds; with $later, held for the check that makes the bundle itself. */
+    public function bundle(bool $later = false): string
     {
-        foreach (self::shuffled(self::BUNDLES) as $title) if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM bundles WHERE lower(title) = lower(:t)', ['t' => $title]) === 0) return $title;
+        return $this->hold(function (callable $held): array {
+            foreach (self::shuffled(self::BUNDLES) as $title) if (!$held('bundle:' . strtolower($title)) && (int) $this->db->fetchOne('SELECT COUNT(*) FROM bundles WHERE lower(title) = lower(:t)', ['t' => $title]) === 0) return [$title, ['bundle:' . strtolower($title)]];
 
-        throw new RuntimeException('Every check title for a bundle is in use.');
+            throw new RuntimeException('Every check title for a bundle is in use.');
+        }, $later);
     }
 
-    /** A promo code no promotion has, as a shop would write one. */
-    public function promotion(): string
+    /** A promo code no promotion has and no check holds, as a shop would write one. */
+    public function promotion(bool $later = false): string
     {
-        foreach (self::shuffled(self::PROMOTIONS) as $code) if ((int) $this->db->fetchOne('SELECT COUNT(*) FROM promotions WHERE upper(code) = :c', ['c' => $code]) === 0) return $code;
+        return $this->hold(function (callable $held): array {
+            foreach (self::shuffled(self::PROMOTIONS) as $code) if (!$held('promotion:' . $code) && (int) $this->db->fetchOne('SELECT COUNT(*) FROM promotions WHERE upper(code) = :c', ['c' => $code]) === 0) return [$code, ['promotion:' . $code]];
 
-        throw new RuntimeException('Every check promo code is in use.');
+            throw new RuntimeException('Every check promo code is in use.');
+        }, $later);
     }
 
     /**
@@ -168,12 +237,65 @@ final class CheckNames
      *
      * @return list<string>
      */
-    public function promotions(int $count): array
+    public function promotions(int $count, bool $later = false): array
     {
-        $free = array_values(array_filter(self::shuffled(self::PROMOTIONS), fn(string $code): bool => (int) $this->db->fetchOne('SELECT COUNT(*) FROM promotions WHERE upper(code) = :c', ['c' => $code]) === 0));
-        if (count($free) < $count) throw new RuntimeException('Not enough unused check promo codes.');
+        return $this->hold(function (callable $held) use ($count): array {
+            $free = array_values(array_filter(self::shuffled(self::PROMOTIONS), fn(string $code): bool => !$held('promotion:' . $code) && (int) $this->db->fetchOne('SELECT COUNT(*) FROM promotions WHERE upper(code) = :c', ['c' => $code]) === 0));
+            if (count($free) < $count) throw new RuntimeException('Not enough unused check promo codes.');
+            $chosen = array_slice($free, 0, $count);
 
-        return array_slice($free, 0, $count);
+            return [$chosen, array_map(static fn(string $code): string => 'promotion:' . $code, $chosen)];
+        }, $later);
+    }
+
+    /**
+     * Chooses under the lock with what other checks hold, and holds what was chosen for later until release().
+     *
+     * @template T
+     * @param callable(callable(string):bool):array{0:T,1:list<string>} $choose
+     * @return T
+     */
+    private function hold(callable $choose, bool $later): mixed
+    {
+        [$chosen, $keys] = self::holding($choose, $later ? self::HELD_FOR_LATER : 0);
+        if ($later) $this->heldForLater = [...$this->heldForLater, ...$keys];
+
+        return $chosen;
+    }
+
+    /**
+     * One look at the held names under an exclusive lock: expired holds go, $released go, $choose sees the rest, and
+     * what it returns is held for $seconds when there are any; the file is written only when something changed.
+     *
+     * @template T
+     * @param callable(callable(string):bool):array{0:T,1:list<string>} $choose
+     * @param list<string> $released
+     * @return array{0:T,1:list<string>}
+     */
+    private static function holding(callable $choose, int $seconds, array $released = []): array
+    {
+        $handle = fopen(self::$heldFile ?? sys_get_temp_dir() . '/' . self::HELD, 'c+');
+        if ($handle === false) throw new RuntimeException('The held check names cannot be opened.');
+        try {
+            flock($handle, LOCK_EX);
+            $now = time();
+            $saved = json_decode((string) stream_get_contents($handle), true);
+            $saved = is_array($saved) ? $saved : [];
+            $held = array_filter($saved, static fn(mixed $until, int|string $key): bool => is_int($until) && $until > $now && !in_array((string) $key, $released, true), ARRAY_FILTER_USE_BOTH);
+            [$chosen, $keys] = $choose(static fn(string $key): bool => isset($held[$key]));
+            if ($seconds > 0) foreach ($keys as $key) $held[$key] = $now + $seconds;
+            if ($held !== $saved) {
+                ftruncate($handle, 0);
+                rewind($handle);
+                fwrite($handle, (string) json_encode($held));
+                fflush($handle);
+            }
+
+            return [$chosen, $keys];
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     /** "Payroll Basics" becomes PB-101; a course code is letters, a hyphen and a number by the site's own rule. */

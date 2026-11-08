@@ -8,6 +8,8 @@
  * Run against the development instance with the section pages fixture (an ADMIN session):
  *   section-pages-fixture.php create, its state copied to /tmp/catto-section-pages-state.json, then cleanup. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -36,7 +38,7 @@ async function open(browser, javaScriptEnabled = true) {
     await ctx.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
     const page = await ctx.newPage();
     page.on('pageerror', (error) => failures.push(`page error: ${error.message}`));
-    await page.goto(PAGE, {waitUntil: 'networkidle'});
+    await arrive(page, PAGE);
     return {ctx, page};
 }
 const ticked = (page) => page.locator(`${BOX}:checked`).count();
@@ -119,7 +121,8 @@ const packaged = (file) => JSON.parse(execFileSync('python3', ['-I', '-c', "impo
         await browser.close();
     }
 
-    await scenario('without JavaScript each tick button reloads the page with the boxes ticked', 'no JavaScript', async () => {
+    // Once, in Chromium: when each browser runs as its own process (CATTO_BROWSERS), only the Chromium one does this.
+    if ((process.env.CATTO_BROWSERS || 'chromium,firefox').split(',').includes('chromium')) await scenario('without JavaScript each tick button reloads the page with the boxes ticked', 'no JavaScript', async () => {
         const browser = await playwright.chromium.launch();
         const {page} = await open(browser, false);
         for (const n of [0, 1]) await page.locator(BOX).nth(n).check();

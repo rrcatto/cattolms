@@ -25,6 +25,7 @@ const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-no-row-ids';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-no-row-ids-state.json'));
 const LIMIT = Number(process.env.CATTO_NO_ROW_IDS_LIMIT || 700);
+const {PAGES, open, within} = require('./pace.cjs');
 // Not pages: signing out, downloads, exports, files; and nothing that changes anything is followed (links only).
 const SKIP = /^\/(logout|auth\/|webhooks\/|api\/|mcp)|\/(download|export|delete|remove|reset|revoke|cancel|course-file|course-package|preview\.pdf)(\/|$)|\.(pdf|xlsx|csv|xml|txt|json|svg|png|gif|jpe?g|webp|zip|mp3|m4a|ogg|webm)$|^\/sitemap|^\/robots|^\/m\//;
 const COUNTS = /^(page|.+_page|.+_page_size|page_size|v|insert_index|reviews_stars|month|after|sample_category)$/;
@@ -132,11 +133,18 @@ function normal(href) {
 }
 
 async function crawl(browser, who, cookie, starts, signedIn, met) {
-    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}});
-    if (cookie) await context.addCookies([{name: 'catto_learning_session', value: cookie, url: base, secure: true}]);
-    const page = await context.newPage();
+    // Several pages at once (CATTO_PAGES), each in a browser context of its own, taking addresses from one queue.
+    const contexts = [];
+    const pageFor = async (worker) => {
+        if (!contexts[worker]) {
+            const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}});
+            if (cookie) await context.addCookies([{name: 'catto_learning_session', value: cookie, url: base, secure: true}]);
+            contexts[worker] = {context, page: await context.newPage()};
+        }
+        return contexts[worker].page;
+    };
     const queue = [...starts], seen = new Set(queue), perPattern = new Map(), failures = [], from = new Map(), visited = [];
-    let pages = 0;
+    let pages = 0, busy = 0;
     const judge = (address, where, landed) => {
         const ids = rowIds(address);
         if (!ids.length) return;
@@ -146,18 +154,16 @@ async function crawl(browser, who, cookie, starts, signedIn, met) {
         if (allowed) { met.add(allowed.why); return; }
         failures.push(`${who}: ${address} (${ids.join(', ')}) in ${where} on ${landed}`);
     };
-    while (queue.length && pages < LIMIT) {
-        const address = queue.shift();
+    const visit = async (address, page) => {
         const key = pattern(address);
-        if ((perPattern.get(key) || 0) >= 2) continue;
+        if ((perPattern.get(key) || 0) >= 2) return;
         perPattern.set(key, (perPattern.get(key) || 0) + 1);
         let response;
-        try { response = await page.goto(base + address, {waitUntil: 'domcontentloaded', timeout: 30000}); } catch (error) { continue; }
-        if (!response || !(response.headers()['content-type'] || '').includes('text/html')) continue;
+        // Read once it has loaded and settled: a live page refreshes itself only every 15 or 30 seconds, never on load.
+        try { response = await open(page, base + address, {timeout: 90000}); } catch (error) { return; }
+        if (!response || !(response.headers()['content-type'] || '').includes('text/html')) return;
         pages++;
         visited.push(address);
-        // Any htmx swap the page makes on its own (a live refresh) has settled before the page is read.
-        await page.waitForLoadState('networkidle', {timeout: 5000}).catch(() => {});
         const landed = new URL(page.url()).pathname + new URL(page.url()).search + new URL(page.url()).hash;
         judge(page.url(), 'the address bar', landed);
         for (const {address: found, where} of await page.evaluate(gather)) {
@@ -169,8 +175,32 @@ async function crawl(browser, who, cookie, starts, signedIn, met) {
             from.set(next, landed);
             queue.push(next);
         }
-    }
-    await context.close();
+    };
+    // A stuck page is closed and its worker carries on with a new one.
+    const fresh = async (number, stuck) => {
+        await stuck.close().catch(() => {});
+        const page = await contexts[number].context.newPage();
+        contexts[number].page = page;
+        return page;
+    };
+    const worker = async (number) => {
+        let page = await pageFor(number);
+        for (;;) {
+            if (pages >= LIMIT) return;
+            const address = queue.shift();
+            if (address === undefined) {
+                if (busy === 0) return;
+                await new Promise((done) => setTimeout(done, 50));
+                continue;
+            }
+            busy++;
+            try { await within(120000, 'took more than two minutes', () => visit(address, page)); }
+            catch (error) { failures.push(`${who}: ${address} could not be read: ${error.message.split('\n')[0]}`); page = await fresh(number, page); }
+            finally { busy--; }
+        }
+    };
+    await Promise.all(Array.from({length: PAGES}, (_, number) => worker(number)));
+    for (const {context} of contexts.filter(Boolean)) await context.close();
     return {pages, failures, visited};
 }
 
@@ -178,10 +208,13 @@ async function crawl(browser, who, cookie, starts, signedIn, met) {
     fs.mkdirSync(output, {recursive: true});
     const browser = await chromium.launch();
     const met = new Set();
-    const visitor = await crawl(browser, 'visitor', null, ['/', `/courses/${state.course.slug}`, `/courses/${state.course.slug}/preview`, '/courses', '/courses/tags', '/bundles', '/presentation', '/help', '/faq', '/contact', '/terms', '/refunds', '/privacy', '/login', '/register'], false, met);
-    const learner = await crawl(browser, 'learner', state.learner.token, ['/account', '/account/courses', `/learn/${state.course.slug}`, '/account/orders', '/account/certificates', '/account/favourites', '/account/subscriptions', '/courses'], true, met);
-    const companyAdmin = await crawl(browser, 'company administrator', state.company_admin.token, ['/company', '/company/people', '/company/orders', '/company/credits', '/company/enrolments', '/company/requests', '/company/favourites', '/company/profile', '/account', '/account/orders'], true, met);
-    const admin = await crawl(browser, 'admin', state.admin.token, ['/admin/courses', '/admin', '/admin/people', '/admin/companies', '/admin/commerce/orders', '/admin/commerce/ledger', '/admin/commerce/unmatched', '/admin/wallets', '/admin/bundles', '/admin/promotions', '/admin/courses/categories', '/admin/courses/tags', '/admin/certificates', '/admin/messages', '/admin/course-items', '/admin/reports/popularity', '/admin/course-reviews', '/admin/courses/page-layouts', '/admin/courses/catalogue', '/admin/activity', '/admin/analytics/events', '/admin/course/credits', '/admin/course/enrolments', '/admin/course/requests', '/admin/site-analytics', '/mailing', '/mailing/subscribers', '/company', '/company/favourites', '/company/credits', '/account'], true, met);
+    // The four readers at once.
+    const [visitor, learner, companyAdmin, admin] = await Promise.all([
+        crawl(browser, 'visitor', null, ['/', `/courses/${state.course.slug}`, `/courses/${state.course.slug}/preview`, '/courses', '/courses/tags', '/bundles', '/presentation', '/help', '/faq', '/contact', '/terms', '/refunds', '/privacy', '/login', '/register'], false, met),
+        crawl(browser, 'learner', state.learner.token, ['/account', '/account/courses', `/learn/${state.course.slug}`, '/account/orders', '/account/certificates', '/account/favourites', '/account/subscriptions', '/courses'], true, met),
+        crawl(browser, 'company administrator', state.company_admin.token, ['/company', '/company/people', '/company/orders', '/company/credits', '/company/enrolments', '/company/requests', '/company/favourites', '/company/profile', '/account', '/account/orders'], true, met),
+        crawl(browser, 'admin', state.admin.token, ['/admin/courses', '/admin', '/admin/people', '/admin/companies', '/admin/commerce/orders', '/admin/commerce/ledger', '/admin/commerce/unmatched', '/admin/wallets', '/admin/bundles', '/admin/promotions', '/admin/courses/categories', '/admin/courses/tags', '/admin/certificates', '/admin/messages', '/admin/course-items', '/admin/reports/popularity', '/admin/course-reviews', '/admin/courses/page-layouts', '/admin/courses/catalogue', '/admin/activity', '/admin/analytics/events', '/admin/course/credits', '/admin/course/enrolments', '/admin/course/requests', '/admin/site-analytics', '/mailing', '/mailing/subscribers', '/company', '/company/favourites', '/company/credits', '/account'], true, met),
+    ]);
     await browser.close();
     const unmet = ALLOWED.filter((entry) => !met.has(entry.why)).map((entry) => `allowed but never met, take it off ALLOWED: ${entry.why}`);
     const runs = {visitor, learner, company_administrator: companyAdmin, admin};

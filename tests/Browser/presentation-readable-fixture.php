@@ -16,6 +16,10 @@ checked for what an author can choose as well as for what has been written. It l
 removes everything it made (CheckScrub), even after a `create` that stopped part way; the site's own courses are only read.
 
 Changelog:
+2026/11/07 SAST
+- Each presentation carries `content`, the hash of what its reader is given to draw (its slides without their ids, the
+  titles, the bar's line and the course's styling), and its count of slides, so the check measures only what changed;
+  `content` prints those hashes as they are now, which the check reads when it starts.
 2026/11/02 SAST
 - Created.
 */
@@ -40,6 +44,16 @@ $db = $container->get(Database::class);
 $statePath = $argv[2] ?? '/tmp/catto-presentation-readable-state.json';
 $action = $argv[1] ?? '';
 $fixture = new DevelopmentFixture($db);
+// What the reader is given to draw: the slides, their words and their narration's words (never its recording, which is
+// stored apart), the titles and the line in the player's bar, and the course's own styling. A slide's id is made afresh
+// with the fixture's own course, and changes nothing on the screen, so it is left out. The check adds the hashes of the
+// code and stylesheets that draw it (presentation-readable.cjs).
+$drawn = static function (array $row): array {
+    $config = json_decode((string) $row['config'], true, 512, JSON_THROW_ON_ERROR);
+    foreach ((array) ($config['slides'] ?? []) as $at => $slide) { unset($config['slides'][$at]['id']); }
+    return ['content' => hash('sha256', json_encode([$config, (string) $row['title'], (string) ($row['display_title_override'] ?? ''), (string) ($row['description_html'] ?? ''), (string) ($row['display_description_override'] ?? ''), (string) ($row['presentation_css'] ?? '')], JSON_THROW_ON_ERROR)),
+        'slides' => count((array) ($config['slides'] ?? []))];
+};
 
 if ($action === 'create') {
     if (is_file($statePath)) { throw new RuntimeException('Clean up the previous presentation fixture first.'); }
@@ -75,7 +89,8 @@ if ($action === 'create') {
     }
 
     $decks = $db->fetchAllAssociative(
-        "SELECT c.id AS course_id, c.code, c.title AS course, c.slug, n.id AS node, n.part_name AS part, ci.id AS item, ci.title, ci.type_config->>'kind' AS kind, ci.type_config->>'theme' AS look
+        "SELECT c.id AS course_id, c.code, c.title AS course, c.slug, n.id AS node, n.part_name AS part, ci.id AS item, ci.title, ci.type_config->>'kind' AS kind, ci.type_config->>'theme' AS look,
+                ci.type_config::text AS config, ci.description_html, p.display_title_override, p.display_description_override, c.presentation_css
            FROM course_items ci JOIN course_item_placements p ON p.course_item_id = ci.id JOIN course_structure_nodes n ON n.id = p.node_id JOIN courses c ON c.id = n.course_id
           WHERE ci.item_type = 'slide_deck' ORDER BY c.code NULLS LAST, c.id, n.id"
     );
@@ -87,7 +102,8 @@ if ($action === 'create') {
     // The presentation that introduces the site belongs to no course.
     $site = $container->get(\CattoLearning\Course\CourseItemRepository::class)->sitePresentation();
     if ($site !== null) {
-        $decks[] = ['course_id' => 0, 'code' => '', 'course' => 'the site', 'slug' => '', 'node' => 0, 'part' => '', 'item' => $site['id'], 'title' => $site['title'], 'kind' => 'site', 'look' => $site['type_config']['theme'] ?? 'light'];
+        $decks[] = ['course_id' => 0, 'code' => '', 'course' => 'the site', 'slug' => '', 'node' => 0, 'part' => '', 'item' => $site['id'], 'title' => $site['title'], 'kind' => 'site', 'look' => $site['type_config']['theme'] ?? 'light',
+            'config' => (string) $db->fetchOne('SELECT type_config::text FROM course_items WHERE id = :id', ['id' => (int) $site['id']]), 'description_html' => (string) $db->fetchOne('SELECT description_html FROM course_items WHERE id = :id', ['id' => (int) $site['id']]), 'display_title_override' => null, 'display_description_override' => null, 'presentation_css' => ''];
     }
     foreach ($decks as &$deck) {
         // A trailer is for visitors: someone who has the course never sees it in their outline.
@@ -95,6 +111,8 @@ if ($action === 'create') {
             ? \CattoLearning\Support\Address\CoursePartAddress::preview((string) $deck['slug'], (string) $deck['part'])
             : \CattoLearning\Support\Address\CoursePartAddress::reader((string) $deck['slug'], (string) $deck['part']) . '?preview=1');
         $deck['own'] = (int) $deck['course_id'] === (int) $own['id'];
+        $deck = $drawn($deck) + $deck;
+        unset($deck['config'], $deck['description_html'], $deck['display_title_override'], $deck['display_description_override'], $deck['presentation_css']);
         // A draft course, the check's own or one not yet published, has no public preview: ADMIN's preview plays its trailer.
         $draft = $deck['own'] || ($deck['kind'] === 'trailer' && $db->fetchOne('SELECT status FROM courses WHERE id = :id', ['id' => (int) $deck['course_id']]) === 'draft');
         if ($draft && $deck['kind'] === 'trailer') { $deck['url'] .= '?preview=1'; }
@@ -107,12 +125,27 @@ if ($action === 'create') {
     file_put_contents($statePath, json_encode(['token' => $token, 'decks' => $decks, 'themes' => $themes, 'scrub' => $fixture->seeds()], JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo count($decks), " presentations listed.\n";
+} elseif ($action === 'content') {
+    // Each listed presentation's hash as it is now, by item and placement, for the check to read when it starts: a slide
+    // changed after `create` is then measured again.
+    $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
+    $now = [];
+    foreach ($state['decks'] as $deck) {
+        $row = $db->fetchAssociative(
+            "SELECT ci.title, ci.type_config::text AS config, ci.description_html, p.display_title_override, p.display_description_override, c.presentation_css
+               FROM course_items ci LEFT JOIN course_item_placements p ON p.course_item_id = ci.id AND p.node_id = :node LEFT JOIN courses c ON c.id = :course
+              WHERE ci.id = :item",
+            ['item' => (int) $deck['item'], 'node' => (int) $deck['node'], 'course' => (int) $deck['course_id']]
+        );
+        $now[$deck['item'] . ':' . $deck['node']] = $row === false ? null : $drawn($row)['content'];
+    }
+    echo json_encode($now, JSON_THROW_ON_ERROR), "\n";
 } elseif ($action === 'cleanup') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     (new CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Cleaned up.\n";
 } else {
-    fwrite(STDERR, "Usage: php tests/Browser/presentation-readable-fixture.php create|cleanup [state.json]\n");
+    fwrite(STDERR, "Usage: php tests/Browser/presentation-readable-fixture.php create|content|cleanup [state.json]\n");
     exit(1);
 }

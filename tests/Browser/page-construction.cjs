@@ -26,7 +26,8 @@ const inspect = () => {
   }
   const h1 = main.querySelector('.cl-page-head h1');
   // A page head with a picture holds its title inside the picture: the picture's edge is the one the cards line up with.
-  const picture = main.querySelector('.cl-page-head .cl-picture-head');
+  // A bundle's page holds its title in the bundle colour under its drawing (owner, 2026-11-07): that box's edge, likewise.
+  const picture = main.querySelector('.cl-page-head .cl-picture-head, .cl-page-head .cl-bundle-head');
   // A head that opens with a logo (ph_media, the company page) starts at the logo, not at its title.
   const media = main.querySelector('.cl-page-head .cl-page-head-media');
   // The first box in document order: a card, or the accordion that holds a section on an "All sections" page.

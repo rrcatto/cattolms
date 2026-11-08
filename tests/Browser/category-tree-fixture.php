@@ -20,6 +20,9 @@ test category in front of a shipped one, and closing the gaps puts the shipped o
 
 Changelog:
 2026/11/07 SAST
+- The category names and the three course titles the checks make themselves are held from every other check until
+  cleanup (CheckNames): in a release gate the picker's no-JavaScript course title had been taken by another lane's
+  fixture in the minute between this fixture choosing it and the check typing it.
 - The state holds each category's slug, which names it in its addresses and anchors; cleanup puts back when each
   shipped category last changed, which moving a test category among them touches.
 2026/10/07 SAST
@@ -99,10 +102,19 @@ if ($command === 'create') {
         $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Category tree browser', $email);
         $tokens[] = $token;
     }
-    $words = (new \CattoLearning\Tests\Support\CheckNames($db))->categories([...array_keys(NAMES), 'cancelled', 'new_top', 'new_sub', 'new_subsub', 'imported', 'root', 'sub', 'leaf', 'renamed', 'nojs_sub', 'nojs_root']);
-    $titles = new \CattoLearning\Tests\Support\CheckNames($db);
+    // The checks make most of these themselves, minutes later: each is held from every other check until cleanup.
+    // A create that fails lets them go again, so the next one is not left without names.
+    $names = new \CattoLearning\Tests\Support\CheckNames($db);
+    try {
+        $words = $names->categories([...array_keys(NAMES), 'cancelled', 'new_top', 'new_sub', 'new_subsub', 'imported', 'root', 'sub', 'leaf', 'renamed', 'nojs_sub', 'nojs_root'], true);
+        $extra = array_diff_key($words, NAMES) + ['picker_course' => $names->course(true)['title'], 'picker_nojs' => $names->course(true)['title'], 'import' => $names->course(true)];
+    } catch (\Throwable $failed) {
+        \CattoLearning\Tests\Support\CheckNames::release($names->held());
+        throw $failed;
+    }
     $state = ['user' => $user, 'email' => $email, 'tokens' => $tokens, 'scrub' => $fixture->seeds(),
-        'extra' => array_diff_key($words, NAMES) + ['picker_course' => $titles->course()['title'], 'picker_nojs' => $titles->course()['title'], 'import' => $titles->course()],
+        'extra' => $extra,
+        'held' => $names->held(),
         'max_category_id' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM course_categories'),
         // Moving a test category among the shipped ones touches their rows: cleanup puts back when each last changed.
         'shipped_updated' => array_column($db->fetchAllAssociative('SELECT id, updated_at::text AS updated_at FROM course_categories ORDER BY id'), 'updated_at', 'id'),
@@ -125,6 +137,7 @@ if ($command === 'create') {
         $db->executeStatement('UPDATE course_categories SET updated_at = CAST(:at AS timestamptz) WHERE id = :id AND updated_at <> CAST(:at AS timestamptz)', ['id' => (int) $id, 'at' => (string) $updated]);
     }
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub'] ?? ['users' => [(int) $state['user']]]);
+    \CattoLearning\Tests\Support\CheckNames::release((array) ($state['held'] ?? []));
     unlink($statePath);
     echo "Removed the category tree fixture and every category the run made.\n";
 } else {

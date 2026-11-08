@@ -1,23 +1,19 @@
-/* Real HTTP checks for all bundled themes, both authentication states and three viewport widths.
-   Theme selection is temporarily changed for anonymous requests and restored even on failure. */
+/* Real HTTP checks in the theme the site is drawn in (Saharan Sunset, the one bundled theme since 2026-11-07), both
+   authentication states and three viewport widths. Nothing is activated: the active theme is the owner's. */
 const {chromium}=require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs=require('node:fs'), path=require('node:path'), assert=require('node:assert/strict');
-const {execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../..');
 const base=process.env.CATTO_BASE_URL || 'https://catto.test';
 const output=process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-canonical-page';
 const state=JSON.parse(fs.readFileSync('/tmp/catto-ui-stabilisation-state.json'));
-const themes=fs.readdirSync(path.join(root,'themes')).map(slug=>JSON.parse(fs.readFileSync(path.join(root,'themes',slug,'theme.json'))).theme);
-const themeState=(...args)=>execFileSync('podman',['exec','-u','cattotest','env_php_1','php','/home/cattotest/code/current/tests/Browser/canonical-page-theme.php',...args],{stdio:'pipe'});
+const {siteTheme}=require('./site-theme.cjs');
+const themes=[siteTheme()];
 fs.mkdirSync(output,{recursive:true});
 const results=[], failures=[];
 (async()=>{
  const browser=await chromium.launch({headless:true});
- let begun=false;
  try {
-  themeState('begin');begun=true;
   for(const theme of themes){
-   themeState('select',`${theme.slug}-v${theme.version}`);
    for(const authenticated of [false,true]){
     const context=await browser.newContext({ignoreHTTPSErrors:true});
     if(authenticated)await context.addCookies([{name:'catto_learning_session',value:state.token,url:base,secure:true}]);
@@ -38,10 +34,9 @@ const results=[], failures=[];
        return {mains:document.querySelectorAll('main').length,frame:main?.parentElement.classList.contains('cl-page-frame'),siblings:main?.nextElementSibling===footer,context:!!document.querySelector('section.cl-page-context>div.cl-page-context-inner'),head:!!document.querySelector('section.cl-page-head>.cl-page-head-inner>.cl-page-head-content, section.cl-page-head.cl-page-head--picture>.cl-page-head-inner>.cl-picture-head>.cl-page-head-content.cl-picture-head-text'),nav:!!nav,overflow:document.documentElement.scrollWidth-innerWidth,geometry:document.body.dataset.clNavigation,main:rect(main),footer:rect(footer),gnIdentity:!!document.querySelector('header .cl-identity-compact'),gnArt:!!document.querySelector('.cl-footer .gn-footer-art'),gnSections:document.querySelectorAll('.cl-footer .cl-footer-section').length};
       });
       assert.equal(structure.mains,1);assert.ok(structure.frame && structure.siblings && structure.context && structure.head && structure.nav,'Canonical landmarks');
-      assert.equal(structure.geometry,theme.slug.startsWith('factory-reset')?'sidebar':'top');
+      assert.equal(structure.geometry,'top');
       assert.ok(structure.overflow<=2,`Document overflow ${structure.overflow}`);
       if(width<=820)assert.ok(structure.main.y<650,`No empty navigation grid row: main y=${structure.main.y}`);
-      if(theme.slug==='gilded-noir'){assert.equal(structure.gnIdentity,authenticated);assert.ok(structure.gnArt);assert.equal(structure.gnSections,3);}
       const paletteHide=page.locator('.cl-palette-hide');
       if(await paletteHide.isVisible())await paletteHide.click();
       await page.screenshot({path:path.join(output,label+'.png'),fullPage:true});
@@ -88,7 +83,6 @@ const results=[], failures=[];
    }
   }
  }finally{
-  if(begun)themeState('restore');
   await browser.close();
   fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({results,failures},null,2));
  }

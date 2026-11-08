@@ -96,7 +96,8 @@ function assertUi(measured,theme,route,width) {
             }
         }
         // Mutation checks prove these tests detect the original defects in the real cascade.
-        const light=themes.find(t=>t.slug==='light-default');
+        // In the theme the site is drawn in (Saharan Sunset, the one bundled theme since 2026-11-07; Light Default before).
+        const light=themes.find(t=>t.slug===require('./site-theme.cjs').siteTheme().slug);
         await page.setViewportSize({width:1440,height:1000});
         await page.goto(`${base}/admin/system/ui-components?theme_preview=${light.key}`);
         let mutation=await page.addStyleTag({content:'.cl-main .cl-ui-section-head::before{position:static}'});

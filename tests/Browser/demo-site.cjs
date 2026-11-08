@@ -7,7 +7,8 @@
  * starts with [DEMO] and says it comes from a demo site (Mailpit). ADMIN switches the site to live at
  * Administration > Settings > Site mode, where ADMIN also words the notice and can go back to the standard words: the notice, the robots rule and the simulated card are gone,
  * and the earlier order still says it was a simulation; Reset returns to APP_SITE_MODE. In Firefox the
- * notice and the checkout statement show as well. In every bundled theme at 1440, 820 and 390px the
+ * notice and the checkout statement show as well. In the site's own theme (Saharan Sunset, the one bundled theme since
+ * 2026-11-07; nothing is activated) at 1440, 820 and 390px the
  * notice shows on the home page, the catalogue, a course and the order, with one h1 and no sideways
  * scrolling.
  *
@@ -16,6 +17,8 @@
  * X-Robots-Tag: noindex to every response by itself; the live check therefore looks for the absence of
  * the demo site's own "noindex, nofollow". Orders and their documents are immutable and stay behind. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -30,8 +33,8 @@ fs.mkdirSync(output, {recursive: true});
 
 const php = (...args) => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `SHELL_VERBOSITY=-1 php tests/Browser/demo-site-fixture.php ${args[0]} ${statePath} ${args.slice(1).join(' ')} 2>/dev/null`], {encoding: 'utf8'}).trim().split('\n').pop();
 const state = () => JSON.parse(execFileSync('podman', ['exec', container, 'cat', statePath], {encoding: 'utf8'}));
-const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
-    .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme).map((t) => `${t.slug}-v${t.version}`);
+const {siteTheme, themeKey} = require('./site-theme.cjs');
+const themes = [themeKey(siteTheme())];
 const widths = (process.env.CATTO_WIDTHS || '1440,820,390').split(',').map(Number);
 // The words ADMIN's Settings give, read when the run starts (owner, 2026-11-03: the notice is ADMIN's to word).
 let NOTICE = '';
@@ -244,16 +247,14 @@ async function toReview(page, fixture, course, method) {
             await admin.ctx.close();
         });
 
-        /* The notice in every theme at every width. Learners cannot preview a theme, so each theme is
-         * activated in turn and the active theme is restored afterwards. */
+        /* The notice at every width, in the site's own theme: learners cannot preview a theme, and no check switches it. */
         const pages = ['/', '/courses', `/courses/${fixture.courses.a.slug}`, `/account/orders/${order}`];
         for (const key of themes) {
-            php('theme', key);
             for (const width of widths) {
                 const {ctx, page} = await open(chromium, fixture.learner.token, {width});
                 for (const route of pages) {
                     await check(`${key} ${width} ${route}`, async () => {
-                        const response = await page.goto(`${base}${route}`, {waitUntil: 'networkidle'});
+                        const response = await arrive(page, `${base}${route}`);
                         assert.equal(response.status(), 200);
                         assert.equal(await notice(page), `${HEADING} ${NOTICE}`, 'the notice');
                         const facts = await page.evaluate((k) => ({
@@ -271,7 +272,7 @@ async function toReview(page, fixture, course, method) {
             }
         }
     } finally {
-        php('restore');
+        // Nothing to put back: since 2026-11-07 no theme is activated.
     }
 
     await chromium.close();

@@ -45,13 +45,15 @@
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'add-lockout'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Add a lockout'}) }}
+		{# A refused lockout comes back as it was typed and chosen (2026-11-07). #}
+		{% set typed = typed_for('/admin/site-analytics/lockouts') %}
 		<form action="/admin/site-analytics/lockouts" method="post" hx-morph-skip>
 			<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="/admin/site-analytics/lockouts">
 			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What to lock out', for: 'add-target', required: true, help: 'An address, a range such as 198.51.100.0/24, or a network owner\'s number such as AS64500.'})} %}{% block control %}<input id="add-target" name="target" required maxlength="60" placeholder="198.51.100.23" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How long', for: 'add-length'})} %}{% block control %}<select id="add-length" name="length" {{ ui_field_attrs(props) }}>{% for value, label in lengths %}<option value="{{ value }}"{{ value == '30d' ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'add-why', required: true})} %}{% block control %}<input id="add-why" name="why" required maxlength="500" placeholder="What it was doing" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-				{% if firewall_offered %}<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'The server\'s firewall', legend_hidden: true, size: 'small', selected: [], items: [
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What to lock out', for: 'add-target', required: true, help: 'An address, a range such as 198.51.100.0/24, or a network owner\'s number such as AS64500.'})} %}{% block control %}<input id="add-target" name="target" value="{{ typed.target|default('') }}" required maxlength="60" placeholder="198.51.100.23" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How long', for: 'add-length'})} %}{% block control %}<select id="add-length" name="length" {{ ui_field_attrs(props) }}>{% for value, label in lengths %}<option value="{{ value }}"{{ value == typed.length|default('30d') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'add-why', required: true})} %}{% block control %}<input id="add-why" name="why" value="{{ typed.why|default('') }}" required maxlength="500" placeholder="What it was doing" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% if firewall_offered %}<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'The server\'s firewall', legend_hidden: true, size: 'small', selected: typed.firewall is defined ? ['firewall'] : [], items: [
 	{value: 'firewall', label: 'Also ban it at the server\'s firewall', icon: lucide('shield'), note: 'It then cannot reach any website on this server. For an address or a range. A firewall knows nothing of network owners. Leave it unticked and only this site refuses it.'},
 ]}) }}</div>{% endif %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Lock out', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-lock-out'}) }}{% endblock %}{% endembed %}
@@ -88,10 +90,11 @@
 			{% block header %}<tr><th>Address or domain</th><th>Why</th><th class="text-end">Refused</th><th><span class="visually-hidden">Remove</span></th></tr>{% endblock %}
 			{% block body %}{% for row in emails %}<tr data-refused-email="{{ row.id }}"><td class="cell-text">{{ row.value }}</td><td class="cell-text">{{ row.why }}</td><td class="text-end">{{ row.refused|number_format }}</td><td class="cell-actions">{% if can_manage %}<form action="/admin/site-analytics/refused-emails/{{ row.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove', aria_label: 'Stop refusing ' ~ row.value}) }}</form>{% endif %}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'None yet.'}) }}{% endif %}
+			{% set typed = typed_for('/admin/site-analytics/refused-emails') %}
 			{% if can_manage %}<form action="/admin/site-analytics/refused-emails" method="post" hx-morph-skip><input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address or domain', for: 'refuse-value', required: true})} %}{% block control %}<input id="refuse-value" name="value" required maxlength="254" placeholder="someone@example.com or example.com" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'refuse-why'})} %}{% block control %}<input id="refuse-why" name="why" maxlength="500" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address or domain', for: 'refuse-value', required: true})} %}{% block control %}<input id="refuse-value" name="value" value="{{ typed.value|default('') }}" required maxlength="254" placeholder="someone@example.com or example.com" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'refuse-why'})} %}{% block control %}<input id="refuse-why" name="why" value="{{ typed.why|default('') }}" maxlength="500" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
 				{% endblock %}{% endembed %}
 			</form>{% endif %}

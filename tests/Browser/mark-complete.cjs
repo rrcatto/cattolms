@@ -15,6 +15,8 @@
    - nothing scrolls sideways and no script errors.
    Fixture: php tests/Browser/course-parts-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-parts-state.json'));
@@ -29,7 +31,7 @@ async function session(browser, options = {}) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/courses/${state.course_code}/preview`);
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();

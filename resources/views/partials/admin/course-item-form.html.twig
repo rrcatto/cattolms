@@ -58,10 +58,14 @@
 {% endif %}
 {% if item.item_type == 'flashcards' %}{% include '@platform/partials/admin/flashcards-editor.html.twig' %}{% endif %}
 {% if item.item_type in ['assessment','diagnostic'] %}
-{{ ui('layout.section-head', {heading: 'Assessment settings', heading_level: 3, summary: 'Assessment and diagnostic Course Items share the same reusable lifecycle.'}) }}
+{# A readiness check asks every question it holds (AssessmentService::drawQuestions), so the numbers drawn are not shown for one, as a setting another type does not use is not; their stored values go back unchanged. #}
+{{ ui('layout.section-head', {heading: 'Assessment settings', heading_level: 3, summary: item.item_type == 'diagnostic' ? 'A readiness check asks every question it holds, so it has no number of questions drawn.' : 'Assessment and diagnostic Course Items share the same reusable lifecycle.'}) }}
+{% if item.item_type == 'diagnostic' %}<input type="hidden" name="graded_question_count" value="{{ item.graded_question_count }}"><input type="hidden" name="practice_question_count" value="{{ item.practice_question_count }}">{% endif %}
 {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: item.item_type == 'diagnostic' ? 'Pass mark (%)' : 'Pass mark (%) · diagnostics only', for: 'pass-mark', help: item.item_type == 'diagnostic' ? 'Scores at or above this mark show Ready; below it show Review.' : 'Graded and final assessments are graded by the course grading scale on the Grades tab. Here this mark only chooses the pass or fail message in the public preview.'})} %}{% block control %}<input class="cl-input" type="number" min="0" max="100" step="0.01" id="pass-mark" name="pass_mark" value="{{ item.pass_mark }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if item.item_type != 'diagnostic' %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Graded questions drawn', for: 'graded-count'})} %}{% block control %}<input class="cl-input" type="number" min="1" id="graded-count" name="graded_question_count" value="{{ item.graded_question_count }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum attempts', for: 'maximum-attempts'})} %}{% block control %}<input class="cl-input" type="number" min="1" id="maximum-attempts" name="maximum_attempts" value="{{ item.maximum_attempts }}" placeholder="Unlimited" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time limit (seconds)', for: 'time-limit'})} %}{% block control %}<input class="cl-input" type="number" min="60" id="time-limit" name="time_limit_seconds" value="{{ item.time_limit_seconds }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Score policy', for: 'score-policy'})} %}{% block control %}<select class="cl-select" id="score-policy" name="score_policy" {{ ui_field_attrs(props) }}>{% for policy in ['highest','average','latest'] %}<option value="{{ policy }}" {{ item.score_policy == policy ? 'selected' : '' }}>{{ policy|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
@@ -78,7 +82,9 @@
 	{value: 'randomise_options', label: 'Randomise options', icon: lucide('list-restart'), note: 'Each question shuffles its options. Untick it to keep your order.'},
 	{value: 'negative_marking', label: 'Use configured negative points', icon: lucide('circle-minus'), note: 'A wrong answer loses the points set on its question. Untick it and it loses none.'},
 ]}) }}
-{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Practice or diagnostic questions drawn',for:'practice-count'})} %}{% block control %}<input class="cl-input" type="number" min="1" id="practice-count" name="practice_question_count" value="{{ item.practice_question_count }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% if item.item_type != 'diagnostic' %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Practice questions drawn',for:'practice-count'})} %}{% block control %}<input class="cl-input" type="number" min="1" id="practice-count" name="practice_question_count" value="{{ item.practice_question_count }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
 {% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Practice question pool',for:'practice-pool'})} %}{% block control %}<select class="cl-select" id="practice-pool" name="practice_pool_mode" {{ ui_field_attrs(props) }}>{% for pool in ['separate','graded','both'] %}<option value="{{ pool }}" {{ item.practice_pool_mode == pool ? 'selected' : '' }}>{{ pool|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 {% include '@platform/partials/question-editor.html.twig' with {diagnostic: item.item_type == 'diagnostic'} %}{{ ui('action.button', {label: 'Add question', variant: 'secondary', type: 'submit', skip_validation: true, name: 'question_action', value: 'add-question', id: 'add-question', icon: 'action-add'}) }}
 {% endif %}

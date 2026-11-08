@@ -12,6 +12,8 @@ Handles web requests for admin course operations, enforcing access rules and coo
 
 Changelog:
 2026/11/07 SAST
+- A refused New course comes back as it was typed, its category chosen (keepTyped, typedCourse()).
+- A refused price option or Test access grant comes back as it was typed and ticked (keepTyped).
 - Import (an HTML course file or a course JSON) follows the catalogue's canonical rules (CataloguePackage::
   reviewCourseFile and importCourseFile): the file's code names the course it updates, with no course picked by hand;
   the review lists each difference with Use the file's and Keep this site's, and an out-of-date review is refused.
@@ -109,10 +111,12 @@ final class AdminCourseController extends BaseController
     public function createForm(): Response
     {
         $user = $this->requirePermission('COURSE.CREATE');
+        // A refused course comes back as it was typed, its category chosen (2026-11-07: it came back empty, at Uncategorised).
+        $course = self::typedCourse($this->blankCourse(), $this->typed('/admin/courses'));
         return $this->render('admin-course-form', [
             'title' => 'Create course',
-            'course' => $this->blankCourse(),
-            'category_picker' => $this->courses->courseCategoryPicker(null),
+            'course' => $course,
+            'category_picker' => $this->courses->courseCategoryPicker((int) $course['category_id'] > 0 ? (int) $course['category_id'] : null),
             'category_places' => $this->courses->categoryLocationPicker(),
             'form_action' => '/admin/courses',
             'form_heading' => 'Create a new course',
@@ -130,7 +134,25 @@ final class AdminCourseController extends BaseController
             $courseId = $this->courses->createBlank($_POST, $user->id);
             $this->flash('success', 'The course was created.');
             $this->redirect($this->courseUrl($courseId));
-        }, '/admin/courses/new');
+        }, '/admin/courses/new', keepTyped: true);
+    }
+
+    /**
+     * The blank course with what a refused New course form sent in its place: each field as it was typed, the study time
+     * in hours as the form shows it.
+     *
+     * @param array<string,mixed> $course
+     * @param array<string,mixed> $typed
+     * @return array<string,mixed>
+     */
+    private static function typedCourse(array $course, array $typed): array
+    {
+        foreach (['title', 'code', 'slug', 'subtitle', 'level', 'access_days', 'summary', 'introduction_html', 'description_html'] as $field) {
+            if (is_string($typed[$field] ?? null)) $course[$field] = $typed[$field];
+        }
+        if (is_string($typed['category_id'] ?? null) && ctype_digit($typed['category_id'])) $course['category_id'] = (int) $typed['category_id'];
+        if (is_string($typed['study_hours'] ?? null)) $course['study_hours'] = $typed['study_hours'];
+        return $course;
     }
 
 
@@ -460,7 +482,7 @@ final class AdminCourseController extends BaseController
             $this->courses->createPriceVariant($courseId, $_POST, $user->id);
             $this->flash('success', 'The course price option was added.');
             $this->redirect($this->tabUrl($courseId, 'pricing'));
-        }, $this->tabUrl($courseId, 'pricing'));
+        }, $this->tabUrl($courseId, 'pricing'), keepTyped: true);
     }
 
 
@@ -783,7 +805,7 @@ final class AdminCourseController extends BaseController
             );
             $this->flash('success', 'Course access granted to ' . $result['count'] . ' people until ' . $result['expires_at'] . '.');
             $this->redirect($this->tabUrl($courseId, 'test-access'));
-        }, $this->tabUrl($courseId, 'test-access'));
+        }, $this->tabUrl($courseId, 'test-access'), keepTyped: true);
     }
 
 

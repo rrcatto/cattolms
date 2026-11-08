@@ -12,6 +12,7 @@ site protection settings. Only Platform Administrators see it (PLATFORM.SITEANAL
 
 Changelog:
 2026/11/07 SAST
+- A refused lockout or refused address comes back as it was typed (keepTyped).
 - People are linked by their account references (owner, 2026-11-06: no row id in an address).
 2026/11/04 SAST
 - Created.
@@ -369,7 +370,7 @@ final class SiteAnalyticsController extends BaseController
             $this->locking->lockOut($target, (string) ($_POST['length'] ?? ''), (string) ($_POST['why'] ?? ''), !empty($_POST['firewall']), $user->id);
             $this->flash('success', $target['label'] . ' is locked out. From now on it sees a plain page saying the site is not available, and nothing more.');
             $this->redirect(self::back((string) ($_POST['return'] ?? '')));
-        }, $back);
+        }, $back, keepTyped: true);
     }
 
     #[Route('/admin/site-analytics/lockouts/{id}/lift', name: 'admin_site_lift', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -399,7 +400,7 @@ final class SiteAnalyticsController extends BaseController
             $this->audit->record($user->id, 'site.email_refused', ['value' => $value]);
             $this->flash('success', $value . ' is refused from now on.');
             $this->redirect(self::BASE . '/lockouts#emails');
-        }, self::BASE . '/lockouts#emails');
+        }, self::BASE . '/lockouts#emails', keepTyped: true);
     }
 
     #[Route('/admin/site-analytics/refused-emails/{id}/remove', name: 'admin_site_refused_email_remove', requirements: ['id' => '\d+'], methods: ['POST'])]

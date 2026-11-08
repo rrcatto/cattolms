@@ -157,7 +157,9 @@
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'companyAddPersonModal', title: 'Add person', action: '/company/people', method: 'post'})} %}
+	{# A refused person comes back as typed and chosen, the window open (2026-11-07). #}
+	{% set typed = typed_for('/company/people') %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'companyAddPersonModal', title: 'Add person', action: '/company/people', method: 'post', open: typed is not empty})} %}
 {% block modal_body %}
 
 		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -166,28 +168,28 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+						<input name="first_name" value="{{ typed.first_name|default('') }}" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+						<input name="last_name" value="{{ typed.last_name|default('') }}" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'At ' ~ company_context_domain|default('') ~ ', as every staff address is.'})} %}
 {% block control %}
 
-						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+						<input type="email" name="email" value="{{ typed.email|default('') }}" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role in the company', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">Course editor</option><option value="COURSE_OWNER">Course owner</option><option value="COMPANY_ADMIN">Company Administrator</option></select>
+						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{% for value, label in {STUDENT: 'Student', COURSE_EDITOR: 'Course editor', COURSE_OWNER: 'Course owner', COMPANY_ADMIN: 'Company Administrator'} %}<option value="{{ value }}"{{ value == typed.role|default('STUDENT') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
 
 {% endblock %}
 {% endembed %}

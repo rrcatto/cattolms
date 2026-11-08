@@ -25,6 +25,8 @@ Changelog:
 - view() also gives the study time in minutes, for the course's structured data (search engines and AI).
 2026/11/07 SAST
 - The trailer's link opens its part in the free preview by its part name, never its row id (CoursePartAddress).
+- factsOf(): the facts from counts the database gives (CourseItemRepository::pageFacts), so the layouts' pages no
+  longer read every course's outline; facts() goes through it, so What you get is counted by one rule.
 */
 
 declare(strict_types=1);
@@ -124,10 +126,23 @@ final class CoursePageView
             // As CourseService::publicCourse decides has_public_preview: any item in the free preview.
             if ((string) $row['node_type'] === 'item' && !empty($row['public_preview'])) { $preview = true; break; }
         }
+        return self::factsOf(['modules' => count($t['modules']), 'presentations' => $t['presentations'], 'videos' => $t['videos'], 'cards' => $t['cards'], 'tasks' => $t['tasks'],
+            'moduleQuestions' => $t['moduleQuestions'], 'finalQuestions' => $t['finalQuestions'], 'preview' => $preview]);
+    }
+
+    /**
+     * The same from the counts the database gives for many courses at once (CourseItemRepository::pageFacts), for the
+     * layouts' pages, which need no outline: What you get shows a figure for each kind the course has.
+     *
+     * @param array{modules:int,presentations:int,videos:int,cards:int,tasks:int,moduleQuestions:int,finalQuestions:int,preview:bool} $counts
+     * @return array{modules:int,figures:int,preview:bool}
+     */
+    public static function factsOf(array $counts): array
+    {
         return [
-            'modules' => count($t['modules']),
-            'figures' => count(array_filter([$t['presentations'], $t['videos'], $t['cards'], $t['tasks'], $t['moduleQuestions'], $t['finalQuestions']])),
-            'preview' => $preview,
+            'modules' => $counts['modules'],
+            'figures' => count(array_filter([$counts['presentations'], $counts['videos'], $counts['cards'], $counts['tasks'], $counts['moduleQuestions'], $counts['finalQuestions']])),
+            'preview' => $counts['preview'],
         ];
     }
 

@@ -263,7 +263,17 @@ final class CourseItemRepository
         return (int) ($this->db->fetchOne('SELECT first_module_number FROM courses WHERE id = :id', ['id' => $courseId]) ?? 1);
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * A course's whole outline, every row in course order with its section, placement, item and assessment.
+     *
+     * Written so the planner sees how small a course is (2026-11-07): each step down the tree stays in the course (a
+     * trigger keeps every child in its parent's course, so the result is the same), and the question counts come from
+     * one grouped count of the course's own items, not two sub-selects per row. Asked the old way, a course of 173 rows
+     * was estimated at 17,858 with a sub-select each, which made PostgreSQL compile the query (JIT) on every visit: 550
+     * milliseconds against 5 to run it.
+     *
+     * @return list<array<string,mixed>>
+     */
     public function structure(int $courseId, bool $publicOnly = false): array
     {
         // A section and an item placement each opt into the public preview with their own flag.
@@ -272,21 +282,84 @@ final class CourseItemRepository
             "WITH RECURSIVE tree AS (
                 SELECT n.*,1 AS depth,ARRAY[n.position,n.id::int] AS order_path FROM course_structure_nodes n WHERE n.course_id=:course_id AND n.parent_node_id IS NULL
                 UNION ALL
-                SELECT n.*,t.depth+1,t.order_path||ARRAY[n.position,n.id::int] FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id
+                SELECT n.*,t.depth+1,t.order_path||ARRAY[n.position,n.id::int] FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id WHERE n.course_id=:course_id
+             ),
+             counted AS (
+                SELECT q.course_item_id,COUNT(*) FILTER (WHERE q.graded_eligible) AS graded_question_pool,COUNT(*) AS question_count FROM assessment_questions q
+                WHERE q.course_item_id IN (SELECT cp.course_item_id FROM course_item_placements cp WHERE cp.course_id=:course_id) GROUP BY q.course_item_id
              )
              SELECT n.*,s.title AS section_title,s.introduction_html AS section_introduction_html,s.show_outline,s.numbered,
                     p.course_item_id,p.display_title_override,p.display_description_override,COALESCE(p.public_preview, s.public_preview) AS public_preview,p.assessment_role,
                     ci.item_key,ci.name AS item_name,ci.item_type,ci.title AS item_title,ci.description_html,ci.content_source,ci.type_config,ci.resource_id,ci.estimated_minutes,ci.updated_at AS item_updated_at,
-                    (SELECT COUNT(*) FROM assessment_questions q WHERE q.course_item_id=ci.id AND q.graded_eligible) AS graded_question_pool,(SELECT COUNT(*) FROM assessment_questions q WHERE q.course_item_id=ci.id) AS question_count,
+                    COALESCE(qc.graded_question_pool,0) AS graded_question_pool,COALESCE(qc.question_count,0) AS question_count,
                     r.public_id AS resource_public_id,r.filename AS resource_filename,r.original_filename,r.resource_type,r.mime_type,r.byte_size,r.description AS resource_description,
                     a.instructions_html,a.result_pass_html,a.result_fail_html,a.pass_mark,a.practice,a.practice_enabled,a.practice_pool_mode,
                     a.practice_question_count,a.graded_question_count,a.maximum_attempts,a.time_limit_seconds,a.score_policy,a.randomise_questions,a.randomise_options,a.negative_marking,a.difficulty_selection
              FROM tree n LEFT JOIN course_sections s ON s.node_id=n.id LEFT JOIN course_item_placements p ON p.node_id=n.id
              LEFT JOIN course_items ci ON ci.id=p.course_item_id LEFT JOIN resources r ON r.id=ci.resource_id LEFT JOIN course_item_assessments a ON a.course_item_id=ci.id
+             LEFT JOIN counted qc ON qc.course_item_id=ci.id
              WHERE 1=1{$public} ORDER BY n.order_path",
             ['course_id' => $courseId]
         );
         return array_map($this->normalise(...), $rows);
+    }
+
+    /**
+     * What each course's catalogue page counts for its blocks, worked out in the database without the outline
+     * (2026-11-07: the layouts' pages had read every course's whole outline, 15 seconds a visit): its module sections,
+     * the presentations in its modules (a course preview is not one), its videos, flash cards, practical tasks, the
+     * questions in its module assessments and in its final, and whether anything is in its free preview. The same rows
+     * and the same rules as CoursePageView's tally of structure() (CoursePageView::facts), which a test holds it to.
+     *
+     * @param list<int> $courseIds
+     * @return array<int,array{modules:int,presentations:int,videos:int,cards:int,tasks:int,moduleQuestions:int,finalQuestions:int,preview:bool}>
+     */
+    public function pageFacts(array $courseIds): array
+    {
+        $courseIds = array_values(array_unique(array_filter($courseIds, static fn(int $id): bool => $id > 0)));
+        if ($courseIds === []) { return []; }
+        $task = '<section class="task"';
+        $rows = $this->db->fetchAllAssociative(
+            "WITH RECURSIVE tree AS (
+                SELECT n.id,n.course_id,n.parent_node_id,n.node_type FROM course_structure_nodes n WHERE n.course_id IN (:ids) AND n.parent_node_id IS NULL
+                UNION ALL
+                SELECT n.id,n.course_id,n.parent_node_id,n.node_type FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id WHERE n.course_id=t.course_id
+             ),
+             counted AS (
+                SELECT q.course_item_id,COUNT(*) AS question_count FROM assessment_questions q
+                WHERE q.course_item_id IN (SELECT cp.course_item_id FROM course_item_placements cp WHERE cp.course_id IN (:ids)) GROUP BY q.course_item_id
+             ),
+             parts AS (
+                SELECT t.course_id,t.node_type,COALESCE(s.numbered,FALSE) AS numbered,COALESCE(p.public_preview,s.public_preview,FALSE) AS public_preview,
+                       (pt.node_type='section' AND COALESCE(ps.numbered,FALSE)) IS TRUE AS in_module,
+                       ci.item_type,COALESCE(p.assessment_role,'') AS assessment_role,COALESCE(qc.question_count,0) AS question_count,
+                       CASE WHEN jsonb_typeof(ci.type_config)='object' THEN ci.type_config ELSE '{}'::jsonb END AS config,COALESCE(ci.content_source,'') AS content_source
+                FROM tree t LEFT JOIN course_sections s ON s.node_id=t.id LEFT JOIN course_item_placements p ON p.node_id=t.id
+                LEFT JOIN course_items ci ON ci.id=p.course_item_id LEFT JOIN counted qc ON qc.course_item_id=ci.id
+                LEFT JOIN tree pt ON pt.id=t.parent_node_id LEFT JOIN course_sections ps ON ps.node_id=pt.id
+             )
+             SELECT course_id,
+                    COUNT(*) FILTER (WHERE node_type='section' AND numbered) AS modules,
+                    COUNT(*) FILTER (WHERE node_type='item' AND item_type='slide_deck' AND in_module AND config->>'kind' IS DISTINCT FROM 'trailer') AS presentations,
+                    COUNT(*) FILTER (WHERE node_type='item' AND item_type IN ('youtube','uploaded_video')) AS videos,
+                    COALESCE(SUM(CASE COALESCE(jsonb_typeof(config->'cards'),'null') WHEN 'null' THEN 0 WHEN 'array' THEN jsonb_array_length(config->'cards')
+                        WHEN 'object' THEN (SELECT COUNT(*) FROM jsonb_object_keys(config->'cards')) ELSE 1 END) FILTER (WHERE node_type='item' AND item_type='flashcards'),0) AS cards,
+                    COALESCE(SUM((LENGTH(content_source)-LENGTH(REPLACE(content_source,:task,'')))/LENGTH(:task)) FILTER (WHERE node_type='item' AND item_type='practical'),0) AS tasks,
+                    COALESCE(SUM(question_count) FILTER (WHERE node_type='item' AND item_type='assessment' AND assessment_role<>'final' AND in_module),0) AS module_questions,
+                    COALESCE(SUM(question_count) FILTER (WHERE node_type='item' AND item_type='assessment' AND assessment_role='final'),0) AS final_questions,
+                    COALESCE(BOOL_OR(node_type='item' AND public_preview),FALSE) AS preview
+             FROM parts GROUP BY course_id",
+            ['ids' => $courseIds, 'task' => $task]
+        );
+        $facts = array_fill_keys($courseIds, ['modules' => 0, 'presentations' => 0, 'videos' => 0, 'cards' => 0, 'tasks' => 0, 'moduleQuestions' => 0, 'finalQuestions' => 0, 'preview' => false]);
+        foreach ($rows as $row) {
+            $facts[(int) $row['course_id']] = [
+                'modules' => (int) $row['modules'], 'presentations' => (int) $row['presentations'], 'videos' => (int) $row['videos'], 'cards' => (int) $row['cards'],
+                'tasks' => (int) $row['tasks'], 'moduleQuestions' => (int) $row['module_questions'], 'finalQuestions' => (int) $row['final_questions'],
+                'preview' => $this->boolean($row['preview']),
+            ];
+        }
+        return $facts;
     }
 
     /** @return array<string,mixed>|null */
@@ -661,8 +734,14 @@ final class CourseItemRepository
         $where = ['1=1']; $params = [];
         if ($search !== '') { $where[] = '(r.title ILIKE :search OR r.filename ILIKE :search)'; $params['search'] = '%' . $search . '%'; }
         if ($type !== '') { $where[] = 'r.resource_type=:type'; $params['type'] = $type; }
+        // The Course Items that name a Resource are read once (2026-11-07): counted for each Resource from every item's
+        // settings, a library of 38 took half a second, and the Course Item form asks for the library twice.
         return $this->db->fetchAllAssociative(
-            'SELECT r.*,(SELECT COUNT(*) FROM course_items ci WHERE ci.resource_id=r.id OR ci.type_config->>\'poster_resource_id\'=r.id::text OR ci.type_config->>\'subtitle_resource_id\'=r.id::text)::int AS usage_count FROM resources r WHERE ' . implode(' AND ', $where) . ' ORDER BY r.title,r.id',
+            'WITH uses AS MATERIALIZED (
+                SELECT ci.resource_id,ci.type_config->>\'poster_resource_id\' AS poster,ci.type_config->>\'subtitle_resource_id\' AS subtitle FROM course_items ci
+                WHERE ci.resource_id IS NOT NULL OR ci.type_config->>\'poster_resource_id\' IS NOT NULL OR ci.type_config->>\'subtitle_resource_id\' IS NOT NULL
+             )
+             SELECT r.*,(SELECT COUNT(*) FROM uses u WHERE u.resource_id=r.id OR u.poster=r.id::text OR u.subtitle=r.id::text)::int AS usage_count FROM resources r WHERE ' . implode(' AND ', $where) . ' ORDER BY r.title,r.id',
             $params
         );
     }

@@ -45,7 +45,7 @@ final class ThemePackageValidatorTest extends TestCase
     {
         $this->requireZip();
         $manifest = json_decode($this->manifest(), true, 512, JSON_THROW_ON_ERROR);
-        $manifest['parent'] = ['name' => 'Factory Reset', 'version' => '1.0.1'];
+        $manifest['parent'] = ['name' => 'Parent Theme', 'version' => '1.0.1'];
         $path = $this->makePackage([
             'theme.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
             'public/css/theme.css' => '.course-card{border-radius:0}',
@@ -53,7 +53,7 @@ final class ThemePackageValidatorTest extends TestCase
         try {
             $result = (new ThemePackageValidator())->inspect($path);
             self::assertTrue($result['summary']['child']);
-            self::assertSame('Factory Reset', $result['summary']['parent_name']);
+            self::assertSame('Parent Theme', $result['summary']['parent_name']);
             self::assertSame('1.0.1', $result['summary']['parent_version']);
         } finally { @unlink($path); }
     }
@@ -62,7 +62,7 @@ final class ThemePackageValidatorTest extends TestCase
     {
         $this->requireZip();
         $manifest = json_decode($this->manifest(), true, 512, JSON_THROW_ON_ERROR);
-        $manifest['parent'] = ['name' => 'Factory Reset', 'version' => '1.0.1'];
+        $manifest['parent'] = ['name' => 'Parent Theme', 'version' => '1.0.1'];
         $path = $this->makePackage([
             'theme.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
             'public/css/theme.css' => " \n",

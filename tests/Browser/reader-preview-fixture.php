@@ -16,6 +16,8 @@ assessment; it writes the ADMIN's session and the rows' ids to the state file. `
 everything it made (CheckScrub).
 
 Changelog:
+2026/11/07 SAST
+- The readiness check's two questions name the modules to study after a wrong answer, the first module and the second.
 2026/11/01 SAST
 - Created.
 */
@@ -48,9 +50,13 @@ if ($action === 'create') {
     $db->executeStatement('UPDATE courses SET introduction_html = :words WHERE id = :id', ['words' => '<div class="intro-check"><h3>How this course relates to its exam</h3></div>', 'id' => $id]);
     $key = 'reader-' . $fixture->suffix();
     $public = ['public_preview' => '1'];
-    $readiness = $items->createAndPlace($id, $public + ['item_key' => $key . '-readiness', 'item_type' => 'diagnostic', 'title' => 'Are you ready to start?', 'pass_mark' => '50'], $admin['id']);
-    $fixture->createQuestion($readiness['item'], 1);
-    $fixture->createQuestion($readiness['item'], 2);
+    $readiness = $items->createAndPlace($id, $public + ['item_key' => $key . '-readiness', 'item_type' => 'diagnostic', 'title' => 'Are you ready to start?', 'pass_mark' => '50', 'graded_question_count' => '2'], $admin['id']);
+    // Each readiness question names the module to study after a wrong answer, as a course file does ("u": ["m1"]): the
+    // first module, which the public preview shows, and the second, which it does not (2026-11-07).
+    foreach ([1 => 'm1', 2 => 'm2'] as $position => $module) {
+        $question = $fixture->createQuestion($readiness['item'], $position);
+        $db->executeStatement('UPDATE assessment_questions SET remediation_item_keys = CAST(:keys AS jsonb) WHERE id = :id', ['keys' => json_encode([$module]), 'id' => $question['question_id']]);
+    }
     $module = $items->addSection($id, $public + ['title' => 'Soil, compost and containers', 'introduction_html' => '<p>Why soil comes first.</p>', 'show_outline' => '1', 'numbered' => '1'], $admin['id']);
     $in = $public + ['parent_node_id' => (string) $module];
     $lesson = $items->createAndPlace($id, $in + ['item_key' => $key . '-lesson', 'item_type' => 'html_lesson', 'title' => 'Soil, compost and containers', 'content_source' => '<h2>Why soil comes first</h2><p>Roots need water, air and food from the soil.</p>'], $admin['id']);

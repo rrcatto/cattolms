@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.6 · **Updated:** 2026-10-20
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 1.1.0 · **Updated:** 2026-11-07
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -112,8 +112,8 @@ address, robots rule and Open Graph tags, from the view model's `meta`. For exam
 
 For sidebar navigation, set `data-cl-navigation="sidebar"` and replace the header with
 `aside.cl-sidebar[data-theme-nav]`, containing the same brand, toggle and core navigation include.
-The page/context/frame/main/footer construction remains identical. Factory Reset and Factory Reset
-Sidebar use this geometry; Radiant Learning, Light Default and Gilded Noir use the top-header geometry.
+The page/context/frame/main/footer construction remains identical. Saharan Sunset, the bundled theme,
+uses the top-header geometry.
 Do not branch between guest and authenticated shells. Core supplies both navigation states.
 
 Core enhances `[data-cl-nav-toggle]` with expanded state and Escape/focus restoration. With JavaScript
@@ -157,24 +157,24 @@ System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-leve
 are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
 these examples do not authorise hard-coded destinations in themes.
 
-The standard footer destination array is core-owned. Factory Reset, Light Default and Radiant Learning delegate
-to the site-footer partial. Factory Reset Sidebar retains its richer themed footer. Gilded Noir retains its individual footer composition using the same
-standard destinations and platform action component. Do not replace its footer with another theme's.
+The standard footer destination array is core-owned. A theme either delegates to the site-footer partial
+(`partials/site-footer.html.twig`) or composes a footer of its own from the same standard destinations and
+platform action component, as Saharan Sunset does.
 
 Since v0.9.1 `footer_navigation` also carries the public legal documents - Terms (`/terms`), Refunds
 (`/refunds`) and Privacy (`/privacy`) - after Contact, for every visitor. Each link is in one place (owner,
 2026-10-18): the menu has Home and Catalogue but not Help and Contact, and the footer has Home, Catalogue,
 Help, Contact, Terms, Refunds and Privacy, the same for everyone, but not Account, Company and
 Administration. A footer draws every entry of the array in the order core gives it and never writes a legal
-link of its own. The one exception: a footer with its own contact form button (Saharan Sunset, Gilded Noir)
+link of its own. The one exception: a footer with its own contact form button (Saharan Sunset)
 leaves the Contact entry out, `footer_navigation|filter(link => link.key != 'contact')`, so the contact form
 is offered once; a footer without the button keeps it (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
 (`layout.surface`, `layout.section-head`, `data.key-value-list`): a theme styles them as it styles any page.
 
 Since v0.9.2 the footer's social marks come only from `footer_social`: Facebook, WhatsApp, X, LinkedIn,
 Instagram and YouTube, each a link to its platform's home page (`SocialPlatform::home()`) until the settings
-give the installation's profile address in `platform_social`. A theme may draw the marks from its own sprite,
-as Gilded Noir does, but never writes a social link of its own or a link to `#` (`NavigationContractTest`).
+give the installation's profile address in `platform_social`. A theme may draw the marks from its own sprite
+(Saharan Sunset draws them from the platform sprite), but never writes a social link of its own or a link to `#` (`NavigationContractTest`).
 
 Account, company and admin family models expose `sections` and `section` for composed workspace and
 standalone contexts. Their content is already-rendered platform content. Core page bodies own the
@@ -196,9 +196,12 @@ Canonical classes include `cl-ui-surface`, `cl-ui-section-head`, `cl-ui-action`,
 `cl-ui-badge`, `cl-ui-notice`, `cl-ui-empty-state`, `cl-ui-progress`, `cl-ui-modal` and
 `cl-ui-accordion-section`. Themes decorate these existing elements; they cannot emit duplicate
 functional structures. Existing shared search, pagination, sortable headers, entity lookup, course
-cards and favourites remain canonical. The course card (`partials/course-card.html.twig`,
-`cl-course-card` inside `catalogue.course-grid`) also presents course bundles in the bundle catalogue,
-so a theme's course-card styling covers bundles too; do not add a separate bundle card. Core styles
+cards and favourites remain canonical. A course bundle has its own card (`partials/bundle-card.html.twig`,
+`cl-bundle-card`), drawn by `catalogue.bundles` in the catalogue and on the Bundles page and by
+`catalogue.course-grid` among a person's favourite courses (owner, 2026-11-07, the approved mockup): Core styles it
+in the bundle colour, which a theme may set at `:root` with `--cl-bundle` (the card), `--cl-bundle-text` and
+`--cl-bundle-highlight` (its marks and View bundle); without them it is the theme's accent darkened. A bundle's page opens
+with the same colour (`cl-bundle-head`: its drawing, then a band with its name). Core styles
 the checkout promo code section (`cl-checkout-promo`), cart and checkout bundle lines
 (`cl-bundle-line`) and the bundle editor's course list (`cl-bundle-courses`); themes decorate them
 like any other core content.
@@ -211,7 +214,7 @@ only the way to the choice; without JavaScript every branch is listed. A course'
 its in-place + New panel are `cl-category-field` and `cl-category-create-*`. Course Content and the
 course category tree share the sortable tree (`cl-tree-*`: rows, drag handles, disclosure toggles,
 the ⋯ tools and the status line). Core sets their indentation, disclosure state, popover position
-and drag geometry; no bundled theme styles them, and a theme that does gives them only its colours,
+and drag geometry; the bundled theme does not style them, and a theme that does gives them only its colours,
 type and borders, as with any other core content.
 
 Core owns responsive columns, stable IDs/htmx targets, minimum functional spacing, native GET/POST,
@@ -219,8 +222,6 @@ required overflow and accessible states. Themes own colours, typography, borders
 `UiOwnershipAudit` rejects canonical component display/flex/grid, dimensions, overflow, positioning
 and visibility declarations in theme CSS, including responsive rules. Use `cl-ui-notice-heading`
 for notice headings; a broad notice `strong` selector would also restyle inline prose emphasis.
-In particular, Gilded Noir keeps its engraved canvas, paper surfaces, gold actions and navigation
-identity chip while consuming the same components.
 
 A filled multi-field form ends in one `form.actions` row. An immediate one-value operation uses
 `form.compact-action`. Modal content has one canonical footer; do not nest form action rows inside
@@ -240,7 +241,8 @@ Never style it as a human-facing field or override its hidden treatment.
 ## Palette and script boundary
 
 Palettes are optional. Each palette has exactly five six-digit hex colours. No palettes means fixed
-colours; one is applied automatically; multiple palettes use the core palette switcher. Do not ship
+colours; one is applied automatically; multiple palettes use the core palette switcher. The bundled
+theme, Saharan Sunset, declares none; the palette system stays in Core for any theme that declares them. Do not ship
 a competing switcher or palette persistence. Core cart chrome exposes `cl-cart-count`,
 `cl-cart-panel` and `cl-cart-line`; give them opaque theme surfaces and suitable action colours.
 
@@ -279,32 +281,40 @@ Bootstrap JavaScript is loaded: a theme never styles a Bootstrap component class
   A browser older than cascade layers ignores all of Bootstrap 6, and one without `light-dark()` loses
   its tokens; with the safety net both keep the theme's colours. Set `accent-color` on the theme's root
   or body too, so checkboxes, radios and ranges take the theme's colour. `BootstrapSixContractTest` and
-  `tests/Browser/bootstrap-safety-net.cjs` check every bundled theme.
+  `tests/Browser/bootstrap-safety-net.cjs` check the bundled theme.
 - **Scrollbar gutter.** Bootstrap 6 keeps the scrollbar gutter stable, so the page no longer shifts
   when a scrollbar appears; a short page keeps the strip empty. A fixed background (the page texture)
   does not reach the strip, which shows the canvas: the body's background colour when `html` has none.
   Core gives `body.cl-page-texture` the texture's light colour for it. A theme that draws its own body
-  background gives it a solid background colour too (Gilded Noir: `#0b0b0c`), or paints `html`; never
+  background gives it a solid background colour too, or paints `html`; never
   leave the strip white (`bootstrap-safety-net.cjs`).
 
 ## Development validation
 
-Use `composer themes:install -- --force` to replace bundled installed themes during development,
-then publish the core assets and compiled AssetMapper output to the instance web root. ThemeManager
-owns theme installation and publication. Do not manually maintain a parallel theme structure.
-Version changes and release packaging require the owner's instruction.
+Saharan Sunset is the one bundled theme and the default: a fresh database starts on it, and it cannot
+be uninstalled. ThemeManager reads it from `themes/saharan-sunset` in the code root and never copies it
+into the instance. The other five themes that were bundled until v1.1.0 remain in the Git history at
+v1.1.0. A theme tree copied back into `themes/` is installed into the instance by
+`composer themes:install`; a theme package is uploaded and installed at Administration → Themes, and a
+child theme needs its exact parent installed first.
+
+After changing a theme's source in development, run `composer themes:install` (it publishes Saharan
+Sunset's browser files; `-- --force` also replaces an installed copy of another tree at the same
+version), then publish the core assets and compiled AssetMapper output to the instance web root.
+ThemeManager owns theme installation and publication. Do not manually maintain a parallel theme
+structure. Version changes and release packaging require the owner's instruction.
 
 Run `composer qa`, inspect `/admin/system/ui-components`, and review actual login, account,
 administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart, checkout (including
 the promo code review step), order and learning pages at desktop/tablet/mobile sizes, with the
 category picker opened on the catalogue and on a course's edit form, and the Course Content and
 course category trees. To see an installed theme without activating it, add
-`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.5`) to a page while
+`?theme_preview={slug}-v{version}` (for example `?theme_preview=example-theme-v1.0.0`) to a page while
 signed in with `SYSTEM.THEME.VIEW`; an unknown key leaves the live theme in place. The browser
-checks in `tests/Browser/` cover every bundled theme at 1440 and 390px.
+checks in `tests/Browser/` cover the bundled theme at 1440 and 390px, and none of them switches the
+active theme.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
-pagination, htmx replacement and plain GET/POST fallbacks. Gilded Noir, Light Default, Factory Reset
-Radiant Learning, Factory Reset Sidebar and Saharan Sunset all need individual visual checks. The component ownership contracts scan bundled theme templates as well as platform views.
+pagination, htmx replacement and plain GET/POST fallbacks. Every installed theme needs its own visual check. The component ownership contracts scan bundled theme templates as well as platform views.
 
 ## Canonical shared page vocabulary
 
@@ -378,8 +388,8 @@ theme's `div.cl-page-family` - take their width and spacing from three variables
 
 Rows carry no Bootstrap container or spacing classes (`container*`, `cl-container-wide`, `cl-medium`,
 `cl-narrow`, `py-*`; `PageStructureContractTest`), so a theme sets the variables, never per page:
-Gilded Noir and Light Default fill their frame (`--cl-content-width: none`) with their own gutter and
-column widths, and Saharan Sunset draws the page context band and main as one box whose rows fill it.
+Saharan Sunset fills its frame (`--cl-content-width: none`) with its own gutter and draws the page
+context band and main as one box whose rows fill it.
 Full is drawn as wide unless a theme draws full-width pages differently; Saharan Sunset draws Home and
 course landing pages without its box. The bands that still hold a container (the home hero and feature
 band, and the course, bundle and landing page heads) hold Core's `cl-container`, which keeps 5.3.8's
@@ -395,7 +405,7 @@ inside by the gutter; a theme whose page head is not a box sets `--cl-head-inset
 the title stands on the cards' edge (Saharan Sunset). `tests/Browser/page-construction.cjs` fails any
 painted notice, head or band whose edges differ from the cards'.
 
-Theme-specific elements may use theme-owned classes such as `gn-ribbon`, `gn-footer-art`, or future third-party theme classes.
+Theme-specific elements may use theme-owned classes such as Saharan Sunset's `ss-footer-art` and `ss-footnote`, or a third-party theme's own.
 
 
 `cl-identity-details`, `cl-footer-grid` and `cl-footer-section` name the inner identity and rich-footer
@@ -404,8 +414,7 @@ Page heading and full identity are semantic sections; ordinary content uses `sec
 Never replace meaningful sections with generic divs to obtain a layout.
 
 The full identity band owns its padding and row layout; compact identity metadata has no band
-padding. Themes can set `--cl-identity-avatar-size` on the compact identity (Gilded Noir uses 46px).
+padding. Themes can set `--cl-identity-avatar-size` on the compact identity.
 
-Gilded Noir uses the shared compact identity in its top navigation. Its footer retains three
-semantic sections, social presentation, `gn-footer-art`, `gn-footer-veil` and `gn-footnote`, with
-shared `cl-footer*` names on common concepts. Do not substitute the standard footer for it.
+Saharan Sunset's footer has three semantic sections, the social marks, `ss-footer-art`,
+`ss-footer-veil` and `ss-footnote`, with shared `cl-footer*` names on common concepts.

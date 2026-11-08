@@ -17,6 +17,11 @@ final class ModalComponentContractTest extends TestCase
         self::assertSame(1, substr_count($html, 'class="cl-ui-modal-foot"'));
         self::assertStringNotContainsString('cl-ui-form-actions', $html);
         self::assertStringNotContainsString(' hidden', $html, 'Without JavaScript the same forms must be reachable.');
+        self::assertStringNotContainsString('data-modal-open', $html, 'A window opens when asked.');
+        // A window whose form was refused comes back open, holding what was typed (2026-11-07).
+        $refused = ComponentHarness::render('overlay.modal', ['id' => 'example', 'title' => 'Example', 'action' => '/example', 'open' => true]);
+        self::assertStringContainsString('data-modal-open', $refused);
+        self::assertStringNotContainsString(' hidden', $refused, 'Without JavaScript it is an ordinary section, as every window is.');
     }
     public function testAccordionUsesNativeDisclosureAndOmittedEmptySummary(): void
     {

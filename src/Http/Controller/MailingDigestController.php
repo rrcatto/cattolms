@@ -16,6 +16,8 @@ like; and the updates released before. UpdateService does the work. Seeing needs
 PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/07 SAST
+- A refused update comes back as it was typed and chosen (keepTyped).
 2026/10/28 SAST
 - Created.
 */
@@ -101,7 +103,7 @@ final class MailingDigestController extends BaseController
             $id = $this->service->write($_POST, $user->id);
             $this->flash('success', 'The update is held with the others. Nothing is sent until you release it.');
             $this->redirect(self::BASE . '#update-' . $id);
-        }, self::BASE . '#write');
+        }, self::BASE . '#write', keepTyped: true);
     }
 
     #[Route('/mailing/digest/release', name: 'mailing_manage_updates_release', methods: ['POST'])]

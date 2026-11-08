@@ -25,17 +25,19 @@ final class ThemeFilesystemSyncContractTest extends TestCase
         $instance = sys_get_temp_dir() . '/catto-theme-sync-' . bin2hex(random_bytes(6));
         mkdir($instance . '/themes', 0777, true);
         try {
-            $this->copyDirectory($project . '/themes/factory-reset', $instance . '/themes/stale-default-copy');
-            // A stale persistent duplicate of the current Factory Reset release
+            // The bundled default theme (Saharan Sunset since 2026-11-07, Factory Reset before).
+            $default = ThemeManager::DEFAULT_SLUG;
+            $this->copyDirectory($project . '/themes/' . $default, $instance . '/themes/stale-default-copy');
+            // A stale persistent duplicate of the current default release
             // must never shadow the repaired bundled recovery copy.
-            $this->copyDirectory($project . '/themes/factory-reset', $instance . '/themes/factory-reset-v1.0.0');
-            $this->rewriteManifest($instance . '/themes/factory-reset-v1.0.0/theme.json', 'Factory Reset', 'factory-reset', '1.0.0');
+            $this->copyDirectory($project . '/themes/' . $default, $instance . '/themes/' . $default . '-v1.0.0');
+            $this->rewriteManifest($instance . '/themes/' . $default . '-v1.0.0/theme.json', 'Saharan Sunset', $default, '1.0.0');
 
             // Deliberately use a non-canonical enclosing directory and one
             // nested package directory to reproduce older persistent installs.
-            $legacy = $instance . '/themes/radiant-learning-legacy/radiant-learning-v3.2.0';
-            $this->copyDirectory($project . '/themes/factory-reset', $legacy);
-            $this->rewriteManifest($legacy . '/theme.json', 'Radiant Learning', 'radiant-learning', '3.2.0');
+            $legacy = $instance . '/themes/legacy-theme-old/legacy-theme-v3.2.0';
+            $this->copyDirectory($project . '/themes/' . $default, $legacy);
+            $this->rewriteManifest($legacy . '/theme.json', 'Legacy Theme', 'legacy-theme', '3.2.0');
 
             $manager = (new ReflectionClass(ThemeManager::class))->newInstanceWithoutConstructor();
             $this->set($manager, 'codeRoot', $project);
@@ -45,15 +47,15 @@ final class ThemeFilesystemSyncContractTest extends TestCase
             $themes = $method->invoke($manager);
             self::assertIsArray($themes);
             $keys = array_column($themes, 'key');
-            self::assertContains('factory-reset-v1.0.0', $keys);
-            self::assertContains('radiant-learning-v3.2.0', $keys);
+            self::assertContains($default . '-v1.0.0', $keys);
+            self::assertContains('legacy-theme-v3.2.0', $keys);
             // Read from the bundled manifest, not written out, so a version bump does not fail a
             // test that is about discovery rather than about any particular number.
-            $manifest = json_decode((string) file_get_contents(__DIR__ . '/../../themes/factory-reset/theme.json'), true);
-            $bundledKey = 'factory-reset-v' . (string) ($manifest['theme']['version'] ?? '');
-            self::assertContains($bundledKey, $keys, 'Bundled default must remain visible alongside older persistent Factory Reset releases.');
-            $default = array_values(array_filter($themes, static fn(array $theme): bool => (string) $theme['key'] === $bundledKey))[0] ?? [];
-            self::assertSame($project . '/themes/factory-reset', $default['root'] ?? null, 'Bundled Factory Reset must win over a stale persistent same-version duplicate.');
+            $manifest = json_decode((string) file_get_contents(__DIR__ . '/../../themes/' . $default . '/theme.json'), true);
+            $bundledKey = $default . '-v' . (string) ($manifest['theme']['version'] ?? '');
+            self::assertContains($bundledKey, $keys, 'Bundled default must remain visible alongside older persistent releases of it.');
+            $found = array_values(array_filter($themes, static fn(array $theme): bool => (string) $theme['key'] === $bundledKey))[0] ?? [];
+            self::assertSame($project . '/themes/' . $default, $found['root'] ?? null, 'The bundled default must win over a stale persistent same-version duplicate.');
         } finally {
             $this->removeDirectory($instance);
         }

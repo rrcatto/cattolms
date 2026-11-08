@@ -82,15 +82,17 @@
 
 			{% if active_tab == 'test-access' %}
 				{{ ui('layout.section-head', {heading: 'Test access', heading_level: 2, summary: 'Add existing people to this course, including while it is a draft. Access expires counted from the time you grant it.'}) }}
+				{# A refused grant comes back as it was typed (2026-11-07). #}
+				{% set typed = typed_for(course_admin_url(course, '/grant')) %}
 				<form action="{{ course_admin_url(course, '/grant') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Verified account emails', for: 'test-access-emails', span: 'two-thirds', required: true, help: 'Enter one email per line. Every person must have an active, verified account.'})} %}
-{% block control %}<textarea class="cl-input" id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
+{% block control %}<textarea class="cl-input" id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}>{{ typed.emails|default('') }}</textarea>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'test-access-days', span: 'third', required: true, help: 'The countdown begins when you grant access.'})} %}
-{% block control %}<input class="cl-input" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ typed.access_days|default(course.access_days) }}" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}
@@ -213,30 +215,32 @@
 				{% else %}
 					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and exactly one active default price before it can be published.'}) }}
 				{% endif %}
+				{# A refused price option comes back as it was typed and ticked (2026-11-07). #}
+				{% set typed = typed_for(course_admin_url(course, '/pricing')) %}
 				<form class="mt-7" action="{{ course_admin_url(course, '/pricing') }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Add a price option', heading_level: 2}) }}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', for: 'new-price-period', span: 'quarter', required: true})} %}
-{% block control %}<input class="cl-input" id="new-price-period" type="number" min="1" name="access_period_value" value="12" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-period" type="number" min="1" name="access_period_value" value="{{ typed.access_period_value|default('12') }}" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'new-price-unit', span: 'quarter'})} %}
-{% block control %}<select class="cl-select" id="new-price-unit" name="access_period_unit" {{ ui_field_attrs(props) }}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select>{% endblock %}
+{% block control %}<select class="cl-select" id="new-price-unit" name="access_period_unit" {{ ui_field_attrs(props) }}>{% for value, label in {days: 'Days', weeks: 'Weeks', months: 'Months', years: 'Years'} %}<option value="{{ value }}"{{ value == typed.access_period_unit|default('months') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', for: 'new-price-amount', span: 'quarter', required: true})} %}
-{% block control %}<input class="cl-input" id="new-price-amount" name="price" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-amount" name="price" value="{{ typed.price|default('') }}" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (optional)', for: 'new-price-was', span: 'quarter', help: 'A higher price shown struck through beside the price, so the course is seen to be marked down. Only the price is charged. Leave it empty when the course is not marked down.'})} %}
-{% block control %}<input class="cl-input" id="new-price-was" name="was_price" placeholder="7500.00" inputmode="decimal" {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-was" name="was_price" value="{{ typed.was_price|default('') }}" placeholder="7500.00" inputmode="decimal" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'quarter', required: true})} %}
-{% block control %}<input class="cl-input text-uppercase" id="new-price-currency" name="currency_code" value="ZAR" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input text-uppercase" id="new-price-currency" name="currency_code" value="{{ typed.currency_code|default('ZAR') }}" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label'})} %}
-{% block control %}<input class="cl-input" id="new-price-label" name="label" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-label" name="label" value="{{ typed.label|default('') }}" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'This price option', size: 'small', selected: ['is_active'], items: [
+						<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'This price option', size: 'small', selected: typed is empty ? ['is_active'] : ['is_active', 'is_default']|filter(tick => attribute(typed, tick) is defined), items: [
 							{value: 'is_active', label: 'Active', icon: lucide('circle-check'), note: 'Buyers can choose it. Untick it to keep it off sale.'},
 							{value: 'is_default', label: 'Make this the default catalogue price', icon: lucide('star'), note: 'The price on the course\'s card. Leave it unticked and the current default stays.'},
 						]}) }}</div>

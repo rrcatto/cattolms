@@ -37,8 +37,6 @@ use PHPUnit\Framework\TestCase;
 
 final class FlashDismissalContractTest extends TestCase
 {
-    /** The themes whose flash partial the shared dismissal drives. */
-    private const THEMES_WITH_FLASH_PARTIALS = ['factory-reset', 'light-default', 'gilded-noir'];
 
     public function testDismissingTheLastMessageRemovesTheStackAsWell(): void
     {
@@ -71,10 +69,12 @@ final class FlashDismissalContractTest extends TestCase
     public function testEveryFlashPartialCarriesTheHooksTheDismissalNeeds(): void
     {
         $root = dirname(__DIR__, 2);
-        foreach (self::THEMES_WITH_FLASH_PARTIALS as $theme) {
-            self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/' . $theme . '/base.html.twig'));
+        // Every bundled theme (Saharan Sunset alone since 2026-11-07) includes the shared flash partial.
+        $bases = glob($root . '/themes/*/base.html.twig') ?: [];
+        self::assertNotSame([], $bases);
+        foreach ($bases as $base) {
+            self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($base), $base);
         }
-        self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/radiant-learning/base.html.twig'));
         $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/flash-messages', ['flash_messages' => [['type' => 'success', 'message' => 'Saved']]]);
         foreach (['cl-flash-stack', 'data-flash-message', 'data-flash-close', 'data-flash-type="success"'] as $hook) self::assertStringContainsString($hook, $html);
     }

@@ -11,7 +11,11 @@
  * refused. The keyboard opens, expands and chooses. A course saves the category chosen at any level
  * and Uncategorised; an import is filed in the category chosen, including one created during the
  * import. The catalogue's picker behaves the same way and navigates to the category chosen. Without
- * JavaScript the picker lists the whole tree and still chooses.
+ * JavaScript the picker lists the whole tree and still chooses. A course the check makes must open on its own page
+ * before its category is read, so a refused Create course is reported in its own words (2026-11-07: a gate run read it
+ * as the wrong category saved, when another lane's fixture had taken the course title; the fixture now holds its titles,
+ * CheckNames). A refused New course comes back as it was typed, its category still chosen, with and without JavaScript
+ * (2026-11-07: it came back empty, at Uncategorised).
  *
  * Run against the development instance with category-tree-fixture.php, which builds
  *   A > A1 > A1x, A > A2      B > B1      G      D > D1 > D1x
@@ -82,6 +86,23 @@ async function opened(p) {
     if (!(await p.panel.isVisible())) await p.toggle.click();
     await p.panel.waitFor({state: 'visible'});
 }
+/* Fills in a new course whose slug the site refuses, chooses its category with choose(picker), sends it, and checks that
+   it comes back with the refusal and everything as it was typed and chosen; nothing is made. */
+async function refusedCourse(page, choose) {
+    const typed = {title: state.extra.picker_course, slug: 'Not a slug!', subtitle: 'Typed before it was refused', summary: 'A summary typed in full before the form was refused.'};
+    await page.locator('#title').fill(typed.title);
+    await page.locator('#slug').fill(typed.slug);
+    await page.locator('#subtitle').fill(typed.subtitle);
+    await page.locator('#summary').fill(typed.summary);
+    await page.locator('#study-hours').fill('12');
+    await choose(picker(page, 'category'));
+    await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Create course'}).click()]);
+    assert.equal(new URL(page.url()).pathname, '/admin/courses/new', 'Refused, it comes back to the New course form.');
+    assert.match((await page.locator('[data-flash-message]').allTextContents()).join(' '), /Use lowercase letters, numbers and hyphens for the slug/, 'It says why.');
+    for (const [field, value] of Object.entries(typed)) assert.equal(await page.locator(`#${field}`).inputValue(), value, `${field} is as it was typed.`);
+    assert.equal(await page.locator('#study-hours').inputValue(), '12');
+    assert.equal(await picker(page, 'category').shown(), pathOf('A', 'A1', 'A1x'), 'The category chosen is still chosen.');
+}
 const noSideScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 const shipped = () => state.shipped_roots;
 const ROOTS = 4; // A, B, G and D
@@ -141,6 +162,22 @@ const ROOTS = 4; // A, B, G and D
             assert.equal(await p.shown(), 'Uncategorised');
             await p.toggle.click();
             assert.equal(await page.locator('#category-options .cl-ui-tree-select-expand[aria-expanded="true"]').count(), 0, 'With nothing chosen, every branch starts closed.');
+            await page.keyboard.press('Escape');
+        });
+
+        // 2026-11-07: a refused New course came back with every field cleared and the picker at Uncategorised.
+        await scenario('a refused New course comes back as typed, its category still chosen', browserName, async () => {
+            await fresh();
+            await refusedCourse(page, async (p) => {
+                await opened(p);
+                await p.expander('A').click();
+                await p.expander('A1').click();
+                await p.option('A1x').click();
+            });
+            const p = course();
+            await p.toggle.click();
+            await p.panel.waitFor({state: 'visible'});
+            assert.deepEqual([await p.expander('A').getAttribute('aria-expanded'), await p.expander('A1').getAttribute('aria-expanded'), await p.expander('B').getAttribute('aria-expanded')], ['true', 'true', 'false'], 'It opens on the way to the category chosen.');
             await page.keyboard.press('Escape');
         });
 
@@ -240,7 +277,7 @@ const ROOTS = 4; // A, B, G and D
                 await p.expander('A').click();
                 await p.option('A1').click();
                 await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), page.getByRole('button', {name: 'Create course'}).click()]);
-                assert.match(page.url(), /\/admin\/courses\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+/, 'The course opens by its code.');
+                assert.match(new URL(page.url()).pathname, /^\/admin\/courses\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+$/, `The course opens by its code (${(await page.locator('[data-flash-message]').allTextContents()).join(' ').replace(/×/g, '').trim() || page.url()})`);
                 assert.equal(await course().shown(), pathOf('A', 'A1'), 'Saved and shown by its path on the course.');
                 await opened(course());
                 await course().expander('A1').click();
@@ -315,7 +352,23 @@ const ROOTS = 4; // A, B, G and D
         await page.keyboard.press('Escape');
         await page.locator('#title').fill(state.extra.picker_nojs);
         await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Create course'}).click()]);
+        // The course's own page, by its code: a refused Create course comes back to the New course form, so the refusal
+        // is reported in its own words rather than as the wrong category.
+        assert.match(new URL(page.url()).pathname, /^\/admin\/courses\/(?=[A-Z0-9-]*[A-Z])[A-Z0-9-]+$/, `The course was created (${(await page.locator('[data-flash-message]').allTextContents()).join(' ').replace(/×/g, '').trim() || page.url()})`);
         assert.equal(await picker(page, 'category').shown(), pathOf('A', 'A1', 'A1x'), 'The course was saved in it.');
+        await ctx.close();
+    });
+
+    await scenario('without JavaScript a refused New course comes back as typed, its category still chosen', 'chromium-nojs', async () => {
+        reset();
+        const {ctx, page} = await open(chromium, {js: false});
+        await page.goto(`${base}/admin/courses/new`);
+        await refusedCourse(page, async (p) => {
+            await p.toggle.click();
+            await p.panel.waitFor({state: 'visible'});
+            await p.option('A1x').click();
+            await page.keyboard.press('Escape');
+        });
         await ctx.close();
     });
 

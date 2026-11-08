@@ -7,6 +7,9 @@ Description:
 Validates the Catto Learning release contract (written for v0.5.8, kept current): PHP 8.5.12 or later, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/11/07 SAST
+- The default theme is the one ThemeManager names (Saharan Sunset); its package, its baseline seed and its contracts are
+  checked in place of Factory Reset's. The release version is read from composer.json, never pinned here.
 2026/10/19 SAST
 - 101 permissions with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE.
 - 105 with PLATFORM.SITEANALYTICS.VIEW/MANAGE (site analytics; owner, 2026-11-04).
@@ -65,7 +68,8 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '1.1.0', 'composer.json version must be 1.1.0.');
+// The release is the owner's to number, so composer.json is checked for shape and everything else follows it.
+$need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($composer['version'] ?? '')) === 1, 'composer.json must declare a semantic version.');
 // PHP 8.5.12 or later (owner, 2026-10-22): 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution.
 $need(($composer['require']['php'] ?? '') === '>=8.5.12 <9.0', 'PHP runtime target must be >=8.5.12 <9.0.');
 $need(($composer['config']['platform']['php'] ?? '') === '8.5.12', 'Composer must resolve packages for PHP 8.5.12 (config.platform.php).');
@@ -95,7 +99,7 @@ $auditStart = strpos($baseline, 'CREATE TABLE audit_log');
 $auditEnd = $auditStart === false ? false : strpos($baseline, 'CREATE INDEX audit_log_user', $auditStart);
 $auditBlock = ($auditStart !== false && $auditEnd !== false) ? substr($baseline, $auditStart, $auditEnd - $auditStart) : '';
 $need(!str_contains($auditBlock, 'ip_hash'), 'audit_log must store raw IP only, not ip_hash.');
-// The baseline records whichever Factory Reset the release actually bundles, checked below
+// The baseline records whichever default theme the release actually bundles, checked below
 // against extras/themes rather than pinned to a literal here. The v0.5.8 baseline seeded 1.0.1 and
 // two later migrations advanced it; the v0.6 baseline records the bundled version directly, so
 // there is nothing left to advance and nothing to keep in step by hand.
@@ -193,7 +197,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '1.1.0'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '" . (string) ($composer['version'] ?? '') . "'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
@@ -202,7 +206,7 @@ foreach (['discoverInstalledThemes','$row = $registry[$key] ?? null;',"\$item['f
     $need(str_contains($manager, $token), 'ThemeManager filesystem-authoritative recovery contract missing: ' . $token);
 }
 $need(str_contains($manager, 'Older releases could leave one enclosing package'), 'Theme discovery must retain legacy enclosing-directory recovery.');
-$need(str_contains($manager, 'stale persistent duplicate cannot shadow'), 'Bundled Factory Reset must win over stale same-version persistent duplicates.');
+$need(str_contains($manager, 'stale persistent duplicate cannot shadow'), 'The bundled default theme must win over stale same-version persistent duplicates.');
 
 foreach (['AccountSectionRegistry.php','AdministrationSectionRegistry.php','CompanySectionRegistry.php','RoleAdministrationService.php'] as $file) {
     $need(is_file($root . '/src/Application/' . $file), 'Missing application registry/service: ' . $file);
@@ -220,39 +224,44 @@ foreach (['event.ip_address','event.geo_location','activity_pagination','activit
 $roleEdit = $read($root . '/resources/views/pages/admin-role-edit.html.twig');
 foreach (['name="permissions[]"','Save permissions'] as $token) $need(str_contains($roleEdit, $token), 'Role permission editor missing explicit-save control: ' . $token);
 
-$factoryManifest = json_decode($read($root . '/themes/factory-reset/theme.json'), true);
-$need(($factoryManifest['format'] ?? '') === 'catto-learning-theme', 'Factory Reset theme format is invalid.');
-$need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($factoryManifest['theme']['version'] ?? '')) === 1, 'Factory Reset must declare a semantic version.');
-$need(is_array($factoryManifest) && array_key_exists('parent', $factoryManifest) && $factoryManifest['parent'] === null, 'Factory Reset must be standalone.');
-$factoryBase = $read($root . '/themes/factory-reset/base.html.twig');
+// The default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07, when the owner put the other five
+// "on ice until further notice"): it is discovered from the code root, never copied, and never uninstalled.
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $manager, $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme (DEFAULT_SLUG).');
+$defaultRoot = $root . '/themes/' . $defaultSlug;
+$defaultManifest = json_decode($read($defaultRoot . '/theme.json'), true);
+$defaultName = (string) ($defaultManifest['theme']['name'] ?? $defaultSlug);
+$need(($defaultManifest['format'] ?? '') === 'catto-learning-theme', 'The default theme ' . $defaultName . "'s format is invalid.");
+$need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($defaultManifest['theme']['version'] ?? '')) === 1, 'The default theme ' . $defaultName . ' must declare a semantic version.');
+$need(is_array($defaultManifest) && array_key_exists('parent', $defaultManifest) && $defaultManifest['parent'] === null, 'The default theme ' . $defaultName . ' must be standalone.');
+$defaultBase = $read($defaultRoot . '/base.html.twig');
 $coreNav = $read($root . '/resources/views/partials/navigation.html.twig');
-$factoryFooter = $read($root . '/themes/factory-reset/partials/footer.html.twig');
-$need(str_contains($factoryBase, '@platform/partials/navigation.html.twig') && str_contains($coreNav, 'navigation'), 'Factory Reset must render the core-owned standard navigation array.');
-// The footer's markup is core's and the theme includes it, so the array is read in core. Checking
-// only the theme file would pass a theme that included a footer which rendered nothing.
-$need(str_contains($factoryFooter, '@platform/partials/site-footer.html.twig'), 'Factory Reset must include the core-owned site footer.');
+$defaultFooter = $read($defaultRoot . '/partials/footer.html.twig');
+$need(str_contains($defaultBase, '@platform/partials/navigation.html.twig') && str_contains($coreNav, 'navigation'), 'The default theme ' . $defaultName . ' must render the core-owned standard navigation array.');
+// The footer's destinations are core's footer_navigation, whether the theme includes the core footer or draws the same
+// array itself (Saharan Sunset draws it, with its own art around it).
+$need(str_contains($defaultFooter, '@platform/partials/site-footer.html.twig') || str_contains($defaultFooter, 'footer_navigation'), 'The default theme ' . $defaultName . ' must render the core footer_navigation array.');
 $need(str_contains($read($root . '/resources/views/partials/site-footer.html.twig'), 'footer_navigation'), 'The core-owned site footer must render the standard footer navigation array.');
 
 // extras/themes is a drop-in directory: any number of theme packages may ship there. The only
-// requirement is that the default Factory Reset package is present, because ThemeManager falls
-// back to it and the installer publishes it. Capping the count served no purpose.
+// requirement is that the default theme's package is present at its current version, because
+// it is the one a site falls back to. Capping the count served no purpose.
 $bundled = glob($root . '/extras/themes/*.zip') ?: [];
 $bundledNames = array_map('basename', $bundled);
-$factoryVersion = (string) ($factoryManifest['theme']['version'] ?? '');
-$factoryPackage = 'factory-reset-v' . $factoryVersion . '.zip';
-$need(in_array($factoryPackage, $bundledNames, true), 'extras/themes must ship the bundled Factory Reset at its current version: ' . $factoryPackage . '.');
+$defaultVersion = (string) ($defaultManifest['theme']['version'] ?? '');
+$defaultPackage = $defaultSlug . '-v' . $defaultVersion . '.zip';
+$need(in_array($defaultPackage, $bundledNames, true), 'extras/themes must ship the bundled default theme at its current version: ' . $defaultPackage . '.');
 
-// The recorded active theme is an install key, so a bundled bump that is not accompanied by a
-// migration leaves an upgraded database pointing at a theme directory that does not exist.
-// The baseline seeds 1.0.1; every version after that needs a migration naming it.
+// The recorded active theme is an install key, so a bundled bump that is not accompanied by the
+// baseline naming it leaves a new database pointing at a theme directory that does not exist.
 $migrations = '';
 foreach (glob($root . '/database/migrations/*.php') ?: [] as $migrationFile) {
     $migrations .= (string) file_get_contents($migrationFile);
 }
 $need(
-    str_contains($migrations, "factory-reset-v" . $factoryVersion),
-    'The bundled Factory Reset is ' . $factoryVersion . ' but no migration records active_theme as it, '
-    . 'so an installed database would activate a theme key with nothing behind it.'
+    str_contains($migrations, "('active_theme', '" . $defaultSlug . '-v' . $defaultVersion . "')"),
+    'The bundled default theme is ' . $defaultName . ' ' . $defaultVersion . ' but the baseline does not record active_theme as it, '
+    . 'so a new database would activate a theme key with nothing behind it.'
 );
 foreach ($bundledNames as $bundledName) {
     $need(preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*-v\d+\.\d+\.\d+\.zip$/', $bundledName) === 1, 'Bundled theme package must be named <slug>-v<version>.zip: ' . $bundledName);
@@ -292,9 +301,9 @@ foreach (['find-a-course', 'buy-access', 'course-structure', 'learn', 'sign-in',
 }
 
 require_once $root . '/src/View/ThemePackageValidator.php';
-if (class_exists(ZipArchive::class) && count($bundled) === 1) {
-    try { (new CattoLearning\View\ThemePackageValidator())->inspect($bundled[0]); }
-    catch (Throwable $e) { $errors[] = 'Bundled Factory Reset package fails ThemePackageValidator: ' . $e->getMessage(); }
+if (class_exists(ZipArchive::class) && is_file($root . '/extras/themes/' . $defaultPackage)) {
+    try { (new CattoLearning\View\ThemePackageValidator())->inspect($root . '/extras/themes/' . $defaultPackage); }
+    catch (Throwable $e) { $errors[] = 'The bundled default theme package fails ThemePackageValidator: ' . $e->getMessage(); }
 }
 
 if ($errors !== []) {

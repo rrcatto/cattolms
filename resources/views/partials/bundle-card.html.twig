@@ -1,0 +1,42 @@
+{#
+	A bundle's card (owner, 2026-11-07, the approved mockup: "it needs to be obvious they are bundles not courses ... perhaps
+	each bundle should take up less space than a full course card"): a card of the bundle colour drawn as a small pile, about
+	shorter than a course card. Its own drawing as a strip across the top (owner, 2026-11-07: "This will enhance them
+	further and make them more interesting to look at"), the journey from its first course to its last; "Bundle · N courses"
+	and the star; its name; its short description; its courses' covers,
+	three and "+N" when there are more than four; its price over the was price; what it saves and when a later sale starts;
+	how long its courses stay open; then View bundle at the bottom left, under a line (owner, 2026-11-07). In a row of
+	bundles every card is as tall as the row, the covers and everything under them at its foot; among course cards
+	(Favourites) it keeps its own height.
+	bundle: a card as BundleService::card() gives it.
+#}
+{% set bundle_covers = bundle.course_covers|default([]) %}
+{% set bundle_shown = bundle_covers|length > 4 ? bundle_covers|slice(0, 3) : bundle_covers %}
+{% set bundle_more = bundle_covers|length - bundle_shown|length %}
+<article class="cl-bundle-card">
+	{% if bundle.cover_href|default(null) %}<div class="cl-bundle-card-art" aria-hidden="true"><img src="{{ bundle.cover_href }}" alt="" width="640" height="360" loading="lazy"></div>{% endif %}
+	<div class="cl-bundle-card-top">
+		<p class="cl-bundle-card-kind"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>Bundle · {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }}</span></p>
+		{% if can_favourite is defined and can_favourite %}
+			{% include '@platform/partials/course-favourite.html.twig' with {course: bundle, favourite_kind: 'bundle', favourite_return: favourite_return|default('/bundles')} %}
+		{% endif %}
+	</div>
+	<h3 class="cl-bundle-card-title"><a href="{{ bundle.href }}">{{ bundle.title }}</a></h3>
+	{% if bundle.summary %}<p class="cl-bundle-card-summary">{{ bundle.summary }}</p>{% endif %}
+	<div class="cl-bundle-card-offer">
+		<ul class="cl-bundle-card-covers" aria-label="Courses in this bundle">
+			{% for cover in bundle_shown %}
+				<li>{% if cover.cover %}<img src="{{ cover.cover }}" alt="{{ cover.title }}" title="{{ cover.title }}" width="64" height="40" loading="lazy">{% else %}<span class="cl-bundle-card-initial" title="{{ cover.title }}"><span aria-hidden="true">{{ cover.initial }}</span><span class="visually-hidden">{{ cover.title }}</span></span>{% endif %}</li>
+			{% endfor %}
+			{% if bundle_more > 0 %}<li class="cl-bundle-card-more" title="And {{ bundle_more }} more courses"><span aria-hidden="true">+{{ bundle_more }}</span><span class="visually-hidden">And {{ bundle_more }} more courses</span></li>{% endif %}
+		</ul>
+		{% if bundle.price_label %}<p class="cl-bundle-card-price">{% include '@platform/partials/price.html.twig' with {price: bundle} %}</p>{% endif %}
+	</div>
+	<div class="cl-bundle-card-terms">
+		{% if bundle.saving_badge or bundle.availability_badge %}<p class="cl-bundle-card-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
+		{% if bundle.not_available %}<p class="cl-bundle-card-access">Not available now</p>{% elseif bundle.access_label %}<p class="cl-bundle-card-access">{{ bundle.access_label }} of access to every course</p>{% endif %}
+	</div>
+	<div class="cl-bundle-card-foot">
+		{{ ui('action.link', {label: 'View bundle', variant: 'primary', size: 'small', href: bundle.href, icon: 'action-view'}) }}
+	</div>
+</article>

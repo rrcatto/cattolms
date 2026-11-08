@@ -7,7 +7,8 @@
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 {% block body %}
 {{ ui('data.stat-card', {label: 'Question pool', value: assessment.question_pool_count}) }}
-{{ ui('data.stat-card', {label: 'Questions drawn', value: assessment.assessment_type == 'diagnostic' ? assessment.practice_question_count : assessment.graded_question_count}) }}
+{# A readiness check asks every question it holds (AssessmentService::drawQuestions), so it says how many it asks. #}
+{{ ui('data.stat-card', assessment.assessment_type == 'diagnostic' ? {label: 'Questions asked', value: assessment.question_pool_count} : {label: 'Questions drawn', value: assessment.graded_question_count}) }}
 {{ ui('data.stat-card', {label: 'Time', value: time_limit_label}) }}
 {{ ui('data.stat-card', {label: assessment.assessment_type == 'diagnostic' ? 'Suggested threshold' : 'Pass mark', value: assessment.pass_mark ~ '%'}) }}
 {% endblock %}

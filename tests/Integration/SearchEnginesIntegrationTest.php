@@ -256,13 +256,13 @@ final class SearchEnginesIntegrationTest extends TestCase
         $_SERVER['REQUEST_URI'] = '/admin/settings';
         $meta = ['structured_data' => ['{"@context":"https://schema.org","@type":"Thing"}'], 'verification' => ['msvalidate.01' => self::BING]];
         foreach (['admin-section', 'account-section', 'learn-item', 'course-public-preview', 'login', 'error'] as $template) {
-            $model = $renderer->viewModel($template, ['page_meta' => $meta], 'factory-reset', false);
+            $model = $renderer->viewModel($template, ['page_meta' => $meta], \CattoLearning\View\ThemeManager::DEFAULT_SLUG, false);
             self::assertSame([], $model['meta']['structured_data'], $template);
             self::assertSame([], $model['meta']['verification'], $template);
         }
         // A public page that asks not to be indexed (an ADMIN preview) carries none either.
         $_SERVER['REQUEST_URI'] = '/landing/a-preview';
-        $preview = $renderer->viewModel('landing-page', ['page_meta' => $meta + ['robots' => 'noindex, nofollow'], 'title' => 'Preview'], 'factory-reset', false);
+        $preview = $renderer->viewModel('landing-page', ['page_meta' => $meta + ['robots' => 'noindex, nofollow'], 'title' => 'Preview'], \CattoLearning\View\ThemeManager::DEFAULT_SLUG, false);
         self::assertSame([], $preview['meta']['structured_data']);
     }
 

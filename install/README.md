@@ -48,7 +48,7 @@ It then does the following:
 3. Prepares the database named in `.env`:
    - creates it, when PostgreSQL runs on this server and it is missing;
    - empties it, when it already holds tables. This is a clean installation, so every table and everything in it is deleted. The installer asks you to type the username first.
-4. Builds the database's tables and installs the themes.
+4. Builds the database's tables and installs the themes. The site starts on Saharan Sunset, the theme that comes with the code.
 5. Copies the web files to `/home/<username>/public_html` and makes `storage` and `themes` there, all owned by the site's user.
 6. Points `/usr/local/lib/php/cattolms/current` at the new version.
 7. Runs the scheduler every minute from cron, in `/etc/cron.d/cattolms-<username>`. The scheduler sends order emails, cancels unpaid orders, expires wallet credit, recalculates course popularity and does the daily clean-up.
@@ -74,7 +74,7 @@ It then does the following:
    - payment methods and the bank account for EFT;
    - fees and periods;
    - identity verification with Didit;
-   - the theme;
+   - the theme (Saharan Sunset is installed, and another theme can be uploaded on the Themes page);
    - the categories and tags: the starter set, from `resources/catalogue/catalogue.json`, or a catalogue package from another site (Courses → Import & Export Catalogue), which brings its courses too;
    - importing your courses from a catalogue package or from their HTML files;
    - giving each course its category, tags and cover picture (a catalogue package brings them);

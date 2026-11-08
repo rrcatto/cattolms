@@ -7,9 +7,11 @@ Date time: 2026/08/25 14:29 SAST
 Version: 0.5.8.3
 
 Description:
-Regression tests for the Catto Learning 0.5.8 Theme Package 4.0 / Template API 2.0 contract: filesystem-only themes, platform-owned functional pages, immutable releases, direct-parent child inheritance and Factory Reset as the shipped default rather than a universal fallback.
+Regression tests for the Catto Learning 0.5.8 Theme Package 4.0 / Template API 2.0 contract: filesystem-only themes, platform-owned functional pages, immutable releases, direct-parent child inheritance and the bundled default theme (Saharan Sunset since 2026-11-07, Factory Reset before) as the shipped default rather than a universal fallback.
 
 Changelog:
+2026/11/07 SAST
+- The default theme is Saharan Sunset, the one bundled theme; the release version is read from composer.json.
 
 2026/08/25 14:29 SAST
 
@@ -37,26 +39,28 @@ use PHPUnit\Framework\TestCase;
 
 final class ThemeUiContractTest extends TestCase
 {
-    public function testFactoryResetCompliesWithThemePackage4(): void
+    /** The one bundled theme is the default (owner, 2026-11-07: the other themes "on ice until further notice"). */
+    public function testTheDefaultThemeCompliesWithThemePackage4(): void
     {
-        $root = __DIR__ . '/../../themes/factory-reset';
+        self::assertSame('saharan-sunset', \CattoLearning\View\ThemeManager::DEFAULT_SLUG);
+        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('catto-learning-theme', $manifest['format'] ?? null);
         self::assertSame('4.0', $manifest['schema_version'] ?? null);
         self::assertSame('2.0', $manifest['template_api'] ?? null);
-        self::assertSame('Factory Reset', $manifest['theme']['name'] ?? null);
+        self::assertSame('Saharan Sunset', $manifest['theme']['name'] ?? null);
         self::assertNull($manifest['parent'] ?? null);
         self::assertFileExists($root . '/base.html.twig');
         self::assertNotSame('', trim((string) file_get_contents($root . '/public/css/theme.css')));
         self::assertStringContainsString('page_body', (string) file_get_contents($root . '/base.html.twig'));
     }
 
-    public function testFactoryResetOptsIntoCorePaletteManagement(): void
+    /** The default theme keeps its own colours; the core palette system stays for any theme that declares palettes. */
+    public function testTheDefaultThemeKeepsItsOwnColoursAndCoreStillOffersPalettes(): void
     {
-        $root = __DIR__ . '/../../themes/factory-reset';
+        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
-        self::assertGreaterThanOrEqual(1, count($manifest['palettes'] ?? []));
-        foreach ($manifest['palettes'] as $palette) self::assertCount(5, $palette['colors'] ?? []);
+        self::assertSame([], $manifest['palettes'] ?? []);
         self::assertFileDoesNotExist($root . '/partials/palette-switcher.html.twig');
         self::assertFileDoesNotExist($root . '/public/js/palette-switcher.js');
 
@@ -66,11 +70,14 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringContainsString('paletteCount<2', $platformJs);
     }
 
-    public function testFunctionalPagesBelongToPlatformNotFactoryReset(): void
+    public function testFunctionalPagesBelongToPlatformNotTheDefaultTheme(): void
     {
         self::assertDirectoryExists(__DIR__ . '/../../resources/views/pages');
         self::assertFileExists(__DIR__ . '/../../resources/views/pages/courses.html.twig');
-        self::assertDirectoryDoesNotExist(__DIR__ . '/../../themes/factory-reset/pages');
+        // The default theme may wrap a page family (Saharan Sunset's sign-in pages), never hold a page body.
+        foreach (glob(__DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/pages/*.twig') ?: [] as $wrapper) {
+            self::assertStringContainsString('cl-page-family', (string) file_get_contents($wrapper), basename($wrapper) . ' wraps a page family.');
+        }
         $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
         // The page comes from the platform namespace; a theme cannot shadow one, because @platform
         // is a single fixed path while @theme is the one that moves.
@@ -95,7 +102,9 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringContainsString('modal.hidden = false', $platformJs);
 
         $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
-        self::assertStringContainsString("PLATFORM_ASSET_VERSION = '1.1.0'", $renderer);
+        // The platform asset version is the release's, read from composer.json, so a version change needs no edit here.
+        $composer = json_decode((string) file_get_contents(__DIR__ . '/../../composer.json'), true, 512, JSON_THROW_ON_ERROR);
+        self::assertStringContainsString("PLATFORM_ASSET_VERSION = '" . (string) $composer['version'] . "'", $renderer);
         self::assertStringContainsString("platformAsset('/js/platform-overrides.js')", $renderer);
         self::assertStringContainsString("platformAsset('/css/catto-platform.css')", $renderer);
     }

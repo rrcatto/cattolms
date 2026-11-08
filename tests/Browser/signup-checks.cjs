@@ -11,6 +11,8 @@
    names, at a domain that receives no mail). Fixtures: section-pages-fixture.php create (an ADMIN to look with), then signup-checks-fixture.php cleanup and
    section-pages-fixture.php cleanup afterwards (in env_php_1). Mailpit: CATTO_MAILPIT_URL (http://127.0.0.1:8025). */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const {execFileSync} = require('node:child_process');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -80,7 +82,7 @@ async function register(browser, width, javaScript, person) {
     const page = await context.newPage();
     const errors = [];
     page.on('response', (response) => { if (response.status() >= 500) errors.push(response.status() + ' ' + response.url()); });
-    await page.goto(`${base}/admin/people/signup-attempts`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/people/signup-attempts`);
     for (const email of emails) {
         const row = page.locator('tr', {hasText: email});
         check(await row.count() === 1, `${email}: listed at Sign-up Attempts`);
@@ -90,16 +92,16 @@ async function register(browser, width, javaScript, person) {
     await page.waitForLoadState('networkidle');
     const attempt = await text(page);
     check(/\d+ points/.test(attempt) && /cannot receive email: it has no mail server/.test(attempt) && /IP address/.test(attempt), 'the attempt opens with its signals in words and where it came from');
-    await page.goto(`${base}/admin/dashboard`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/dashboard`);
     const attention = page.locator('.cl-ui-list-item', {hasText: people[0].name}).first();
     check(await attention.count() === 1 && /RISK \d+/i.test(await attention.innerText()), 'the waiting account is on Needs your attention with its risk badge');
     await attention.locator('a', {hasText: 'Approve or disable'}).click();
     await page.waitForLoadState('networkidle');
     check(await page.locator('#signup-check').count() === 1 && /Sign-up risk/.test(await page.locator('#signup-check').innerText()), 'the person\'s page shows the Sign-up risk');
     check(await page.locator('#recent-sign-ins').count() === 1, 'and Recent sign-ins');
-    await page.goto(`${base}/admin/people?people_view=list&people_sort=risk&people_dir=desc`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/people?people_view=list&people_sort=risk&people_dir=desc`);
     check(/RISK \d+/i.test(await page.locator('table tbody tr').first().innerText()), 'People sorts by risk, the riskiest first');
-    await page.goto(`${base}/admin/settings?section=signup-checks`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/settings?section=signup-checks`);
     check(await page.locator('#settings-signup-checks').count() === 1 && /What the check reads/.test(await page.locator('#settings-signup-checks').innerText()), 'Settings shows the Sign-up checks section');
     check(errors.length === 0, 'no server error: ' + errors.join(', '));
     await browser.close();

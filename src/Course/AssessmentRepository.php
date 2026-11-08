@@ -154,7 +154,7 @@ final class AssessmentRepository
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
                     a.time_limit_seconds,a.practice_enabled,a.practice AS practice_only,ce.course_id,ci.item_key AS assessment_key,
                     a.result_pass_html,a.result_fail_html,p.assessment_role,
-                    ce.user_id, ce.is_preview, c.slug, c.title AS course_title
+                    ce.user_id, ce.is_preview, ce.started_at AS enrolment_started_at, c.slug, c.title AS course_title
              FROM assessment_sessions s
              JOIN course_items ci ON ci.id=s.course_item_id JOIN course_item_assessments a ON a.course_item_id=ci.id
              JOIN course_enrolments ce ON ce.id=s.enrolment_id

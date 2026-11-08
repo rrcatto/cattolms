@@ -9,6 +9,8 @@
    Fixture: php tests/Browser/section-pages-fixture.php create|cleanup (in env_php_1), the same ADMIN session; its state
    file is CATTO_BROWSER_STATE. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs'), path = require('node:path');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-money-reports';
@@ -32,7 +34,7 @@ const ADDRESS = '/admin/commerce/reports';
   for (const width of [1440, 390]) {
     const ctx = await context(width);
     const page = await ctx.newPage();
-    const response = await page.goto(base + ADDRESS, {waitUntil: 'networkidle'});
+    const response = await arrive(page, base + ADDRESS);
     check(response.status() === 200, `${width}: status ${response.status()}`);
     const found = await page.evaluate(inspect);
     for (const fault of judge(found, `${width} ${ADDRESS}`)) failures.push(fault);
@@ -43,7 +45,7 @@ const ADDRESS = '/admin/commerce/reports';
 
   const ctx = await context(1440);
   const page = await ctx.newPage();
-  await page.goto(base + ADDRESS, {waitUntil: 'networkidle'});
+  await arrive(page, base + ADDRESS);
   const months = await page.$$eval('#money-report-month-choice option', options => options.map(o => ({value: o.value, selected: o.selected})));
   check(months.length >= 2, 'the Month offers this month and last month at least');
   const shown = months.find(m => m.selected).value;
@@ -65,17 +67,17 @@ const ADDRESS = '/admin/commerce/reports';
   check(!new URL(page.url()).searchParams.has('month') && await page.$eval('#money-report-month-choice', select => select.value) === shown, 'Back returns to the month before');
 
   // Every figure opens its list for the month, and Money in is the Money Ledger's Money in for it.
-  await page.goto(`${base}${ADDRESS}?month=${shown}`, {waitUntil: 'networkidle'});
+  await arrive(page, `${base}${ADDRESS}?month=${shown}`);
   const figures = await page.$$eval('#money-report-month .cl-ui-stat-link', links => links.map(a => ({href: a.getAttribute('href'), value: a.querySelector('.cl-ui-stat-value').textContent.trim(), label: a.querySelector('.cl-ui-stat-label').textContent.trim()})));
   check(figures.length === 6, `six figures (${figures.length})`);
   for (const figure of figures) check(/[?&](people_)?from=\d{4}-\d{2}-01&(people_)?to=\d{4}-\d{2}-\d{2}/.test(figure.href), `${figure.label} opens its list with the month's dates: ${figure.href}`);
   const moneyIn = figures.find(f => f.label === 'Money in');
-  await page.goto(base + moneyIn.href, {waitUntil: 'networkidle'});
+  await arrive(page, base + moneyIn.href);
   const ledgerIn = await page.$$eval('.cl-ui-stat-card', cards => (cards.find(c => c.querySelector('.cl-ui-stat-label')?.textContent.trim() === 'Money in')?.querySelector('.cl-ui-stat-value')?.textContent || '').trim());
   check(ledgerIn === moneyIn.value, `Money in (${moneyIn.value}) is the Money Ledger's Money in for the month (${ledgerIn})`);
 
   // The downloads.
-  await page.goto(`${base}${ADDRESS}?month=${shown}`, {waitUntil: 'networkidle'});
+  await arrive(page, `${base}${ADDRESS}?month=${shown}`);
   for (const [link, name, start] of [['Download PDF', `money-report-${shown}.pdf`, '%PDF-'], ['Download Excel', `money-report-${shown}.xlsx`, 'PK']]) {
     const [download] = await Promise.all([page.waitForEvent('download'), page.click(`a:has-text("${link}")`)]);
     const file = path.join(output, download.suggestedFilename());
@@ -103,7 +105,7 @@ const ADDRESS = '/admin/commerce/reports';
   // Without JavaScript: Show is there and opens the chosen month.
   const plain = await context(1440, false);
   const noScript = await plain.newPage();
-  await noScript.goto(base + ADDRESS, {waitUntil: 'networkidle'});
+  await arrive(noScript, base + ADDRESS);
   check(await noScript.isVisible('form.cl-money-period button:has-text("Show")'), 'without JavaScript Show is there');
   await noScript.selectOption('#money-report-month-choice', other);
   await Promise.all([noScript.waitForNavigation({waitUntil: 'networkidle'}), noScript.click('form.cl-money-period button:has-text("Show")')]);

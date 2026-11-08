@@ -65,7 +65,7 @@ if ($action === 'create') {
         // What the pages say about the later one: the long form on its page, the short one elsewhere (brief, 2026-11-06).
         'later_long' => 'On sale from ' . $start->format('l j F Y') . ' at 09:30', 'later_short' => 'On sale from ' . $start->format('j M Y'),
         'later_refusal' => 'This bundle can be bought from ' . $start->format('l j F Y') . ' at 09:30.',
-        'new_code' => $freeCode(), 'new_title' => $names->bundle(), 'learners' => [], 'scrub' => $fixture->seeds()];
+        'new_code' => $freeCode(), 'new_title' => $names->bundle(true), 'held' => $names->held(), 'learners' => [], 'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created bundles round two fixture.\n";
@@ -80,6 +80,7 @@ if ($action === 'create') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     (new CheckScrub($db))->remove($state['scrub']);
+    \CattoLearning\Tests\Support\CheckNames::release((array) ($state['held'] ?? []));
     unlink($statePath);
     echo "Removed everything the bundles round two check made.\n";
 } else {

@@ -19,7 +19,6 @@ final class CanonicalPageFixture
         $root = dirname(__DIR__, 2);
         $loader = TwigFactory::loader($root);
         $paths = [$root . '/themes/' . $slug];
-        if ($slug === 'factory-reset-sidebar') $paths[] = $root . '/themes/factory-reset';
         (new ThemeTemplates($loader))->use($paths);
         $twig = TwigFactory::create($loader, $root, sys_get_temp_dir() . '/catto-canonical-' . getmypid(), true);
         $item = static fn(string $key, string $href, array $children = [], string $method = 'GET'): array => [
@@ -42,7 +41,7 @@ final class CanonicalPageFixture
             'platform' => ['styles' => [], 'scripts' => [], 'icon_sprite' => '/img/nav-icons.svg'],
             'theme' => ['name' => $slug, 'slug' => $slug, 'version' => '2.0.0', 'asset_url' => '/theme', 'styles' => [], 'scripts' => [], 'external_styles' => [], 'external_scripts' => []],
             'user' => ['logged_in' => $authenticated, 'name' => 'Reader'], 'is_authenticated' => $authenticated,
-            'identity_placement' => $slug === 'gilded-noir' ? 'navigation' : 'page',
+            'identity_placement' => 'page',
             'identity_display_name' => 'Reader', 'identity_name' => 'Course Reader', 'identity_email' => 'reader@example.test', 'identity_role' => 'ADMIN',
             'identity_roles' => ['ADMIN'], 'identity_status' => 'Active',
             'course_content_mode' => false, 'theme_preview_active' => false, 'color_scheme' => 'light',

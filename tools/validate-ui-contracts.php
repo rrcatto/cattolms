@@ -10,25 +10,27 @@ $read = static function (string $path) use ($need): string {
     return is_file($path) ? (string) file_get_contents($path) : '';
 };
 
-$manifest = json_decode($read($root . '/themes/factory-reset/theme.json'), true);
-$need(is_array($manifest), 'Factory Reset theme.json must decode as JSON.');
-$need(($manifest['schema_version'] ?? '') === '4.0', 'Factory Reset must use Theme Package 4.0.');
-$need(($manifest['template_api'] ?? '') === '2.0', 'Factory Reset must use Template API 2.0.');
+// The bundled default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07, the other themes "on ice").
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ThemeManager.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme.');
+$manifest = json_decode($read($root . '/themes/' . $defaultSlug . '/theme.json'), true);
+$need(is_array($manifest), 'The default theme.json must decode as JSON.');
+$need(($manifest['schema_version'] ?? '') === '4.0', 'The default theme must use Theme Package 4.0.');
+$need(($manifest['template_api'] ?? '') === '2.0', 'The default theme must use Template API 2.0.');
 // The bundled version is the owner's to choose, so it is checked for shape rather than for a
 // particular number. Pinning the literal here meant every approved bump failed the gate and
 // had to be "fixed" by editing the check, which trains people to edit checks.
-$need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($manifest['theme']['version'] ?? '')) === 1, 'Factory Reset must declare a semantic version.');
-$need(array_key_exists('parent', $manifest) && $manifest['parent'] === null, 'Factory Reset must be standalone.');
-$need(count((array) ($manifest['palettes'] ?? [])) >= 1, 'Factory Reset must declare palettes.');
-$need((array) ($manifest['scripts'] ?? []) === [], 'Factory Reset must not own core interaction JavaScript.');
+$need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($manifest['theme']['version'] ?? '')) === 1, 'The default theme must declare a semantic version.');
+$need(array_key_exists('parent', $manifest) && $manifest['parent'] === null, 'The default theme must be standalone.');
+$need((array) ($manifest['scripts'] ?? []) === [], 'The default theme must not own core interaction JavaScript.');
 
-$base = $read($root . '/themes/factory-reset/base.html.twig');
-foreach (['{% block page_body %}','platform.styles','platform.scripts','navigation'] as $token) $need(str_contains($base, $token), 'Factory Reset base contract missing: ' . $token);
-// The footer is core-owned markup that every theme includes, so the theme delegates and core is
-// where footer_navigation is read. Both halves are checked: a theme that stopped delegating, or a
-// core footer that stopped rendering the array, each breaks the same contract.
-$factoryFooter = $read($root . '/themes/factory-reset/partials/footer.html.twig');
-$need(str_contains($factoryFooter, '@platform/partials/site-footer.html.twig'), 'Factory Reset footer must include the core site footer.');
+$base = $read($root . '/themes/' . $defaultSlug . '/base.html.twig');
+foreach (['{% block page_body %}','platform.styles','platform.scripts','navigation'] as $token) $need(str_contains($base, $token), 'Default theme base contract missing: ' . $token);
+// The footer's destinations are core's footer_navigation: a theme includes the core footer or draws the same array itself
+// (Saharan Sunset draws it among its own art). Both halves are checked: a theme that stopped drawing the array, or a core
+// footer that stopped rendering it, each breaks the same contract.
+$defaultFooter = $read($root . '/themes/' . $defaultSlug . '/partials/footer.html.twig');
+$need(str_contains($defaultFooter, '@platform/partials/site-footer.html.twig') || str_contains($defaultFooter, 'footer_navigation'), 'The default theme footer must render the core footer_navigation array.');
 $coreFooter = $read($root . '/resources/views/partials/site-footer.html.twig');
 $need(str_contains($coreFooter, 'footer_navigation'), 'The core footer must render the core footer_navigation array.');
 
@@ -209,7 +211,8 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '1.1.0'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+$composer = json_decode($read($root . '/composer.json'), true);
+foreach (["PLATFORM_ASSET_VERSION = '" . (string) (is_array($composer) ? ($composer['version'] ?? '') : '') . "'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);

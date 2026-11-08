@@ -19,6 +19,8 @@ SYSTEM.SETTING.MANAGE, which the site's default layout needed at Settings > Cour
 without JavaScript: the builder's buttons send the whole form and the server saves it.
 
 Changelog:
+2026/11/07 SAST
+- A refused new layout comes back as it was typed and arranged.
 2026/11/01 SAST
 - Created.
 */
@@ -88,12 +90,18 @@ final class AdminPageLayoutController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        return $this->handle(function () use ($user): void {
-            [$blocks] = CoursePageLayouts::fromForm($_POST);
-            $id = $this->layouts->create((string) ($_POST['name'] ?? ''), (string) ($_POST['purpose'] ?? ''), $blocks, $user->id);
-            $this->flash('success', 'The layout was made. Give it to courses on Course Page Layouts or on a course\'s Page layout tab.');
-            $this->redirect(self::PAGE . '/' . $id);
-        }, self::PAGE . '/new');
+        [$blocks] = CoursePageLayouts::fromForm($_POST);
+        $name = (string) ($_POST['name'] ?? '');
+        $purpose = (string) ($_POST['purpose'] ?? '');
+        try {
+            $id = $this->layouts->create($name, $purpose, $blocks, $user->id);
+        } catch (InvalidArgumentException|\RuntimeException $refused) {
+            // The new layout comes back as it was typed and arranged (2026-11-07: a refused one came back as the default).
+            $this->flash('danger', $refused->getMessage());
+            return $this->layoutPage(['id' => 0, 'name' => $name, 'purpose' => $purpose, 'blocks' => $blocks, 'is_default' => false, 'courses' => 0, 'updated_at' => ''], true, 422);
+        }
+        $this->flash('success', 'The layout was made. Give it to courses on Course Page Layouts or on a course\'s Page layout tab.');
+        $this->redirect(self::PAGE . '/' . $id);
     }
 
     #[Route('/admin/courses/page-layouts/{id}', name: 'admin_page_layout', requirements: ['id' => '\\d+'], methods: ['GET'])]
@@ -187,7 +195,7 @@ final class AdminPageLayoutController extends BaseController
      *
      * @param array{id:int,name:string,purpose:string,blocks:list<array{id:string,width:string,shown:bool}>,is_default:bool,courses:int,updated_at:string} $layout
      */
-    private function layoutPage(array $layout, bool $canManage): Response
+    private function layoutPage(array $layout, bool $canManage, int $status = 200): Response
     {
         $courses = $this->layouts->courses();
         $default = $this->layouts->defaultLayout();
@@ -212,7 +220,7 @@ final class AdminPageLayoutController extends BaseController
             'can_manage' => $canManage,
             'name_max' => CoursePageLayouts::NAME_MAX,
             'purpose_max' => CoursePageLayouts::PURPOSE_MAX,
-        ]);
+        ], $status);
     }
 
     private function layoutId(): int

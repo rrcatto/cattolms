@@ -1,1 +1,0 @@
-/* Light Default uses the core canonical navigation enhancement. */

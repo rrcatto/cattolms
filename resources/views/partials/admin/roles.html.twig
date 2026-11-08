@@ -63,7 +63,9 @@
 {% endembed %}
 
 		{% if can_manage_roles %}
-			{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createRoleModal', title: 'Create role', action: '/admin/roles', method: 'post'})} %}
+			{# A refused role comes back as it was typed, its window open (2026-11-07). #}
+			{% set typed = typed_for('/admin/roles') %}
+			{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createRoleModal', title: 'Create role', action: '/admin/roles', method: 'post', open: typed is not empty})} %}
 {% block modal_body %}
 
 							<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -73,21 +75,21 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role key', full_width: true, for: 'field-roles-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Uppercase snake notation. Prefix SEED_ only when the role is reserved for seed identities.'})} %}
 {% block control %}
 
-									<input name="role_key" required pattern="[A-Z][A-Z0-9_]+" placeholder="TRAINING_MANAGER" id="field-roles-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+									<input name="role_key" value="{{ typed.role_key|default('') }}" required pattern="[A-Z][A-Z0-9_]+" placeholder="TRAINING_MANAGER" id="field-roles-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role name', full_width: true, for: 'field-roles-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'CamelCase without spaces.'})} %}
 {% block control %}
 
-									<input name="role_name" required pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example TrainingManager" placeholder="TrainingManager" id="field-roles-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+									<input name="role_name" value="{{ typed.role_name|default('') }}" required pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example TrainingManager" placeholder="TrainingManager" id="field-roles-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: true, for: 'field-roles-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<textarea name="role_description" rows="3" id="field-roles-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}></textarea>
+									<textarea name="role_description" rows="3" id="field-roles-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ typed.role_description|default('') }}</textarea>
 
 {% endblock %}
 {% endembed %}

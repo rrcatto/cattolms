@@ -14,6 +14,7 @@ Unfollow from any category, course or tag page and from My Subscriptions; and, i
 
 Changelog:
 2026/11/07 SAST
+- A refused list comes back as it was typed (keepTyped).
 - Follow names a category or a tag by its slug, /follow/category/garden-design, never its row id (owner, 2026-11-06).
 2026/10/28 SAST
 - The Mailing menu (owner, 2026-10-27): Overview at /mailing, the lists at /mailing/lists, Sending settings at
@@ -123,7 +124,7 @@ final class MailingController extends BaseController
             $id = $this->listService->create($_POST, $user->id);
             $this->flash('success', 'The list is made. People join it themselves, on My Subscriptions or with its join link.');
             $this->redirect('/mailing/lists/' . $id);
-        }, '/mailing/lists#make');
+        }, '/mailing/lists#make', keepTyped: true);
     }
 
     #[Route('/mailing/lists/{id}', name: 'mailing_manage_list', requirements: ['id' => '\\d+'], methods: ['GET'])]

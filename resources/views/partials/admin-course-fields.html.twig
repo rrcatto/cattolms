@@ -47,7 +47,7 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Study time in hours', help: 'What a buyer is told the whole course takes. Empty adds up its parts.', span: 'quarter', for: 'study-hours'})} %}
 {% block control %}
 
-		<input class="cl-input" id="study-hours" type="number" min="0" name="study_hours" value="{{ course.estimated_minutes|default(0) ? (course.estimated_minutes / 60)|round : '' }}" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="study-hours" type="number" min="0" name="study_hours" value="{{ course.study_hours is defined ? course.study_hours : (course.estimated_minutes|default(0) ? (course.estimated_minutes / 60)|round : '') }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

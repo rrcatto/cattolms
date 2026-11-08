@@ -7,7 +7,7 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Checks high-risk Catto Learning runtime contracts, with special guards for filesystem-authoritative Theme Package 4.0 / Template API 2.0 with rebuildable registry, platform-owned page bodies, exact-parent child themes and Factory Reset isolation.
+Checks high-risk Catto Learning runtime contracts, with special guards for filesystem-authoritative Theme Package 4.0 / Template API 2.0 with rebuildable registry, platform-owned page bodies, exact-parent child themes and default theme (Saharan Sunset) isolation.
 
 Changelog:
 2026/09/09 02:10 SAST
@@ -36,10 +36,13 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // @theme is the theme a request renders in, so what is checked is that it still asks ThemeTemplates
 // for both rather than composing a path of its own.
 foreach (['pageTemplate($page)','layoutFor(','templates->use('] as $token) $need(str_contains($renderer,$token),'Theme renderer guard missing: '.$token);
-$need(!str_contains($renderer,'themes/factory-reset/pages'),'Theme renderer must not source functional pages from Factory Reset.');
+// The bundled default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07).
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ThemeManager.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme.');
+$need(!str_contains($renderer,'themes/' . $defaultSlug . '/pages'),'Theme renderer must not source functional pages from the default theme.');
 
-$base = $read($root . '/themes/factory-reset/base.html.twig');
-foreach (['block page_body','@platform/partials/navigation.html.twig','@platform/partials/flash-messages.html.twig','@theme/partials/footer.html.twig'] as $token) $need(str_contains($base,$token),'Factory Reset base runtime dependency missing: '.$token);
+$base = $read($root . '/themes/' . $defaultSlug . '/base.html.twig');
+foreach (['block page_body','@platform/partials/navigation.html.twig','@platform/partials/flash-messages.html.twig','@theme/partials/footer.html.twig'] as $token) $need(str_contains($base,$token),'Default theme base runtime dependency missing: '.$token);
 
 $baselineMatches = glob($root . '/database/migrations/*_baseline.php') ?: [];
 $need(count($baselineMatches) === 1, 'Expected exactly one baseline migration, found ' . count($baselineMatches) . '.');
@@ -48,7 +51,7 @@ foreach (['theme_definitions','theme_files','theme_assets'] as $token) $need(!st
 // The baseline must record *an* active theme, not a particular version. It pinned 1.0.1 while two
 // later migrations advanced the value; v0.6 collapsed those into one baseline that records the
 // bundled version directly, and validate-release.php is what checks the two agree.
-$need((bool) preg_match("/\('active_theme', 'factory-reset-v\d+\.\d+\.\d+'\)/", $baseline), 'Default active_theme seed is missing.');
+$need((bool) preg_match("/\('active_theme', '" . preg_quote($defaultSlug, '/') . "-v\d+\.\d+\.\d+'\)/", $baseline), 'Default active_theme seed is missing.');
 $need(str_contains($baseline,'CREATE TABLE theme_registry'),'Rebuildable theme metadata registry is missing.');
 $need(str_contains($baseline,'CREATE TABLE permissions') && str_contains($baseline,'CREATE TABLE role_permissions'),'ACL schema is missing.');
 $auditStart = strpos($baseline, 'CREATE TABLE audit_log');
@@ -80,8 +83,8 @@ $need(is_file($root . '/src/Application/AccountSectionRegistry.php'),'Account se
 $need(is_file($root . '/src/Application/CompanySectionRegistry.php'),'Company section registry is missing.');
 foreach (['footer_navigation','account_sections','company_sections'] as $token) $need(str_contains($renderer,$token),'Stable Theme API guard missing: '.$token);
 $need(!str_contains($coreJs,'data-theme-file'),'Removed Theme Studio JavaScript must not return.');
-$factoryJs = glob($root . '/themes/factory-reset/public/js/*.js') ?: [];
-$need($factoryJs === [], 'Factory Reset must not contain platform-owned JavaScript.');
+$defaultJs = glob($root . '/themes/' . $defaultSlug . '/public/js/*.js') ?: [];
+$need($defaultJs === [], 'The default theme must not contain platform-owned JavaScript.');
 
 if ($errors) {
     fwrite(STDERR, "Runtime hazard check failed:\n- " . implode("\n- ", $errors) . "\n");

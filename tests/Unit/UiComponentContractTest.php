@@ -80,6 +80,7 @@ final class UiComponentContractTest extends TestCase
     {
         $owners = [
             'cl-course-card' => 'partials/course-card',
+            'cl-bundle-card' => 'partials/bundle-card',
             'cl-ui-surface' => 'ui/layout/surface',
             'cl-ui-section-grid' => 'ui/layout/section-grid',
             'cl-ui-section-head' => 'ui/layout/section-head',
@@ -109,6 +110,7 @@ final class UiComponentContractTest extends TestCase
             'cl-ui-accordion-section' => 'ui/overlay/accordion-section',
             'cl-ui-icon' => 'ui/helpers/icon',
             'cl-course-cards' => 'ui/catalogue/course-grid',
+            'cl-bundle-cards' => 'ui/catalogue/bundles',
             'cl-tag-chip' => 'ui/catalogue/tag-chip',
             'cl-ui-tree-select' => 'ui/forms/tree-select',
             'cl-tag-browser' => 'ui/catalogue/tag-browser',
@@ -172,7 +174,9 @@ final class UiComponentContractTest extends TestCase
         foreach (['catalogue-workspace', 'catalogue-region', 'catalogue-results'] as $id) {
             self::assertSame(1, substr_count($workspace, 'id="' . $id . '"'));
         }
-        self::assertSame(2, substr_count($workspace, 'partials/pagination.html.twig'));
+        // The courses' pagination above and below them, and the bundles' own under theirs (owner, 2026-11-07).
+        self::assertSame(3, substr_count($workspace, 'partials/pagination.html.twig'));
+        self::assertStringContainsString("ui('catalogue.bundles'", $workspace);
         self::assertStringContainsString("ui('catalogue.course-grid'", $workspace);
         self::assertSame(1, substr_count($templates['resources/views/ui/catalogue/course-grid.html.twig'], 'partials/course-card.html.twig'));
     }

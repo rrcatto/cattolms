@@ -68,11 +68,14 @@ final class PlatformUi
         'feedback.notice' => ['template' => 'feedback/notice', 'defaults' => ['tone' => 'info', 'heading' => '', 'section_spacing' => false, 'flash' => false, 'solid' => false, 'icon' => '']],
         'feedback.empty' => ['template' => 'feedback/empty-state', 'defaults' => ['heading' => '', 'summary' => '']],
         'feedback.progress' => ['template' => 'feedback/progress', 'defaults' => ['value' => null, 'min' => 0, 'max' => 100, 'label' => null, 'show_value' => false, 'size' => 'normal']],
-        'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post', 'upload' => false]],
+        'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post', 'upload' => false, 'open' => false]],
         // eyebrow and icon (owner, 2026-10-20, the FAQ): a category line above the heading and an SVG icon before both.
         'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'summary_tone' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '', 'eyebrow' => '', 'icon' => '']],
         'icon' => ['template' => 'helpers/icon', 'defaults' => ['name' => null, 'label' => '', 'decorative' => true, 'size' => 'normal']],
         'catalogue.course-grid' => ['template' => 'catalogue/course-grid', 'defaults' => ['courses' => []]],
+        // Bundles as bundles (owner, 2026-11-07, the approved mockup: "it needs to be obvious they are bundles not courses"):
+        // their own cards, three to a row, or their own list (view 'list'), in the catalogue and on the Bundles page.
+        'catalogue.bundles' => ['template' => 'catalogue/bundles', 'defaults' => ['bundles' => [], 'view' => 'grid']],
         'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'courses' => [], 'catalogue_pagination' => []]],
         'catalogue.tag-browser' => ['template' => 'catalogue/tag-browser', 'defaults' => ['tags' => [], 'selected_slug' => '']],
         'catalogue.tag-chip' => ['template' => 'catalogue/tag-chip', 'defaults' => ['tag' => [], 'selected' => false, 'compact' => false]],
@@ -133,8 +136,8 @@ final class PlatformUi
             'size' => $component === 'overlay.modal' ? ['normal', 'wide', 'page'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
             // What a button or link's htmx GET replaces: its target's inside, or the target itself (a course's row edited
-            // in place, owner 2026-11-01).
-            'swap' => ['innerHTML', 'outerHTML'],
+            // in place, owner 2026-11-01), or the inside morphed to match (the catalogue's two sections, owner 2026-11-07).
+            'swap' => ['innerHTML', 'outerHTML', 'innerMorph'],
             'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ($component === 'form.picture-choice' ? ['auto', 1, 4] : ($component === 'data.stat-grid' ? ['auto', 1, 2, 3, 4, 5] : ($component === 'data.card-grid' ? [4, 5] : ($component === 'layout.section-grid' ? ['auto', 1, 2, 3, 4, 'main-side'] : ['auto', 1, 2, 3, 4])))),
             'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
@@ -143,6 +146,7 @@ final class PlatformUi
             $enums['workspace'] = ['', 'admin', 'account', 'company', 'library'];
             $enums['summary_tone'] = ['', 'success', 'danger', 'neutral'];
         }
+        if ($component === 'catalogue.bundles') $enums['view'] = ['grid', 'list'];
         if ($component === 'data.card') {
             $enums['picture'] = ['round', 'square', 'wide'];
         }

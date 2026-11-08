@@ -14,6 +14,8 @@ time, pausing, resuming and cancelling, what became of each copy and each link, 
 Seeing needs PLATFORM.MAILING.VIEW and every change PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/07 SAST
+- A refused new email or address never emailed comes back as it was typed (keepTyped); a new email's goes back to its form.
 2026/10/28 SAST
 - The new-course digest's pages gone: Mailing › Digest is MailingDigestController's.
 2026/10/26 SAST
@@ -110,7 +112,7 @@ final class MailingCampaignController extends BaseController
             $id = $this->service->create($user->id, (string) ($_POST['name'] ?? ''), array_map('intval', (array) ($_POST['list_ids'] ?? [])));
             $this->flash('success', 'The email is a draft. Write its subject and content, look at the preview, then send it.');
             $this->redirect(self::BASE . '/' . $id);
-        }, self::BASE);
+        }, self::BASE . '#new', keepTyped: true);
     }
 
     #[Route('/mailing/messages/{id}', name: 'mailing_manage_campaign', requirements: ['id' => '\d+'], methods: ['GET'])]
@@ -342,7 +344,7 @@ final class MailingCampaignController extends BaseController
             $this->audit->record($user->id, 'mailing.suppressed', ['email' => $email]);
             $this->flash('success', $email . ' will never be emailed news.');
             $this->redirect('/mailing/never-emailed');
-        }, '/mailing/never-emailed');
+        }, '/mailing/never-emailed', keepTyped: true);
     }
 
     #[Route('/mailing/never-emailed/remove', name: 'mailing_manage_suppression_remove', methods: ['POST'])]

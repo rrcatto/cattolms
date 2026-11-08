@@ -131,22 +131,6 @@ if ($action === 'create') {
     echo json_encode($id > 0 ? ['id' => $id, 'state' => $records->order($id)['state'], 'due' => $records->dueAmount($id)] : ['id' => 0], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'request') {
     echo (int) $db->fetchOne("SELECT id FROM commerce_refund_requests WHERE requested_by_user_id = :u AND status = 'requested' ORDER BY id DESC LIMIT 1", ['u' => (int) ($argv[3] ?? 0)]) . "\n";
-} elseif ($action === 'theme') {
-    // Learners cannot preview a theme, so the matrix activates each in turn; `restore` puts back the one that was active.
-    $state = $readState();
-    $themes = $container->get(\CattoLearning\View\ThemeManager::class);
-    $state['active_theme'] ??= $themes->activeTheme();
-    $writeState($state);
-    $themes->activate((string) ($argv[3] ?? ''), (int) $state['users']['admin']);
-    echo $themes->activeTheme() . "\n";
-} elseif ($action === 'restore') {
-    $state = $readState();
-    if (isset($state['active_theme'])) {
-        $container->get(\CattoLearning\View\ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
-        unset($state['active_theme']);
-        $writeState($state);
-    }
-    echo "Restored.\n";
 } elseif ($action === 'wallet') {
     echo $container->get(WalletService::class)->balance(WalletOwner::person((int) ($argv[3] ?? 0))) . "\n";
 } elseif ($action === 'cleanup') {
@@ -157,11 +141,10 @@ if ($action === 'create') {
         $db->executeStatement('INSERT INTO app_options (option_key, option_value, updated_at, updated_by_user_id) VALUES (:k, :v, :at, :by)',
             ['k' => $row['option_key'], 'v' => $row['option_value'], 'at' => $row['updated_at'], 'by' => $row['updated_by_user_id']]);
     }
-    if (isset($state['active_theme'])) $container->get(\CattoLearning\View\ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
     // Everything the check made, its orders, ledger, wallets and requests included (owner, 2026-10-27).
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed everything the commerce wallets check made and put the settings back.\n";
 } else {
-    throw new RuntimeException('Usage: php tests/Browser/commerce-wallets-fixture.php create|learner|company-learner|order|request|wallet|theme|restore|cleanup [state-path] [learner-id]');
+    throw new RuntimeException('Usage: php tests/Browser/commerce-wallets-fixture.php create|learner|company-learner|order|request|wallet|cleanup [state-path] [learner-id]');
 }

@@ -20,6 +20,8 @@
      visitor, and offered by the reader. The presentation editor's own checks are presentation-editor.cjs.
    Fixture: php tests/Browser/course-parts-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-course-parts-state.json'));
@@ -34,7 +36,7 @@ async function session(browser, options = {}) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/courses/${state.course_code}/preview`);
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();
@@ -51,7 +53,7 @@ async function reader(browserType, name, width) {
     const at = `${name} ${width}`;
     await startPreview(page);
 
-    await page.goto(learn(state.presentation_node), {waitUntil: 'networkidle'});
+    await arrive(page, learn(state.presentation_node));
     const outline = await page.locator('.cl-course-outline').innerText();
     check(`${at}: the outline numbers the module`, outline.includes('Module 1: Soil, compost and containers'), outline.slice(0, 200));
     check(`${at}: the outline labels each part`, ['PRESENTATION', 'LESSON', 'SUMMARY', 'FLASH CARDS', 'PRACTICAL WORK'].every((label) => outline.toUpperCase().includes(label)));
@@ -87,7 +89,7 @@ async function reader(browserType, name, width) {
     });
     check(`${at}: the course's stylesheet leaves the player's design alone`, player.colour !== 'rgb(200, 0, 0)' && !player.font.includes('Courier') && player.border !== 'solid' && player.button !== 'rgb(200, 0, 0)', JSON.stringify(player));
 
-    await page.goto(learn(state.lesson_node), {waitUntil: 'networkidle'});
+    await arrive(page, learn(state.lesson_node));
     const decks = page.locator('.cw-deck.cw-ready');
     check(`${at}: the lesson plays both embedded presentations`, await decks.count() === 2);
     await decks.nth(0).focus();
@@ -102,7 +104,7 @@ async function reader(browserType, name, width) {
     });
     check(`${at}: the lesson takes the course's stylesheet and its presentations do not`, styled.lesson === 'rgb(200, 0, 0)' && styled.slide !== 'rgb(200, 0, 0)' && styled.slide !== '', JSON.stringify(styled));
 
-    await page.goto(learn(state.flashcards_node), {waitUntil: 'networkidle'});
+    await arrive(page, learn(state.flashcards_node));
     check(`${at}: the flash cards show one card at a time`, await page.locator('.cl-flashcards-card').count() === 1 && await page.locator('.cl-flashcards-list').isHidden());
     await page.getByRole('button', {name: 'Turn over', exact: true}).click();
     check(`${at}: turning a card over shows its answer`, (await page.locator('.cl-flashcards-back').innerText()) === 'Clay.');
@@ -115,7 +117,7 @@ async function reader(browserType, name, width) {
     const status = await page.locator('.cl-flashcards-status').innerText();
     check(`${at}: a card marked Again comes back, and the set ends when every card is known`, status.startsWith('Every card known, after going over 1 again'), status);
 
-    await page.goto(learn(state.practical_node), {waitUntil: 'networkidle'});
+    await arrive(page, learn(state.practical_node));
     check(`${at}: the model answer starts closed`, await page.locator('details.cl-practical-answer:not([open])').count() === 1);
     await page.locator('details.cl-practical-answer summary').click();
     check(`${at}: the model answer opens`, (await page.locator('.cl-practical-answer-body').innerText()).includes('Sand settles first'));
@@ -127,7 +129,7 @@ async function reader(browserType, name, width) {
     }
     // The Course Modules list keeps its place from page to page (owner, 2026-11-01), in a window short enough to scroll it.
     await page.setViewportSize({width, height: 420});
-    await page.goto(learn(state.presentation_node), {waitUntil: 'networkidle'});
+    await arrive(page, learn(state.presentation_node));
     const list = page.locator('.cl-course-reader > .cl-course-outline');
     const scrolls = await list.evaluate((nav) => nav.scrollHeight > nav.clientHeight + 20);
     await list.evaluate((nav) => { nav.scrollTop = nav.scrollHeight; });
@@ -201,7 +203,7 @@ async function narration() {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`${base}${state.presentation_url}`, {waitUntil: 'networkidle'});
+  await arrive(page, `${base}${state.presentation_url}`);
   await page.locator('#presentation-slide-list .cl-tree-node').first().getByRole('link', {name: /^Edit/}).click();
   await page.waitForLoadState('networkidle');
   await page.locator('#narration-record').click();
@@ -216,7 +218,7 @@ async function narration() {
   const visitor = await browser.newContext({ignoreHTTPSErrors: true});
   check('a visitor does not', (await visitor.request.get(base + src)).status() === 404);
   await startPreview(page);
-  await page.goto(learn(state.presentation_node), {waitUntil: 'networkidle'});
+  await arrive(page, learn(state.presentation_node));
   check('the reader offers the narration', await page.locator('.cw-btn', {hasText: 'Narration'}).count() === 1);
   check('narration: no script errors', errors.length === 0, errors.join(' | '));
   await browser.close();

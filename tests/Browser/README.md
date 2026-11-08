@@ -1,9 +1,47 @@
 # UI stabilisation browser checks
 
 These tests run Chromium against the existing development instance. They create one temporary
-administrator session. Component checks select theme previews without changing the active theme;
-the canonical matrix temporarily activates themes and restores the original. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
+administrator session. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
 No Node dependency or frontend build is added; use an existing Playwright installation.
+
+## One theme, and checks that take minutes
+
+Since 2026-11-07 Saharan Sunset is the only theme the code bundles (owner: "there is only ONE theme that matters now and
+it is Saharan sunset", and the other five "on ice until further notice"), so "every bundled theme" below is Saharan
+Sunset alone. `site-theme.cjs` names it: `bundledThemes()` for the checks that look through the theme preview, and
+`siteTheme()` for those that look as a visitor or a learner, who cannot preview one. **No check switches the active
+theme**: a check that finds the site drawn in another theme fails and says so, and the owner's choice is never changed to
+make it pass. A theme copied back into `themes/` joins the preview checks by itself.
+
+`pace.cjs` is how the checks wait and run side by side (owner, 2026-11-07: "you must figure out how to do the tests in
+minutes, not hours!!"):
+
+- A page counts as ready once it has loaded and settled: its fonts in, then two animation frames, so the scripts that
+  fit tables, figures and pagination have run (`open`, `settle`). Every page is drawn by the server, so nothing a check
+  reads arrives later; the half second of network quiet a check used to wait for on every page bought nothing. A check
+  that waits for an htmx request it started still waits for that request itself.
+- The crawls open several pages at once, each in a browser context of its own: `every-page.cjs` (its four crawls at once
+  too), `no-row-ids.cjs` (its four readers at once), `section-pages.cjs` and `card-grids.cjs` (each list in a fresh
+  context). `CATTO_PAGES` sets how many (5 when unset). A page that takes over two minutes fails on its own, never stops
+  the crawl.
+- `presentation-readable.cjs` measures only what has changed since it last passed (below), on several processes.
+
+Which checks may run beside which: the read-only ones (the crawls, the shared-construction checks, presentation-readable,
+catalogue-export, money-reports, figure-fit, signup-checks, bundle-display, financial-documents and order-links) beside
+each other, as long as their fixtures are made before any of them starts and removed after all have finished, and no
+check that adds or removes a course, a bundle, a category or a promotion runs with them. PHPUnit's Integration suite makes
+real companies, people, courses and categories for each test and deletes them straight after, and its tests count what
+the whole site holds, so beside any browser check it runs against a copy of the database (`DB_NAME` given to its process
+wins over `.env`), never the one the site is using. `structured-data.cjs` needs every
+published course to have its cover (a course without one has no share picture), so it runs before any check's own course
+exists. Fixture clean-ups (`tests/Support/CheckScrub.php`) take one advisory lock, so only one runs at a time, and give
+way to a busy table, so two never deadlock. Never beside anything: `promotions.cjs` (an automatic promotion
+that takes 20% off every cart), `demo-site.cjs` (the site goes live for a moment), `site-notification.cjs` and
+`notice-tones.cjs` (a notice on every page) and `site-analytics.cjs` (it locks out, for a moment, the address the checks
+come from). The checks that place orders one at a time (`financial-documents.cjs` saves a new design that every order placed
+meanwhile would be drawn in); `page-layout.cjs` makes a layout of its own the default for a moment, so not beside a check
+that reads a course's page; the category checks not beside one that reads a category; the Telegram checks
+(`owner-messages.cjs`, `telegram-sign-in.cjs`) one after the other.
 
 Every fixture person has a date of birth (set by `DevelopmentFixture::createUser` as registration sets
 it), so no check stops at the first-sign-in date of birth step (adults only, owner, 2026-10-20). Nothing
@@ -15,7 +53,9 @@ Seed Database), so a check must neither break the rules nor leave anything behin
 
 - Every name is a real one nobody on the site has, never a string of digits (`tests/Support/CheckNames.php`): people
   (Lerato Dlamini), companies (Karoo Ridge Accounting, at karooridgeaccounting.test), courses (Payroll Basics),
-  bundles, promo codes and categories.
+  bundles, promo codes and categories. A name a fixture hands its check to make later (a course title typed into Create
+  course) is held from every other check until the fixture's clean-up releases it (`course(true)` and the like, then
+  `CheckNames::release($state['held'])`), so checks side by side never choose the same one.
 - Every company is made with its founding Company Administrator (`DevelopmentFixture::company()`; the database refuses
   a company without one), and its staff are at its domain (`staff()`).
 - Every `cleanup` removes everything the check made, its orders, payments, ledger, documents, refunds, wallets,
@@ -59,36 +99,27 @@ run this browser matrix separately before the full QA gate after UI/theme change
 
 ## Canonical page construction
 
-`canonical-page.cjs` covers every bundled theme in anonymous and authenticated states at 1440, 820
-and 390px: 36 page/state/viewport combinations. It checks the shared landmarks, main/footer
+`canonical-page.cjs` covers the theme the site is drawn in (Saharan Sunset; nothing is activated) in anonymous and
+authenticated states at 1440, 820 and 390px: 6 page/state/viewport combinations. It checks the shared landmarks, main/footer
 siblings, semantic sections, navigation geometry, document overflow, mobile toggle and Escape,
 keyboard access to nested menus, mobile Menu-label contrast, and desktop flyouts versus inline
 sidebar/mobile groups.
 Ten additional checks follow native catalogue links with JavaScript disabled. Full-page, open-navigation and footer
 screenshots are saved beside `results.json` in `/tmp/catto-canonical-page`.
 
-The combined sequence above runs this matrix before cleanup. To run it separately, create and copy the isolated identity first, run the following, then restore theme state and clean up:
+The combined sequence above runs this matrix before cleanup. To run it separately, create and copy the isolated identity first, run the following, then clean up:
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/canonical-page.cjs
 ```
 
-Unlike the component matrix, this matrix temporarily activates each bundled theme so anonymous
-requests exercise the actual shell. `canonical-page-theme.php` saves the original active theme and
-the runner restores it in `finally`. Do not run multiple canonical matrices concurrently. If the
-process is killed or the host reboots, restore the saved state **before** cleaning up the identity:
+Anonymous requests exercise the actual shell of the active theme; until 2026-11-07 this matrix activated each bundled
+theme in turn (`canonical-page-theme.php`, removed with the other themes). Keep theme installation/publication complete
+before starting either matrix. The matrices validate development source themes; they do not build a release or
+regenerate distributable theme ZIPs.
 
-```sh
-podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/canonical-page-theme.php restore'
-```
-
-Only run that recovery command when `/tmp/catto-canonical-theme-state.json` exists inside the
-container. A new run refuses to overwrite an unrestored state. Keep theme installation/publication
-complete before starting either matrix. The matrices validate development source themes; they do
-not build a release or regenerate distributable theme ZIPs.
-
-The canonical construction fixes the former blank mobile row in Factory Reset Sidebar. Its frame
-also accounts for margins and the desktop sidebar width, including on the gallery and Reports.
+The canonical construction fixed a blank mobile row in a sidebar theme (Factory Reset Sidebar, now out of the code). Its
+frame also accounts for margins and a desktop sidebar's width, including on the gallery and Reports.
 With JavaScript disabled, mobile top navigation stays in normal flow so its expanded links cannot
 cover pagination or other page controls. The component matrix exercises native Next and jump
 navigation as a regression for that behaviour.
@@ -182,8 +213,8 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 Course Creators, Courses and Bundles (since 2026-11-06) open as tables and the catalogue as cards; each grid shows whole rows (5 people or
 companies, 4 courses or bundles at 1440px, at most 2 at 390px), its own page sizes and its Sort, and every picture it asks for
 arrives; the choice is remembered without the address and the list comes back when chosen; the catalogue's list holds on
-a tag's page (the catalogue's bundle row above its courses is not the list: it stays cards in both views and
-`bundle-display.cjs` checks it); every view passes the shared page checks (`page-construction.cjs`); in the first theme every switch changes
+a tag's page (the catalogue's bundles above its courses are not the list: they have their own cards, list and switch, and
+`bundle-display.cjs` checks them); every view passes the shared page checks (`page-construction.cjs`); in the first theme every switch changes
 only its own list without loading the page (Administration's lists, the catalogue, the Company workspace's people,
 Subscribers, a company's people and courses, a presentation's slides) and keeps the focus on the button pressed; and, in
 the first theme, the switch and the Sort work without JavaScript. It uses `section-pages.cjs`'s fixture (below) and writes screenshots and
@@ -274,9 +305,11 @@ changed before saving, sub-subcategories never offered, the new category chosen 
 keeping the previous choice, a refusal keeping what was typed); a forged fourth level refused by
 the server; the keyboard opening the picker and a branch and choosing; a course saved with a
 category at two levels and then Uncategorised; an import filed in a category created during the
-import; and the catalogue's picker going to the category chosen. Without JavaScript the whole tree
-is listed and a course is saved with a sub-subcategory. Every theme opens the picker at 1440 and
-390px without it leaving the screen or the page scrolling sideways.
+import; and the catalogue's picker going to the category chosen. A refused New course (a slug the
+site refuses) comes back with its title, slug, subtitle, summary and study time as typed and the
+sub-subcategory still chosen, the picker opening on the way to it, with and without JavaScript. Without
+JavaScript the whole tree is listed and a course is saved with a sub-subcategory. Every theme opens the
+picker at 1440 and 390px without it leaving the screen or the page scrolling sideways.
 
 It uses `category-tree-fixture.php` (the same test tree, after the shipped taxonomy); `reset` also
 deletes the courses and Course Items the run created or imported. The theme scenario requests
@@ -287,6 +320,22 @@ Playwright moves the anchored popover.
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/category-picker.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php cleanup'
+```
+
+## Refused forms
+
+`refused-forms.cjs` sends Administration > People's Add person with an address that already has an
+account, in Chromium and Firefox and without JavaScript, and checks what comes back (21 checks): the
+refusal in words, the window open over the page with JavaScript (an ordinary section of the page
+without), every field as it was typed, the role as it was chosen and the notification still ticked,
+the window still closing, nothing typed on the next visit, and nobody made. Every create form is
+checked on the server by `RefusedFormsKeepWhatWasTypedIntegrationTest`, and the New course form with
+its category by `category-picker.cjs` (UX rule 4.10).
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/refused-forms-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/refused-forms.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/refused-forms-fixture.php cleanup'
 ```
 
 ## Course reviews
@@ -381,18 +430,21 @@ every bundled theme at 1440 and 390px without sideways scrolling. The script cre
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
 ```
 
-`bundle-display.cjs` (owner, 2026-11-06: "Bundle mockup is approved"; UX rule 8.8) checks how the site's own bundles
-show beside the courses, changing none of them, in Chromium and Firefox. In every bundled theme at 1440 and 390px (the
-theme preview, as an administrator): the course in the most bundles has, in its Course access card under the buy button,
-one note for each bundle the visitor could buy in BundleService's order (the larger saving first), with its words, its
-Save badge and See the bundle with its icon, nothing out of the card; All courses and the category with the most
-bundles have the "Save with a bundle" row of the Bundles page's cards above the courses, with View all bundles, the
-right cards to a row and none out of the grid, in place of the line about bundles, which a category without bundles
-keeps; the Bundles page's cards say what they save; no sideways scrolling, no inline style and the shared page checks
-(`page-construction.cjs`) everywhere. A company account sees no note and no row. Without JavaScript the notes, the row
-and See the bundle work, and a search (and a later page, where the site has one) has the line instead of the row; with
-it, a search typed in place takes the row away and brings the line, clearing it brings the row back, and a page turned
-in place (where there is a second) does the same, the page never loading again. `bundle-display-fixture.php` makes only
+`bundle-display.cjs` (owner, 2026-11-06: "Bundle mockup is approved"; the bundles' own section, 2026-11-07; UX rule 8.8)
+checks how the site's own bundles show beside the courses, changing none of them, in Chromium and Firefox. In the bundled
+theme at 1440 and 390px (the theme preview, as an administrator): the course in the most bundles has, in its Course
+access card under the buy button, one note for each bundle the visitor could buy in BundleService's order (the larger
+saving first), with its words, its Save badge and See the bundle with its icon, nothing out of the card; All courses and
+the category with the most bundles have the Course bundles section above the courses, with View all bundles, the first
+six bundles as their own cards in the bundle colour (none drawn as a course card), three to a row at 1440 and one at
+390, none out of the grid, each shorter than a course card with View bundle at its bottom left under a line, in place of
+the line about bundles, which a category without bundles keeps; the Bundles page has the bundles' own cards, saying
+what they save; no sideways scrolling, no inline style and the shared page checks (`page-construction.cjs`) everywhere.
+A company account sees no note and no bundles. Without JavaScript the notes, the bundles and See the bundle work, a
+search and a later page of courses keep the bundles, and the bundles' next page opens their next six. With it, a search
+typed in place, a page of courses, a page of bundles and List or Grid each change their own section and leave the other
+exactly as it was (the same elements, not drawn again), the address naming both pages, the list showing Bundle, No of
+courses, Description, Access and Price, and the page never loading again. `bundle-display-fixture.php` makes only
 a company account and an administrator, writes what BundleService says each page should show, and `cleanup` removes
 them and what their browsers recorded. Screenshots go to `/tmp/catto-bundle-display`; `CATTO_BROWSERS`, `CATTO_THEMES`
 and `CATTO_WIDTHS` narrow a run:
@@ -531,7 +583,7 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/owner-messages-fixture.php cleanup'
 ```
 
-`telegram-sign-in.cjs` (owner, 2026-11-05, the approved mockup) checks signing in with Telegram and two-step sign-in in Chromium and Firefox, against a stand-in of Telegram (`telegram-sign-in-standin.php`, which its fixture starts inside `env_php_1` after pointing the site at it, so no message reaches the real service): the Sign in page's two feature cards in every bundled theme at 1440 and 390 pixels; Account > Sign-in and security connecting Telegram (the page noticing Start by itself, and I have pressed Start without JavaScript), a test, Disconnect; two-step set up from the QR code read off the screen's pixels with jsQR and a code worked out in the check (RFC 6238), and its recovery codes; the same page for an unknown and a real username, a code that does not work in another browser, a wrong code's words, Send a new code, two-step's step and a recovery code; the link once in another browser and a used link saying what a used email link says; an administrator made to set two-step up first; the person's Sign-in card and Reset two-step; Settings' words and Two-step sign-in; the Telegram log's To column with no code or link in it; and that every message went to the stand-in and the log holds as many messages after as before. It creates and cleans up its own fixture (and switches themes, putting the active one back), so do not run it beside another theme-switching check. `CATTO_SHOTS=<folder>` keeps pictures.
+`telegram-sign-in.cjs` (owner, 2026-11-05, the approved mockup) checks signing in with Telegram and two-step sign-in in Chromium and Firefox, against a stand-in of Telegram (`telegram-sign-in-standin.php`, which its fixture starts inside `env_php_1` after pointing the site at it, so no message reaches the real service): the Sign in page's two feature cards in every bundled theme at 1440 and 390 pixels; Account > Sign-in and security connecting Telegram (the page noticing Start by itself, and I have pressed Start without JavaScript), a test, Disconnect; two-step set up from the QR code read off the screen's pixels with jsQR and a code worked out in the check (RFC 6238), and its recovery codes; the same page for an unknown and a real username, a code that does not work in another browser, a wrong code's words, Send a new code, two-step's step and a recovery code; the link once in another browser and a used link saying what a used email link says; an administrator made to set two-step up first; the person's Sign-in card and Reset two-step; Settings' words and Two-step sign-in; the Telegram log's To column with no code or link in it; and that every message went to the stand-in and the log holds as many messages after as before. It creates and cleans up its own fixture; the Sign in page is read in the site's own theme (nothing is activated). Its cleanup takes off the Telegram log every message after the one it started at, so run nothing else that writes there beside it. `CATTO_SHOTS=<folder>` keeps pictures.
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/telegram-sign-in.cjs
@@ -556,7 +608,7 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'SHELL_VERBOSITY=-1 php tests/Browser/structured-data-fixture.php cleanup /tmp/catto-structured-data-state.json'
 ```
 
-`reader-preview.cjs` (owner, 2026-11-01) checks, in Chromium and Firefox, a visitor reading the course's introduction, the paging row on a part, a section page, an assessment's start page and the course page, in the student preview and the public preview (Previous at the left at its own width, Next at the right, Mark complete centred on a part only, above them at 390px), a visitor marking a part complete and unmarking it with the tick and progress bar following, and the end of an assessment (practice's last answer with View my result, a result with nothing beside its report and its way on at the bottom, Next after a graded attempt, the course's result and Course overview after the final), and a visitor's assessment run as a learner's: the start page with practice and graded, one question at a time with the timer, Skip for now and Finish now, a skipped question coming back with its own number, the result with its question report, the part ticked, practice feedback, and a readiness check ending Ready; the toggle and an assessment without JavaScript, and Course Modules: only the section the reader is in open, moving with them, the arrow opening and closing a section by hand and drawn as an arrow, on a phone and without JavaScript too (144 checks). Its fixture makes a published course with a public readiness check, a public first module (a lesson, a summary and an assessment with practice), a second module that is not public and the final assessment, through the authoring service, and removes it all.
+`reader-preview.cjs` (owner, 2026-11-01) checks, in Chromium and Firefox, a visitor reading the course's introduction, the paging row on a part, a section page, an assessment's start page and the course page, in the student preview and the public preview (Previous at the left at its own width, Next at the right, Mark complete centred on a part only, above them at 390px), a visitor marking a part complete and unmarking it with the tick and progress bar following, and the end of an assessment (practice's last answer with View my result, a result with nothing beside its report and its way on at the bottom, Next after a graded attempt, the course's result and Course overview after the final), and a visitor's assessment run as a learner's: the start page with practice and graded, one question at a time with the timer, Skip for now and Finish now, a skipped question coming back with its own number, the result with its question report, the part ticked, practice feedback, and a readiness check ending Ready, then with wrong answers ending Review and saying what to study first (each module its questions name, in course order, its lesson and summary opening in the reader or the preview, the module the preview does not show said to be in the full course, at 1440 and 390px); the toggle and an assessment without JavaScript, and Course Modules: only the section the reader is in open, moving with them, the arrow opening and closing a section by hand and drawn as an arrow, on a phone and without JavaScript too (264 checks). Its fixture makes a published course with a public readiness check whose two questions name the first module and the second, a public first module (a lesson, a summary and an assessment with practice), a second module that is not public and the final assessment, through the authoring service, and removes it all.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/reader-preview-fixture.php create'
@@ -574,7 +626,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Chromium and Firefox (4).** Place my order without the tick places nothing; the Terms link opens in a new tab and leaves the checkout where it was; a form that lost its `required` attribute is refused by the server with the reason, for the learner and for the company; the details step has no identity number field.
 - **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms and a contents entry jumps to its section.
 
-Each bundled theme is activated in turn (`legal-pages-fixture.php theme <key>`), so signed-out requests are drawn in it, and the theme that was active before the run is put back even when a check fails. Do not run it beside the canonical matrix or any other check that switches themes. The script creates and cleans up its own fixture (a paid course, a learner, a company administrator and an ADMIN); it places no order, so cleanup removes everything. If a run is killed, run the cleanup yourself: it also restores the theme. Screenshots and `results.json` are written to `/tmp/catto-legal-pages` (`CATTO_BROWSER_OUTPUT`).
+The pages are read in the site's own theme, Saharan Sunset (a visitor cannot preview a theme, and nothing is activated). The script creates and cleans up its own fixture (a paid course, a learner, a company administrator and an ADMIN); it places no order, so cleanup removes everything. If a run is killed, run the cleanup yourself. Screenshots and `results.json` are written to `/tmp/catto-legal-pages` (`CATTO_BROWSER_OUTPUT`).
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/legal-pages.cjs
@@ -587,7 +639,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 - **Chromium (6).** Signed out, the home page, catalogue, a course, sign-in and the Terms say they are a demo site and carry `noindex, nofollow` in their robots meta and `X-Robots-Tag`; the notice shows without JavaScript; checkout offers EFT and then the simulated card (Settings → Payment methods) and says the purchase is a simulation; an EFT order says it is a simulation, shows fake bank details labelled as fake and the account reference, and its invoice says the same (checked by `demo-site-fixture.php order`); a sign-in email starts with `[DEMO]` and says it comes from a demo site (Mailpit, `CATTO_MAILPIT_URL`). ADMIN sets Site mode to live: no notice, no demo robots rule, only EFT at checkout, and the earlier order still a simulation; Reset returns to `APP_SITE_MODE`. In development (`APP_ENV`), Symfony itself sends `X-Robots-Tag: noindex`, so the live check looks only for the absence of the demo site's own rule.
 - **Firefox (1).** The notice and the checkout statement.
-- **Every theme at 1440, 820 and 390px.** The home page, catalogue, a course and the order show the notice, with one `h1` and no sideways scrolling. Each theme is activated in turn and the one that was active is put back.
+- **The site's own theme at 1440, 820 and 390px.** The home page, catalogue, a course and the order show the notice, with one `h1` and no sideways scrolling. Nothing is activated.
 
 The script creates and cleans up its own fixture (two paid courses, an ADMIN and a learner); cleanup puts back the site mode and removes everything the run made, its orders and their documents included. Phone screenshots go to `/tmp/catto-demo-site` (`CATTO_BROWSER_OUTPUT`).
 
@@ -603,7 +655,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Commerce settings (1).** A Stitch fee saved in its section of Administration → Settings is printed by the Refund Policy, a reminder longer than the credit expiry is refused with its reason, and Reset brings back the `.env` default.
 - **Money records (1).** The dashboard's Money received figure opens the Money Ledger filtered to payments; a search by account reference finds the learner's payment and overpayment; an entry opens on its own page. The order's page lists its Money Ledger lines, Payment Events and Commerce Trail together; a payment event and a trail entry open on their own pages, whose way back is the order; Credits & Orders lists Record EFT Payment and Unmatched Money but not Payment Events or the Commerce Trail.
 - **Unmatched money (1).** A deposit whose reference names nobody is put on Unmatched Money from Record EFT Payment; its page says what arrived; the dashboard and the list show it until ADMIN records that it was paid back.
-- **Every theme at 1440, 820 and 390px (288).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail, Payment Events, Record EFT Payment and Unmatched Money answer in that theme with one `h1` and no sideways scrolling. Learners cannot preview a theme, so each theme is activated in turn (`commerce-wallets-fixture.php theme <key>`) and the theme that was active is put back even when a check fails; do not run it beside another check that switches themes.
+- **The site's own theme at 1440, 820 and 390px (48).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail, Payment Events, Record EFT Payment and Unmatched Money answer in it with one `h1` and no sideways scrolling. Learners cannot preview a theme, and nothing is activated, so the pages are read in the site's own theme.
 
 The script creates and cleans up its own fixture (three paid courses, an ADMIN, a learner per scenario with wallet credit from a real overpaid EFT order and a course ADMIN assigned, and a member of a client company); no fixture writes a record a person could not have produced (owner, 2026-10-19); cleanup puts back every commerce setting and removes everything the run made, its orders, ledger and wallets included. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
 
@@ -723,3 +775,17 @@ podman cp env_php_1:/tmp/catto-presentation-readable-state.json /tmp/catto-prese
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/presentation-readable.cjs
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/presentation-readable-fixture.php cleanup'
 ```
+
+What has not changed is not measured again (owner, 2026-11-07). Each reading of a presentation (in the reader, or the
+fixture's course at a theme and width) has a fingerprint made from what its reader is given to draw, from the fixture:
+its slides and their words (a slide's id left out, being made afresh with the fixture's own course), their narration's
+words (on the screen in the transcript) but never its recording, the titles, the line in the player's bar and the
+course's own styling; with the hashes of what draws it (`public_html/js/catwalk.js`, `public_html/css/catwalk.css`, the
+reader's own markup and stylesheet, the code that turns slides into the deck and the theme's stylesheet, in the code and
+as the site serves them), the check's measuring code, the browser's version, and the theme and width. A reading that
+passes with nothing found is recorded by its fingerprint in `CATTO_CHECK_CACHE_FILE` (by default
+`runtime/storage/check-cache/presentation-readable.json` in the workspace beside the code tree, outside the repository);
+a later run measures only the readings whose fingerprint is not there, loading no page for the rest, and the front
+page's link is always followed. A run narrowed by `CATTO_READABLE_ONLY` or `CATTO_READABLE_CODES` records nothing.
+`CATTO_FULL=1` measures every reading. The measuring is shared by `CATTO_READABLE_WORKERS` processes (6 when unset), each
+with its own Chromium.

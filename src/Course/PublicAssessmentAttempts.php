@@ -19,6 +19,9 @@ scoring zero, negative marking, the course's grade bands), but it is an array th
 session: a public preview records nothing, so nothing here writes to the database.
 
 Changelog:
+2026/11/07 SAST
+- A readiness check's result suggests the modules its wrong answers name, as a learner's does (ReadinessSuggestions):
+  it had looked "m2" up as a Course Item's key and never suggested anything.
 2026/11/01 SAST
 - Created.
 */
@@ -221,7 +224,7 @@ final class PublicAssessmentAttempts
 
     /**
      * The result page's view (AssessmentService::result): the score, the counts, the question report and, for a
-     * readiness check, its message and the parts to look at again that the public preview shows.
+     * readiness check, its message and the modules to study again, opening only what the public preview shows.
      *
      * @param array<string,mixed> $attempt
      * @param list<array<string,mixed>> $structure the public preview's outline
@@ -233,7 +236,7 @@ final class PublicAssessmentAttempts
         $questions = $this->questions((int) $attempt['assessment_id']);
         $rows = $attempt['questions'];
         usort($rows, static fn(array $a, array $b): int => (int) $a['sequence'] <=> (int) $b['sequence']);
-        $responses = []; $review = [];
+        $responses = []; $references = [];
         foreach ($rows as $row) {
             $question = $questions[(int) $row['question_id']] ?? null;
             if ($question === null) { continue; }
@@ -243,7 +246,7 @@ final class PublicAssessmentAttempts
                 if ((bool) $option['is_correct']) { $correct = (string) $option['option_html']; }
             }
             $responses[] = ['question_id' => (int) $row['question_id'], 'question_html' => (string) $question['question_html'], 'explanation_html' => (string) ($question['explanation_html'] ?? ''), 'points' => $question['points'], 'response_status' => $row['response_status'], 'is_correct' => $row['is_correct'], 'points_awarded' => $row['points_awarded'], 'selected_option_html' => $selected, 'correct_option_html' => $correct, 'response_seconds' => $row['response_seconds'], 'has_response_seconds' => $row['response_seconds'] !== null && $row['response_status'] !== 'unanswered', 'response_time' => AssessmentService::timeTaken((int) $row['response_seconds'])];
-            if ($row['is_correct'] !== true) { foreach ((array) ($question['remediation_item_keys'] ?? []) as $key) { $review[(string) $key] = true; } }
+            $references[] = ['is_correct' => $row['is_correct'], 'remediation_item_keys' => (array) ($question['remediation_item_keys'] ?? [])];
         }
         $view = $attempt;
         $view['responses'] = $responses;
@@ -256,14 +259,11 @@ final class PublicAssessmentAttempts
             $passed = (float) $attempt['percentage'] + .0001 >= (float) $attempt['pass_mark'];
             $view['diagnostic_passed'] = $passed;
             $view['diagnostic_message_html'] = $passed ? (string) $attempt['result_pass_html'] : (string) $attempt['result_fail_html'];
-            $view['diagnostic_remediation_items'] = [];
-            foreach (array_keys($review) as $key) {
-                $item = $this->itemRecords->itemByKey((string) $key);
-                if ($item === null) { continue; }
-                $item['node_id'] = null;
-                foreach ($structure as $node) { if (($node['node_type'] ?? '') === 'item' && (int) ($node['course_item_id'] ?? 0) === (int) $item['id']) { $item['node_id'] = (int) $node['id']; $item['part_name'] = (string) ($node['part_name'] ?? ''); break; } }
-                $view['diagnostic_remediation_items'][] = $item;
-            }
+            // The learner's modules to study again (AssessmentService::studySuggestions): only what the public preview
+            // shows opens, and a module it leaves out is named as part of the full course.
+            $open = [];
+            foreach (CourseNavigation::sequence($structure) as $node) { $open[(int) $node['id']] = true; }
+            $view['study_suggestions'] = $this->assessments->studySuggestions((int) $attempt['course_id'], $references, null, $open);
         }
         return $view;
     }

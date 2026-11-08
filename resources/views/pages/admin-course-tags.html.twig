@@ -62,7 +62,9 @@
 
 {% endblock %}
 {% endembed %}
-		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post', upload: true})} %}
+		{# A refused tag comes back as it was typed, its window open (2026-11-07). #}
+		{% set typed = typed_for('/admin/courses/tags') %}
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post', upload: true, open: typed is not empty})} %}
 {% block modal_body %}
 
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -72,7 +74,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'tag-name', required: true})} %}
 {% block control %}
 
-							<input id="tag-name" name="name" maxlength="80" required {{ ui_field_attrs(props) }}>
+							<input id="tag-name" name="name" value="{{ typed.name|default('') }}" maxlength="80" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

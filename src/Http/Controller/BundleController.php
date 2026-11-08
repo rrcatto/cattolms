@@ -11,6 +11,7 @@ use CattoLearning\Bundle\BundleService;
 use CattoLearning\Commerce\Application\OrderService;
 use CattoLearning\Commerce\Application\PromotionService;
 use CattoLearning\Course\CourseFavouriteService;
+use CattoLearning\Support\ListView;
 use CattoLearning\Support\Pagination;
 use RuntimeException;
 use CattoLearning\View\ThemeRenderer;
@@ -37,14 +38,31 @@ final class BundleController extends BaseController
     public function index(): Response
     {
         $pagination = Pagination::create($this->request()->query->get('bundles_page'), $this->request()->query->get('bundles_page_size'), $this->records->publishedCount(), 24);
+        // The bundles' own cards or their list, as the reader chose for the catalogue's bundles too (owner, 2026-11-07).
+        $query = $this->request()->query->all();
+        $view = ListView::chosen('catalogue_bundles', $query, $this->request()->cookies->all());
+        ListView::rememberAsked('catalogue_bundles', $query);
         return $this->render('bundles', [
             'title' => 'Course bundles', 'active_nav' => 'catalogue',
             'bundles' => $this->bundles->catalogue($pagination->pageSize, $pagination->offset, $this->currentUser()),
+            'bundles_view' => $view,
+            'bundles_view_switch' => ListView::switcher('catalogue_bundles', $view, '/bundles'),
             'bundles_pagination' => PlatformAdministrationService::paginationPayload('bundles', $pagination, '/bundles', 'Course bundles'),
             // Each card's star (owner, 2026-11-06).
             'can_favourite' => $this->currentUser() !== null,
             'favourite_return' => $this->requests->getCurrentRequest()?->getRequestUri() ?? '/bundles',
         ]);
+    }
+
+    /**
+     * A bundle's own drawing as a picture, the strip across the top of its card (owner, 2026-11-07, the approved mockup).
+     * Its address carries the drawing's version, so it may be kept for good.
+     */
+    #[Route('/bundles/{slug}/cover.svg', name: 'bundle_cover_picture', requirements: ['slug' => '[a-z0-9]+(?:-[a-z0-9]+)*'], methods: ['GET'])]
+    public function cover(): Response
+    {
+        $cover = $this->records->publicCover((string) $this->param('slug')) ?? throw $this->notFound('There is no such picture.');
+        return \CattoLearning\Http\PictureResponse::of($cover, 'image/svg+xml', true);
     }
 
     #[Route('/bundles/{slug}', name: 'bundle_detail', requirements: ['slug' => '[a-z0-9]+(?:-[a-z0-9]+)*'], methods: ['GET'])]

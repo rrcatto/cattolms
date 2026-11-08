@@ -1,5 +1,5 @@
-/* Every Account, Company, Administration and Mailing menu page in every bundled theme at 1440 and 390px,
-   through the theme preview (nothing is activated). Checks the one construction every page shares:
+/* Every Account, Company, Administration and Mailing menu page in every bundled theme (Saharan Sunset alone since
+   2026-11-07) at 1440 and 390px, through the theme preview (nothing is activated), several pages at once (CATTO_PAGES). Checks the one construction every page shares:
    - exactly one h1;
    - only page rows directly in main (flash stack, page head, identity band, page sections, a theme's
      page-family wrapper, form windows);
@@ -42,6 +42,7 @@ const pages = [
   '/mailing', '/mailing/digest', '/mailing/messages', '/mailing/lists', '/mailing/subscribers', '/mailing/never-emailed', '/mailing/templates', '/mailing/automatic', '/mailing/settings', '/mailing/reports',
 ];
 const {inspect, judge} = require('./page-construction.cjs');
+const {PAGES, open, pool} = require('./pace.cjs');
 // The company's own page in Administration (owner, 2026-10-26), opened from its name: the fixture's company.
 if (state.company_reference) pages.push(`/admin/companies/${state.company_reference}`);
 
@@ -52,26 +53,35 @@ if (state.company_reference) pages.push(`/admin/companies/${state.company_refere
   for (const theme of themes.filter(t => !only.length || only.includes(t.slug))) {
     const key = `${theme.slug}-v${theme.version}`;
     for (const width of widths) {
-      const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
-      await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
-      const page = await context.newPage();
+      // Several pages at once (CATTO_PAGES), each worker in a browser context of its own.
+      const contexts = [];
+      const pageFor = async (worker) => {
+        if (!contexts[worker]) {
+          const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
+          await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
+          contexts[worker] = {context, page: await context.newPage()};
+        }
+        return contexts[worker].page;
+      };
       const gaps = new Map();
-      for (const route of pages.filter(route => !routes.length || routes.includes(route))) {
+      await pool(pages.filter(route => !routes.length || routes.includes(route)), PAGES, async (route, worker) => {
+        const page = await pageFor(worker);
         const label = `${theme.slug} ${width} ${route}`;
-        const response = await page.goto(`${base}${route}?theme_preview=${key}`, {waitUntil: 'networkidle'});
+        let response;
+        try { response = await open(page, `${base}${route}?theme_preview=${key}`); } catch (error) { failures.push(`${label}: did not load: ${error.message.split('\n')[0]}`); return; }
         const r = await page.evaluate(inspect);
         results.push({theme: theme.slug, width, route, status: response.status(), ...r});
-        if (response.status() !== 200) { failures.push(`${label}: status ${response.status()}`); continue; }
+        if (response.status() !== 200) { failures.push(`${label}: status ${response.status()}`); return; }
         if (!r.theme.includes(`/${key}/`)) failures.push(`${label}: the previewed theme was not served`);
         failures.push(...judge(r, label));
         if (r.gapAboveFooter !== null) gaps.set(route, r.gapAboveFooter);
         const file = `${theme.slug}__${route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}__${width}.jpg`;
         await page.screenshot({path: path.join(output, file), type: 'jpeg', quality: 60, fullPage: true});
-      }
+      });
       const values = [...gaps.values()];
       const common = values.sort((a, b) => values.filter(v => v === a).length - values.filter(v => v === b).length).pop();
       for (const [route, gap] of gaps) if (Math.abs(gap - common) > 2) failures.push(`${theme.slug} ${width} ${route}: ${gap}px above the footer, ${common}px on the other pages`);
-      await context.close();
+      for (const {context} of contexts.filter(Boolean)) await context.close();
       console.log(`${theme.slug} ${width}: done`);
     }
   }

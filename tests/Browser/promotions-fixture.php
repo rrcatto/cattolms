@@ -47,13 +47,15 @@ if ($action === 'create') {
     }
     $admin = $fixture->person('ADMIN');
     $promotions = new PromotionRepository($db);
-    [$code, $expired, $adminCode, $auto] = (new \CattoLearning\Tests\Support\CheckNames($db))->promotions(4);
+    // The check makes the last two itself: they are held from every other check until cleanup.
+    $names = new \CattoLearning\Tests\Support\CheckNames($db);
+    [$code, $expired, $adminCode, $auto] = $names->promotions(4, true);
     $now = new DateTimeImmutable();
     $base = ['name' => 'Ten percent off', 'description' => null, 'discount_type' => 'percentage', 'discount_value' => 1000, 'currency' => null, 'starts_at' => null, 'ends_at' => null,
         'active' => true, 'minimum_order_minor' => null, 'maximum_total_uses' => null, 'maximum_uses_per_customer' => null, 'course_scope' => 'all', 'bundle_scope' => 'none'];
     $promotions->create(['code' => $code] + $base, [], $admin['id'], $now->format(DATE_ATOM));
     $promotions->create(['code' => $expired, 'name' => 'Last week\'s offer', 'starts_at' => $now->modify('-2 days')->format(DATE_ATOM), 'ends_at' => $now->modify('-1 day')->format(DATE_ATOM)] + $base, [], $admin['id'], $now->format(DATE_ATOM));
-    $state = ['company' => $company, 'courses' => $courses, 'code' => $code, 'expired_code' => $expired, 'admin_code' => strtolower($adminCode), 'auto_code' => $auto, 'scrub' => $fixture->seeds(),
+    $state = ['company' => $company, 'courses' => $courses, 'code' => $code, 'expired_code' => $expired, 'admin_code' => strtolower($adminCode), 'auto_code' => $auto, 'held' => $names->held(), 'scrub' => $fixture->seeds(),
         'users' => ['provider' => $provider['founder']['id'], 'admin' => $admin['id']], 'learners' => [], 'admin_token' => $session($admin['id'], $admin['email'])];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
@@ -73,6 +75,7 @@ if ($action === 'create') {
     // Everything the check made, the promotions its administrator created through the pages and the orders that used them
     // included (owner, 2026-10-27).
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
+    \CattoLearning\Tests\Support\CheckNames::release((array) ($state['held'] ?? []));
     unlink($statePath);
     echo "Removed everything the promotions check made.\n";
 } else {

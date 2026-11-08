@@ -27,6 +27,7 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter(slug => fs.exist
 const only = (process.env.CATTO_THEMES || '').split(',').filter(Boolean);
 const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
 const {inspect, judge} = require('./page-construction.cjs');
+const {PAGES, open, pool} = require('./pace.cjs');
 
 // Each list: its address, its dataset, its cards to a row and its grid's page sizes.
 const lists = [
@@ -40,8 +41,8 @@ const lists = [
 
 /** What a page shows of a list: cards, rows, cards to the first row, the switch's choice, sizes, Sort, pictures. */
 const facts = () => {
-  // The list's own cards: the catalogue's bundles above its courses are a row of cards in either view (owner, 2026-11-06,
-  // the approved mockup; bundle-display.cjs checks them), not the list.
+  // The list's own cards: the catalogue's bundles above its courses have their own cards and view (owner, 2026-11-07, the
+  // approved mockup; bundle-display.cjs checks them), not the list's.
   const cards = [...document.querySelectorAll('.cl-ui-card, .cl-course-card')].filter(c => !c.closest('#catalogue-bundles'));
   const tops = cards.slice(0, 12).map(c => Math.round(c.getBoundingClientRect().top));
   const grid = [...document.querySelectorAll('.cl-ui-card-grid, .cl-course-cards')].find(g => !g.closest('#catalogue-bundles')) || null;
@@ -110,7 +111,7 @@ async function cardMenus(page, label, failures) {
   const failures = [];
   let views = 0;
   const visit = async (page, url, label) => {
-    const response = await page.goto(url, {waitUntil: 'networkidle'});
+    const response = await open(page, url);
     views++;
     if (response.status() !== 200) { failures.push(`${label}: status ${response.status()}`); return null; }
     const r = await page.evaluate(inspect);
@@ -121,20 +122,26 @@ async function cardMenus(page, label, failures) {
   // A tag that labels courses, for the catalogue's choice on a tag's page.
   const probe = await browser.newContext({ignoreHTTPSErrors: true});
   const probePage = await probe.newPage();
-  await probePage.goto(`${base}/courses/tags`, {waitUntil: 'networkidle'});
+  await open(probePage, `${base}/courses/tags`);
   const tag = await probePage.locator('a[href^="/courses/tag/"]').first().getAttribute('href');
   await probe.close();
 
+  // Each list, and the catalogue, in a fresh browser context of its own (so no choice is remembered from another), several
+  // at once (CATTO_PAGES). The in-place and the no-JavaScript parts below run beside them.
+  const tasks = [];
+  const fresh = async (width, key) => {
+    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
+    await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
+    const page = await context.newPage();
+    page.on('response', response => { if (response.status() >= 400 && /\/(profile-image|logo)\?v=/.test(response.url())) failures.push(`${key} ${width}: ${response.status()} for ${response.url()}`); });
+    return {context, page};
+  };
   for (const theme of themes.filter(t => !only.length || only.includes(t.slug))) {
     const key = `${theme.slug}-v${theme.version}`;
     for (const width of widths) {
-      const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
-      await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
-      const page = await context.newPage();
-      page.on('response', response => { if (response.status() >= 400 && /\/(profile-image|logo)\?v=/.test(response.url())) failures.push(`${key} ${width}: ${response.status()} for ${response.url()}`); });
       const most = width >= 1440 ? null : 2;
-
-      for (const list of lists) {
+      for (const list of lists) tasks.push(async () => {
+        const {context, page} = await fresh(width, key);
         const label = `${theme.slug} ${width} ${list.route}`;
         let f = await visit(page, `${base}${list.route}?theme_preview=${key}`, `${label} (first visit)`);
         if (f && (f.cards || !f.rows || f.shown !== 'list')) failures.push(`${label}: opens as ${f.cards} cards and ${f.rows} rows, ${f.shown || 'no'} view shown, not as its table`);
@@ -157,30 +164,33 @@ async function cardMenus(page, label, failures) {
         if (f && (!f.cards || f.shown !== 'grid')) failures.push(`${label}: the grid was not remembered (${f.cards} cards, ${f.shown || 'no'} view shown)`);
         f = await visit(page, `${base}${list.route}?${list.name}_view=list&theme_preview=${key}`, `${label} list`);
         if (f && (f.cards || !f.rows || f.shown !== 'list')) failures.push(`${label} list: ${f.cards} cards and ${f.rows} rows, ${f.shown || 'no'} view shown`);
-      }
+        await context.close();
+      });
 
-      const label = `${theme.slug} ${width} /courses`;
-      let f = await visit(page, `${base}/courses?theme_preview=${key}`, `${label} (first visit)`);
-      if (f && (!f.cards || f.rows || f.shown !== 'grid')) failures.push(`${label}: opens as ${f.cards} cards and ${f.rows} rows, not as cards`);
-      if (f && most === null && f.perRow !== Math.min(4, f.cards)) failures.push(`${label}: ${f.perRow} cards to a row, not 4`);
-      if (f && most !== null && f.perRow > most) failures.push(`${label}: ${f.perRow} cards to a row on a phone`);
-      f = await visit(page, `${base}/courses?catalogue_view=list&theme_preview=${key}`, `${label} list`);
-      if (f && (f.cards || !f.rows || f.shown !== 'list')) failures.push(`${label} list: ${f.cards} cards and ${f.rows} rows`);
-      await page.screenshot({path: path.join(output, `${theme.slug}__catalogue__list__${width}.jpg`), type: 'jpeg', quality: 60, fullPage: true});
-      if (tag) {
-        f = await visit(page, `${base}${tag}?theme_preview=${key}`, `${theme.slug} ${width} ${tag}`);
-        if (f && (f.cards || !f.rows)) failures.push(`${theme.slug} ${width} ${tag}: the catalogue's list was not kept (${f.cards} cards, ${f.rows} rows)`);
-      }
-      f = await visit(page, `${base}/courses?catalogue_view=grid&theme_preview=${key}`, `${label} grid`);
-      if (f && (!f.cards || f.rows)) failures.push(`${label} grid: ${f.cards} cards and ${f.rows} rows`);
-      await context.close();
-      console.log(`${theme.slug} ${width}: done`);
+      tasks.push(async () => {
+        const {context, page} = await fresh(width, key);
+        const label = `${theme.slug} ${width} /courses`;
+        let f = await visit(page, `${base}/courses?theme_preview=${key}`, `${label} (first visit)`);
+        if (f && (!f.cards || f.rows || f.shown !== 'grid')) failures.push(`${label}: opens as ${f.cards} cards and ${f.rows} rows, not as cards`);
+        if (f && most === null && f.perRow !== Math.min(4, f.cards)) failures.push(`${label}: ${f.perRow} cards to a row, not 4`);
+        if (f && most !== null && f.perRow > most) failures.push(`${label}: ${f.perRow} cards to a row on a phone`);
+        f = await visit(page, `${base}/courses?catalogue_view=list&theme_preview=${key}`, `${label} list`);
+        if (f && (f.cards || !f.rows || f.shown !== 'list')) failures.push(`${label} list: ${f.cards} cards and ${f.rows} rows`);
+        await page.screenshot({path: path.join(output, `${theme.slug}__catalogue__list__${width}.jpg`), type: 'jpeg', quality: 60, fullPage: true});
+        if (tag) {
+          f = await visit(page, `${base}${tag}?theme_preview=${key}`, `${theme.slug} ${width} ${tag}`);
+          if (f && (f.cards || !f.rows)) failures.push(`${theme.slug} ${width} ${tag}: the catalogue's list was not kept (${f.cards} cards, ${f.rows} rows)`);
+        }
+        f = await visit(page, `${base}/courses?catalogue_view=grid&theme_preview=${key}`, `${label} grid`);
+        if (f && (!f.cards || f.rows)) failures.push(`${label} grid: ${f.cards} cards and ${f.rows} rows`);
+        await context.close();
+      });
     }
   }
 
   // In place: every switch changes only its own list, and no page loads again.
   const firstTheme = themes.filter(t => !only.length || only.includes(t.slug))[0];
-  if (firstTheme) {
+  if (firstTheme) tasks.push(async () => {
     const key = `${firstTheme.slug}-v${firstTheme.version}`;
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});
     await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
@@ -193,7 +203,7 @@ async function cardMenus(page, label, failures) {
     }, area);
     const inPlace = async (route, area, optional = false) => {
       const label = `in place ${route}`;
-      await page.goto(`${base}${route}${route.includes('?') ? '&' : '?'}theme_preview=${key}`, {waitUntil: 'networkidle'});
+      await open(page, `${base}${route}${route.includes('?') ? '&' : '?'}theme_preview=${key}`);
       views++;
       const from = await shown(area);
       if (!from) { if (!optional) failures.push(`${label}: no view switch in ${area}`); return; }
@@ -214,20 +224,20 @@ async function cardMenus(page, label, failures) {
     await inPlace('/company/people', '#people-view');
     await inPlace('/mailing/subscribers', '#subscribers-view');
     const listing = await context.newPage();
-    await listing.goto(`${base}/admin/companies?companies_view=list`, {waitUntil: 'networkidle'});
+    await open(listing, `${base}/admin/companies?companies_view=list`);
     const company = await listing.locator('#companies-view a[href^="/admin/companies/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/companies\/[A-Z]{1,3}[0-9]{12,26}[0-9A-Z]$/.test(href)));
-    await listing.goto(`${base}/admin/course-items?type=slide_deck`, {waitUntil: 'networkidle'});
+    await open(listing, `${base}/admin/course-items?type=slide_deck`);
     const presentation = await listing.locator('a[href^="/admin/course-items/"]').evaluateAll(links => links.map(a => a.getAttribute('href')).find(href => /^\/admin\/course-items\/[a-z0-9-]*[a-z][a-z0-9-]*$/.test(href) && href !== '/admin/course-items/new'));
     await listing.close();
     if (company) { await inPlace(company, '#company_people-view'); await inPlace(company, '#company_courses-view', true); } else failures.push('in place: no company to open');
     if (presentation) await inPlace(presentation, '#slides-view'); else failures.push('in place: no presentation to open');
     if (errors.length) failures.push(`in place: script errors: ${errors.join(' | ')}`);
     await context.close();
-  }
+  });
 
   // Without JavaScript: the switch is links and the Sort a form, so both work.
   const first = themes.filter(t => !only.length || only.includes(t.slug))[0];
-  if (first) {
+  if (first) tasks.push(async () => {
     const key = `${first.slug}-v${first.version}`;
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, javaScriptEnabled: false, reducedMotion: 'reduce'});
     await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
@@ -247,7 +257,10 @@ async function cardMenus(page, label, failures) {
     if (!(await page.locator('.cl-ui-table tbody tr').count())) failures.push('without JavaScript: List did not bring the table back');
     views += 4;
     await context.close();
-  }
+  });
+
+  await pool(tasks, PAGES, (task) => task());
+  console.log(`${themes.filter(t => !only.length || only.includes(t.slug)).map(t => t.slug).join(', ')}: done`);
 
   await browser.close();
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({failures, views}, null, 1));

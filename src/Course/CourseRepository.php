@@ -1378,6 +1378,33 @@ final class CourseRepository
     }
 
     /**
+     * How many published courses are related to each of these courses, as their pages' Related courses count them
+     * (relatedCourseIds, then publishedCoursesByIds), for many courses in one question (the layouts' pages, 2026-11-07).
+     *
+     * @param list<int> $courseIds
+     * @return array<int,int>
+     */
+    public function publishedRelatedCounts(array $courseIds): array
+    {
+        $courseIds = array_values(array_unique(array_filter($courseIds, static fn(int $id): bool => $id > 0)));
+        $counts = array_fill_keys($courseIds, 0);
+        if ($courseIds === []) {
+            return $counts;
+        }
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT k.id AS course_id, COUNT(DISTINCT c.id) AS related FROM courses k
+               JOIN course_relations r ON r.course_low_id = k.id OR r.course_high_id = k.id
+               JOIN courses c ON c.id = CASE WHEN r.course_low_id = k.id THEN r.course_high_id ELSE r.course_low_id END
+              WHERE k.id IN (:ids) AND c.status = 'published' GROUP BY k.id",
+            ['ids' => $courseIds]
+        );
+        foreach ($rows as $row) {
+            $counts[(int) $row['course_id']] = (int) $row['related'];
+        }
+        return $counts;
+    }
+
+    /**
      * Makes these the courses related to this one: each new pair is kept once, lower id first, and each pair no longer
      * wanted goes, so the other course gains or loses the relation too.
      *

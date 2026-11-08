@@ -4,6 +4,10 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/11/07 SAST (Saharan Sunset the only bundled theme)
+- Five Core pieces only Factory Reset had styled, given Core's own look from the theme's tokens: an assessment's timer
+  (.cl-countdown), the card around its question (.cl-question-focus) and the question's words (.cl-question-text), a
+  course card's cover picture (.cl-course-cover) and the import review's module number (.cl-module-number).
 2026/11/05 SAST (Telegram sign-in and two-step sign-in)
 - Sign in by email or Telegram (.cl-sign-in-form, .cl-sign-in-how), a code typed in large spaced figures (.cl-input-code),
   the QR code on a white ground in every theme (.cl-two-step-qr), the recovery codes (.cl-recovery-codes), Account > Sign-in
@@ -227,6 +231,14 @@ summary{display:list-item;cursor:pointer}
 .cl-content-accordion-body{padding:1rem 1.25rem}
 @media (prefers-reduced-motion:reduce){.cl-content-accordion-summary::after{transition:none}}
 .cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
+/* An assessment question (2026-11-07, Core's since Factory Reset, the only theme that styled them, went on ice): the timer a
+   large dark figure at the right that keeps its width as the seconds change, the question's card lifted as the page's focus, its words
+   larger than the answers. Theme tokens where a theme sets them; the reader loads none, so its own colours there. */
+.cl-countdown{flex:none;min-width:7rem;margin-inline-start:auto;padding:.5rem 1rem;font-size:clamp(1.5rem,3vw,2.25rem);font-weight:800;line-height:1.1;letter-spacing:.04em;font-variant-numeric:tabular-nums;text-align:center;color:var(--cl-on-color-1,#fff);background:var(--cl-darkest,#16283e);border-radius:var(--cl-radius,.75rem)}
+.cl-question-focus>.cl-ui-surface{box-shadow:0 1rem 3rem rgba(42,50,75,.12)}
+.cl-question-text{font-size:1.2rem;line-height:1.7;color:var(--cl-ink,inherit)}.cl-question-text>:last-child{margin-bottom:0}
+/* The import review's module number, in a square beside the module's name. */
+.cl-module-number{flex:none;display:grid;place-items:center;width:2.4rem;height:2.4rem;border-radius:var(--cl-radius,.75rem);background:var(--cl-primary-soft,#e6eef7);color:var(--cl-primary-dark,#0e467a);font-weight:800;font-variant-numeric:tabular-nums}
 
 .cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,12px);background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
 .cl-password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.cl-password-control input{min-width:0}.cl-password-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;min-height:42px}.cl-password-toggle svg{width:18px;height:18px;fill:currentColor;display:block}.cl-password-toggle:disabled{opacity:.55;cursor:wait}
@@ -1353,6 +1365,8 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-course-card-header{position:relative;isolation:isolate;display:flex;align-items:flex-end;aspect-ratio:16/10;min-height:8.5rem;overflow:hidden}
 .cl-course-card-art{position:absolute;inset:0;z-index:0;line-height:0;pointer-events:none}
 .cl-course-card-art svg,.cl-course-card-art img{display:block;width:100%;height:100%;object-fit:cover}
+/* A course card's cover picture fills the card's art as its drawn cover does. */
+.cl-course-cover{display:block;width:100%;height:100%;object-fit:cover;background:var(--cl-light,#e8eef3)}
 .cl-course-card-art .cl-course-cover-placeholder{display:grid;place-items:center;width:100%;height:100%;font-size:2.4rem;font-weight:800;color:#fff;background:linear-gradient(135deg,#243b53,#486581)}
 .cl-course-card-header::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(to top,rgba(12,20,28,.86) 0%,rgba(12,20,28,.55) 45%,rgba(12,20,28,.12) 100%)}
 .cl-course-card-headline{position:relative;z-index:2;display:flex;align-items:flex-start;gap:.5rem;width:100%;padding:.7rem .8rem}
@@ -1416,9 +1430,83 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-bundle-courses li > span:first-child { margin-right:.75rem; }
 .cl-bundle-course-actions { display:inline-flex; flex-wrap:wrap; gap:.25rem; vertical-align:middle; }
 .cl-catalogue-bundles { margin:0 0 1rem; }
-/* Bundles above the catalogue's courses (owner, 2026-11-06, the approved mockup): the row's head with its link to every
-   bundle, the bundles' cards, then the Courses head, all inside the results card. */
-.cl-catalogue-bundle-row{display:grid;gap:.25rem;min-width:0;margin:0 0 1.5rem}
+/* Bundles as bundles (owner, 2026-11-07, the approved mockup: "it needs to be obvious they are bundles not courses"): their
+   own colour, a theme's --cl-bundle, --cl-bundle-text and --cl-bundle-highlight, else the accent darkened with a warm
+   highlight. In the catalogue a card of their own between the head and the courses, its background a shade of the accent,
+   its heading marked. A card is a small pile, about half a course card's height, three to a row; a row's cards are as
+   tall as the row, their covers, price and View bundle at its foot; among course cards one keeps its own height. The
+   list's head is in the bundle colour, its View bundle too. */
+.cl-catalogue-bundle-section,.cl-bundle-cards,.cl-bundle-card,.cl-bundle-list{--cl-bundle-surface:var(--cl-bundle,color-mix(in srgb,var(--cl-accent,#9a4a2a) 82%,#000));--cl-bundle-ink:var(--cl-bundle-text,#fbf6ee);--cl-bundle-mark:var(--cl-bundle-highlight,#efc293);--cl-bundle-quiet:color-mix(in srgb,var(--cl-bundle-ink) 84%,var(--cl-bundle-surface));--cl-bundle-rule:color-mix(in srgb,var(--cl-bundle-mark) 35%,transparent)}
+.cl-catalogue-sections>.cl-ui-surface.cl-ui-surface:has(>.cl-catalogue-bundle-section){background:color-mix(in srgb,var(--cl-accent-soft,#f4e4d6) 60%,var(--cl-surface,#fff))}
+.cl-catalogue-sections{display:grid;gap:1.25rem;min-width:0}
+/* A bundle's page opens as its card does (owner, 2026-11-07, the approved mockup): its drawing, then the bundle colour with
+   "Course bundle · N courses", its name and its star, drawn as a pile; its short description and facts beneath. */
+.cl-bundle-head{--cl-bundle-surface:var(--cl-bundle,color-mix(in srgb,var(--cl-accent,#9a4a2a) 82%,#000));--cl-bundle-ink:var(--cl-bundle-text,#fbf6ee);--cl-bundle-mark:var(--cl-bundle-highlight,#efc293);--cl-bundle-rule:color-mix(in srgb,var(--cl-bundle-mark) 35%,transparent);position:relative;z-index:0;display:flex;flex-direction:column;margin:14px 14px 0 0;background:var(--cl-bundle-surface);color:var(--cl-bundle-ink);border-radius:var(--cl-radius,.75rem)}
+.cl-bundle-head::before,.cl-bundle-head::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--cl-bundle-surface);border-radius:inherit;pointer-events:none}
+.cl-bundle-head::after{transform:translate(7px,-7px);opacity:.5}
+.cl-bundle-head::before{transform:translate(14px,-14px);opacity:.22}
+.cl-bundle-head-art{aspect-ratio:32/13;overflow:hidden;border-radius:var(--cl-radius,.75rem) var(--cl-radius,.75rem) 0 0;background:#1f1915}
+.cl-bundle-head-art svg{display:block;width:100%;height:100%}
+.cl-bundle-head-band{display:grid;gap:.6rem;padding:1.5rem 2.25rem 1.9rem}
+.cl-bundle-head .cl-bundle-head-kind{display:flex;align-items:center;gap:.6rem;margin:0;color:var(--cl-bundle-mark);font-size:.8rem;font-weight:500;letter-spacing:.16em;text-transform:uppercase}
+.cl-bundle-head-kind svg{flex:none;width:18px;height:18px}
+.cl-bundle-head .cl-bundle-head-band h1{margin:0;color:var(--cl-bundle-ink);overflow-wrap:anywhere}
+.cl-bundle-head-under{margin-top:1.75rem}
+@media(max-width:640px){.cl-bundle-head{margin-right:10px}.cl-bundle-head-band{padding:1.1rem 1.25rem 1.4rem}.cl-bundle-head-art{aspect-ratio:16/9}}
+.cl-catalogue-bundle-section{display:grid;gap:1.25rem;min-width:0}
+.cl-catalogue-bundle-section>.cl-ui-section-head h2{display:flex;align-items:center;gap:.65rem}
+.cl-catalogue-bundle-section>.cl-ui-section-head h2::before{content:"";flex:none;width:2.4rem;height:2.4rem;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23efc293' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z'/%3E%3Cpath d='M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12'/%3E%3Cpath d='M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17'/%3E%3C/svg%3E") center/1.4rem no-repeat,var(--cl-bundle-surface)}
+.cl-catalogue-bundle-section>.cl-ui-section-head .cl-ui-section-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.cl-bundle-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.9rem 1.6rem;padding-top:10px}
+@media(max-width:1100px){.cl-bundle-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.cl-bundle-cards{grid-template-columns:minmax(0,1fr)}}
+.cl-course-cards>.cl-bundle-card{align-self:start;margin-top:10px}
+.cl-bundle-card{position:relative;z-index:0;display:flex;flex-direction:column;gap:.75rem;min-width:0;margin-right:10px;padding:1.1rem 1.25rem 1.25rem;background:var(--cl-bundle-surface);color:var(--cl-bundle-ink);border-radius:var(--cl-radius,.75rem)}
+.cl-bundle-card::before,.cl-bundle-card::after{content:"";position:absolute;inset:0;z-index:-1;background:var(--cl-bundle-surface);border-radius:inherit;pointer-events:none}
+.cl-bundle-card::after{transform:translate(5px,-5px);opacity:.5}
+.cl-bundle-card::before{transform:translate(10px,-10px);opacity:.22}
+.cl-bundle-card-art{flex:none;height:170px;margin:-1.1rem -1.25rem .25rem;overflow:hidden;border-radius:var(--cl-radius,.75rem) var(--cl-radius,.75rem) 0 0;background:#1f1915}
+.cl-bundle-card-art img{display:block;width:100%;height:100%;object-fit:cover}
+.cl-bundle-card-top{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.cl-bundle-card .cl-bundle-card-kind{display:flex;align-items:center;gap:.5rem;margin:0;color:var(--cl-bundle-mark);font-size:.75rem;font-weight:500;line-height:1.3;letter-spacing:.14em;text-transform:uppercase}
+.cl-bundle-card-kind svg{flex:none;width:16px;height:16px}
+/* The star on the dark card (owner, 2026-11-07: "the star needs to be visible when i'm not hovering over it and switch it to
+   a different colour when I do"): light in its outline, the highlight on hover or focus; starred, the highlight, and light
+   on hover. Stronger than a theme's own star, which is drawn for a light card. */
+:is(.cl-bundle-card .cl-bundle-card-top,.cl-bundle-head .cl-bundle-head-band) .cl-favourite{color:var(--cl-bundle-ink);border-color:var(--cl-bundle-rule);background:transparent}
+:is(.cl-bundle-card .cl-bundle-card-top,.cl-bundle-head .cl-bundle-head-band) .cl-favourite:is(:hover,:focus-visible),:is(.cl-bundle-card .cl-bundle-card-top,.cl-bundle-head .cl-bundle-head-band) .cl-favourite.is-on{color:var(--cl-bundle-mark);border-color:var(--cl-bundle-mark);filter:none}
+:is(.cl-bundle-card .cl-bundle-card-top,.cl-bundle-head .cl-bundle-head-band) .cl-favourite.is-on:is(:hover,:focus-visible){color:var(--cl-bundle-ink);border-color:var(--cl-bundle-ink)}
+.cl-bundle-card .cl-bundle-card-title{margin:0;font-size:1.55rem;font-weight:600;line-height:1.12;overflow-wrap:anywhere}
+.cl-bundle-card .cl-bundle-card-title a{color:inherit;text-decoration:none}
+.cl-bundle-card .cl-bundle-card-title a:hover,.cl-bundle-card .cl-bundle-card-title a:focus-visible{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.cl-bundle-card .cl-bundle-card-summary{display:-webkit-box;margin:0;overflow:hidden;color:var(--cl-bundle-quiet);font-size:.875rem;line-height:1.45;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.cl-bundle-card-offer{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:.75rem;margin-top:auto}
+.cl-bundle-card-covers{display:flex;margin:0;padding:0 0 0 2px;list-style:none}
+.cl-bundle-card-covers li{flex:none;margin:0}
+.cl-bundle-card-covers li+li{margin-left:-26px}
+.cl-bundle-card-covers img,.cl-bundle-card-initial,.cl-bundle-card-more{display:flex;align-items:center;justify-content:center;width:64px;height:40px;object-fit:cover;box-shadow:0 0 0 2px var(--cl-bundle-surface)}
+.cl-bundle-card-initial,.cl-bundle-card-more{background:color-mix(in srgb,var(--cl-bundle-mark) 24%,var(--cl-bundle-surface));color:var(--cl-bundle-mark);font-size:.875rem;font-weight:600}
+.cl-bundle-card .cl-bundle-card-price{margin:0 0 0 auto;text-align:right}
+.cl-bundle-card-price .cl-price{display:inline-flex;flex-direction:column-reverse;align-items:flex-end}
+.cl-bundle-card .cl-bundle-card-price .cl-price-now{color:inherit;font-size:1.25rem;font-weight:600;line-height:1.2;white-space:nowrap}
+.cl-bundle-card .cl-bundle-card-price .cl-price-was{color:var(--cl-bundle-quiet);font-size:.8rem;white-space:nowrap}
+.cl-bundle-card-terms{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem .75rem}
+.cl-bundle-card .cl-bundle-card-badges{display:flex;flex-wrap:wrap;gap:.375rem;margin:0}
+.cl-bundle-card .cl-bundle-card-access{margin:0;color:var(--cl-bundle-quiet);font-size:.8rem}
+.cl-bundle-card-foot{display:flex;justify-content:flex-start;padding-top:.875rem;border-top:1px solid var(--cl-bundle-rule)}
+.cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary{background:var(--cl-bundle-mark);border-color:var(--cl-bundle-mark);color:var(--cl-ink,#1f1915)}
+.cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary:hover,.cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary:focus-visible{background:var(--cl-bundle-ink);border-color:var(--cl-bundle-ink);color:var(--cl-ink,#1f1915)}
+.cl-bundle-list .cl-ui-table table thead th{background:var(--cl-bundle-surface);color:var(--cl-bundle-ink);border-bottom-color:var(--cl-bundle-surface)}
+.cl-bundle-list .cl-ui-table td.cl-bundle-list-count{font-weight:600}
+.cl-bundle-list .cl-bundle-list-title{font-weight:600}
+.cl-bundle-list .cl-ui-table td.cl-bundle-list-summary{min-width:14rem}
+.cl-bundle-list-price{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem}
+.cl-bundle-list-price .cl-price{display:inline-flex;flex-direction:row-reverse;flex-wrap:wrap;justify-content:flex-end;gap:0 .4rem;white-space:nowrap}
+.cl-bundle-list-price .cl-price-now{font-weight:600}
+.cl-bundle-list-badges{display:flex;flex-wrap:wrap;gap:.3rem;max-width:100%}
+.cl-bundle-list-badges .cl-ui-badge{max-width:100%;white-space:normal}
+.cl-bundle-list .cl-ui-table .cell-actions .cl-ui-action--primary{background:var(--cl-bundle-surface);border-color:var(--cl-bundle-surface);color:var(--cl-bundle-ink)}
+.cl-bundle-list .cl-ui-table .cell-actions .cl-ui-action--primary:hover,.cl-bundle-list .cl-ui-table .cell-actions .cl-ui-action--primary:focus-visible{background:var(--cl-ink,#1f1915);border-color:var(--cl-ink,#1f1915);color:var(--cl-bundle-ink)}
 /* A bundle the course is in, under the buy button of its Course access card (the approved mockup): each one after a rule. */
 .cl-course-bundles{display:grid;min-width:0}
 .cl-course-bundle{display:grid;gap:.5rem;min-width:0;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--cl-border,#dfe4ea)}

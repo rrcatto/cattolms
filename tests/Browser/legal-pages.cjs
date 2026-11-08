@@ -1,9 +1,10 @@
 /* The public legal pages and the checkout acceptance in a real browser.
  *
- * In every bundled theme, signed out and signed in, at 1440, 820 and 390px: /terms, /refunds and
+ * In the theme the site is drawn in (Saharan Sunset, the one bundled theme since 2026-11-07), signed out and signed in,
+ * at 1440, 820 and 390px: /terms, /refunds and
  * /privacy answer in that theme with their title and last-updated date (no version), a contents list
  * whose every entry is a card on the page, all prose on cards, no value overlapping its label and
- * no sideways scrolling; and the Core footer lists Terms, Refunds and Privacy. In every theme at
+ * no sideways scrolling; and the Core footer lists Terms, Refunds and Privacy. In that theme at
  * the three widths the learner's checkout review and the company credit checkout show the one
  * acceptance box: required, with links to the Terms and Conditions and the Refund Policy inside
  * its label, whole and inside the form.
@@ -14,10 +15,9 @@
  * has no identity number field. Without JavaScript the pages read, the footer link leads to the
  * Terms and the contents list jumps to a section.
  *
- * Each theme is activated in turn (legal-pages-fixture.php `theme`) so signed-out requests are
- * drawn in it; the theme active before the run is restored even when a check fails. Do not run it
- * beside another theme-switching check. The script creates and cleans up its own fixture; no order
- * is placed, so cleanup removes everything. If the run is killed, run the fixture's `cleanup`. */
+ * Nothing is activated: a visitor cannot preview a theme, so the pages are read in the site's own theme, the owner's.
+ * The script creates and cleans up its own fixture; no order is placed, so cleanup removes everything. If the run is
+ * killed, run the fixture's `cleanup`. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -31,8 +31,7 @@ const root = path.resolve(__dirname, '..', '..');
 fs.mkdirSync(output, {recursive: true});
 
 const php = (action) => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `SHELL_VERBOSITY=-1 php tests/Browser/legal-pages-fixture.php ${action} 2>/dev/null`], {encoding: 'utf8'});
-const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
-    .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme);
+const themes = [require('./site-theme.cjs').siteTheme()];
 const WIDTHS = [1440, 820, 390];
 const DOCUMENTS = [['/terms', 'terms', 'Terms and Conditions'], ['/refunds', 'refunds', 'Refund Policy'], ['/privacy', 'privacy', 'Privacy Policy']];
 const REFUSED = 'Accept the Terms and Conditions and the Refund Policy before placing';
@@ -168,14 +167,13 @@ function assertAcceptance(facts, label) {
         for (const name of browsers) launched[name] = await playwright[name].launch({headless: true});
         const chromium = launched.chromium || Object.values(launched)[0];
 
-        /* 1. Every theme: the three pages and the footer, signed out and signed in; both checkout boxes. */
+        /* 1. The site's theme: the three pages and the footer, signed out and signed in; both checkout boxes. */
         const anonymous = await open(chromium);
         const learner = await open(chromium, state.learner_token);
         const buyer = await open(chromium, state.company_admin_token);
         await toReview(learner.page);
         await toCompanyCheckout(buyer.page);
         for (const theme of themes) {
-            php(`theme ${theme.slug}-v${theme.version}`);
             for (const [who, session] of [['signed-out', anonymous], ['signed-in', learner]]) {
                 for (const width of WIDTHS) {
                     await check(`${theme.slug} ${who} ${width}: the three pages and the footer`, async () => {
@@ -226,7 +224,6 @@ function assertAcceptance(facts, label) {
                 }
             }
         }
-        php('restore');
         for (const session of [anonymous, learner, buyer]) await session.ctx.close();
 
         /* 2. Each browser: nothing is placed without the tick, and the server says why. */
@@ -297,7 +294,7 @@ function assertAcceptance(facts, label) {
         failures.push(`run: ${error.message.split('\n')[0]}`);
         console.error(error);
     } finally {
-        // cleanup puts back the theme that was active before the run, then removes the fixture.
+        // cleanup removes the fixture.
         if (created) { try { php('cleanup'); } catch (error) { failures.push(`cleanup: ${error.message.split('\n')[0]}`); } }
         for (const browser of Object.values(launched)) await browser.close();
         fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({results, failures}, null, 2));

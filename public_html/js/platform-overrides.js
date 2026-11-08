@@ -105,6 +105,10 @@
       }
     });
     initialiseModals();
+    /* A window whose form was refused comes back open, holding what was typed (2026-11-07, overlay.modal open: true).
+       Without JavaScript every window is an ordinary section of the page, so it shows anyway. */
+    const refusedWindow = document.querySelector('.cl-ui-modal[data-modal-open]');
+    if (refusedWindow) openModal(refusedWindow.id);
     document.addEventListener('htmx:after:swap', () => initialiseModals());
 
     /* Delegated from document rather than bound per element, so a trigger or a close button that

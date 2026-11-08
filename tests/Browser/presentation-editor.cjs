@@ -13,6 +13,8 @@
    - every new page is built as every page is (page-construction.cjs), at 1440 and 390px.
    Fixture: php tests/Browser/course-parts-fixture.php create|cleanup (in env_php_1), the same as course-parts.cjs. */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const {inspect, judge} = require('./page-construction.cjs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -57,7 +59,7 @@ async function presentationPage(browserType, name) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('dialog', (dialog) => dialog.accept());
-    await page.goto(`${page1}?slides_view=list`, {waitUntil: 'networkidle'});
+    await arrive(page, `${page1}?slides_view=list`);
     const at = `${name} presentation page`;
     check(`${at}: named as the editor`, (await page.locator('h1').innerText()).trim() === 'Edit Course Item: Presentation');
     check(`${at}: the preview plays at the top`, await page.locator('#presentation-preview .cw-deck.cw-ready').count() === 1);
@@ -80,7 +82,7 @@ async function presentationPage(browserType, name) {
     check(`${at}: Up next stays last, and says why`, (await page.locator('.cl-tree-error').innerText()).includes('comes last') && (await titles(page))[3] === 'Up next');
     check(`${at}: moves load no page`, await page.evaluate(() => window.__same === true));
 
-    await page.goto(`${page1}?slides_view=grid`, {waitUntil: 'networkidle'});
+    await arrive(page, `${page1}?slides_view=grid`);
     check(`${at}: the grid shows the slides as cards`, await page.locator('.cl-slide-tree--grid .cl-tree-node').count() === 4);
     const grid = await ids(page);
     check(`${at}: in the grid the right half of a card means after it`, await drag(page, grid[0], grid[1], 0.85, 0.3) === 'after');
@@ -90,7 +92,7 @@ async function presentationPage(browserType, name) {
     await page.keyboard.press('ArrowLeft');
     await saved(page);
     check(`${at}: in the grid the left arrow moves a slide earlier`, (await titles(page))[0] === 'Welcome');
-    await page.goto(`${page1}?slides_view=list`, {waitUntil: 'networkidle'});
+    await arrive(page, `${page1}?slides_view=list`);
     check(`${at}: the list is remembered`, await page.locator('.cl-slide-tree--list').count() === 1);
 
     const first = (await ids(page))[0];
@@ -116,7 +118,7 @@ async function slidePages(browserType, name) {
     let answer = 'dismiss';
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('dialog', (dialog) => { dialogs.push(dialog.message()); answer === 'accept' ? dialog.accept() : dialog.dismiss(); });
-    await page.goto(page1, {waitUntil: 'networkidle'});
+    await arrive(page, page1);
     const at = `${name} slide page`;
 
     await page.getByRole('link', {name: 'Add a slide'}).click();
@@ -181,7 +183,7 @@ async function slidePages(browserType, name) {
     check(`${at}: and kept`, await page.locator('#narration-script').inputValue() === 'We start underground, where the roots are.');
 
     // The details page.
-    await page.goto(`${page1}/details`, {waitUntil: 'networkidle'});
+    await arrive(page, `${page1}/details`);
     await page.locator('#details-description').fill('Module 1: Soil and compost');
     dialogs.length = 0;
     answer = 'dismiss';
@@ -193,7 +195,7 @@ async function slidePages(browserType, name) {
 
     await page.setViewportSize({width: 390, height: 900});
     for (const address of [page1, `${page1}/details`]) {
-        await page.goto(address, {waitUntil: 'networkidle'});
+        await arrive(page, address);
         check(`${at}: nothing scrolls sideways at 390px (${address.replace(base, '')})`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     }
     check(`${at}: no script errors`, errors.length === 0, errors.join(' | '));
@@ -207,7 +209,7 @@ async function narration() {
     page.on('dialog', (dialog) => dialog.accept());
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(page1, {waitUntil: 'networkidle'});
+    await arrive(page, page1);
     await page.locator('#presentation-slide-list .cl-tree-node').first().getByRole('link', {name: /^Edit/}).click();
     await page.waitForLoadState('networkidle');
     const box = page.locator('#narration .cl-narration');
@@ -228,7 +230,7 @@ async function narration() {
     check('narration: Keep saves it at once', /^\/narrations\/[0-9a-f-]{36}$/.test(src || ''));
     await page.reload({waitUntil: 'networkidle'});
     check('narration: still there after a reload', await kept() === 1);
-    await page.goto(page1, {waitUntil: 'networkidle'});
+    await arrive(page, page1);
     check('narration: the list says so', (await page.locator('#presentation-slide-list .cl-tree-meta').first().innerText()).includes('Recording saved'));
     await page.goBack({waitUntil: 'networkidle'});
     await box.locator('.cl-narration-remove button').click();
@@ -243,10 +245,10 @@ async function construction() {
     for (const width of [1440, 390]) {
         const context = await session(browser, {viewport: {width, height: 1000}, reducedMotion: 'reduce'});
         const page = await context.newPage();
-        await page.goto(page1, {waitUntil: 'networkidle'});
+        await arrive(page, page1);
         const slide = (await ids(page))[1];
         for (const address of [page1, `${page1}/details`, `${page1}/slides/${slide}`, `${page1}/slides/${slide}/layout`, `${page1}/slides/add`, `${page1}/slides/new?layout=points&after=3`]) {
-            await page.goto(address, {waitUntil: 'networkidle'});
+            await arrive(page, address);
             const problems = judge(await page.evaluate(inspect), '').map((failure) => failure.replace(/^: /, ''));
             check(`built as every page is at ${width}px: ${address.replace(base, '')}`, problems.length === 0, problems.join(' | '));
         }

@@ -24,6 +24,11 @@ tables involved while the rows go, inside one transaction, and switched on again
 removed category, course or tag goes with it.
 
 Changelog:
+2026/11/07 SAST
+- One clean-up at a time across checks run side by side (an advisory lock), and a clean-up that finds a table busy gives
+  way and tries again (lock_timeout 400ms, up to 120 times), so two clean-ups never deadlock and a page never waits on one.
+  A clean-up the database refuses because something named a check's record after the rows were found starts again from
+  the finding, up to five times.
 2026/10/27 SAST
 - Created.
 - Never follows a pointer; puts a republished template back; refuses to remove rows the check did not make; takes the
@@ -92,6 +97,25 @@ final class CheckScrub
      */
     public function remove(array $seeds): array
     {
+        // With checks side by side something may name a check's record after the rows to remove were found (the commerce
+        // worker adds to an order's outbox, say), and the database then refuses the removal: so the whole clean-up, the
+        // finding included, is tried again a few times before it gives up.
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return $this->removeOnce($seeds);
+            } catch (\RuntimeException $refused) {
+                if ($attempt >= 5 || !str_starts_with($refused->getMessage(), 'The clean-up removed nothing')) throw $refused;
+                usleep(random_int(300000, 900000));
+            }
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $seeds
+     * @return array<string,int>
+     */
+    private function removeOnce(array $seeds): array
+    {
         $emails = array_values(array_filter(array_map('strval', $seeds['emails'] ?? [])));
         $analyticsAfter = isset($seeds['analytics_after']) ? (int) $seeds['analytics_after'] : null;
         unset($seeds['emails'], $seeds['analytics_after']);
@@ -139,9 +163,16 @@ final class CheckScrub
         $visitors = array_map('strval', $this->db->fetchFirstColumn('SELECT DISTINCT visitor_id::text FROM analytics_events WHERE visitor_id IS NOT NULL AND user_id::text IN (SELECT jsonb_array_elements_text(CAST(:u AS jsonb)))', ['u' => $userIds]));
         $tables = array_keys($depth);
         usort($tables, static fn(string $a, string $b): int => $depth[$b] <=> $depth[$a]);
+        // Checks run side by side (owner, 2026-11-07: "you must figure out how to do the tests in minutes, not hours!!"), and
+        // switching a table's guards off takes a lock on it: two clean-ups at once deadlocked. So one clean-up runs at a
+        // time across every check (an advisory lock held to the end of the transaction), and a clean-up that finds a table
+        // busy gives way within moments and tries again, so it, never a page someone is loading, is what waits.
+        for ($attempt = 1; ; $attempt++) {
         $removed = [];
         $this->db->beginTransaction();
         try {
+            $this->db->executeStatement("SELECT pg_advisory_xact_lock(hashtext('catto-check-scrub'))");
+            $this->db->executeStatement("SET LOCAL lock_timeout = '400ms'");
             // A template the check published a version of goes back to its latest version from before the check.
             if (isset($rows['document_template_versions'])) {
                 $this->db->executeStatement(
@@ -213,9 +244,16 @@ final class CheckScrub
             }
             foreach ($guarded as $table) $this->db->executeStatement('ALTER TABLE ' . $table . ' ENABLE TRIGGER USER');
             $this->db->commit();
+            break;
         } catch (\Throwable $failed) {
             $this->db->rollBack();
+            // A lock it waited too long for (55P03) or a deadlock (40P01): the tables were busy, so it tries again shortly.
+            if ($attempt < 120 && ($failed instanceof \Doctrine\DBAL\Exception\RetryableException || preg_match('/SQLSTATE\[(55P03|40P01)\]/', $failed->getMessage()) === 1)) {
+                usleep(random_int(100000, 500000));
+                continue;
+            }
             throw $failed;
+        }
         }
 
         return array_filter($removed);

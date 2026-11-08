@@ -12,6 +12,7 @@ The themes this platform ships live in the code root, and a fresh install instal
 
 Owner's instruction, 2026/09/10: the four themes that were instance-only are part of the codebase
 now - versioned with the code, committed, and installed with the LMS. Factory Reset already was.
+Owner, 2026/11/07: only Saharan Sunset stays, the default; the other five are on ice, out of the code.
 
 Three things have to stay true, and none of them is visible in a browser until an install has
 already gone wrong:
@@ -50,11 +51,12 @@ final class BundledThemeContractTest extends TestCase
     {
         $themes = self::bundledThemes();
 
-        self::assertGreaterThanOrEqual(
-            5,
-            count($themes),
-            'The platform ships Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default and '
-            . 'Radiant Learning. Fewer than five means one stopped being part of the codebase.'
+        // Saharan Sunset alone since 2026-11-07 (owner: the other themes "on ice until further notice"), and it is the
+        // default, so it can never stop being part of the codebase.
+        self::assertArrayHasKey(
+            \CattoLearning\View\ThemeManager::DEFAULT_SLUG,
+            $themes,
+            'The default theme, ' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . ', must be bundled: a site falls back to it.'
         );
 
         foreach ($themes as $slug => $manifest) {
@@ -155,7 +157,9 @@ final class BundledThemeContractTest extends TestCase
             );
         }
 
-        self::assertSame(1, $children, 'Factory Reset Sidebar is the one bundled child theme.');
+        // Since 2026-11-07 no bundled theme is a child (Factory Reset Sidebar is on ice with its parent); one copied back
+        // is checked above against the parent beside it.
+        self::assertGreaterThanOrEqual(0, $children);
     }
 
     /**

@@ -56,6 +56,10 @@ final class CourseController extends BaseController
     /** The shared search and pagination dataset. */
     private const DATASET = 'catalogue';
 
+    /** The catalogue's bundles, cards or a list as the reader chose (Support\ListView), six to a page. */
+    private const BUNDLES = 'catalogue_bundles';
+    private const BUNDLES_PER_PAGE = 6;
+
     #[Route('/courses', name: 'course_catalogue_1', methods: ['GET'])]
     #[Route('/courses/category/{slug}', name: 'course_catalogue_2', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
     public function catalogue(): Response
@@ -80,13 +84,25 @@ final class CourseController extends BaseController
         $courses = $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset);
         $navigation = $this->courses->categoryNavigation($category);
         $scope = $category === null ? '' : (string) $category['name'] . ($navigation['subcategories'] === [] ? '' : ' and all its subcategories');
-        // Bundles first, above the courses (owner, 2026-11-06, the approved mockup): on All courses and a category's first
-        // page, never with a search (or on a tag's page, which is not this one). The line about bundles stays where they do not.
-        $bundleRow = $search === '' && $pagination->page === 1 ? $this->bundleOffers->catalogueRow($category === null ? null : (int) $category['id'], $this->currentUser()) : [];
-        // Cards or a list, as the reader chose, remembered (owner, 2026-10-26).
+        // Bundles in a section of their own above the courses (owner, 2026-11-07, the approved mockup: "each section (bundles
+        // and courses) should page independently of the other"): on All courses every bundle on sale, on a category's pages
+        // those with a course in its branch, the larger saving first, six to a page, as cards or a list. They are there on
+        // every page of courses and with a search, and each address names both pages, so a link or Back opens the same view.
+        // The line about bundles stays where no section shows (a category without bundles, a company account).
         $query = $this->request()->query->all();
+        $searchParam = PlatformAdministrationService::searchParam(self::DATASET);
+        $bundles = $this->bundleOffers->catalogueRow($category === null ? null : (int) $category['id'], $this->currentUser());
+        $bundlePagination = Pagination::within($query['bundles_page'] ?? null, self::BUNDLES_PER_PAGE, count($bundles), [self::BUNDLES_PER_PAGE]);
+        $bundlesPage = $bundles === [] || $bundlePagination->page === 1 ? '' : $bundlePagination->page;
+        $coursesPage = $pagination->page === 1 ? '' : $pagination->page;
+        $bundleView = ListView::chosen(self::BUNDLES, $query, $this->request()->cookies->all());
+        ListView::rememberAsked(self::BUNDLES, $query);
+        // Cards or a list, as the reader chose, remembered (owner, 2026-10-26).
         $view = ListView::chosen(self::DATASET, $query, $this->request()->cookies->all());
         ListView::rememberAsked(self::DATASET, $query);
+        // Every control of either section fetches the page again and morphs the two sections: the one it changes changes,
+        // the other stays as it is, only its links learning the new address (catalogue.workspace).
+        $inPlace = ['region' => 'catalogue-region', 'results' => 'catalogue-results', 'swap' => 'innerMorph'];
 
         return $this->render('courses', [
             // The courses it shows, for search engines (owner, 2026-11-06): the summary page of Google's Course list.
@@ -98,24 +114,33 @@ final class CourseController extends BaseController
             'can_favourite' => $this->currentUser() !== null,
             'favourite_return' => $this->requests->getCurrentRequest()?->getRequestUri() ?? $base,
             'workspace' => [
-                'heading' => $search !== '' ? 'Search results' : ($category['name'] ?? 'All courses'),
-                'summary' => $search !== ''
-                    ? ($category === null ? 'Searching every course.' : 'Searching ' . $scope . '.')
-                    : ($category === null ? 'Every course in the catalogue. Choose a category to narrow the list.' : 'Every course in ' . $scope . '.'),
+                'heading' => $category['name'] ?? 'All courses',
+                'summary' => $category === null ? 'Every course in the catalogue. Choose a category to narrow the list.' : 'Every course in ' . $scope . '.',
+                // With a search, the courses' head says so (the bundles stay as they are).
+                'search_heading' => $search !== '' ? 'Search results' : '',
+                'search_summary' => $search !== '' ? ($category === null ? 'Searching every course.' : 'Searching ' . $scope . '.') : '',
                 'navigation' => $navigation,
-                'bundles' => $bundleRow === [] ? null : ['cards' => $bundleRow, 'summary' => $category === null ? 'Several courses for one price.' : 'Bundles with a course in ' . (string) $category['name'] . '.'],
-                'bundles_line' => $bundleRow === [] && $this->bundles->publishedCount() > 0,
+                'bundles' => $bundles === [] ? null : [
+                    'cards' => array_slice($bundles, $bundlePagination->offset, $bundlePagination->pageSize),
+                    'summary' => $category === null ? 'Several courses for one price, for less than buying them one by one.' : 'Bundles with a course in ' . (string) $category['name'] . ', for less than buying the courses one by one.',
+                    'view' => $bundleView,
+                    'page' => $bundlePagination->page,
+                    'view_switch' => ListView::switcher(self::BUNDLES, $bundleView, $base, [$searchParam => $search, 'page' => $coursesPage, 'bundles_page' => $bundlesPage]),
+                    'pagination' => [...PlatformAdministrationService::paginationPayload('bundles', $bundlePagination, $base, 'Course bundles', [$searchParam => $search, 'page' => $coursesPage], 'bundles_page', 'bundles_page_size', [self::BUNDLES_PER_PAGE]), ...$inPlace],
+                ],
+                'bundles_line' => $bundles === [] && $this->bundles->publishedCount() > 0,
                 'view' => $view,
                 'follow' => $category === null ? null : $this->followView('category', (int) $category['id'], (string) $category['name'], $base . '#follow', (string) $category['slug']),
-                'view_switch' => ListView::switcher(self::DATASET, $view, $base, [PlatformAdministrationService::searchParam(self::DATASET) => $search]),
+                'view_switch' => ListView::switcher(self::DATASET, $view, $base, [$searchParam => $search, 'bundles_page' => $bundlesPage]),
+                'in_place' => true,
                 'paginated' => true,
                 'empty_heading' => $search !== '' ? 'No courses match your search' : 'No courses to show here yet',
                 'empty_summary' => $search !== '' ? 'Try another term or clear the search.' : 'Choose another category to find a course.',
             ],
-            'catalogue_pagination' => PlatformAdministrationService::paginationPayload(
+            'catalogue_pagination' => [...PlatformAdministrationService::paginationPayload(
                 self::DATASET, $pagination, $base, 'Courses',
-                [PlatformAdministrationService::searchParam(self::DATASET) => $search], 'page', 'page_size'
-            ),
+                [$searchParam => $search, 'bundles_page' => $bundlesPage], 'page', 'page_size'
+            ), ...$inPlace],
         ]);
     }
 

@@ -34,11 +34,13 @@
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'make'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Make a list', summary: 'People join it themselves, on My Subscriptions or with its join link. You never add anyone.'}) }}
+		{# A refused list comes back as it was typed and ticked (2026-11-07). #}
+		{% set typed = typed_for('/mailing/lists') %}
 		<form action="/mailing/lists" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true, help: 'Such as "Early access to new courses".'})} %}{% block control %}<input class="cl-input" id="list-name" name="name" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
-			{{ ui('form.picture-choice', {multiple: true, legend: 'My Subscriptions', legend_hidden: true, size: 'small', selected: ['shown'], items: [
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'list-name', full_width: true, help: 'Such as "Early access to new courses".'})} %}{% block control %}<input class="cl-input" id="list-name" name="name" value="{{ typed.name|default('') }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What it is for', for: 'list-words', full_width: true, help: 'People see this beside the list on My Subscriptions and on its join page.'})} %}{% block control %}<textarea class="cl-input" id="list-words" name="description" rows="3" maxlength="500" {{ ui_field_attrs(props) }}>{{ typed.description|default('') }}</textarea>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'My Subscriptions', legend_hidden: true, size: 'small', selected: typed is empty or typed.shown is defined ? ['shown'] : [], items: [
 					{value: 'shown', label: 'Show it on everyone\'s My Subscriptions page', icon: lucide('eye'), note: 'Unticked, people join only with its join link, and those on it still see it there to leave it.'},
 				]}) }}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the list', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}

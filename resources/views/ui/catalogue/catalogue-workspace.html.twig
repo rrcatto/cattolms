@@ -1,13 +1,24 @@
 {% set workspace = props.workspace %}
 {% set courses = props.courses %}
 {% set catalogue_pagination = props.catalogue_pagination %}
-<div id="catalogue-workspace">
-	<div id="catalogue-region" data-server-search-target>
-		<div id="catalogue-results">
-			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
-				{% block surface_body %}
+{#
+	The bundles have a section of their own between the page's head and the courses (owner, 2026-11-07, the approved
+	mockup: "each section (bundles and courses) should page independently of the other and should not affect the other"):
+	their cards or their list, their own List and Grid and their own pages (catalogue.bundles), on every page of courses and
+	with a search. Then the page is three cards: the head with the categories, the bundles, the courses under their own head.
+	Without bundles (a tag's page, a category without any) it is one card, as it always was.
+	Every control of either section asks for the whole page and morphs both (workspace.in_place): the section it changes
+	changes, the other keeps every node and only its links change, to name the new address. The search sends the bundles'
+	page with it (#catalogue-state), so a search leaves them where they are.
+#}
+{% set bundles = workspace.bundles|default(null) %}
+{% set in_place = workspace.in_place|default(false) %}
+{% set head_heading = bundles ? workspace.heading : workspace.search_heading|default(workspace.heading) %}
+{% set head_summary = bundles ? workspace.summary : workspace.search_summary|default(workspace.summary) %}
+{# The head with the categories, and the courses with their toolbar and pages: one card without bundles, two with. #}
+{% set head_body %}
 					{# A category or tag shown here can be followed (mailing, step 1; owner, 2026-10-26). #}
-					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: workspace.heading, summary: workspace.summary})} %}{% block section_actions %}{% if workspace.follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: workspace.follow} %}{% endif %}{% endblock %}{% endembed %}
+					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: head_heading, summary: head_summary})} %}{% block section_actions %}{% if workspace.follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: workspace.follow} %}{% endif %}{% endblock %}{% endembed %}
 					{# Where the reader is in the category tree (owner, 2026-10-19): a light trail up to All courses. The
 					   categories beneath are short feature cards, four to a row (owner, 2026-10-20): choosing one opens it at
 					   once with JavaScript (data-choose-submits), or with Show courses without it. The next page opens with
@@ -28,21 +39,14 @@
 							{% endif %}
 						</div>
 					{% endif %}
-					{# Bundles first, above the courses (owner, 2026-11-06, the approved mockup): on All courses every bundle on sale,
-					   on a category's page those with a course in its branch, the larger saving first. The row replaces the line
-					   about bundles; the line stays where no row shows (a search, a later page, a category without bundles). Both
-					   are inside the results, so a search or a page turned in place brings the right one. #}
-					{% if workspace.bundles|default(null) %}
-						<div class="cl-catalogue-bundle-row" id="catalogue-bundles">
-							{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Save with a bundle', summary: workspace.bundles.summary, heading_level: 3})} %}{% block section_actions %}{{ ui('action.link', {label: 'View all bundles', variant: 'secondary', size: 'small', href: '/bundles', icon: 'action-view-all'}) }}{% endblock %}{% endembed %}
-							{{ ui('catalogue.course-grid', {courses: workspace.bundles.cards}) }}
-						</div>
-						{{ ui('layout.section-head', {heading: 'Courses', heading_level: 3}) }}
-					{% elseif workspace.bundles_line|default(false) %}
+					{% if not bundles and workspace.bundles_line|default(false) %}
 						<p class="cl-catalogue-bundles">Several courses for one price: <a href="/bundles">browse course bundles</a>.</p>
 					{% endif %}
+{% endset %}
+{% set courses_body %}
 					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
-					{% if courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region'} %}</div>{% endif %}
+					{# With bundles, the courses' List and Grid are in their own head, at the right, as the bundles' are (owner, 2026-11-07). #}
+					{% if not bundles and courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: in_place ? 'innerMorph' : 'innerHTML'} %}</div>{% endif %}
 					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
 					{% if courses and workspace.view|default('grid') == 'list' %}
 						{# One row per course, in the catalogue's order, on one line like every table's (the summary and rating
@@ -79,8 +83,31 @@
 						{{ ui('feedback.empty', {heading: workspace.empty_heading, summary: workspace.empty_summary}) }}
 					{% endif %}
 					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'bottom'} %}{% endif %}
-				{% endblock %}
-			{% endembed %}
+{% endset %}
+<div id="catalogue-workspace">
+	<div id="catalogue-region" data-server-search-target>
+		<div id="catalogue-results"{% if bundles %} class="cl-catalogue-sections"{% endif %}>
+			{% if bundles %}
+				<div id="catalogue-state" hidden>{% if bundles.page > 1 %}<input type="hidden" name="bundles_page" value="{{ bundles.page }}">{% endif %}</div>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}{% block surface_body %}{{ head_body }}{% endblock %}{% endembed %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
+					{% block surface_body %}
+						<div class="cl-catalogue-bundle-section" id="catalogue-bundles">
+							{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course bundles', summary: bundles.summary})} %}{% block section_actions %}{% include '@platform/partials/view-switch.html.twig' with {vs: bundles.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{{ ui('action.link', {label: 'View all bundles', variant: 'secondary', size: 'small', href: '/bundles', icon: 'action-view-all'}) }}{% endblock %}{% endembed %}
+							{{ ui('catalogue.bundles', {bundles: bundles.cards, view: bundles.view}) }}
+							{% include '@platform/partials/pagination.html.twig' with {pg: bundles.pagination, pg_position: 'bottom'} %}
+						</div>
+					{% endblock %}
+				{% endembed %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
+					{% block surface_body %}
+						{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: workspace.search_heading|default('Courses'), summary: workspace.search_summary|default('')})} %}{% block section_actions %}{% if courses and workspace.view_switch|default(null) %}{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{% endif %}{% endblock %}{% endembed %}
+						{{ courses_body }}
+					{% endblock %}
+				{% endembed %}
+			{% else %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}{% block surface_body %}{{ head_body }}{{ courses_body }}{% endblock %}{% endembed %}
+			{% endif %}
 		</div>
 	</div>
 </div>

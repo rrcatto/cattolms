@@ -12,6 +12,8 @@ Handles web requests for admin operations, enforcing access rules and coordinati
 
 Changelog:
 2026/11/07 SAST
+- A refused role, person, company or credit comes back as it was typed and chosen (keepTyped, typedCredit()).
+- A refused course access grant on a person's page comes back to the courses found, the course chosen and the days typed.
 - A person's and a company's pages and forms are at their account references (/admin/people/CL2026…,
   /admin/companies/CL2026…), and the Activity filter names them as ?actor= and ?company= (owner, 2026-11-06: no row
   id in an address); the return checks accept references.
@@ -377,7 +379,7 @@ final class AdminController extends BaseController
             $roleId = $this->roleAdministration->create($_POST, $user->id);
             $this->flash('success', 'The role was created. Assign its permissions before using it.');
             $this->redirect('/admin/roles/' . $roleId);
-        }, '/admin/roles');
+        }, '/admin/roles', keepTyped: true);
     }
 
     #[Route('/admin/roles/{id}', name: 'admin_update_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -557,11 +559,14 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
         $personId = $this->personIdFromAddress($this->keys);
         $back = PersonAddress::admin($this->param('reference'));
+        // A refusal comes back to the courses found, the one chosen and the days typed (2026-11-07).
+        $search = PlatformAdministrationService::searchTerm('grant_courses', $_POST);
+        $refused = $search === '' ? $back : $back . '?' . http_build_query([PlatformAdministrationService::searchParam('grant_courses') => $search]) . '#grant-course';
         return $this->handle(function () use ($user, $personId, $back): void {
             $result = $this->courses->grantToPerson((int) ($_POST['course_id'] ?? 0), $personId, (int) ($_POST['access_days'] ?? 0), $user->id);
             $this->flash('success', 'Course access granted until ' . $result['expires_at'] . '.');
             $this->redirect($back);
-        }, $back);
+        }, $refused, keepTyped: true);
     }
 
     /** A person's page in Administration, by the person's row id carried in a form: their account reference, or the list. */
@@ -612,7 +617,7 @@ final class AdminController extends BaseController
             $this->platformAdministration->createPerson($_POST, $user->id);
             $this->flash('success', 'The person was created.');
             $this->redirect(self::companyPageReturn('/admin/people'));
-        }, self::companyPageReturn('/admin/people'));
+        }, self::companyPageReturn('/admin/people'), keepTyped: true);
     }
 
     #[Route('/admin/people/{reference}', name: 'admin_update_person', requirements: ['reference' => PersonAddress::REQUIREMENT], methods: ['POST'])]
@@ -705,7 +710,7 @@ final class AdminController extends BaseController
             $this->platformAdministration->createCompany($_POST, $user->id);
             $this->flash('success', 'The company was created.');
             $this->redirect('/admin/companies');
-        }, '/admin/companies');
+        }, '/admin/companies', keepTyped: true);
     }
 
     #[Route('/admin/companies/{reference}', name: 'admin_update_company', requirements: ['reference' => CompanyAddress::REQUIREMENT], methods: ['POST'])]
@@ -754,7 +759,27 @@ final class AdminController extends BaseController
             'can_manage_credits' => $user->hasPermission('PLATFORM.CREDIT.MANAGE'),
             'can_select_company' => $this->companyContext->canSelect($user),
             'editing' => $this->request()->query->get('edit') === '1',
+            'credit_typed' => $this->typedCredit(),
         ]);
+    }
+
+    /**
+     * What a refused Give credits form chose, drawn back into it (2026-11-07): the company and the course as their lookups
+     * show them, and the course's lengths to choose from again.
+     *
+     * @return array{company:array<string,mixed>|int,course:array<string,mixed>|int,lengths:list<array{seconds:int,label:string}>,course_chosen:bool}
+     */
+    private function typedCredit(): array
+    {
+        $typed = $this->typed('/admin/course/credits');
+        $courseId = is_string($typed['course'] ?? null) ? ($this->courses->courseIdForCode($typed['course']) ?? 0) : 0;
+        $companyId = is_string($typed['company_id'] ?? null) && ctype_digit($typed['company_id']) ? (int) $typed['company_id'] : 0;
+        return [
+            'company' => $companyId > 0 ? ($this->platformAdministration->describeEntity('companies', $companyId) ?? 0) : 0,
+            'course' => $courseId > 0 ? ($this->platformAdministration->describeEntity('courses', $courseId) ?? 0) : 0,
+            'lengths' => $this->platformAdministration->creditLengths($courseId),
+            'course_chosen' => $courseId > 0,
+        ];
     }
 
     /** Back to the company's own page when a form was sent from it (owner, 2026-10-27: one page for a company), else $fallback. */
@@ -904,7 +929,7 @@ final class AdminController extends BaseController
             $this->platformAdministration->addCredit($_POST, $user->id);
             $this->flash('success', 'The course credit was added and audited.');
             $this->redirect(self::companyPageReturn('/admin/course/credits'));
-        }, self::companyPageReturn('/admin/course/credits'));
+        }, self::companyPageReturn('/admin/course/credits'), keepTyped: true);
     }
 
     #[Route('/admin/course/requests/{id}/decision', name: 'admin_decide_request', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -948,7 +973,7 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
-        $theme = trim((string) ($_POST['theme'] ?? 'factory-reset'));
+        $theme = trim((string) ($_POST['theme'] ?? ThemeManager::DEFAULT_SLUG));
         // A refusal is a message on the Themes page, never an error page (2026-10-26 audit).
         return $this->handle(function () use ($theme, $user): void {
             $this->themes->activate($theme, $user->id);
@@ -1439,6 +1464,8 @@ final class AdminController extends BaseController
                 }
             }
         }
+        // A refused Give credits form's company, course and lengths, drawn back into it (2026-11-07).
+        if ($key === 'credits') $data['credit_typed'] = $this->typedCredit();
         // Each company's logo, or its drawn picture (owner, 2026-10-26), for its row and its Edit window.
         foreach (['companies', 'company_creators'] as $companyRows) {
             if ($key === $companyRows && isset($data[$companyRows]) && is_array($data[$companyRows]) && array_is_list($data[$companyRows])) {

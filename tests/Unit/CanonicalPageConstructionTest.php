@@ -14,7 +14,10 @@ final class CanonicalPageConstructionTest extends TestCase
 {
     public function testEveryThemeUsesCanonicalLandmarksInBothAuthenticationStates(): void
     {
-        foreach (['radiant-learning', 'light-default', 'gilded-noir', 'factory-reset', 'factory-reset-sidebar', 'saharan-sunset'] as $slug) {
+        // The bundled themes: Saharan Sunset alone since 2026-11-07 (owner: the other five "on ice until further notice").
+        $slugs = array_map(static fn(string $manifest): string => basename(dirname($manifest)), glob(dirname(__DIR__, 2) . '/themes/*/theme.json') ?: []);
+        self::assertContains('saharan-sunset', $slugs);
+        foreach ($slugs as $slug) {
             $structures = [];
             foreach ([false, true] as $authenticated) {
                 $html = CanonicalPageFixture::render($slug, $authenticated);
@@ -39,20 +42,12 @@ final class CanonicalPageConstructionTest extends TestCase
                 self::assertSame(1, $xpath->query('//footer/div' . $cls('cl-footer-inner'))->length, $slug);
                 self::assertSame(1, $xpath->query('//footer//nav' . $cls('cl-footer-nav') . '//a[@href="/help"]')->length, $slug);
                 self::assertSame(1, $xpath->query('//nav[@id="cl-primary-navigation"]' . $cls('cl-navigation'))->length, $slug);
-                $landmark = str_starts_with($slug, 'factory-reset') ? 'aside' . $cls('cl-sidebar') : 'header' . $cls('cl-header');
-                self::assertSame(1, $xpath->query('//div' . $cls('cl-shell') . '/' . $landmark)->length, $slug);
+                self::assertSame(1, $xpath->query('//div' . $cls('cl-shell') . '/header' . $cls('cl-header'))->length, $slug);
                 self::assertSame($authenticated ? 1 : 0, $xpath->query('//form[@action="/logout"][@method="post"]/input[@name="csrf"][@value="test-csrf"]')->length, $slug);
                 self::assertSame($authenticated ? 1 : 0, $xpath->query('//a[@href="/account/emails"]' . $cls('cl-nav-sublink'))->length, $slug);
                 self::assertSame($authenticated ? 0 : 1, $xpath->query('//nav[@id="cl-primary-navigation"]/a[@href="/login"]')->length, $slug);
                 self::assertSame(0, $xpath->query('//a[@href="/logout"]')->length, 'Logout must retain POST and CSRF.');
-                if ($slug === 'gilded-noir') {
-                    self::assertSame($authenticated ? 1 : 0, $xpath->query('//header//div' . $cls('cl-identity') . $cls('cl-identity-compact'))->length);
-                    self::assertSame(0, $xpath->query('//main//section' . $cls('cl-identity-head'))->length);
-                    self::assertSame(3, $xpath->query('//footer//section' . $cls('cl-footer-section'))->length);
-                    foreach (['gn-footer-art', 'gn-footer-veil', 'gn-footnote', 'gn-canvas', 'gn-ribbon'] as $decoration) self::assertSame(1, $xpath->query('//*' . $cls($decoration))->length);
-                } else {
-                    self::assertSame(1, $xpath->query('//section' . $cls('cl-identity') . $cls('cl-identity-head'))->length, $slug);
-                }
+                self::assertSame(1, $xpath->query('//section' . $cls('cl-identity') . $cls('cl-identity-head'))->length, $slug);
                 $structures[] = array_map(static fn($node): string => $node->nodeName . ':' . $node->parentNode?->nodeName, iterator_to_array($xpath->query('//div' . $cls('cl-shell') . ' | //div' . $cls('cl-page') . ' | ' . $frame . ' | //main | //footer')));
             }
             self::assertSame($structures[0], $structures[1], $slug . ' must not switch shell structure with authentication.');

@@ -53,7 +53,7 @@ if ($action === 'create') {
         'starts_at' => null, 'ends_at' => null, 'active' => true, 'minimum_order_minor' => null, 'maximum_total_uses' => null, 'maximum_uses_per_customer' => null,
         'course_scope' => 'none', 'bundle_scope' => 'all'], [], $admin['id'], (new DateTimeImmutable())->format(DATE_ATOM));
     $scrub = $fixture->seeds() + ['promotions' => [$promotion]];
-    $state = ['company' => $company['id'], 'company_domain' => $company['domain'], 'courses' => $courses, 'code' => $code, 'bundle_title' => $names->bundle(),
+    $state = ['company' => $company['id'], 'company_domain' => $company['domain'], 'courses' => $courses, 'code' => $code, 'bundle_title' => $names->bundle(true), 'held' => $names->held(),
         'users' => ['provider' => $company['founder']['id'], 'admin' => $admin['id']], 'learners' => [], 'admin_token' => $session($admin['id'], $admin['email']), 'scrub' => $scrub];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
@@ -76,6 +76,7 @@ if ($action === 'create') {
     // Everything the check made: its bundles (made by its administrator), its orders and their money records included
     // (owner, 2026-10-27: "you can remove the data without worrying about the rules").
     (new CheckScrub($db))->remove($state['scrub']);
+    \CattoLearning\Tests\Support\CheckNames::release((array) ($state['held'] ?? []));
     unlink($statePath);
     echo "Removed everything the bundles check made.\n";
 } else {

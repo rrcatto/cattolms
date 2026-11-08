@@ -16,7 +16,9 @@
 		should still supply the key; this makes forgetting it a missing hidden field rather than a
 		broken page.
 	#}
-	{# ds_hidden: what else the list shown depends on, kept by the search (My Courses' chosen list). #}
+	{# ds_hidden: what else the list shown depends on, kept by the search (My Courses' chosen list). ds_include: a part of the
+	   page whose fields go with the search too, kept current by the list itself (the catalogue's bundles' page,
+	   #catalogue-state), and ds_swap how the results are put in (the catalogue morphs, innerMorph). #}
 	{% for hidden_name, hidden_value in ds_hidden|default({}) %}<input type="hidden" name="{{ hidden_name }}" value="{{ hidden_value }}">{% endfor %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (ds_label), full_width: false, for: (ds_name) ~ '-search-input'})} %}
 {% block control %}
@@ -27,8 +29,8 @@
 		       {% if ds_push_url|default(false) %}hx-push-url="true"{% endif %}
 		       hx-target="#{{ ds_name }}-region"
 		       hx-select="#{{ ds_name }}-results"
-		       hx-swap="innerHTML"
-		       hx-include="closest form"
+		       hx-swap="{{ ds_swap|default('innerHTML') }}"
+		       hx-include="closest form{% if ds_include|default('') %}, {{ ds_include }}{% endif %}"
 		       hx-sync="this:replace"
 		       hx-indicator="closest .dataset-search" {{ ui_field_attrs(props) }}>
 

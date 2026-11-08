@@ -39,13 +39,14 @@ final class BundledThemePackageContractTest extends TestCase
         // out, it has to be edited by hand on every version bump, and a test that fails because
         // the owner chose a new number is noise that trains people to edit tests to make them
         // pass.
-        $manifest = json_decode((string) file_get_contents(__DIR__ . '/../../themes/factory-reset/theme.json'), true);
-        $expected = 'factory-reset-v' . (string) ($manifest['theme']['version'] ?? '') . '.zip';
+        $default = \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
+        $manifest = json_decode((string) file_get_contents(__DIR__ . '/../../themes/' . $default . '/theme.json'), true);
+        $expected = $default . '-v' . (string) ($manifest['theme']['version'] ?? '') . '.zip';
 
         self::assertContains(
             $expected,
             array_map('basename', $packages),
-            'The default Factory Reset package must remain bundled at its current version; '
+            'The default theme\'s package (Saharan Sunset since 2026-11-07) must remain bundled at its current version; '
             . 'ThemeManager falls back to it.'
         );
         $validator = new ThemePackageValidator();

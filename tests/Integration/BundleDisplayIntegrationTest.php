@@ -16,9 +16,10 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * How bundles show beside the courses (owner, 2026-11-06: "Bundle mockup is approved"): on a course's page, under the
- * buy button, each bundle holding it that the visitor could buy, the larger saving first; in the catalogue a "Save with
- * a bundle" row above the courses, every bundle on All courses and a category's branch's bundles on its page, but never
- * with a search, on a later page or on a tag's page, where the one line about bundles stays. A company account sees
+ * buy button, each bundle holding it that the visitor could buy, the larger saving first; in the catalogue a section of
+ * their own above the courses (owner, 2026-11-07, the approved mockup), every bundle on All courses and a category's
+ * branch's bundles on its pages, six to a page, with a search and on every page of courses, their own cards or list; never
+ * on a tag's page, and where no bundle shows the one line about bundles stays. A company account sees
  * none. On the real services and controllers; every write rolls back.
  */
 #[Group('commerce')]
@@ -228,45 +229,68 @@ final class BundleDisplayIntegrationTest extends TestCase
         self::assertSame(['label' => 'Price', 'value' => $this->rand(120000), 'was' => $this->rand(160000)], $card['facts'][2]);
         self::assertSame(['/bundles/' . $this->made['big']['slug'], 'View bundle'], [$card['href'], $card['link_label']], 'The Bundles page\'s card.');
         self::assertArrayNotHasKey('saving_percent', $card);
+        // Its own card (owner, 2026-11-07, the approved mockup): how many courses, their covers, its price and access.
+        self::assertSame(3, $card['course_count']);
+        self::assertCount(3, $card['course_covers']);
+        self::assertSame([$this->rand(120000), $this->rand(160000), '1 year'], [$card['price_label'], $card['was_label'], $card['access_label']]);
 
         $html = $this->catalogue('root');
-        foreach (['id="catalogue-bundles"', '>Save with a bundle</h3>', 'Bundles with a course in ' . $this->categories['root']['name'] . '.', 'View all bundles', '>Courses</h3>'] as $shown) self::assertStringContainsString($shown, $html, $shown);
-        self::assertStringNotContainsString(self::LINE, $html, 'The row replaces the line.');
-        $row = (string) strstr((string) strstr($html, 'id="catalogue-bundles"'), '>Courses</h3>', true);
+        foreach (['id="catalogue-bundles"', '>Course bundles</h2>', 'Bundles with a course in ' . $this->categories['root']['name'] . ', for less than buying the courses one by one.', 'View all bundles', '>Courses</h2>', 'class="cl-bundle-card"', 'Bundle · 3 courses', '1 year of access to every course'] as $shown) self::assertStringContainsString($shown, $html, $shown);
+        self::assertStringNotContainsString(self::LINE, $html, 'The section replaces the line.');
+        $row = (string) strstr((string) strstr($html, 'id="catalogue-bundles"'), '>Courses</h2>', true);
+        self::assertStringNotContainsString('cl-course-card', $row, 'A bundle is not drawn as a course.');
         $at = array_map(fn(string $key): int|false => strpos($row, '>' . $this->made[$key]['title'] . '</a>'), ['big', 'small', 'plain']);
         self::assertNotContains(false, $at, 'Each card is in the row, above the courses.');
         self::assertTrue($at[0] < $at[1] && $at[1] < $at[2]);
         self::assertStringNotContainsString($this->made['elsewhere']['title'], $html);
-        self::assertStringNotContainsString($this->courses['a']['title'], $row, 'The courses come after the row.');
+        self::assertStringNotContainsString('>' . $this->courses['a']['title'] . '</a>', $row, 'The courses come after the bundles (a bundle names its courses only on its covers).');
 
         $everything = $this->catalogue(null);
         self::assertStringContainsString('id="catalogue-bundles"', $everything);
-        self::assertStringContainsString('Several courses for one price.</p>', $everything);
+        self::assertStringContainsString('Several courses for one price, for less than buying them one by one.</p>', $everything);
         self::assertStringNotContainsString(self::LINE, $everything);
         $none = $this->catalogue('empty');
         self::assertStringNotContainsString('id="catalogue-bundles"', $none, 'No bundle has a course here.');
         self::assertStringContainsString(self::LINE, $none, 'So the line stays.');
     }
 
-    public function testNoRowWithASearchOnALaterPageOrOnATagPage(): void
+    public function testTheBundlesStayWithASearchAndOnEveryPageOfCoursesButNotOnATagPage(): void
     {
+        // Owner, 2026-11-07: "why do you remove the bundles when you show pg2 of the courses? I think each section (bundles
+        // and courses) should page independently of the other and should not affect the other".
         $this->hide();
         $search = $this->catalogue('root', ['catalogue_q' => $this->courses['a']['title']]);
         self::assertStringContainsString('Search results', $search);
-        self::assertStringNotContainsString('id="catalogue-bundles"', $search);
-        self::assertStringContainsString(self::LINE, $search, 'The line stays with a search.');
-        self::assertStringNotContainsString('id="catalogue-bundles"', $this->catalogue(null, ['catalogue_q' => $this->courses['a']['title']]));
+        self::assertStringContainsString('id="catalogue-bundles"', $search, 'A search leaves the bundles.');
+        self::assertStringNotContainsString(self::LINE, $search);
+        self::assertStringContainsString('id="catalogue-bundles"', $this->catalogue(null, ['catalogue_q' => $this->courses['a']['title']]));
 
         // A second page of the branch.
         for ($n = 0; $n < 24; $n++) {
             $id = $this->fixture->createCourse($this->company['founder']['id'], $this->company['id'], 'bundle-row-page-' . $n . '-' . $this->fixture->suffix(), 'Garden design practice set', 'published');
             $this->db->executeStatement('UPDATE courses SET category_id = :c WHERE id = :id', ['c' => $this->categories['root']['id'], 'id' => $id]);
         }
-        self::assertStringContainsString('id="catalogue-bundles"', $this->catalogue('root', ['page' => '1']));
         $later = $this->catalogue('root', ['page' => '2']);
         self::assertStringContainsString('Pg 2 of 2', $later);
-        self::assertStringNotContainsString('id="catalogue-bundles"', $later);
-        self::assertStringContainsString(self::LINE, $later, 'The line stays on a later page.');
+        self::assertStringContainsString('id="catalogue-bundles"', $later, 'The bundles stay on a later page of courses.');
+        self::assertStringContainsString('>' . $this->made['big']['title'] . '</a>', $later);
+        // The bundles' own pages, six at a time, each address naming both pages; every control morphs the two sections.
+        $all = $this->bundles->catalogueRow(null, null);
+        $pages = (int) ceil(count($all) / 6);
+        $first = $this->catalogue(null, ['page' => '2']);
+        self::assertStringContainsString('data-pagination="bundles"', $first);
+        self::assertStringContainsString('hx-swap="innerMorph"', $first);
+        if ($pages > 1) {
+            self::assertStringContainsString('href="/courses?page=2&amp;bundles_page=2&amp;bundles_page_size=6"', $first, 'Its next page keeps the courses\' page.');
+            $second = $this->catalogue(null, ['page' => '2', 'bundles_page' => '2']);
+            self::assertStringContainsString('>' . $all[6]['title'] . '</a>', $second, 'The seventh bundle opens the second page.');
+            self::assertStringNotContainsString('>' . $all[0]['title'] . '</a>', $second);
+            self::assertStringContainsString('<input type="hidden" name="bundles_page" value="2">', $second, 'A search sends the bundles\' page with it.');
+            self::assertStringContainsString('href="/courses?bundles_page=2&amp;page=1&amp;page_size=24"', $second, 'And the courses\' links keep it.');
+        }
+        $list = $this->catalogue('root', ['catalogue_bundles_view' => 'list']);
+        foreach (['class="cl-bundle-list"', '>No of courses</th>', '>Description</th>'] as $shown) self::assertStringContainsString($shown, $list, $shown);
+        self::assertStringNotContainsString('class="cl-bundle-card"', $list, 'The list instead of the cards.');
 
         $tag = 'bundle-row-tag-' . $this->fixture->suffix();
         $tagId = (int) $this->db->fetchOne('INSERT INTO tags (name, slug) VALUES (:name, :slug) RETURNING id', ['name' => 'Garden design practice', 'slug' => $tag]);
@@ -275,7 +299,43 @@ final class BundleDisplayIntegrationTest extends TestCase
         self::assertSame(200, $tagPage['status']);
         self::assertStringContainsString($this->courses['a']['title'], $tagPage['body']);
         self::assertStringNotContainsString('id="catalogue-bundles"', $tagPage['body']);
-        self::assertStringNotContainsString('Save with a bundle', $tagPage['body']);
+        self::assertStringNotContainsString('cl-bundle-card', $tagPage['body']);
+    }
+
+    public function testABundleHasItsOwnDrawingOnItsCardAndItsPage(): void
+    {
+        // Owner, 2026-11-07: "draw the other seven and build it" (the approved mockup): its own drawing across the top of its
+        // card, at the head of its own page, and served as a picture whose address names its version.
+        $this->hide();
+        $drawing = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="A path of three steps"><rect width="640" height="360" fill="#1f2a5c"/></svg>';
+        $this->db->executeStatement('UPDATE bundles SET cover_svg = :svg WHERE id = :id', ['svg' => $drawing, 'id' => $this->made['big']['id']]);
+        $this->db->executeStatement("UPDATE bundles SET cover_svg = '' WHERE id = :id", ['id' => $this->made['small']['id']]);
+        $cards = array_column($this->bundles->catalogueRow($this->categories['root']['id'], null), null, 'title');
+        $href = '/bundles/' . $this->made['big']['slug'] . '/cover.svg?v=' . substr(md5($drawing), 0, 12);
+        self::assertSame($href, $cards[$this->made['big']['title']]['cover_href'], 'Its card\'s strip, by the drawing\'s version.');
+        self::assertNull($cards[$this->made['small']['title']]['cover_href'], 'No drawing, no strip.');
+        $html = $this->catalogue('root');
+        self::assertStringContainsString('<div class="cl-bundle-card-art" aria-hidden="true"><img src="' . htmlspecialchars($href) . '"', $html);
+        self::assertSame(1, substr_count($html, 'class="cl-bundle-card-art"'), 'Only the bundle with a drawing has a strip.');
+
+        $picture = InProcessPage::run(null, \CattoLearning\Http\Controller\BundleController::class, 'cover', ['slug' => $this->made['big']['slug']]);
+        self::assertSame(200, $picture['status']);
+        self::assertSame($drawing, $picture['body']);
+        $this->db->executeStatement("UPDATE bundles SET status = 'draft' WHERE id = :id", ['id' => $this->made['big']['id']]);
+        try {
+            InProcessPage::run(null, \CattoLearning\Http\Controller\BundleController::class, 'cover', ['slug' => $this->made['big']['slug']]);
+            self::fail('A draft\'s drawing is not shown.');
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+        }
+        $this->db->executeStatement("UPDATE bundles SET status = 'published' WHERE id = :id", ['id' => $this->made['big']['id']]);
+
+        $page = InProcessPage::run(null, \CattoLearning\Http\Controller\BundleController::class, 'show', ['slug' => $this->made['big']['slug']])['body'];
+        self::assertStringContainsString('<div class="cl-bundle-head-art" aria-hidden="true">' . $drawing . '</div>', $page, 'The head of its page.');
+        self::assertStringContainsString('Course bundle · 3 courses', $page);
+        self::assertSame(1, substr_count($page, '<h1'), 'Its name the page\'s one heading.');
+        $without = InProcessPage::run(null, \CattoLearning\Http\Controller\BundleController::class, 'show', ['slug' => $this->made['small']['slug']])['body'];
+        self::assertStringNotContainsString('cl-bundle-head-art', $without, 'Without a drawing, the band alone.');
+        self::assertStringContainsString('class="cl-bundle-head"', $without);
     }
 
     /** Takes the bundle that saves the most off sale, for the tests that do not need it. */

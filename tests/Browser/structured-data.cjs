@@ -26,7 +26,10 @@ const digits = (text) => String(text).replace(/\D/g, '');
 
 /** What a page carries in its head, and what it shows. */
 async function read(page, path) {
-    const response = await page.goto(base + path, {waitUntil: 'load'});
+    // Once more if the browser itself abandoned the load (net::ERR_ABORTED, the site never answering otherwise): with
+    // checks side by side it has happened once on a page that answers 200 (2026-11-07).
+    const go = () => page.goto(base + path, {waitUntil: 'load', timeout: 90000});
+    const response = await go().catch((error) => { if (/ERR_ABORTED/.test(error.message)) { console.log(`again: ${path} (${error.message.split('\n')[0]})`); return go(); } throw error; });
     return page.evaluate(() => {
         const nodes = [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => { try { return {ok: true, node: JSON.parse(script.textContent)}; } catch (error) { return {ok: false, error: String(error), text: script.textContent.slice(0, 200)}; } });
         const meta = {};

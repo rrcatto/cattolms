@@ -1,0 +1,45 @@
+{#
+	Bundles shown as bundles (owner, 2026-11-07, the approved mockup: "bundles need to look differently and be coloured
+	differently and it needs to be obvious they are bundles not courses"), in the catalogue and on the Bundles page.
+	As cards (view 'grid'): three to a row, each partials/bundle-card.html.twig. As a list (view 'list', owner 2026-11-07:
+	"Have the bundle title first, then number of courses ... then have a concise bundle description - and the rest as you
+	have it"): Bundle, No of courses (the number alone), its short description, Access, Price with what it saves, then
+	View bundle and the star, the head in the bundle colour.
+	props.bundles: cards as BundleService::card() gives them.
+#}
+{% set bundles = props.bundles %}
+{% if props.view == 'list' %}
+	<div class="cl-bundle-list">
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}<tr><th scope="col">Bundle</th><th scope="col">No of courses</th><th scope="col">Description</th><th scope="col">Access</th><th scope="col">Price</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>{% endblock %}
+{% block body %}
+			{% for bundle in bundles %}
+				<tr>
+					<td class="cell-text"><a class="cl-bundle-list-title" href="{{ bundle.href }}">{{ bundle.title }}</a></td>
+					<td class="cl-bundle-list-count">{{ bundle.course_count }}</td>
+					<td class="cell-text cl-bundle-list-summary">{{ bundle.summary }}</td>
+					<td>{{ bundle.not_available ? 'Not available now' : bundle.access_label }}</td>
+					<td class="cell-text">
+						<span class="cl-bundle-list-price">
+							{% if bundle.price_label %}{% include '@platform/partials/price.html.twig' with {price: bundle} %}{% endif %}
+							{% if bundle.saving_badge or bundle.availability_badge %}<span class="cl-bundle-list-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success', size: 'small'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info', size: 'small'}) }}{% endif %}</span>{% endif %}
+						</span>
+					</td>
+					<td class="cell-actions">
+						<span class="cl-catalogue-row-actions">
+							{{ ui('action.link', {label: 'View bundle', variant: 'primary', size: 'small', href: bundle.href, icon: 'action-view'}) }}
+							{% if can_favourite is defined and can_favourite %}{% include '@platform/partials/course-favourite.html.twig' with {course: bundle, favourite_kind: 'bundle', favourite_return: favourite_return|default('/bundles')} %}{% endif %}
+						</span>
+					</td>
+				</tr>
+			{% endfor %}
+{% endblock %}
+{% endembed %}
+	</div>
+{% else %}
+	<div class="cl-bundle-cards">
+		{% for bundle in bundles %}
+			{% include '@platform/partials/bundle-card.html.twig' with {bundle: bundle} %}
+		{% endfor %}
+	</div>
+{% endif %}

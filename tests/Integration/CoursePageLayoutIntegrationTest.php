@@ -21,6 +21,8 @@ Changelog:
 - Created.
 2026/11/01 SAST
 - Layouts of one's own replace the site's default at Settings > Course pages and the templates.
+2026/11/07 SAST
+- What the layouts' pages count for every course equals the course's own tally of its outline.
 */
 
 declare(strict_types=1);
@@ -29,10 +31,13 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseCatalogueSettings;
+use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CoursePageLayout;
 use CattoLearning\Course\CoursePageLayouts;
 use CattoLearning\Course\CoursePageLayoutRepository;
+use CattoLearning\Course\CoursePageView;
 use CattoLearning\Course\CourseRepository;
+use CattoLearning\Course\CourseReviewRepository;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
@@ -124,6 +129,30 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         $this->layouts->choose($this->course, 'custom', null, null, $this->admin);
         self::assertSame(['modules', 'glance', 'access'], $this->blocks(), 'Choosing Custom layout again brings it back.');
         self::assertSame(4, (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_edit_history WHERE course_id=:c AND event_key='course.page_layout_saved'", ['c' => $this->course]));
+    }
+
+    /**
+     * The layouts' pages count every course in the database at once (2026-11-07: reading each course's whole outline
+     * took 15 seconds a visit). What they count is what the course's own tally of its outline gives, for every course
+     * the site holds: the owner's courses have every kind of part, a course preview, module and final assessments.
+     */
+    public function testTheLayoutsPagesCountEachCourseAsItsOutlineDoes(): void
+    {
+        $container = IntegrationContainer::get();
+        $items = $container->get(CourseItemService::class);
+        $courses = $container->get(CourseRepository::class);
+        $reviews = $container->get(CourseReviewRepository::class);
+        $ids = array_map('intval', $this->db->fetchFirstColumn('SELECT id FROM courses ORDER BY id'));
+        $ratings = $reviews->ratingSummaries($ids);
+        $counted = $this->layouts->factsFor($ids);
+        foreach ($ids as $id) {
+            $fromOutline = CoursePageView::facts($items->availability($id, null, false)) + [
+                'reviews' => isset($ratings[$id]) ? $ratings[$id]->count : 0,
+                'related' => count($courses->publishedCoursesByIds($courses->relatedCourseIds($id))),
+            ];
+            self::assertSame($fromOutline, $counted[$id], 'Course ' . $id . ' is counted as its outline counts it.');
+        }
+        self::assertSame($counted[$this->course], $this->layouts->facts($this->course));
     }
 
     public function testLayoutsAreNamedCopiedAndDeletedOnlyWhenNothingUsesThem(): void

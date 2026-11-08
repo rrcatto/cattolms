@@ -33,7 +33,7 @@
                         {% endembed %}
                     {% endfor %}
                     {% if diagnostic %}
-                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Suggested Course Item keys', for: 'question-' ~ qi ~ '-remediation', help: 'Separate keys with commas. References are never rewritten automatically.'})} %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What to study after a wrong answer', for: 'question-' ~ qi ~ '-remediation', help: 'A module as m and its number (m2 is Module 2), or a Course Item by its key. Separate them with commas. References are never rewritten automatically.'})} %}
                             {% block control %}<input id="{{ props.for }}" name="remediation_item_keys[{{ qi }}]" value="{{ question.remediation_item_keys|default([])|join(', ') }}" {{ ui_field_attrs(props) }}>{% endblock %}
                         {% endembed %}
                         <input type="hidden" name="question_difficulty[{{ qi }}]" value="standard">

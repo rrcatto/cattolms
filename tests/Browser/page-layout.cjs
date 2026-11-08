@@ -15,6 +15,8 @@
      one column.
    Fixture: php tests/Browser/course-page-fixture.php create|cleanup (in env_php_1), the same as course-page.cjs. */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const {inspect, judge} = require('./page-construction.cjs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -47,7 +49,7 @@ const sketchOf = (page, scope) => page.locator(`${scope} .cl-page-sketch [data-b
 
 // The course page's blocks in order, by their headings, and whether two of them share a row.
 async function blocks(page) {
-    await page.goto(coursePage, {waitUntil: 'networkidle'});
+    await arrive(page, coursePage);
     const headings = await page.locator('main section.cl-page-section h2').allInnerTexts();
     return headings.map((text) => (BLOCKS.find(([, pattern]) => pattern.test(text.trim())) || [null])[0]).filter(Boolean);
 }
@@ -84,7 +86,7 @@ async function withScript(browserType, name) {
     const buy = `Buy first ${state.mark} ${name}`;
 
     // Course Page Layouts: the layouts and every course.
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     check(`${name}: Course Page Layouts lists the default layout, marked`, await page.locator('#your-layouts .cl-ui-card').filter({hasText: state.default_layout_name}).filter({hasText: 'Default layout'}).count() >= 1);
     const row = page.locator('#courses-layouts tr').filter({has: page.locator(`a[href="/admin/courses/${state.course_code}?tab=page-layout"]`)});
     const rowText = (await row.textContent()).replace(/\s+/g, ' ');
@@ -110,16 +112,16 @@ async function withScript(browserType, name) {
     const buyId = page.url().match(/page-layouts\/(\d+)/)[1];
 
     // Copy, and Delete of the copy no course uses.
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     await page.getByRole('button', {name: `Copy ${buy}`}).click();
     await page.waitForLoadState('networkidle');
     check(`${name}: Copy makes "Copy of" and opens it`, (await page.locator('h1').innerText()).includes(`Copy of ${buy}`));
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     await page.getByRole('button', {name: `Delete Copy of ${buy}`}).click();
     check(`${name}: Delete removes an unused layout`, (await saved(page)).includes('was deleted') && await page.getByRole('button', {name: `Delete Copy of ${buy}`}).count() === 0);
 
     // The course tab: on the default layout, that layout drawn for this course, no builder.
-    await page.goto(tab, {waitUntil: 'networkidle'});
+    await arrive(page, tab);
     const {layouts, defaultId} = await tabLayouts(page);
     check(`${name}: the tab shows the default layout drawn for this course, no builder`, await page.locator('input[name="source"][value="default"]').isChecked()
         && await page.locator('[data-page-layout-choice-target="shared"]').isVisible() && await page.locator('[data-page-layout-choice-target="custom"]').isHidden()
@@ -127,7 +129,7 @@ async function withScript(browserType, name) {
     check(`${name}: the course page follows the default layout`, (await blocks(page)).join(',') === drawn(layouts[defaultId].blocks), (await blocks(page)).join(','));
 
     // One of your layouts, chosen: drawn at once, saved with Save.
-    await page.goto(tab, {waitUntil: 'networkidle'});
+    await arrive(page, tab);
     await page.locator('label:has(input[name="source"][value="layout"])').click();
     await page.locator('#page-layout-layout').selectOption(buyId);
     const bar = page.locator('.cl-page-builder-part:has(#page-layout-source) .cl-page-builder-savebar');
@@ -139,7 +141,7 @@ async function withScript(browserType, name) {
     check(`${name}: the course page draws it`, (await blocks(page))[0] === 'access');
 
     // Custom layout, for this course only: Start again from, hide, move, drag, width, saved.
-    await page.goto(tab, {waitUntil: 'networkidle'});
+    await arrive(page, tab);
     await page.locator('label:has(input[name="source"][value="custom"])').click();
     check(`${name}: Custom layout shows its builder in the dashed frame`, await page.locator('.cl-page-layout-custom').isVisible() && await page.locator('[data-page-layout-choice-target="shared"]').isHidden());
     await page.locator('#page-layout-start-from').selectOption(buyId);
@@ -172,7 +174,7 @@ async function withScript(browserType, name) {
     if (Math.abs(glance - how) === 1) check(`${name}: two half blocks side by side share a row`, await shareRow(page, 'At a glance', 'How each module works'));
 
     // Save as one of your layouts: the course then uses it, its custom layout kept.
-    await page.goto(tab, {waitUntil: 'networkidle'});
+    await arrive(page, tab);
     await page.locator('#page-layout-new-name').fill(`Saved ${state.mark} ${name}`);
     await page.getByRole('button', {name: 'Save as a layout'}).click();
     check(`${name}: Save as a layout makes one, which the course uses`, (await saved(page)).includes('is one of your layouts now') && await page.locator('input[name="source"][value="layout"]').isChecked());
@@ -183,16 +185,16 @@ async function withScript(browserType, name) {
     check(`${name}: back on the default layout, the custom layout kept`, (await saved(page)).includes('uses the default layout') && (await page.locator('#page-layout-form').innerText()).includes('custom layout kept from before'));
 
     // Make default changes every course on the default layout; the owner's default is made the default again.
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     await page.getByRole('button', {name: `Make ${buy} the default layout`}).click();
     check(`${name}: Make default`, (await saved(page)).includes('is the default layout now'));
     check(`${name}: every course on the default layout shows it`, (await blocks(page))[0] === 'access');
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     await page.getByRole('button', {name: `Make ${state.default_layout_name} the default layout`}).click();
     check(`${name}: the owner's default is the default again`, (await saved(page)).includes(`"${state.default_layout_name}" is the default layout now`));
 
     // Apply to the ticked courses, and the feature cards.
-    await page.goto(layoutsPage, {waitUntil: 'networkidle'});
+    await arrive(page, layoutsPage);
     await page.getByRole('checkbox', {name: new RegExp(`^Tick .*`)}).first().waitFor();
     await row.locator('input[type="checkbox"]').check();
     await page.locator('#page-layout-apply').selectOption(buyId);
@@ -259,13 +261,13 @@ async function construction() {
         const context = await session(browser, {viewport: {width, height: 1000}, reducedMotion: 'reduce'});
         const page = await context.newPage();
         for (const address of [layoutsPage, `${layoutsPage}/${state.default_layout_id}`, tab]) {
-            await page.goto(address, {waitUntil: 'networkidle'});
+            await arrive(page, address);
             const problems = judge(await page.evaluate(inspect), '').map((failure) => failure.replace(/^: /, ''));
             check(`built as every page is at ${width}px: ${address.replace(base, '')}`, problems.length === 0, problems.join(' | '));
             check(`nothing scrolls sideways at ${width}px: ${address.replace(base, '')}`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
         }
         if (width === 390) {
-            await page.goto(`${layoutsPage}/${state.default_layout_id}`, {waitUntil: 'networkidle'});
+            await arrive(page, `${layoutsPage}/${state.default_layout_id}`);
             const widths = await page.locator('.cl-page-builder-board > [data-block]').evaluateAll((tiles) => tiles.map((tile) => Math.round(tile.getBoundingClientRect().width)));
             check('on a phone the board is one column', new Set(widths).size === 1, widths.join(','));
         }

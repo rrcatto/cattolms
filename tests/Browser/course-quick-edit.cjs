@@ -13,6 +13,8 @@
    Every run puts the course back as it was.
    Fixture: php tests/Browser/course-quick-edit-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const {execFileSync} = require('node:child_process');
 const {inspect, judge} = require('./page-construction.cjs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -53,7 +55,7 @@ async function withScript(browserType, name) {
     page.on('pageerror', (error) => errors.push(error.message));
     execFileSync('podman', ['exec', '-u', 'cattotest', 'env_php_1', 'sh', '-lc', 'php tests/Browser/course-quick-edit-fixture.php age 2>/dev/null']);
 
-    await page.goto(list('list', one.code), {waitUntil: 'networkidle'});
+    await arrive(page, list('list', one.code));
     await page.evaluate(() => { window.cattoNoReload = true; });
     const updatedBefore = await text(rowOf(page, one).locator('td').nth(6));
     await open(page, one, one.title);
@@ -117,13 +119,13 @@ async function withScript(browserType, name) {
         && (await text(rowOf(page, one).locator('[data-position]'))) === position);
 
     // Other price options: Manage prices instead of the price's fields.
-    await page.goto(list('list', two.code), {waitUntil: 'networkidle'});
+    await arrive(page, list('list', two.code));
     await open(page, two, two.title);
     check(`${name}: a course with other price options shows Manage prices`, await page.locator(`#course-${two.code} input[name="price"]`).count() === 0
         && await rowOf(page, two).getByRole('link', {name: 'Manage prices'}).count() === 1);
 
     // The grid: the card turns into the same form.
-    await page.goto(list('grid', one.code), {waitUntil: 'networkidle'});
+    await arrive(page, list('grid', one.code));
     await page.evaluate(() => { window.cattoNoReload = true; });
     const card = () => page.locator('li.cl-ui-card').filter({has: page.locator(`#course-${one.code}`)});
     await swapped(page, cardSelector(one), () => card().getByRole('link', {name: `Edit ${one.title} here`}).click());
@@ -166,7 +168,7 @@ async function construction() {
     for (const width of [1440, 390]) {
         const context = await session(browser, {viewport: {width, height: 1000}});
         const page = await context.newPage();
-        await page.goto(`${list('list', one.code)}&edit=${one.code}`, {waitUntil: 'networkidle'});
+        await arrive(page, `${list('list', one.code)}&edit=${one.code}`);
         const problems = judge(await page.evaluate(inspect), '').map((failure) => failure.replace(/^: /, ''));
         check(`the list with a row open is built as every page is at ${width}px`, problems.length === 0, problems.join(' | '));
         check(`nothing scrolls sideways at ${width}px`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));

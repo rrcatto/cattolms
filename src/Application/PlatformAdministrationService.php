@@ -12,6 +12,7 @@ Implements Catto Learning business and application logic for platform administra
 
 Changelog:
 2026/11/07 SAST
+- addCredit() refuses a course code no course has, which max(1, …) had read as the first course.
 - The Activity filter names the person and the company by their account references (?actor=, ?company=), and
   people and companies are linked by them (owner, 2026-11-06: no row id in an address).
 2026/11/01 SAST
@@ -2656,7 +2657,8 @@ final class PlatformAdministrationService
         }
         $userId = null;
         // The course by its code, as the Give credits form chooses it (owner, 2026-11-06: no row id in an address).
-        $courseId = max(1, $this->courses->idForCode(\CattoLearning\Course\CourseCode::normalise((string) ($input['course'] ?? ''))) ?? 0);
+        // A code no course has is refused, never read as the first course (2026-11-07: max(1, …) turned it into row 1).
+        $courseId = $this->courses->idForCode(\CattoLearning\Course\CourseCode::normalise((string) ($input['course'] ?? ''))) ?? throw new InvalidArgumentException('Choose the course the credit is for.');
         $period = max(86400, (int) ($input['access_period_seconds'] ?? 31536000));
         // One of the lengths the course is sold for (owner, 2026-10-26), so assigning and requests always find it.
         $lengths = $this->administration->courseSaleLengths($courseId);

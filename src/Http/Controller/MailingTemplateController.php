@@ -15,6 +15,8 @@ is a sandboxed page the form posts its unsaved values to ("Update the preview", 
 change by the certificate-preview controller), so it works without JavaScript too. A proof goes to any address.
 
 Changelog:
+2026/11/07 SAST
+- A refused new template comes back as it was typed and chosen (keepTyped).
 2026/10/28 SAST
 - Created.
 */
@@ -101,7 +103,7 @@ final class MailingTemplateController extends BaseController
             $id = $this->templates->create((string) ($_POST['name'] ?? ''), $user->id, $sample);
             $this->flash('success', isset(TemplateDesign::SAMPLES[$sample]) ? 'The template was made from the ' . TemplateDesign::SAMPLES[$sample]['name'] . ' sample. Change anything below.' : 'The template was made from the default for messages. Change it below.');
             $this->redirect(self::BASE . '/' . $id);
-        }, self::BASE . '#new');
+        }, self::BASE . '#new', keepTyped: true);
     }
 
     #[Route('/mailing/templates/{id}', name: 'mailing_template', requirements: ['id' => '\d+'], methods: ['GET'])]

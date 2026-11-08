@@ -228,6 +228,60 @@ final class ThemeLifecycleRegressionTest extends TestCase
         }
     }
 
+    /**
+     * A child theme whose parent has gone, as Factory Reset Sidebar's releases were left when Factory Reset left the code
+     * (2026-11-07), is listed on the Themes page and can be uninstalled from it: uninstalling had asked for the parent
+     * and refused.
+     */
+    public function testAChildWhoseParentHasGoneCanBeUninstalled(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var ThemeManager $liveThemes */
+        $liveThemes = $container->get(ThemeManager::class);
+        /** @var OptionRepository $options */
+        $options = $container->get(OptionRepository::class);
+        $fixture = new DevelopmentFixture($container->get(Database::class));
+        $suffix = $fixture->suffix();
+        $actorId = $fixture->createUser('QA orphan theme actor ' . $suffix);
+        $instanceRoot = sys_get_temp_dir() . '/catto-theme-orphan-instance-' . $suffix;
+        $publicRoot = sys_get_temp_dir() . '/catto-theme-orphan-public-' . $suffix;
+        $parentZip = sys_get_temp_dir() . '/catto-orphan-parent-' . $suffix . '.zip';
+        $childZip = sys_get_temp_dir() . '/catto-orphan-child-' . $suffix . '.zip';
+        $parentName = 'QA Gone Parent ' . $suffix;
+        $originalActive = $liveThemes->activeTheme();
+        try {
+            mkdir($instanceRoot, 0775, true);
+            mkdir($publicRoot, 0775, true);
+            $manager = new ThemeManager(dirname(__DIR__, 2), $instanceRoot, $publicRoot, $options, $container->get(AuditRepository::class), $container->get(ThemeRegistryRepository::class));
+            $this->writeThemeZip($parentZip, $parentName, 'qa-gone-parent-' . $suffix, '1.0.0', 'body{background:#222}');
+            $parentKey = $manager->importStaged((string) $manager->stageImport($parentZip)['token'], $actorId);
+            $this->writeThemeZip($childZip, 'QA Orphan ' . $suffix, 'qa-orphan-' . $suffix, '1.0.0', '.qa-orphan{color:red}', ['name' => $parentName, 'version' => '1.0.0'], false);
+            $childKey = $manager->importStaged((string) $manager->stageImport($childZip)['token'], $actorId);
+
+            // The parent leaves without its child, as a theme taken out of the code does.
+            $this->removeDirectory($instanceRoot . '/themes/' . $parentKey);
+            $listed = array_column($manager->themes(), null, 'key');
+            self::assertArrayHasKey($childKey, $listed, 'The child is still listed, so it can be uninstalled.');
+            self::assertSame('', $listed[$childKey]['parent_key'], 'Its parent is missing.');
+            self::assertDirectoryExists($publicRoot . '/themes/' . $childKey);
+
+            $manager->delete($childKey, $actorId);
+            self::assertDirectoryDoesNotExist($instanceRoot . '/themes/' . $childKey);
+            self::assertDirectoryDoesNotExist($publicRoot . '/themes/' . $childKey);
+            self::assertArrayNotHasKey($childKey, array_column($manager->themes(), null, 'key'));
+            $row = $container->get(Database::class)->fetchAssociative("SELECT user_id FROM audit_log WHERE event_key = 'theme.uninstalled' AND metadata->>'key' = :key ORDER BY id DESC LIMIT 1", ['key' => $childKey]);
+            self::assertIsArray($row, 'The uninstall is in the audit log.');
+            self::assertSame($actorId, (int) $row['user_id']);
+        } finally {
+            $options->set('active_theme', $originalActive, $actorId);
+            $liveThemes->resyncRegistry();
+            $fixture->cleanup();
+            foreach ([$parentZip, $childZip] as $path) @unlink($path);
+            $this->removeDirectory($instanceRoot);
+            $this->removeDirectory($publicRoot);
+        }
+    }
+
     /** @param array{name:string,version:string}|null $parent */
     private function writeThemeZip(string $path, string $name, string $slug, string $version, string $css, ?array $parent = null, bool $withBase = true): void
     {

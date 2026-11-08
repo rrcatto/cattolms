@@ -23,6 +23,9 @@ Changelog:
 2026/11/01 SAST
 - Layouts of one's own replace the site's default at Settings > Course pages and the three templates; a course's
   choice of the default, a layout or its custom layout; apply to many; a custom layout saved as a layout; facts.
+2026/11/07 SAST
+- factsFor() counts every course in the database at once (CourseItemRepository::pageFacts, CourseRepository::
+  publishedRelatedCounts) instead of reading each course's whole outline: the layouts' pages took 15 seconds a visit.
 */
 
 declare(strict_types=1);
@@ -45,7 +48,7 @@ final class CoursePageLayouts
     public function __construct(
         private readonly CoursePageLayoutRepository $layouts,
         private readonly CourseRepository $courses,
-        private readonly CourseItemService $items,
+        private readonly CourseItemRepository $items,
         private readonly CourseReviewRepository $reviews,
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit
@@ -261,12 +264,16 @@ final class CoursePageLayouts
      */
     public function factsFor(array $courseIds): array
     {
+        // Counted in the database for every course at once (2026-11-07): reading each course's whole outline had made the
+        // layouts' pages take 15 seconds.
+        $counts = $this->items->pageFacts($courseIds);
         $ratings = $this->reviews->ratingSummaries($courseIds);
+        $related = $this->courses->publishedRelatedCounts($courseIds);
         $facts = [];
         foreach ($courseIds as $courseId) {
-            $facts[$courseId] = CoursePageView::facts($this->items->availability($courseId, null, false)) + [
+            $facts[$courseId] = CoursePageView::factsOf($counts[$courseId] ?? ['modules' => 0, 'presentations' => 0, 'videos' => 0, 'cards' => 0, 'tasks' => 0, 'moduleQuestions' => 0, 'finalQuestions' => 0, 'preview' => false]) + [
                 'reviews' => isset($ratings[$courseId]) ? $ratings[$courseId]->count : 0,
-                'related' => count($this->courses->publishedCoursesByIds($this->courses->relatedCourseIds($courseId))),
+                'related' => $related[$courseId] ?? 0,
             ];
         }
         return $facts;

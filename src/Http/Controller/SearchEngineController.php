@@ -19,6 +19,8 @@ Changelog:
 - GET /llms.txt (Search\LlmsTxt), answering "not found" on a demo site as the sitemap does, and the share pictures of a
   published course or bundle, /share/course/{slug}.png and /share/bundle/{slug}.png (Search\SharePictures), served as
   pictures are, by PictureResponse with the ?v= version their pages name.
+2026/11/07 SAST
+- GET /courses/{slug}/cover.svg: a published course's drawn cover, for the covers on a bundle's card.
 */
 
 declare(strict_types=1);
@@ -76,6 +78,18 @@ final class SearchEngineController extends BaseController
     public function coursePicture(): Response
     {
         return $this->picture($this->records->courseCover((string) $this->param('slug')));
+    }
+
+    /**
+     * A published course's cover as a picture, small on a bundle's card beside its other courses' (owner, 2026-11-07, the
+     * approved bundles mockup). Its address carries the cover's version, so it may be kept for good.
+     */
+    #[Route('/courses/{slug}/cover.svg', name: 'course_cover_picture', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function courseCover(): Response
+    {
+        $cover = $this->records->courseCover((string) $this->param('slug'));
+        if ($cover === null || !str_starts_with(ltrim($cover), '<svg')) throw new NotFoundHttpException('There is no such picture.');
+        return PictureResponse::of($cover, 'image/svg+xml', true);
     }
 
     /** A published bundle's share picture: its own cover, else its first course's. */

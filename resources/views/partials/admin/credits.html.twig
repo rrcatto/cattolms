@@ -5,38 +5,41 @@
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Add or correct a credit', eyebrow: 'Credits', summary: 'Every adjustment is recorded in the audit log.'}) }}
+		{# A refused credit comes back as it was typed and chosen (2026-11-07): the lookups and the course's lengths from the controller. #}
+		{% set typed = typed_for('/admin/course/credits') %}
+		{% set ct = credit_typed|default({company: 0, course: 0, lengths: [], course_chosen: false}) %}
 		<form action="/admin/course/credits" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: 0, lk_required: 1} %}
-			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course', lk_by_code: true, lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: 0} %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: ct.company, lk_required: 1} %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course', lk_by_code: true, lk_type: 'courses', lk_label: 'Course', lk_required: 1, lk_empty: 'Search for the course', lk_selected: ct.course} %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Length of access', full_width: false, help: 'The lengths the course is sold for.', for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
 				{# The lengths the chosen course is sold for, redrawn when the course is chosen (owner, 2026-10-26). #}
-				<select name="access_period_seconds" required id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course-value" hx-include="#course-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: [], course_chosen: false} %}</select>
+				<select name="access_period_seconds" required id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" hx-get="/admin/course/credits/lengths" hx-trigger="change from:#course-value" hx-include="#course-value" hx-target="this" hx-swap="innerHTML" {{ ui_field_attrs(props) }}>{% include '@platform/partials/credit-length-options.html.twig' with {lengths: ct.lengths, course_chosen: ct.course_chosen, selected_seconds: typed.access_period_seconds|default(0)} %}</select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Quantity', full_width: false, for: 'field-credits-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input type="number" name="quantity" min="1" value="1" id="field-credits-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+				<input type="number" name="quantity" min="1" value="{{ typed.quantity|default('1') }}" id="field-credits-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', full_width: false, for: 'field-credits-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="reason" id="field-credits-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="administrator">Manual grant</option><option value="replacement">Replacement credit</option><option value="correction">Correction</option></select>
+				<select name="reason" id="field-credits-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{% for value, label in {administrator: 'Manual grant', replacement: 'Replacement credit', correction: 'Correction'} %}<option value="{{ value }}"{{ value == typed.reason|default('administrator') ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Audit note', full_width: true, for: 'field-credits-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<textarea name="note" id="field-credits-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}></textarea>
+				<textarea name="note" id="field-credits-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ typed.note|default('') }}</textarea>
 
 {% endblock %}
 {% endembed %}

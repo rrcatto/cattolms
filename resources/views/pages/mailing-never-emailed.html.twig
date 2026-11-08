@@ -12,11 +12,13 @@
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'add'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Add an address', summary: 'For someone who asked, some other way, never to be emailed news.'}) }}
+		{# A refused address comes back as it was typed (2026-11-07). #}
+		{% set typed = typed_for('/mailing/never-emailed') %}
 		<form action="/mailing/never-emailed" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'sx-email', help: 'As you type, the addresses that match show below. Choose one, or write any address in full.'})} %}{% block control %}<input class="cl-input" type="email" id="sx-email" name="email" required autocomplete="off" aria-controls="sx-matches" hx-get="/mailing/never-emailed/matches" hx-trigger="input changed delay:300ms, search" hx-target="#sx-matches" hx-swap="innerHTML" {{ ui_field_attrs(props) }}><div class="cl-address-matches" id="sx-matches" role="region" aria-live="polite" aria-label="Addresses that match"></div>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'sx-detail', help: 'For the record, such as "Asked by phone never to be emailed".'})} %}{% block control %}<input class="cl-input" id="sx-detail" name="detail" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'sx-email', help: 'As you type, the addresses that match show below. Choose one, or write any address in full.'})} %}{% block control %}<input class="cl-input" type="email" id="sx-email" name="email" value="{{ typed.email|default('') }}" required autocomplete="off" aria-controls="sx-matches" hx-get="/mailing/never-emailed/matches" hx-trigger="input changed delay:300ms, search" hx-target="#sx-matches" hx-swap="innerHTML" {{ ui_field_attrs(props) }}><div class="cl-address-matches" id="sx-matches" role="region" aria-live="polite" aria-label="Addresses that match"></div>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why', for: 'sx-detail', help: 'For the record, such as "Asked by phone never to be emailed".'})} %}{% block control %}<input class="cl-input" id="sx-detail" name="detail" value="{{ typed.detail|default('') }}" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% endblock %}{% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Never email it news', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-disable'}) }}{% endblock %}{% endembed %}
 		</form>

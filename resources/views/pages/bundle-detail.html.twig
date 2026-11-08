@@ -1,13 +1,21 @@
 {% extends layout %}
 {% block page_body %}
+	{# The head of a bundle's page is its card's (owner, 2026-11-07, the approved mockup): its own drawing across the top, then
+	   the bundle colour with "Course bundle · N courses", its name and its star; its short description and its facts beneath.
+	   Not a course page's picture with the title over it, which would cover the drawing's first step. #}
 	<section class="cl-page-head cl-course-head">
 		<div class="cl-container py-12">
-			<div class="row g-7 align-items-center">
-				<div class="lg:col-8">
-					<div class="d-flex flex-wrap gap-3 mb-5">{{ ui('feedback.badge', {label: 'Course bundle', tone: 'neutral'}) }}</div>
+			<div class="cl-bundle-head">
+				{% if bundle.cover_svg|default('') starts with '<svg' %}<div class="cl-bundle-head-art" aria-hidden="true">{{ bundle.cover_svg|raw }}</div>{% endif %}
+				<div class="cl-bundle-head-band">
+					<p class="cl-bundle-head-kind"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>Course bundle · {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }}</span></p>
 					{# The same star as its card's and a course's (owner, 2026-11-06), beside the title. #}
 					<div class="cl-course-detail-headline"><h1 class="cl-display-4 fw-bold">{{ bundle.title }}</h1>{% if can_favourite|default(false) %}{% include '@platform/partials/course-favourite.html.twig' with {course: bundle, favourite_kind: 'bundle', favourite_return: favourite_return|default('/bundles')} %}{% endif %}</div>
-					{% if bundle.short_description %}<p class="cl-lead mt-5 mb-0">{{ bundle.short_description }}</p>{% endif %}
+				</div>
+			</div>
+			<div class="row g-7 align-items-center cl-bundle-head-under">
+				<div class="lg:col-8">
+					{% if bundle.short_description %}<p class="cl-lead mb-0">{{ bundle.short_description }}</p>{% endif %}
 				</div>
 				<div class="lg:col-4">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}

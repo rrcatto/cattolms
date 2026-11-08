@@ -9,11 +9,11 @@ Version: 1.1.0
 
 Description:
 Signing in with Telegram and two-step sign-in, the browser check's fixture (owner, 2026-11-05). `create` makes an ADMIN and a
-learner, each with a session, keeps what the site has saved of Messages to you, the two-step policy and the theme, points the
+learner, each with a session, keeps what the site has saved of Messages to you, the two-step policy, points the
 site at the stand-in (telegram-sign-in-standin.php) before anything else and starts it, so no message ever goes to the real
 Telegram, and turns sign-in by Telegram on with the stand-in's key. `writes <chat> <username> <text>` is someone writing to
 the bot; `sent` prints what the site sent; `connect <user id> <chat> <username>` connects a person's Telegram directly; `reset-two-step <user id>`;
-`policy CHOICE|ADMINS|EVERYONE`; `theme <key>`; `counts` prints the Telegram log's and the real queue's counts; `cleanup` puts
+`policy CHOICE|ADMINS|EVERYONE`; `counts` prints the Telegram log's and the real queue's counts; `cleanup` puts
 everything back, stops the stand-in and removes what the check made, and says whether the log has as many messages as before.
 
 Change log:
@@ -33,7 +33,6 @@ use CattoLearning\OwnerMessages\TelegramAccountRepository;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
-use CattoLearning\View\ThemeManager;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -76,7 +75,7 @@ if ($action === 'create') {
     usleep(500000);
     $state = ['admin' => $admin, 'learners' => $learners, 'admin_token' => $adminToken, 'pid' => $pid, 'before' => $before,
         'messages_before' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages'), 'last_message' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM telegram_messages'),
-        'theme' => $container->get(ThemeManager::class)->activeTheme(), 'scrub' => $fixture->seeds()];
+        'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo json_encode(['admin' => $admin, 'learners' => $learners, 'admin_token' => $adminToken]), "\n";
@@ -100,11 +99,6 @@ if ($action === 'create') {
     $container->get(\CattoLearning\Auth\TwoStep\TwoStep::class)->reset((int) ($argv[2] ?? 0), null);
 } elseif ($action === 'policy') {
     $options->set(TwoStepPolicy::OPTION, strtoupper((string) ($argv[2] ?? 'CHOICE')));
-} elseif ($action === 'theme') {
-    $container->get(ThemeManager::class)->activate((string) ($argv[2] ?? ''), (int) $read()['admin']['id']);
-} elseif ($action === 'restore-theme') {
-    $themes = $container->get(ThemeManager::class);
-    if ($themes->activeTheme() !== (string) $read()['theme']) $themes->activate((string) $read()['theme'], (int) $read()['admin']['id']);
 } elseif ($action === 'counts') {
     echo json_encode(['messages' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages'), 'owner_waiting' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NULL AND chat_id IS NULL'),
         'address' => $options->find(OwnerMessageSettings::ADDRESS_OPTION)]), "\n";
@@ -112,8 +106,6 @@ if ($action === 'create') {
     if (!is_file($statePath)) { exit(0); }
     $state = $read();
     if ((int) ($state['pid'] ?? 0) > 0) { @shell_exec('kill ' . (int) $state['pid'] . ' 2>/dev/null'); }
-    $themes = $container->get(ThemeManager::class);
-    if ($themes->activeTheme() !== (string) $state['theme']) $themes->activate((string) $state['theme'], (int) $state['admin']['id']);
     $db->executeStatement('DELETE FROM telegram_messages WHERE id > :before', ['before' => (int) $state['last_message']]);
     foreach ($state['before'] as $name => $value) {
         if ($value === null) { $options->delete($name); } else { $options->set($name, $value); }
@@ -124,6 +116,6 @@ if ($action === 'create') {
     $after = (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages');
     echo json_encode(['messages_before' => (int) $state['messages_before'], 'messages_after' => $after]), "\n";
 } else {
-    fwrite(STDERR, "Usage: php tests/Browser/telegram-sign-in-fixture.php create|writes <chat> <username> <text>|sent|connect <user id> <chat> <username>|reset-two-step <user id>|policy <value>|theme <key>|restore-theme|counts|cleanup\n");
+    fwrite(STDERR, "Usage: php tests/Browser/telegram-sign-in-fixture.php create|writes <chat> <username> <text>|sent|connect <user id> <chat> <username>|reset-two-step <user id>|policy <value>|counts|cleanup\n");
     exit(2);
 }

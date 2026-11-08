@@ -20,6 +20,7 @@ the other.
 
 Changelog:
 2026/11/07 SAST
+- A refused tag comes back as it was typed, its window open (keepTyped).
 - A tag is named by its slug in its addresses (/admin/courses/tags/raised-beds), never its row id (owner, 2026-11-06).
 2026/10/17 SAST
 - No course_group: the Courses group tab strip is gone.
@@ -112,7 +113,7 @@ final class AdminCourseTagController extends BaseController
             $tag = $this->courses->createTag($_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The tag “' . (string) $tag['name'] . '” was created.');
             $this->redirect('/admin/courses/tags');
-        }, '/admin/courses/tags');
+        }, '/admin/courses/tags', keepTyped: true);
     }
 
 

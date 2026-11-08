@@ -115,8 +115,32 @@ final class AssessmentService
         $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = self::timeTaken($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
         // The final assessment's page says the course's result too (owner-approved mockup, 2026-11-05).
         $session['course_result'] = ($session['assessment_role'] ?? '') === 'final' && $session['attempt_mode'] === 'graded' ? $this->courses->courseResult((int) $session['enrolment_id']) : null;
-        if ($session['is_diagnostic']) { $passed = (float) ($session['percentage'] ?? 0) + .0001 >= (float) ($session['pass_mark'] ?? 50); $session['diagnostic_passed'] = $passed; $session['diagnostic_message_html'] = $passed ? (string) ($session['result_pass_html'] ?? '') : (string) ($session['result_fail_html'] ?? ''); $session['diagnostic_remediation_items'] = $this->remediationItems($responses, (int) $session['course_id']); }
+        if ($session['is_diagnostic']) {
+            $passed = (float) ($session['percentage'] ?? 0) + .0001 >= (float) ($session['pass_mark'] ?? 50); $session['diagnostic_passed'] = $passed; $session['diagnostic_message_html'] = $passed ? (string) ($session['result_pass_html'] ?? '') : (string) ($session['result_fail_html'] ?? '');
+            // The modules to study again (2026-11-07): a part the learner's start has not yet opened says when it opens;
+            // an administrator's preview opens everything, as its reader does.
+            $session['study_suggestions'] = $this->studySuggestions((int) $session['course_id'], $responses, (bool) ($session['is_preview'] ?? false) ? null : ((string) ($session['enrolment_started_at'] ?? '') ?: null));
+        }
         return $session;
+    }
+
+    /**
+     * What a readiness check suggests studying after the questions not answered correctly (ReadinessSuggestions), worked
+     * out from the course's whole outline, for a learner's result and a visitor's in the public preview alike.
+     *
+     * @param list<array<string,mixed>> $responses each question asked, with is_correct and remediation_item_keys
+     * @param string|null $startedAt when the learner started the course, which decides what is open yet; null opens everything
+     * @param array<int,true>|null $open the parts the reader can open, by row id (the public preview's), or null for every one
+     * @return list<array<string,mixed>>
+     */
+    public function studySuggestions(int $courseId, array $responses, ?string $startedAt = null, ?array $open = null): array
+    {
+        $wrong = [];
+        foreach ($responses as $response) {
+            $references = array_values(array_map('strval', (array) ($response['remediation_item_keys'] ?? [])));
+            if (($response['is_correct'] ?? null) !== true && $references !== []) { $wrong[] = $references; }
+        }
+        return $wrong === [] ? [] : ReadinessSuggestions::resolve($this->items->availability($courseId, $startedAt, false), $wrong, $open);
     }
 
     /**
@@ -133,7 +157,8 @@ final class AssessmentService
         // for this assessment" on every imported diagnostic).
         $eligible = array_values(array_filter($all, static function (array $question) use ($mode, $poolMode): bool { if ($mode === 'diagnostic') { return true; } if ($mode === 'graded') { return (bool) ($question['graded_eligible'] ?? true); } return match ($poolMode) { 'separate' => (bool) ($question['practice_eligible'] ?? true) && !(bool) ($question['graded_eligible'] ?? true), 'graded' => (bool) ($question['graded_eligible'] ?? true), default => (bool) ($question['practice_eligible'] ?? true) || (bool) ($question['graded_eligible'] ?? true) }; }));
         if ((bool) ($assessment['randomise_questions'] ?? true)) { shuffle($eligible); }
-        $count = $mode === 'practice' ? (int) ($assessment['practice_question_count'] ?? 5) : (int) ($assessment['graded_question_count'] ?? count($eligible));
+        // Every one of them, too (2026-11-07: "Graded questions drawn" still limited a readiness check): no drawn setting applies.
+        $count = match ($mode) { 'diagnostic' => count($eligible), 'practice' => (int) ($assessment['practice_question_count'] ?? 5), default => (int) ($assessment['graded_question_count'] ?? count($eligible)) };
         return array_slice($eligible, 0, max(1, min($count, count($eligible))));
     }
 
@@ -214,29 +239,6 @@ final class AssessmentService
     {
         if (preg_match('/^[0-9a-f-]{36}$/i', $publicId) !== 1) { throw new InvalidArgumentException('Invalid assessment session.'); }
         $session = $this->assessments->sessionByPublicId($publicId); if ($session === null || (int) $session['user_id'] !== $userId) { throw new InvalidArgumentException('The assessment session does not exist.'); } return $session;
-    }
-
-    /**
-     * @param list<array<string,mixed>> $responses
-     * @return list<array<string,mixed>>
-     */
-    private function remediationItems(array $responses, int $courseId): array
-    {
-        $items = [];
-        foreach ($responses as $response) {
-            if (($response['is_correct'] ?? null) === true) { continue; }
-            foreach ((array) ($response['remediation_item_keys'] ?? []) as $key) {
-                $item = $this->itemRecords->itemByKey((string) $key);
-                if ($item !== null) { $item['node_id'] = null; $items[(int) $item['id']] = $item; }
-            }
-        }
-        foreach ($this->itemRecords->structure($courseId) as $node) {
-            if ($node['node_type'] !== 'item') { continue; }
-            foreach ($this->itemRecords->reachableItems((int) $node['course_item_id']) as $item) {
-                if (isset($items[(int) $item['id']]) && $items[(int) $item['id']]['node_id'] === null) { $items[(int) $item['id']]['node_id'] = (int) $node['id']; $items[(int) $item['id']]['part_name'] = (string) $node['part_name']; }
-            }
-        }
-        return array_values($items);
     }
 
     /** @param list<float> $values */

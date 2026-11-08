@@ -12,7 +12,7 @@
 {% endembed %}
 			</form>
 			<div id="catalogue-search">
-				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
+				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true, ds_swap: 'innerMorph', ds_include: '#catalogue-state'} %}
 			</div>
 {% endblock %}
 {% endembed %}

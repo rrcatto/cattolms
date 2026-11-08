@@ -22,6 +22,7 @@ templates keep the semantics they were written against and this supplies them.
 
 Changelog:
 2026/11/07 SAST
+- typed_for: what a refused form sent to an action, so the form comes back as it was typed and chosen.
 - person_url, company_url, order_url and the rest: every other record's addresses by its code, number, slug or name
   (Support\Address), stage 2 of keeping row ids out of addresses.
 2026/11/06 SAST
@@ -86,6 +87,8 @@ final class PlatformExtension extends AbstractExtension
             new TwigFunction('preview_part_url', A\CoursePartAddress::preview(...)),
             new TwigFunction('content_part_url', A\CoursePartAddress::content(...)),
             new TwigFunction('stop_url', A\CoursePartAddress::stop(...)),
+            // What a refused form sent to this action, for the form to show again (Http\TypedForm, 2026-11-07); empty otherwise.
+            new TwigFunction('typed_for', static fn(array $context, string $action): array => \CattoLearning\Http\TypedForm::for($context['typed_form'] ?? null, $action), ['needs_context' => true]),
         ];
     }
 

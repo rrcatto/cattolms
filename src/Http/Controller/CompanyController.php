@@ -9,6 +9,7 @@ Handles the consolidated Company workspace, standalone semantic Company sections
 Changelog:
 
 2026/11/07 SAST
+- A refused company account or new staff member comes back as it was typed and chosen (keepTyped).
 - A member's page and forms are at their account reference (/company/people/CL2026…, owner 2026-11-06).
 
 
@@ -100,7 +101,7 @@ final class CompanyController extends BaseController
             $this->companies->register($user->id, $user->primaryEmail, (string) ($_POST['name'] ?? ''), (string) ($_POST['domain'] ?? ''));
             $this->flash('success', 'The company account has been created.');
             $this->redirect('/company');
-        }, '/company/register');
+        }, '/company/register', keepTyped: true);
     }
 
     /** Renders every Company section as one presentation-neutral workspace. */
@@ -471,7 +472,7 @@ final class CompanyController extends BaseController
             );
             $this->flash('success', 'The staff account was created.');
             $this->redirect('/company/people');
-        }, '/company/people');
+        }, '/company/people', keepTyped: true);
     }
 
 

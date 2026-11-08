@@ -80,25 +80,38 @@
 
 {% endblock %}
 {% endembed %}
-			{% if session.diagnostic_remediation_items %}
-				<div class="mt-7">
-					<h2 class="h5">
-						Suggested Course Items to review
-					</h2>
+			{# The modules the questions not answered correctly name (COURSE-SPECIFICATION.md section 11: "the modules to study
+			   again after a wrong answer", 2026-11-07), each with the parts a learner studies in it, opening in the reader the
+			   reader is in: the learner's, or the public preview, which names a module it does not show as part of the full course. #}
+			{% set study = session.study_suggestions|default([]) %}
+			{% if study %}
+				{% set study_where = is_public_preview|default(false) ? 'preview' : 'reader' %}
+				{% set study_query = item_query|default(is_preview ? '?preview=1' : '') %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+				<div data-study-suggestions>
+					<h2 class="h5">What to study first</h2>
+					<p>The questions you did not get right are covered in {{ study|length == 1 ? 'this part' : 'these parts' }} of the course.</p>
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
-
-						{% for item in session.diagnostic_remediation_items %}
+						{% for suggestion in study %}
 							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
-{% if item.part_name|default('') %}<a href="{{ is_public_preview|default(false) ? preview_part_url(course, item) : part_url(course, item) }}{{ item_query|default(is_preview ? '?preview=1' : '') }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
+							<div data-study-suggestion{% if suggestion.module is not null %} data-study-module="{{ suggestion.module }}"{% endif %}>
+								<strong>{% if suggestion.link %}<a href="{{ stop_url(study_where, course, suggestion.link, study_query) }}">{{ suggestion.heading }}</a>{% else %}{{ suggestion.heading }}{% endif %}</strong>
+								<div class="cl-text-muted">{{ suggestion.questions == 1 ? '1 question' : suggestion.questions ~ ' questions' }} you did not get right{% if suggestion.elsewhere %} · <span data-study-elsewhere>in the full course</span>{% endif %}</div>
+								{% if suggestion.parts %}
+									<p class="mb-0" data-study-parts>{% for part in suggestion.parts %}{% if part.locked %}<span>{{ part.label }} (opens in {{ part.opens_in }})</span>{% else %}<a href="{{ stop_url(study_where, course, part.row, study_query) }}" aria-label="{{ suggestion.heading }}, {{ part.label }}: {{ part.title }}">{{ part.label }}</a>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+								{% endif %}
+							</div>
 {% endblock %}
 {% endembed %}
 						{% endfor %}
-
 {% endblock %}
 {% endembed %}
 				</div>
+{% endblock %}
+{% endembed %}
 			{% endif %}
 		{% elseif session.attempt_mode == 'practice' %}
 			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: true})} %}

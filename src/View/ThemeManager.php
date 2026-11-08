@@ -7,9 +7,15 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Manages filesystem-authoritative Catto Learning Theme Package 4.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
+Manages filesystem-authoritative Catto Learning Theme Package 4.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Saharan Sunset is the shipped default rather than a universal fallback.
 
 Changelog:
+2026/11/07 SAST
+- Saharan Sunset is the bundled default theme (DEFAULT_SLUG), discovered from the code root, in place of Factory Reset,
+  which was taken out of the code with the other four themes (owner: "put them on ice until further notice").
+- delete() takes no user from a console run.
+- delete() uninstalls a child theme whose parent has gone (installedRelease()): it had asked for the parent and refused,
+  so Factory Reset Sidebar's releases could not leave once Factory Reset had.
 2026/10/17 SAST
 - A theme names its colour scheme (color_scheme, light when the manifest has none).
 2026/10/07 SAST
@@ -57,7 +63,8 @@ use ZipArchive;
  */
 final class ThemeManager
 {
-    public const FACTORY_RESET_SLUG = 'factory-reset';
+    /** The theme the code ships as the default: discovered from the code root, never copied, never uninstalled. */
+    public const DEFAULT_SLUG = 'saharan-sunset';
 
     public function __construct(
         private readonly string $codeRoot,
@@ -74,7 +81,7 @@ final class ThemeManager
     public function activeTheme(): string
     {
         $configured = trim($this->options->get('active_theme', ''));
-        if ($configured === '' || $configured === 'default' || $configured === self::FACTORY_RESET_SLUG) {
+        if ($configured === '' || $configured === 'default' || $configured === self::DEFAULT_SLUG) {
             return $this->defaultThemeKey();
         }
         foreach ($this->discoverInstalledThemes() as $theme) {
@@ -87,7 +94,7 @@ final class ThemeManager
 
     public function defaultThemeKey(): string
     {
-        $manifest = $this->bundledFactoryResetManifest();
+        $manifest = $this->bundledDefaultManifest();
         return $this->installKey((string) $manifest['theme']['slug'], (string) $manifest['theme']['version']);
     }
 
@@ -332,16 +339,21 @@ final class ThemeManager
         ]);
     }
 
-    public function delete(string $key, int $userId): void
+    /**
+     * Uninstalls one installed release. A console run that acts for nobody passes no user, and its audit row names none.
+     * A child whose parent has gone is uninstalled too: removing it needs nothing of its parent, and it could otherwise
+     * never leave once its parent had (Factory Reset Sidebar's releases, when Factory Reset left the code, 2026-11-07).
+     */
+    public function delete(string $key, ?int $userId): void
     {
         $key = $this->normaliseKey($key);
         if ($key === $this->defaultThemeKey()) {
-            throw new RuntimeException('Factory Reset is the default theme and cannot be uninstalled.');
+            throw new RuntimeException((string) $this->bundledDefaultManifest()['theme']['name'] . ' is the default theme and cannot be uninstalled.');
         }
         if ($this->activeTheme() === $key) {
             throw new RuntimeException('Activate another theme before uninstalling this one.');
         }
-        $theme = $this->theme($key);
+        $theme = $this->installedRelease($key);
         $this->removeDirectory((string) $theme['root']);
         $this->publisher->removePublished($this->publicThemeRoot($key));
         $this->resyncRegistry();
@@ -666,15 +678,15 @@ final class ThemeManager
             }
         }
 
-        // Factory Reset for the current LMS release is a bundled recovery
+        // The default theme for the current LMS release is a bundled recovery
         // boundary. Always prefer the bundled copy for its exact version so a
         // stale persistent duplicate cannot shadow repaired core presentation
-        // files. Older Factory Reset versions remain separately discoverable.
+        // files. Older versions of it remain separately discoverable.
         $defaultKey = $this->defaultThemeKey();
-        $dir = $this->bundledFactoryResetRoot();
+        $dir = $this->bundledDefaultRoot();
         $manifest = $this->validator->validateInstalledDirectory($dir);
         $item = $this->themeRecord($defaultKey, $dir, $manifest);
-        $item['filesystem_key'] = 'factory-reset-v1.0.1';
+        $item['filesystem_key'] = $defaultKey;
         $itemsByKey[$defaultKey] = $item;
         return array_values($itemsByKey);
     }
@@ -705,6 +717,20 @@ final class ThemeManager
         ];
     }
 
+    /**
+     * An installed release as the filesystem has it, by its key, without asking for its parent: what uninstalling it
+     * needs. theme() refuses a child whose parent is missing, which is right for using a theme and wrong for removing one.
+     *
+     * @return array<string,mixed>
+     */
+    private function installedRelease(string $key): array
+    {
+        foreach ($this->discoverInstalledThemes() as $theme) {
+            if ((string) $theme['key'] === $key || (string) ($theme['filesystem_key'] ?? '') === $key) return $theme;
+        }
+        throw new RuntimeException('The theme is not installed: ' . $key . '.');
+    }
+
     private function themeRootForKey(string $key): string
     {
         $key = $this->normaliseKey($key);
@@ -713,20 +739,20 @@ final class ThemeManager
                 return (string) $theme['root'];
             }
         }
-        if ($key === $this->defaultThemeKey()) return $this->bundledFactoryResetRoot();
+        if ($key === $this->defaultThemeKey()) return $this->bundledDefaultRoot();
         throw new RuntimeException('The theme is not installed: ' . $key . '.');
     }
 
     /**
      * Every theme shipped in the code root, by slug, in a dependency-safe order.
      *
-     * `themes/` in the code root is the versioned home of the themes this platform ships. Factory
-     * Reset has always lived there; the rest joined it so a checkout carries the interface it was
-     * designed against rather than expecting an operator to upload four packages by hand.
+     * `themes/` in the code root is the versioned home of the themes this platform ships, so a
+     * checkout carries the interface it was designed against. Since 2026-11-07 that is Saharan
+     * Sunset alone, the default; a theme copied back there is installed with it.
      *
      * Parents come before children. A child theme cannot install until the exact parent it names is
-     * installed, and the order a directory listing happens to return is not a dependency order:
-     * `factory-reset-sidebar` sorts before `factory-reset` on any case-sensitive scan.
+     * installed, and the order a directory listing happens to return is not a dependency order: a
+     * child whose slug extends its parent's sorts before it on any case-sensitive scan.
      *
      * @return list<string>
      */
@@ -759,7 +785,7 @@ final class ThemeManager
      * Install one bundled theme into the instance, if it is not already there.
      *
      * Returns what happened, so an installer can report it: 'installed', 'replaced', 'skipped'
-     * (already present), or 'bundled' (Factory Reset, which needs no copy).
+     * (already present), or 'bundled' (the default theme, which needs no copy).
      *
      * Already-present is a skip rather than an error, and that is the whole point of the method. An
      * installed theme is an immutable release: reinstalling one at the same version would produce
@@ -767,7 +793,7 @@ final class ThemeManager
      * against an instance that already has these themes and leave them exactly as they are.
      * `$force` exists for the deliberate case - a local rebuild during development - and says so.
      *
-     * Factory Reset is never copied. It is discovered from the code root directly and preferred
+     * The default theme is never copied. It is discovered from the code root directly and preferred
      * over any installed copy, so writing one would create precisely the stale duplicate that
      * discovery exists to shadow.
      */
@@ -778,7 +804,7 @@ final class ThemeManager
         $meta = (array) $manifest['theme'];
         $key = $this->installKey((string) $meta['slug'], (string) $meta['version']);
 
-        if ($source === $this->bundledFactoryResetRoot()) {
+        if ($source === $this->bundledDefaultRoot()) {
             $this->publish($this->defaultThemeKey());
             return 'bundled';
         }
@@ -853,17 +879,17 @@ final class ThemeManager
         }
     }
 
-    private function bundledFactoryResetRoot(): string
+    private function bundledDefaultRoot(): string
     {
-        return rtrim($this->codeRoot, '/') . '/themes/factory-reset';
+        return rtrim($this->codeRoot, '/') . '/themes/' . self::DEFAULT_SLUG;
     }
 
     /** @return array<string,mixed> */
-    private function bundledFactoryResetManifest(): array
+    private function bundledDefaultManifest(): array
     {
-        $path = $this->bundledFactoryResetRoot() . '/theme.json';
+        $path = $this->bundledDefaultRoot() . '/theme.json';
         $manifest = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($manifest)) throw new RuntimeException('Bundled Factory Reset theme.json is invalid.');
+        if (!is_array($manifest)) throw new RuntimeException('The bundled default theme\'s theme.json is invalid.');
         return $manifest;
     }
 
@@ -886,7 +912,7 @@ final class ThemeManager
     private function normaliseKey(string $key): string
     {
         $key = trim($key);
-        if ($key === '' || $key === 'default' || $key === self::FACTORY_RESET_SLUG) return $this->defaultThemeKey();
+        if ($key === '' || $key === 'default' || $key === self::DEFAULT_SLUG) return $this->defaultThemeKey();
         if (preg_match('/^[a-z0-9][a-z0-9._-]*$/', $key) !== 1) {
             throw new RuntimeException('Invalid installed theme identifier.');
         }

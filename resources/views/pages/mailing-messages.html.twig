@@ -14,13 +14,15 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'new'})} %}
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Write a new email', summary: 'Give it a name you will recognise here, and choose who it goes to. You write its subject and content next.'}) }}
+			{# A refused email comes back as it was typed and ticked (2026-11-07). #}
+			{% set typed = typed_for('/mailing/messages') %}
 			<form action="/mailing/messages" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'campaign-name', full_width: true, help: 'For Administration only, such as "November news". Readers never see it.'})} %}{% block control %}<input class="cl-input" id="campaign-name" name="name" maxlength="160" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'campaign-name', full_width: true, help: 'For Administration only, such as "November news". Readers never see it.'})} %}{% block control %}<input class="cl-input" id="campaign-name" name="name" value="{{ typed.name|default('') }}" maxlength="160" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% if lists %}
 				{% set list_icons = {news: 'newspaper', course: 'book-open', category: 'folder', tag: 'tag', own: 'list'} %}
 				<div class="cl-mailing-lists">
-					{{ ui('form.picture-choice', {multiple: true, list: 'list_ids', legend: 'Who it goes to', size: 'small', selected: lists|filter(list => list.id == chosen_list or (chosen_list == 0 and list.kind == 'news'))|map(list => list.id), items: lists|map(list => {value: list.id, label: list.name, icon: lucide(list_icons[list.kind]|default('list')), note: list.followers == 1 ? '1 person' : list.followers ~ ' people'})}) }}
+					{{ ui('form.picture-choice', {multiple: true, list: 'list_ids', legend: 'Who it goes to', size: 'small', selected: typed is not empty ? lists|filter(list => (list.id ~ '') in typed.list_ids|default([]))|map(list => list.id) : lists|filter(list => list.id == chosen_list or (chosen_list == 0 and list.kind == 'news'))|map(list => list.id), items: lists|map(list => {value: list.id, label: list.name, icon: lucide(list_icons[list.kind]|default('list')), note: list.followers == 1 ? '1 person' : list.followers ~ ' people'})}) }}
 					<p class="help">Someone on several lists gets it once.</p>
 				</div>
 				{% else %}

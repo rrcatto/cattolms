@@ -22,6 +22,8 @@ operation accepts, not about what the schema can hold: the `user_id` column stay
 it would be a schema rebase for a distinction commerce has not settled, and no row has ever used it.
 
 Changelog:
+2026/11/07 SAST
+- The company lookup keeps the company chosen before a refusal.
 2026/09/07 20:40 SAST
 - Created when credits became company-held only.
 */
@@ -60,7 +62,8 @@ final class CreditHolderContractTest extends TestCase
         $form = self::read('resources/views/partials/admin/credits.html.twig');
 
         self::assertStringContainsString("lk_name: 'company_id'", $form);
-        self::assertStringContainsString("lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: 0, lk_required: 1", $form);
+        // The company chosen before a refusal stays chosen (2026-11-07): ct.company, else nothing.
+        self::assertStringContainsString("lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: ct.company, lk_required: 1", $form);
         self::assertStringNotContainsString("lk_name='user_id'", $form, 'The individual holder control must not return.');
     }
 

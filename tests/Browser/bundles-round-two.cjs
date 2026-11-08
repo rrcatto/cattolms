@@ -2,7 +2,7 @@
  * its status from three cards on the bundle form, new and existing; the bundle list shows code, title, status, price, on
  * sale from, on sale until and access as columns, is searched by code, and edits a row or a card in place: Save and
  * Cancel without a reload, a refused save coming back as typed with why, and the plain form without JavaScript. A bundle
- * whose sale starts later stays on the Bundles page, in the catalogue's row, in the "Also in" note of its courses and on
+ * whose sale starts later stays on the Bundles page, in the catalogue's bundles, in the "Also in" note of its courses and on
  * its own page, each saying when it goes on sale, and the cart refuses it with the date. A learner stars bundles and
  * courses in place and finds them on Favourites, its own page after My Courses, filtered by All, Courses or Bundles and
  * shown as cards or a list; My Courses has only its two lists, and Course Requests is a page of its own for a company
@@ -155,8 +155,8 @@ const coursesMenu = (page) => page.evaluate(() => [...document.querySelectorAll(
         await scenario('a bundle whose sale starts later stays everywhere with its date, and the cart refuses it with the date', browserName, async () => {
             const {ctx, page} = await open(browser, person('learner').token);
             await page.goto(`${base}/bundles`);
-            const card = page.locator('main .cl-course-card', {hasText: later.title});
-            assert.equal(await card.count(), 1, 'on the Bundles page');
+            const card = page.locator('main .cl-bundle-card', {hasText: later.title});
+            assert.equal(await card.count(), 1, 'on the Bundles page, a bundle\'s own card');
             // Compared without case: a theme may write a badge in capitals.
             assert.ok(clean(await card.innerText()).toLowerCase().includes(fixture.later_short.toLowerCase()), `the card says ${fixture.later_short}`);
             await page.goto(`${base}/bundles/${later.slug}`);
@@ -168,8 +168,14 @@ const coursesMenu = (page) => page.evaluate(() => [...document.querySelectorAll(
             const note = page.locator('.cl-course-bundle', {hasText: later.title});
             assert.equal(await note.count(), 1, 'the "Also in" note of its course');
             assert.ok(clean(await note.innerText()).toLowerCase().includes(fixture.later_short.toLowerCase()), `the note says ${fixture.later_short}`);
-            await page.goto(`${base}/courses`);
-            assert.ok(clean(await page.locator('#catalogue-bundles').innerText()).includes(later.title), 'the catalogue\'s Save with a bundle row');
+            // In the catalogue's bundles, on whichever of their pages (six to a page, owner 2026-11-07) its saving puts it.
+            let inCatalogue = false;
+            for (let n = 1; n <= 10 && !inCatalogue; n++) {
+                await page.goto(`${base}/courses?bundles_page=${n}`);
+                inCatalogue = clean(await page.locator('#catalogue-bundles').innerText()).includes(later.title);
+                if (!inCatalogue && !(await page.locator('#catalogue-bundles a[rel="next"]').count())) break;
+            }
+            assert.ok(inCatalogue, 'the catalogue\'s bundles');
             // Asked to put it in the cart anyway, with the page's own form token: refused, with when.
             await page.goto(`${base}/bundles/${now.slug}`);
             const csrf = await page.locator('form[action="/cart/add-bundle"] input[name=csrf]').inputValue();
@@ -202,14 +208,15 @@ const coursesMenu = (page) => page.evaluate(() => [...document.querySelectorAll(
             assert.equal(menu[menu.indexOf('/account/courses') + 1], '/account/favourites', `Favourites straight after My Courses (${menu.join(' ')})`);
             assert.ok(!menu.includes('/account/requests'), 'no Course Requests for a private account');
             await page.goto(`${base}/account/favourites?favourites_view=grid`);
-            const titles = async () => (await page.locator('#favourites-view .cl-course-card-title').allInnerTexts()).map(clean);
+            // A bundle keeps its own card among the courses (owner, 2026-11-07, the approved mockup).
+            const titles = async () => (await page.locator('#favourites-view :is(.cl-course-card-title, .cl-bundle-card-title)').allInnerTexts()).map(clean);
             assert.deepEqual((await titles()).sort(), [fixture.courses.a.title, now.title, later.title].sort(), 'its courses and bundles together, as cards');
             await mark(page);
             await page.locator('label:has(input[name=kind][value=bundles])').click();
-            await page.waitForFunction(() => document.querySelectorAll('#favourites-view .cl-course-card').length === 2);
+            await page.waitForFunction(() => document.querySelectorAll('#favourites-view .cl-bundle-card').length === 2 && !document.querySelector('#favourites-view .cl-course-card'));
             assert.deepEqual((await titles()).sort(), [now.title, later.title].sort(), 'Bundles shows only the bundles');
             await page.locator('label:has(input[name=kind][value=courses])').click();
-            await page.waitForFunction(() => document.querySelectorAll('#favourites-view .cl-course-card').length === 1);
+            await page.waitForFunction(() => document.querySelectorAll('#favourites-view .cl-course-card').length === 1 && !document.querySelector('#favourites-view .cl-bundle-card'));
             assert.deepEqual(await titles(), [fixture.courses.a.title], 'Courses only the course');
             assert.ok(await stillMarked(page), 'the filter changes the list in place');
             await page.goto(`${base}/account/favourites?favourites_view=list`);
@@ -221,7 +228,7 @@ const coursesMenu = (page) => page.evaluate(() => [...document.querySelectorAll(
             assert.ok(await stillMarked(page), 'unstarred in place');
             await page.reload();
             assert.deepEqual((await titles()).sort(), [fixture.courses.a.title, later.title].sort(), 'and it is gone after a reload');
-            const card = page.locator('#favourites-view .cl-course-card', {hasText: later.title});
+            const card = page.locator('#favourites-view .cl-bundle-card', {hasText: later.title});
             assert.equal(await card.getByRole('link', {name: later.title}).getAttribute('href'), `/bundles/${later.slug}`, 'each card opens its page');
 
             await page.goto(`${base}/account/courses`);

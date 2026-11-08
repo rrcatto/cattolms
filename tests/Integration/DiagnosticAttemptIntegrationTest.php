@@ -12,6 +12,8 @@ A diagnostic asks every question it holds (owner, 2026-10-21: a learner who boug
 not graded-eligible, because a diagnostic never counts towards a grade; the attempt must still ask them all.
 
 Changelog:
+2026/11/07 SAST
+- A readiness check's drawn settings never limit it: the reader, the public preview, the start page and the editor.
 2026/10/21 SAST
 - First version.
 */
@@ -20,10 +22,17 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Course\AssessmentService;
+use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Course\PublicAssessmentAttempts;
+use CattoLearning\Http\Controller\AdminCourseComponentController;
+use CattoLearning\Http\Controller\AssessmentController;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Tests\Support\{DevelopmentFixture, IntegrationContainer};
+use CattoLearning\Support\Uuid;
+use CattoLearning\Tests\Support\{DevelopmentFixture, InProcessPage, IntegrationContainer};
 use PHPUnit\Framework\TestCase;
 
 final class DiagnosticAttemptIntegrationTest extends TestCase
@@ -62,5 +71,55 @@ final class DiagnosticAttemptIntegrationTest extends TestCase
         $session = IntegrationContainer::get()->get(AssessmentService::class)->startAttempt($learner, $slug, $diagnostic['node_id'], $diagnostic['key'], 'diagnostic');
         self::assertSame('diagnostic', $session['attempt_mode']);
         self::assertSame(3, (int) $this->db->fetchOne('SELECT COUNT(*) FROM assessment_session_questions WHERE session_id = :id', ['id' => $session['id']]), 'Every question is asked.');
+    }
+
+    /**
+     * 2026-11-07: the "Graded questions drawn" setting still limited a readiness check, though the rule is that it asks every
+     * question it holds. Whatever its drawn settings say, the learner's reader and the public preview ask all of them, the
+     * learner's start page says so, and the editor shows no number of questions drawn while keeping the stored ones.
+     */
+    public function testAReadinessCheckAsksEveryQuestionWhateverItsDrawnSettingsSay(): void
+    {
+        $fixture = new DevelopmentFixture($this->db);
+        $suffix = $fixture->suffix();
+        $admin = $fixture->createUser('Readiness admin ' . $suffix, 'readiness-admin-' . $suffix . '@example.test');
+        $learner = $fixture->createUser('Readiness learner ' . $suffix, 'readiness-' . $suffix . '@example.test');
+        $company = $fixture->createCompany($admin, 'Readiness Company ' . $suffix, 'readiness-' . $suffix . '.example.test');
+        $slug = 'readiness-' . $suffix;
+        $course = $fixture->createCourse($admin, $company, $slug, 'Readiness Course ' . $suffix, 'published');
+        $check = $fixture->createAssessmentItem($course, $admin, 'content');
+        $this->db->executeStatement("UPDATE course_items SET item_type = 'diagnostic' WHERE id = :id", ['id' => $check['item_id']]);
+        // Settings that would ask fewer: one graded question drawn, two for practice.
+        $this->db->executeStatement('UPDATE course_item_assessments SET graded_question_count = 1, practice_question_count = 2 WHERE course_item_id = :id', ['id' => $check['item_id']]);
+        foreach ([1, 2, 3, 4] as $position) $fixture->createQuestion($check['item_id'], $position);
+        $container = IntegrationContainer::get();
+        $fixture->createEnrolment($learner, $course, $admin);
+        $container->get(LearningService::class)->start($learner, $slug);
+        $assessments = $container->get(AssessmentService::class);
+
+        $session = $assessments->startAttempt($learner, $slug, $check['node_id'], $check['key'], 'diagnostic');
+        self::assertSame(4, (int) $this->db->fetchOne('SELECT COUNT(*) FROM assessment_session_questions WHERE session_id = :id', ['id' => $session['id']]), 'The learner is asked every question.');
+
+        $container->get(CourseItemService::class)->updatePlacement($course, $check['node_id'], ['public_preview' => true], $admin);
+        $row = (array) $this->db->fetchAssociative('SELECT * FROM courses WHERE id = :id', ['id' => $course]);
+        $visitor = $container->get(PublicAssessmentAttempts::class)->start($row, $check['node_id'], $check['key'], 'diagnostic');
+        self::assertCount(4, $visitor['questions'], 'A visitor in the public preview is asked every question.');
+
+        $reader = new CurrentUser($learner, Uuid::v4(), 'readiness-' . $suffix . '@example.test', 'Readiness learner', ['STUDENT'], (new PermissionCatalog())->keys(), Uuid::v4());
+        $part = (string) $this->db->fetchOne('SELECT part_name FROM course_structure_nodes WHERE id = :id', ['id' => $check['node_id']]);
+        $start = InProcessPage::run($reader, AssessmentController::class, 'overview', ['slug' => $slug, 'part' => $part, 'key' => $check['key']]);
+        self::assertSame(200, $start['status']);
+        self::assertStringNotContainsString('Questions drawn', $start['body'], 'The start page names no number drawn.');
+        self::assertStringContainsString('<div class="cl-ui-stat-value">4</div><div class="cl-ui-stat-label">Questions asked</div>', $start['body'], 'It says all four are asked.');
+
+        $person = new CurrentUser($admin, Uuid::v4(), 'readiness-admin@example.test', 'Readiness admin', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());
+        $name = (string) $this->db->fetchOne('SELECT name FROM course_items WHERE id = :id', ['id' => $check['item_id']]);
+        $editor = InProcessPage::run($person, AdminCourseComponentController::class, 'edit', ['item' => (string) $this->db->fetchOne('SELECT course_item_slug(:name)', ['name' => $name])]);
+        self::assertSame(200, $editor['status']);
+        self::assertStringNotContainsString('Graded questions drawn', $editor['body'], 'The editor offers no number of graded questions for a readiness check.');
+        self::assertStringNotContainsString('Practice or diagnostic questions drawn', $editor['body'], 'Nor a number of diagnostic questions.');
+        self::assertStringContainsString('asks every question it holds', $editor['body'], 'It says why.');
+        self::assertMatchesRegularExpression('/<input type="hidden" name="graded_question_count" value="1">/', $editor['body'], 'The stored setting is kept as it is when the form is saved.');
+        self::assertMatchesRegularExpression('/<input type="hidden" name="practice_question_count" value="2">/', $editor['body']);
     }
 }

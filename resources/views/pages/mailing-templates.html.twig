@@ -14,10 +14,12 @@
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'new'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Make a new template', summary: 'Start from one of six sample designs, or from a copy of the default for messages. You then change anything you like, or write it in HTML.'}) }}
+		{# A refused template comes back as it was typed and chosen (2026-11-07). #}
+		{% set typed = typed_for('/mailing/templates') %}
 		<form action="/mailing/templates" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{{ ui('form.picture-choice', {name: 'sample', legend: 'Start from', id: 'template-samples', selected: 'sunset', columns: 4, items: samples}) }}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', help: 'For you only, such as "Newsletter" or "Course news". Readers never see it. Empty uses the sample\'s name.'})} %}{% block control %}<input class="cl-input" id="template-name" name="name" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {name: 'sample', legend: 'Start from', id: 'template-samples', selected: typed.sample|default('sunset'), columns: 4, items: samples}) }}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', help: 'For you only, such as "Newsletter" or "Course news". Readers never see it. Empty uses the sample\'s name.'})} %}{% block control %}<input class="cl-input" id="template-name" name="name" value="{{ typed.name|default('') }}" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Make the template', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
 		</form>
 	{% endblock %}{% endembed %}</section>

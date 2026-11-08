@@ -111,7 +111,7 @@ final class SetupChecklist
                 $this->identity->available() ? 'Didit is configured.' : 'Not configured yet: certificates wait until it is.',
                 $this->identity->available() || $manual('identity'), '/admin/settings?section=identity-verification#settings-identity-verification', 'Open Identity verification'),
             $step('theme', 'Look', 'Theme',
-                'Choose how the site looks. Six themes are installed.',
+                'Choose how the site looks. Saharan Sunset is installed, and another theme can be uploaded on the Themes page.',
                 'Choose one, then mark this step done.', $manual('theme'), '/admin/themes', 'Open Themes'),
             $step('catalogue', 'Courses', 'Categories and tags',
                 'Load the starter categories and tags, each with its icon, published with the code. Or, if you have a catalogue package from another site, import it at Courses → Import & Export Catalogue: it brings the categories, tags and every course with its cover, tags and prices. Change them afterwards under Course Categories and Course Tags.',

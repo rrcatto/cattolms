@@ -10,6 +10,8 @@
  *   podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/course-page-fixture.php cleanup'
  */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -42,7 +44,7 @@ async function scenario(name, run) {
                 const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
                 const page = await ctx.newPage();
                 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-                assert.equal((await page.goto(page_url, {waitUntil: 'networkidle'})).status(), 200);
+                assert.equal((await arrive(page, page_url)).status(), 200);
                 assert.equal(await page.locator('.cl-course-purchase').count(), 1, 'one buy box');
                 assert.equal(await page.locator('.cl-page-section:has(#course-access) .cl-course-purchase').count(), 1, 'under Course access');
                 // The page in the layout's rows (owner, 2026-10-30): two half blocks side by side on a wide screen, every block

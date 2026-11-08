@@ -1,5 +1,7 @@
 {% if can_manage_companies %}
-	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-add', title: 'Add Company', action: '/admin/companies', method: 'post'})} %}
+	{# A refused company comes back as it was typed, the window open (2026-11-07). #}
+	{% set typed = typed_for('/admin/companies') %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'company-add', title: 'Add Company', action: '/admin/companies', method: 'post', open: typed is not empty})} %}
 {% block modal_body %}
 
 				<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -10,21 +12,21 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', full_width: true, for: 'field-company-modals-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-							<input name="name" required id="field-company-modals-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+							<input name="name" value="{{ typed.name|default('') }}" required id="field-company-modals-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Registered email domain', full_width: true, for: 'field-company-modals-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-							<input name="domain" placeholder="example.co.za" required id="field-company-modals-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+							<input name="domain" value="{{ typed.domain|default('') }}" placeholder="example.co.za" required id="field-company-modals-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{# Its Company Administrator, made with it: a company is never empty (owner, 2026-10-27). #}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its Company Administrator: first name', for: 'company-add-admin-first', required: true})} %}{% block control %}<input name="admin_first_name" required id="company-add-admin-first" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'company-add-admin-last', required: true})} %}{% block control %}<input name="admin_last_name" required id="company-add-admin-last" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their email address', full_width: true, for: 'company-add-admin-email', required: true, help: 'At the company\'s domain, such as name@example.co.za. They manage the company in the Company workspace.'})} %}{% block control %}<input type="email" name="admin_email" required id="company-add-admin-email" placeholder="name@example.co.za" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Its Company Administrator: first name', for: 'company-add-admin-first', required: true})} %}{% block control %}<input name="admin_first_name" value="{{ typed.admin_first_name|default('') }}" required id="company-add-admin-first" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'company-add-admin-last', required: true})} %}{% block control %}<input name="admin_last_name" value="{{ typed.admin_last_name|default('') }}" required id="company-add-admin-last" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their email address', full_width: true, for: 'company-add-admin-email', required: true, help: 'At the company\'s domain, such as name@example.co.za. They manage the company in the Company workspace.'})} %}{% block control %}<input type="email" name="admin_email" value="{{ typed.admin_email|default('') }}" required id="company-add-admin-email" placeholder="name@example.co.za" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 						<div class="cl-ui-field--full">
 							<span class="cl-inferred-label">Company type</span>
 							<p class="help">

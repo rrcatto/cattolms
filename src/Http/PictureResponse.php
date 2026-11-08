@@ -18,6 +18,9 @@ Changelog:
 - Created with the drawn avatars.
 2026/11/06 SAST
 - A public picture (a course's or bundle's share picture, Search\SharePictures) may be cached by anyone.
+2026/11/07 SAST
+- The session's "no-store" headers are taken off: sent beside the picture's own, they kept every picture from being
+  cached at all (found with the course covers on a bundle's card).
 */
 
 declare(strict_types=1);
@@ -41,6 +44,9 @@ final class PictureResponse
             $headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'";
         }
 
+        // The session started before the request was handled has queued PHP's own "Cache-Control: no-store" and its kin;
+        // sent beside these, no browser would keep the picture. A picture's address carries its version, so it may be kept.
+        if (!headers_sent()) foreach (['Cache-Control', 'Pragma', 'Expires'] as $name) header_remove($name);
         return new Response($bytes, 200, $headers);
     }
 }

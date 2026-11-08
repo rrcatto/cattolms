@@ -6,7 +6,7 @@ declare(strict_types=1);
 // (A R300.00, B R200.00), an ADMIN with a session, and a signed-in learner with names, a cell number
 // and billing details; it removes any saved site mode, so APP_SITE_MODE decides (demo on catto.test).
 // `order <learner>` prints the learner's latest order: whether its snapshot is a simulation and what its
-// invoice says. `theme <key>` activates a theme and `restore` puts back the one that was active.
+// invoice says. No theme is activated (since 2026-11-07 the check reads the pages in the site's own theme).
 // `cleanup` removes the sessions, carts and any saved site mode and retires the courses: orders and
 // their documents are immutable history and stay behind. The development database is disposable.
 
@@ -23,7 +23,6 @@ use CattoLearning\Support\AccountReference;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
-use CattoLearning\View\ThemeManager;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -81,22 +80,6 @@ if ($action === 'create') {
     echo json_encode(['id' => $id, 'simulation' => ($snapshot['simulation'] ?? false) === true,
         'invoice_simulation' => str_contains($html, $container->get(SiteMode::class)->simulation()), 'invoice_fake_bank' => str_contains($html, 'FAKE BANK (demo site, do not pay)'),
         'invoice_reference' => str_contains($html, 'Use your account reference ' . AccountReference::format((string) ($snapshot['account_reference'] ?? '')) . ' as the payment reference.')], JSON_THROW_ON_ERROR) . "\n";
-} elseif ($action === 'theme') {
-    // Learners cannot preview a theme, so the matrix activates each in turn; `restore` puts back the one that was active.
-    $state = $readState();
-    $themes = $container->get(ThemeManager::class);
-    $state['active_theme'] ??= $themes->activeTheme();
-    $writeState($state);
-    $themes->activate((string) ($argv[3] ?? ''), (int) $state['users']['admin']);
-    echo $themes->activeTheme() . "\n";
-} elseif ($action === 'restore') {
-    $state = $readState();
-    if (isset($state['active_theme'])) {
-        $container->get(ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
-        unset($state['active_theme']);
-        $writeState($state);
-    }
-    echo "Restored.\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = $readState();
@@ -105,12 +88,11 @@ if ($action === 'create') {
         $db->executeStatement('INSERT INTO app_options (option_key, option_value, updated_at, updated_by_user_id) VALUES (:k, :v, :at, :by)',
             ['k' => $state['saved_mode']['option_key'], 'v' => $state['saved_mode']['option_value'], 'at' => $state['saved_mode']['updated_at'], 'by' => $state['saved_mode']['updated_by_user_id']]);
     }
-    if (isset($state['active_theme'])) $container->get(ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
     // Everything the check made, its orders and their money records included (owner, 2026-10-27: "you can remove the data
     // without worrying about the rules").
     (new CheckScrub($db))->remove($state['scrub']);
     unlink($statePath);
     echo "Removed everything the demo site check made and put the site mode back.\n";
 } else {
-    throw new RuntimeException('Usage: php tests/Browser/demo-site-fixture.php create|order|theme|restore|cleanup [state-path] [learner-id]');
+    throw new RuntimeException('Usage: php tests/Browser/demo-site-fixture.php create|order|cleanup [state-path] [learner-id]');
 }

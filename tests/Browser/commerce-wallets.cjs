@@ -18,12 +18,14 @@
  * and leaves both when ADMIN records that it was paid back. An order's page shows its Money Ledger
  * lines, Payment Events and Commerce Trail together, each opening its own page; Credits & Orders lists
  * neither Payment Events nor the Commerce Trail (owner, 2026-10-19). The learner is emailed how to pay
- * the EFT, with the invoice attached and the demo site's fake bank details labelled (owner, 2026-10-19). In every bundled theme at 1440, 820 and 390px the new pages answer in
- * that theme with one h1 and no sideways scrolling.
+ * the EFT, with the invoice attached and the demo site's fake bank details labelled (owner, 2026-10-19). In the site's own theme (Saharan Sunset, the one bundled theme since
+ * 2026-11-07; nothing is activated) at 1440, 820 and 390px the new pages answer in it with one h1 and no sideways scrolling.
  *
  * Run against the development instance with commerce-wallets-fixture.php. Orders and the ledger are
  * immutable and stay behind. Uses the installed Playwright. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -38,8 +40,8 @@ fs.mkdirSync(output, {recursive: true});
 
 const php = (...args) => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `SHELL_VERBOSITY=-1 php tests/Browser/commerce-wallets-fixture.php ${args[0]} ${statePath} ${args.slice(1).join(' ')} 2>/dev/null`], {encoding: 'utf8'}).trim().split('\n').pop();
 const state = () => JSON.parse(execFileSync('podman', ['exec', container, 'cat', statePath], {encoding: 'utf8'}));
-const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
-    .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme).map((t) => `${t.slug}-v${t.version}`);
+const {siteTheme, themeKey} = require('./site-theme.cjs');
+const themes = [themeKey(siteTheme())];
 const widths = (process.env.CATTO_WIDTHS || '1440,820,390').split(',').map(Number);
 const results = [], failures = [];
 const clean = (text) => text.replace(/\s+/g, ' ').trim();
@@ -389,20 +391,18 @@ async function buyWithWalletAndEft(page, fixture) {
         await admin.ctx.close();
     });
 
-    /* Every new page in every theme at every width. Learners cannot preview a theme, so each theme is
-     * activated in turn and the active theme is restored afterwards. */
+    /* Every new page at every width, in the site's own theme: learners cannot preview a theme, and no check switches it. */
     const learnerPages = ['/account/wallet', '/account/dashboard', `/account/orders/${sample?.order}`, '/refunds', '/terms', '/privacy'];
     const adminPages = ['/admin/dashboard', '/admin/settings', '/admin/commerce/refund-requests', '/admin/wallets', `/admin/wallets/person/${sample?.learner.account_reference}`, `/admin/commerce/orders/${sample?.order}`,
         '/admin/commerce/orders', `/admin/commerce/ledger?order=${sample?.order}`, '/admin/commerce/trail', '/admin/commerce/payment-events', '/admin/commerce/eft', '/admin/commerce/unmatched'];
     try {
         for (const key of themes) {
-            php('theme', key);
             for (const width of widths) {
                 for (const [token, pages] of [[sample?.learner.token, learnerPages], [fixture.admin_token, adminPages]]) {
                     const {ctx, page} = await open(chromium, token, {width});
                     for (const route of pages) {
                         await check(`${key} ${width} ${route}`, async () => {
-                            const response = await page.goto(`${base}${route}`, {waitUntil: 'networkidle'});
+                            const response = await arrive(page, `${base}${route}`);
                             assert.equal(response.status(), 200);
                             const facts = await page.evaluate((k) => ({
                                 served: [...document.querySelectorAll('link[rel=stylesheet]')].some((l) => l.href.includes(`/${k}/`)),
@@ -420,7 +420,7 @@ async function buyWithWalletAndEft(page, fixture) {
             }
         }
     } finally {
-        php('restore');
+        // Nothing to put back: since 2026-11-07 no theme is activated.
     }
 
     for (const session of Object.values(admin)) await session.ctx.close();

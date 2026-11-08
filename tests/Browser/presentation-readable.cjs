@@ -21,10 +21,24 @@
    and laptop screens: the whole player must be in view, its buttons included, with nothing scrolling sideways.
    CATTO_READABLE_REPORT names a file for the findings as JSON; CATTO_READABLE_ONLY=own runs only the fixture's course,
    CATTO_READABLE_ONLY=site only the site's own, CATTO_READABLE_ONLY=front only the front page's link, and
-   CATTO_READABLE_CODES=A-101,B-202 only the presentations of the courses with those codes, after changing them. */
+   CATTO_READABLE_CODES=A-101,B-202 only the presentations of the courses with those codes, after changing them.
+   What has not changed is not measured again (owner, 2026-11-07: "you must figure out how to do the tests in minutes, not
+   hours!!"). Each reading's fingerprint is made from what its reader is given to draw (from the fixture: the slides and
+   their words, their narration's words but never its recording, the titles, the line in the player's bar and the course's
+   own styling) with the hashes of what draws it (public_html/js/catwalk.js, public_html/css/catwalk.css, the reader's own
+   markup and stylesheet, the code that turns slides into the deck and the theme's stylesheet, in the code and as the site
+   serves them), this check's own measuring code, the browser's version and the theme and width it is read at. A reading
+   that passes with nothing found is recorded by its fingerprint in CATTO_CHECK_CACHE_FILE (by default
+   runtime/storage/check-cache/presentation-readable.json in the workspace, outside the repository); a later run measures
+   only those whose fingerprint is not recorded, without loading a page for the rest. CATTO_FULL=1 measures every one.
+   The measuring is shared by CATTO_READABLE_WORKERS
+   processes (6 when unset), each with its own Chromium; the front page's link is always followed. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs');
 const zlib = require('node:zlib');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const {fork, execFileSync} = require('node:child_process');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-presentation-readable-state.json'));
 const only = process.env.CATTO_READABLE_ONLY || '';
@@ -259,24 +273,59 @@ async function openDeck(page, url) {
     await page.evaluate(() => document.fonts.ready);
 }
 
-(async () => {
-    const browser = await chromium.launch();
-    const session = async (options = {}) => {
-        const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1100}, reducedMotion: 'reduce', ...options});
-        await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
-        const page = await context.newPage();
-        page.setDefaultTimeout(20000);
-        return page;
-    };
-    const failedToOpen = [];
-    if (codes.length === 0 && state.decks.some((d) => d.kind === 'site') && (only === '' || only === 'front')) {
-        for (const theme of state.themes) {
-            for (const [width, height] of [[1440, 900], [1366, 768], [1920, 1080], [390, 844]]) {
-                const page = await session({viewport: {width, height}});
-                const where = {at: `${theme} ${width}x${height}`, deck: 'the front page\'s link', course: 'the site', item: 0, look: '', slide: 0, state: 'followed'};
-                await page.goto(`${base}/?theme_preview=${theme}`, {waitUntil: 'load'});
-                const link = page.locator('a[href="/presentation#presentation"]').first();
-                if (!await link.count()) { findings.push({...where, kind: 'no link', part: 'page', text: 'the front page has no link to the presentation'}); await page.context().close(); continue; }
+const root = path.resolve(__dirname, '../..');
+const FULL = process.env.CATTO_FULL === '1';
+const WORKERS = Math.max(1, Number(process.env.CATTO_READABLE_WORKERS || 6));
+const workspaceRuntime = path.resolve(root, '../../runtime/storage');
+const CACHE = process.env.CATTO_CHECK_CACHE_FILE
+    || (fs.existsSync(workspaceRuntime) ? path.join(workspaceRuntime, 'check-cache/presentation-readable.json') : '/tmp/catto-check-cache/presentation-readable.json');
+const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
+const fileHash = (relative) => { try { return sha(fs.readFileSync(path.join(root, relative))); } catch { return 'missing'; } };
+// The check's own measuring code (from MIN_PX to here), so a change to how it is run does not measure everything again.
+const measuringCode = () => { const source = fs.readFileSync(__filename, 'utf8'); return sha(source.slice(source.indexOf('const MIN_PX'), source.indexOf("const root = path.resolve(__dirname, '../..');"))); };
+
+async function session(browser, options = {}) {
+    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1100}, reducedMotion: 'reduce', ...options});
+    await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(20000);
+    return page;
+}
+const withTheme = (url, theme) => url + (url.includes('?') ? '&' : '?') + 'theme_preview=' + theme;
+
+/* One job's measuring, in a worker: the findings it adds are its own. */
+async function measureJob(browser, job, shared) {
+    const before = findings.length, scrollBefore = scrolling.length;
+    let failed = null;
+    const deck = job.deck;
+    try {
+        if (job.kind === 'reader') {
+            shared.reader = shared.reader || await session(browser);
+            await openDeck(shared.reader, deck.url);
+            await chrome(shared.reader, deck, 'the reader');
+            await play(shared.reader, deck, 'the reader');
+        } else if (job.kind === 'own' && job.mode === 'plain') {
+            // Without JavaScript every slide shows in order, with its notes, as a page.
+            const plain = await session(browser, {javaScriptEnabled: false});
+            await plain.goto(base + withTheme(deck.url, job.theme), {waitUntil: 'load'});
+            await measure(plain, '.cw-deck', {at: `${job.theme} without JavaScript`, course: deck.course, deck: deck.title, item: Number(deck.item), look: deck.look, slide: 0, state: 'as a page'});
+            await plain.context().close();
+        } else if (job.kind === 'own') {
+            const width = job.mode;
+            const page = await session(browser, {viewport: {width, height: 1100}});
+            const label = `${job.theme} ${width}`;
+            await openDeck(page, withTheme(deck.url, job.theme));
+            if (width === 1440) await chrome(page, deck, label);
+            await play(page, deck, label, width);
+            await page.context().close();
+        } else if (job.kind === 'front') {
+            const [width, height] = job.viewport;
+            const page = await session(browser, {viewport: {width, height}});
+            const where = {at: `${job.theme} ${width}x${height}`, deck: 'the front page\'s link', course: 'the site', item: 0, look: '', slide: 0, state: 'followed'};
+            await page.goto(`${base}/?theme_preview=${job.theme}`, {waitUntil: 'load'});
+            const link = page.locator('a[href="/presentation#presentation"]').first();
+            if (!await link.count()) findings.push({...where, kind: 'no link', part: 'page', text: 'the front page has no link to the presentation'});
+            else {
                 await link.click();
                 await page.waitForSelector('.cw-deck.cw-ready');
                 await page.waitForTimeout(150);
@@ -284,48 +333,145 @@ async function openDeck(page, url) {
                 if (seen.sideways > 1) findings.push({...where, kind: 'cut off', part: 'page', text: `the page scrolls sideways by ${seen.sideways}px`});
                 // On a phone the player is taller than most screens, so there only its top must show.
                 if (width >= 1000 ? (seen.top < 0 || seen.bottom > seen.high + 1) : (seen.top < 0 || seen.top > seen.high / 2)) findings.push({...where, kind: 'out of view', part: 'page', text: `the player runs from ${Math.round(seen.top)} to ${Math.round(seen.bottom)} on a screen ${seen.high} high`});
-                await page.context().close();
             }
+            await page.context().close();
         }
-        console.log('  the front page\'s link followed in every theme');
+    } catch (error) {
+        failed = `${deck ? `${deck.code} ${deck.title} (item ${deck.item})` : job.kind}: ${error.message.split('\n')[0]}`;
+        // A page left half way through is not used again.
+        if (job.kind === 'reader' && shared.reader) { await shared.reader.context().close().catch(() => {}); shared.reader = null; }
     }
-    if (only !== 'own' && only !== 'front') {
-        const page = await session();
-        for (const deck of state.decks.filter((d) => !d.own && (codes.length === 0 || codes.includes(d.code)))) {
-            try {
-                await openDeck(page, deck.url);
-                await chrome(page, deck, 'the reader');
-                await play(page, deck, 'the reader');
-            } catch (error) { failedToOpen.push(`${deck.code} ${deck.title} (item ${deck.item}): ${error.message.split('\n')[0]}`); }
-            if (decksSeen % 25 === 0) console.log(`  ${decksSeen} presentations, ${slidesSeen} slides, ${textsSeen} pieces of text, ${findings.length} findings`);
-        }
-        await page.context().close();
-    }
-    if (codes.length === 0 && only !== 'site' && only !== 'front') {
-        for (const deck of state.decks.filter((d) => d.own)) {
-            for (const theme of state.themes) {
-                for (const width of [1440, 390]) {
-                    const page = await session({viewport: {width, height: 1100}});
-                    const label = `${theme} ${width}`;
-                    await openDeck(page, deck.url + (deck.url.includes('?') ? '&' : '?') + 'theme_preview=' + theme);
-                    if (width === 1440) await chrome(page, deck, label);
-                    await play(page, deck, label, width);
-                    await page.context().close();
-                }
-                // Without JavaScript every slide shows in order, with its notes, as a page.
-                const plain = await session({javaScriptEnabled: false});
-                await plain.goto(base + deck.url + (deck.url.includes('?') ? '&' : '?') + 'theme_preview=' + theme, {waitUntil: 'load'});
-                await measure(plain, '.cw-deck', {at: `${theme} without JavaScript`, course: deck.course, deck: deck.title, item: Number(deck.item), look: deck.look, slide: 0, state: 'as a page'});
-                await plain.context().close();
-            }
-        }
+    return {id: job.id, findings: findings.slice(before), scrolling: scrolling.slice(scrollBefore), failed};
+}
+
+/* A worker: measures the jobs it is sent with a Chromium of its own and sends back what it found. */
+async function worker(jobs) {
+    const browser = await chromium.launch();
+    const shared = {};
+    const results = [];
+    for (const job of jobs) {
+        results.push(await measureJob(browser, job, shared));
+        if (job.kind === 'reader' && decksSeen % 25 === 0) process.send({progress: {decks: decksSeen, slides: slidesSeen}});
     }
     await browser.close();
+    return {results, slidesSeen, textsSeen, decksSeen};
+}
+
+/* The files that draw a presentation in the reader, relative to the code root (and the copies the site serves from the
+   workspace's runtime/public_html, where they are copied one by one): CatWalk, the reader's own markup and styling, the
+   code that turns slide data into the deck, and the stylesheet of every theme the check reads in. */
+// The fixture names a theme by its folder (saharan-sunset); the site serves it under its install key (saharan-sunset-v1.0.7).
+const slugOf = (theme) => theme.replace(/-v\d+\.\d+\.\d+$/, '');
+const keyOf = (theme) => { try { const t = JSON.parse(fs.readFileSync(path.join(root, 'themes', slugOf(theme), 'theme.json'))).theme; return `${t.slug}-v${t.version}`; } catch { return theme; } };
+function drawers(themes) {
+    const list = (dir, test) => { try { return fs.readdirSync(path.join(root, dir)).filter(test).sort().map((name) => `${dir}/${name}`); } catch { return []; } };
+    const served = path.resolve(root, '../../runtime/public_html');
+    const files = [
+        'public_html/js/catwalk.js', 'public_html/css/catwalk.css', 'public_html/css/catto-platform.css', 'public_html/js/platform-overrides.js',
+        ...list('src/Course/Catwalk', (n) => n.endsWith('.php')), 'src/Course/CourseItemRenderer.php', 'src/Course/CourseStyles.php',
+        ...list('resources/views/layout', (n) => n.endsWith('.twig')),
+        ...list('resources/views/pages', (n) => /^(learn-|course-public-preview|site-presentation)/.test(n)),
+        ...list('resources/views/partials', (n) => /^course-/.test(n)),
+        ...themes.map((theme) => `themes/${slugOf(theme)}/public/css/theme.css`),
+    ];
+    const servedCopies = ['js/catwalk.js', 'css/catwalk.css', 'css/catto-platform.css', 'js/platform-overrides.js', ...themes.map((theme) => `themes/${keyOf(theme)}/css/theme.css`)]
+        .map((file) => path.join(served, file)).filter((file) => fs.existsSync(file)).map((file) => path.relative(root, file));
+    return [...files, ...servedCopies];
+}
+
+function readRecord() {
+    try { const record = JSON.parse(fs.readFileSync(CACHE, 'utf8')); return record && typeof record.passed === 'object' ? record : {passed: {}}; } catch { return {passed: {}}; }
+}
+function writeRecord(record) {
+    fs.mkdirSync(path.dirname(CACHE), {recursive: true});
+    const temporary = `${CACHE}.${process.pid}`;
+    fs.writeFileSync(temporary, JSON.stringify(record, null, 1));
+    fs.renameSync(temporary, CACHE);
+}
+
+async function main() {
+    const started = Date.now();
+    const jobs = [];
+    if (codes.length === 0 && state.decks.some((d) => d.kind === 'site') && (only === '' || only === 'front')) {
+        for (const theme of state.themes) for (const viewport of [[1440, 900], [1366, 768], [1920, 1080], [390, 844]]) jobs.push({kind: 'front', theme, viewport});
+    }
+    if (only !== 'own' && only !== 'front') {
+        for (const deck of state.decks.filter((d) => !d.own && (codes.length === 0 || codes.includes(d.code)))) jobs.push({kind: 'reader', deck, url: deck.url});
+    }
+    if (codes.length === 0 && only !== 'site' && only !== 'front') {
+        for (const deck of state.decks.filter((d) => d.own)) for (const theme of state.themes) {
+            for (const mode of [1440, 390, 'plain']) jobs.push({kind: 'own', deck, theme, mode, url: withTheme(deck.url, theme)});
+        }
+    }
+    jobs.forEach((job, index) => { job.id = index; });
+
+    // What every fingerprint shares: what draws a presentation in the reader (the player, the reader's markup and
+    // styling, the bundled themes' stylesheets, in the code and as the site serves them), the check's measuring code and the
+    // browser. A change to any of these measures every presentation again.
+    const probe = await chromium.launch();
+    const browserVersion = probe.version();
+    await probe.close();
+    const common = sha([browserVersion, measuringCode(), ...drawers(state.themes).map((file) => `${file} ${fileHash(file)}`)].join('\n'));
+    // Each presentation's slides as they are now (the fixture works the hashes out afresh), so a slide changed after the
+    // fixture was made is measured again; if that cannot be read, every presentation is measured.
+    let now = null;
+    try {
+        now = JSON.parse(execFileSync('podman', ['exec', '-u', 'cattotest', process.env.CATTO_PHP_CONTAINER || 'env_php_1', 'sh', '-lc', `SHELL_VERBOSITY=-1 php tests/Browser/presentation-readable-fixture.php content ${process.env.CATTO_PHP_STATE || '/tmp/catto-presentation-readable-state.json'} 2>/dev/null`], {encoding: 'utf8'}).trim().split('\n').pop());
+    } catch (error) { console.log(`  the fixture could not say what the presentations hold now (${error.message.split('\n')[0]}): every one is measured`); }
+    for (const job of jobs.filter((j) => j.kind !== 'front')) {
+        job.deck.content = now ? now[`${job.deck.item}:${job.deck.node}`] || null : null;
+        job.slides = job.deck.slides || 4;
+        job.fingerprint = job.deck.content ? sha([common, job.kind, job.theme || '', String(job.mode || ''), job.deck.look || '', job.deck.content].join('\n')) : null;
+    }
+
+    const record = readRecord();
+    const measure = jobs.filter((job) => job.kind === 'front' || FULL || !job.fingerprint || !record.passed[job.fingerprint]);
+    const skipped = jobs.filter((job) => !measure.includes(job));
+    console.log(`  ${jobs.length - jobs.filter((j) => j.kind === 'front').length} presentation readings fingerprinted from what the reader is given to draw; ${skipped.length} unchanged since they last passed, ${measure.filter((j) => j.kind !== 'front').length} to measure${FULL ? ' (CATTO_FULL=1)' : ''}.`);
+
+    // Shared out by their slides, the largest first, so the workers finish together.
+    const bins = Array.from({length: Math.min(WORKERS, Math.max(1, measure.length))}, () => ({cost: 0, jobs: []}));
+    for (const job of [...measure].sort((a, b) => (b.slides || 4) - (a.slides || 4))) {
+        const bin = bins.reduce((low, next) => (next.cost < low.cost ? next : low));
+        bin.jobs.push(job); bin.cost += (job.slides || 4) * (job.kind === 'own' ? 2 : 1);
+    }
+    const outcomes = await Promise.all(bins.filter((bin) => bin.jobs.length).map((bin) => new Promise((resolve, reject) => {
+        const child = fork(__filename, [], {env: {...process.env, CATTO_READABLE_WORKER: '1'}, stdio: ['ignore', 'inherit', 'inherit', 'ipc']});
+        let done = null;
+        child.on('message', (message) => {
+            if (message.progress) return;
+            done = message;
+        });
+        child.on('exit', (code) => (done ? resolve(done) : reject(new Error(`a measuring process stopped (exit ${code})`))));
+        child.send({jobs: bin.jobs});
+    })));
+
+    const failedToOpen = [];
+    const byId = new Map(jobs.map((job) => [job.id, job]));
+    let measuredDecks = 0;
+    for (const outcome of outcomes) {
+        slidesSeen += outcome.slidesSeen; textsSeen += outcome.textsSeen; decksSeen += outcome.decksSeen;
+        for (const result of outcome.results) {
+            findings.push(...result.findings);
+            scrolling.push(...result.scrolling);
+            if (result.failed) failedToOpen.push(result.failed);
+            const job = byId.get(result.id);
+            if (job.kind !== 'front') measuredDecks++;
+            // A presentation that passed with nothing found is recorded, so the next run need not measure it again.
+            if (job.kind !== 'front' && job.fingerprint && !result.failed && result.findings.length === 0) {
+                record.passed[job.fingerprint] = {at: new Date().toISOString(), reading: `${job.kind} ${job.deck.code || job.deck.course} ${job.deck.title}${job.theme ? ' ' + job.theme + ' ' + job.mode : ''}`};
+            }
+        }
+    }
+    // Only what this run saw is kept, so the record never grows past the site's presentations.
+    const live = new Set(jobs.map((job) => job.fingerprint).filter(Boolean));
+    for (const fingerprint of Object.keys(record.passed)) if (!live.has(fingerprint)) delete record.passed[fingerprint];
+    if (codes.length === 0 && only === '') writeRecord(record);
 
     const failing = findings;
     const byKind = {};
     for (const f of failing) byKind[f.kind] = (byKind[f.kind] || 0) + 1;
-    console.log(`${decksSeen} presentations, ${slidesSeen} slides, ${textsSeen} pieces of text measured.`);
+    console.log(`${decksSeen} presentations, ${slidesSeen} slides, ${textsSeen} pieces of text measured; ${skipped.length} readings skipped as unchanged; ${Math.round((Date.now() - started) / 1000)}s.`);
     console.log(`Findings: ${JSON.stringify(byKind)}. Slides taller than their frame (they scroll): ${scrolling.length}.`);
     for (const failure of failedToOpen) console.log(`FAIL could not be played: ${failure}`);
     const seen = new Set();
@@ -335,6 +481,14 @@ async function openDeck(page, url) {
         seen.add(key);
         console.log(`FAIL ${f.kind}: ${f.code || ''} ${f.deck} slide ${f.slide} (${f.layout || ''}, ${f.tone || ''}, ${f.look}, ${f.at}${f.state ? ', ' + f.state : ''}): "${f.text}" ${f.ratio ? f.ratio + ':1, needs ' + (f.need || '') + ', ' + f.colour + ' on ' + f.behind : ''}${f.detail || ''}${f.kind === 'small' ? f.px + 'px' : ''}`);
     }
-    if (process.env.CATTO_READABLE_REPORT) fs.writeFileSync(process.env.CATTO_READABLE_REPORT, JSON.stringify({findings, scrolling, failedToOpen, decksSeen, slidesSeen, textsSeen}, null, 1));
+    if (process.env.CATTO_READABLE_REPORT) fs.writeFileSync(process.env.CATTO_READABLE_REPORT, JSON.stringify({findings, scrolling, failedToOpen, decksSeen, slidesSeen, textsSeen, skipped: skipped.length, measured: measuredDecks}, null, 1));
     process.exit(failing.length || failedToOpen.length ? 1 : 0);
-})();
+}
+
+if (process.env.CATTO_READABLE_WORKER === '1') {
+    process.on('message', async ({jobs}) => {
+        try { process.send(await worker(jobs), () => process.exit(0)); } catch (error) { console.error(error); process.exit(1); }
+    });
+} else {
+    main().catch((error) => { console.error(error); process.exit(1); });
+}

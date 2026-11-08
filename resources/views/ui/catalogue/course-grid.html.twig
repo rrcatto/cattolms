@@ -1,6 +1,11 @@
 {% set courses = props.courses %}
+{# A bundle among the courses (a person's Favourites) keeps its own card (owner, 2026-11-07, the approved mockup). #}
 <div class="cl-course-cards">
 	{% for course in courses %}
-		{% include '@platform/partials/course-card.html.twig' with {course: course} %}
+		{% if course.bundle_id is defined %}
+			{% include '@platform/partials/bundle-card.html.twig' with {bundle: course} %}
+		{% else %}
+			{% include '@platform/partials/course-card.html.twig' with {course: course} %}
+		{% endif %}
 	{% endfor %}
 </div>

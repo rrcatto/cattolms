@@ -8,6 +8,8 @@
    The text is changed in the browser only: nothing is written.
    Fixture: php tests/Browser/section-pages-fixture.php create|cleanup (in env_php_1), as section-pages.cjs. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs'), path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
@@ -29,7 +31,7 @@ const amounts = ['R 1 112 653,62', '-R 1 112 653,62', 'R 123 112 653,62', '-R 1 
         const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: motion});
         await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
         const page = await context.newPage();
-        const response = await page.goto(`${base}/admin/dashboard?theme_preview=${key}`, {waitUntil: 'networkidle'});
+        const response = await arrive(page, `${base}/admin/dashboard?theme_preview=${key}`);
         const label = `${theme.slug} ${width} ${motion}`;
         if (response.status() !== 200) { failures.push(`${label}: status ${response.status()}`); await context.close(); continue; }
         for (const text of amounts) {

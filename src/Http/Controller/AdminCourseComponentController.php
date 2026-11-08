@@ -90,11 +90,19 @@ final class AdminCourseComponentController extends BaseController
             }
             return $this->inserted($courseId, $created['node'], 'The Course Item was created and added to this course.');
         }
-        return $this->handle(function () use ($user): void {
-            $id = $this->items->create($this->withUploadedResource($_POST, $user->id), $user->id);
-            $this->flash('success', 'The Course Item was created.');
-            $this->redirect($this->itemUrl($id));
-        }, '/admin/course-items/new');
+        // From the Course Item Library: a refusal shows the same form again with everything entered, as from Course Content
+        // (2026-11-07: it went back to the type choice, the form empty).
+        $input = $_POST;
+        try {
+            $input = $this->withUploadedResource($_POST, $user->id);
+            $id = $this->items->create($input, $user->id);
+        } catch (InvalidArgumentException|\RuntimeException|\Doctrine\DBAL\Exception\UniqueConstraintViolationException $exception) {
+            $said = $exception instanceof \Doctrine\DBAL\Exception\UniqueConstraintViolationException ? 'That was not saved: something in it is already used by another record. Change it and try again.' : $exception->getMessage();
+            $draft = $this->items->editorDraft($input, $this->blankItem((string) ($input['item_type'] ?? 'html_lesson')));
+            return $this->itemForm($draft, 0, '/admin/course-items', ['tone' => 'danger', 'text' => $said], 422);
+        }
+        $this->flash('success', 'The Course Item was created.');
+        $this->redirect($this->itemUrl($id));
     }
 
     #[Route('/admin/course-items/{item}', name: 'admin_course_item_edit', requirements: ['item' => CourseItemAddress::REQUIREMENT], methods: ['GET'])]
@@ -293,14 +301,14 @@ final class AdminCourseComponentController extends BaseController
     public function uploadResource(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT');
-        return $this->handle(function () use ($user): void { $this->resources->upload((array) ($_FILES['resource_file'] ?? []), $_POST, $user->id); $this->flash('success', 'The Resource was uploaded.'); $this->redirect('/admin/resources'); }, '/admin/resources');
+        return $this->handle(function () use ($user): void { $this->resources->upload((array) ($_FILES['resource_file'] ?? []), $_POST, $user->id); $this->flash('success', 'The Resource was uploaded.'); $this->redirect('/admin/resources'); }, '/admin/resources', keepTyped: true);
     }
 
     #[Route('/admin/resources/register', name: 'admin_resource_register', methods: ['POST'])]
     public function registerResource(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT');
-        return $this->handle(function () use ($user): void { $this->resources->register($_POST, $user->id); $this->flash('success', 'The existing Resource file was registered.'); $this->redirect('/admin/resources'); }, '/admin/resources');
+        return $this->handle(function () use ($user): void { $this->resources->register($_POST, $user->id); $this->flash('success', 'The existing Resource file was registered.'); $this->redirect('/admin/resources'); }, '/admin/resources', keepTyped: true);
     }
 
     #[Route('/admin/resources/{resource_id}', name: 'admin_resource_edit', requirements: ['resource_id' => '\\d+'], methods: ['GET'])]

@@ -22,6 +22,8 @@ The address names a choice as ?<list>_view=grid or list; the choice is then reme
 searching links need not carry it.
 
 Changelog:
+2026/11/07 SAST
+- The bundles in the catalogue and on the Bundles page (catalogue_bundles), cards until chosen, 3 to a row.
 2026/11/06 SAST
 - Administration's bundles (a table until chosen) and a person's Favourites (cards until chosen), 4 to a row.
 2026/10/26 SAST
@@ -53,10 +55,13 @@ final class ListView
         // courses and bundles as the catalogue's cards.
         'bundles' => self::LIST,
         'favourites' => self::GRID,
+        // The bundles in the catalogue and on the Bundles page (owner, 2026-11-07, the approved mockup): their own cards,
+        // three to a row, or their own list, chosen apart from the courses'.
+        'catalogue_bundles' => self::GRID,
     ];
 
     /** Cards to a row in the grid at full width. */
-    public const COLUMNS = ['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4];
+    public const COLUMNS = ['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4, 'catalogue_bundles' => 3];
 
     /** Company People opens as cards for this many people or fewer, else as its table (owner, 2026-10-26). */
     public const COMPANY_PEOPLE_GRID_UP_TO = 10;

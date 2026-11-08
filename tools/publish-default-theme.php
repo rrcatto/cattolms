@@ -9,7 +9,7 @@ Date time: 2026/08/15 19:16 SAST
 Version: 0.5.7.5.1
 
 Description:
-Publishes the installed Factory Reset theme's browser assets and generated automatic-palette stylesheet into the instance public theme directory after deployment.
+Publishes the bundled default theme's (Saharan Sunset since 2026-11-07) browser assets and any generated automatic-palette stylesheet into the instance public theme directory after deployment.
 
 Changelog:
 2026/08/15 19:16 SAST

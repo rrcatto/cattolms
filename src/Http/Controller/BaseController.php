@@ -12,6 +12,7 @@ Handles web requests for base operations, enforcing access rules and coordinatin
 
 Changelog:
 2026/11/07 SAST
+- handle(..., keepTyped: true), keepTyped() and typed(): a refused create form comes back as it was typed and chosen.
 - personIdFromAddress() and companyIdFromAddress(): a person or company named by its account reference, once.
 2026/10/24 SAST
 - requireCsrf() refuses a missing or expired token with a 400, not a 500.
@@ -60,6 +61,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Http\HttpRedirect;
+use CattoLearning\Http\TypedForm;
 use CattoLearning\Http\ViewIdentity;
 use CattoLearning\Support\Csrf;
 use CattoLearning\View\ThemeRenderer;
@@ -277,6 +279,7 @@ abstract class BaseController
         $data['page_title'] = $data['page_title'] ?? ($data['title'] ?? '');
         $data['page_kicker'] = $data['page_kicker'] ?? '';
         $data['flash_messages'] = $this->consumeFlash();
+        $data['typed_form'] = $this->takeTyped();
 
         return new Response($this->view->render($page, $data, $status), $status);
     }
@@ -353,32 +356,72 @@ abstract class BaseController
      * A redirect is not a failure: HttpRedirect extends Exception rather than RuntimeException
      * precisely so a successful write's own redirect passes straight through this.
      */
-    protected function handle(callable $callback, string $fallbackPath): Response
+    protected function handle(callable $callback, string $fallbackPath, bool $keepTyped = false): Response
     {
         try {
             $result = $callback();
         } catch (RuntimeException|\InvalidArgumentException $e) {
             $this->flash('danger', $e->getMessage());
-            $this->redirect($fallbackPath);
+            $this->refused($fallbackPath, $keepTyped);
         } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException) {
             // The database's own refusals in words, never an error page (2026-10-26 audit: a taken course address, an
             // address already on an account): a service that knows the reason says it first.
             $this->flash('danger', 'That was not saved: something in it is already used by another record. Change it and try again.');
-            $this->redirect($fallbackPath);
+            $this->refused($fallbackPath, $keepTyped);
         } catch (\Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException) {
             $this->flash('danger', 'That was not done: other records still depend on it.');
-            $this->redirect($fallbackPath);
+            $this->refused($fallbackPath, $keepTyped);
         } catch (\Doctrine\DBAL\Exception\DriverException $refused) {
             // A company always keeps its Company Administrator (owner, 2026-10-27; the database checks it when a change
             // ends): whatever path tried to take the last one away is told why, never shown an error page.
             if ($refused->getSQLState() !== '23514' || !str_contains($refused->getMessage(), 'Company Administrator')) throw $refused;
             $this->flash('danger', 'That was not done: a company always has a Company Administrator. Make someone else at the company its administrator first.');
-            $this->redirect($fallbackPath);
+            $this->refused($fallbackPath, $keepTyped);
         }
 
         // A callback that produced a response is showing the reader something; one that produced
         // nothing has performed a write, and the reader goes back where they came from.
         return $result instanceof Response ? $result : $this->redirect($fallbackPath);
+    }
+
+    /** Back to the page the refused form came from, with what was typed in it when $keepTyped. */
+    private function refused(string $fallbackPath, bool $keepTyped): never
+    {
+        if ($keepTyped) $this->keepTyped();
+        $this->redirect($fallbackPath);
+    }
+
+    /**
+     * A refused form comes back as it was typed and chosen (2026-11-07: a refused New course form came back empty): what
+     * this request sent is kept for the next page drawn, the form's own page or the page holding its window, which reads
+     * it by the form's action (typed_for() in a template, typed() here). Never the form's token.
+     */
+    protected function keepTyped(): void
+    {
+        $_SESSION[TypedForm::SESSION] = TypedForm::kept($this->request()->getPathInfo(), $_POST);
+    }
+
+    /**
+     * What a refused form sent to $action, for a page that works something out from it before it is drawn (a category
+     * picker opened at the chosen category): nothing when the last refused form went elsewhere.
+     *
+     * @return array<string,mixed>
+     */
+    protected function typed(string $action): array
+    {
+        return TypedForm::for($_SESSION[TypedForm::SESSION] ?? null, $action);
+    }
+
+    /**
+     * What a refused form sent, taken for the page being drawn: it shows once, on the page the reader is sent back to.
+     *
+     * @return array{action:string,values:array<string,mixed>}|null
+     */
+    private function takeTyped(): ?array
+    {
+        $kept = $_SESSION[TypedForm::SESSION] ?? null;
+        unset($_SESSION[TypedForm::SESSION]);
+        return TypedForm::valid($kept);
     }
     private function activeNavigation(): string
     {

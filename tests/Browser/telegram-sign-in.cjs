@@ -1,6 +1,6 @@
 /* Signing in with Telegram and two-step sign-in (owner, 2026-11-05, the approved mockup), in Chromium and Firefox, against a
    stand-in of Telegram, so no message goes to the real service:
-   - the Sign in page offers Email address and Telegram account as feature cards in each of the six themes, at 1440 and 390
+   - the Sign in page offers Email address and Telegram account as feature cards in the site's own theme, at 1440 and 390
      pixels, showing only the chosen field, and without JavaScript shows both and reads the chosen one;
    - Account > Sign-in and security connects Telegram: the page notices by itself when Start is pressed (and has I have pressed
      Start without JavaScript), sends a test, and disconnects;
@@ -33,8 +33,9 @@ const sideways = (page) => page.evaluate(() => document.documentElement.scrollWi
 // A page's words, less a site notification's countdown, which ticks between two loads (the owner's own notification may be on).
 const mainWords = (page) => page.locator('main').evaluate((main) => [...main.querySelectorAll('[data-site-countdown]')].reduce((words, timer) => words.replace(timer.innerText, ''), main.innerText));
 const shot = async (page, name, full = true) => { if (shots) await page.screenshot({path: `${shots}/${name}.png`, fullPage: full}); };
-const themes = fs.readdirSync(path.join(root, 'themes')).filter((n) => fs.existsSync(path.join(root, 'themes', n, 'theme.json')))
-    .map((n) => JSON.parse(fs.readFileSync(path.join(root, 'themes', n, 'theme.json'))).theme);
+// The site's own theme (Saharan Sunset, the one bundled theme since 2026-11-07): a visitor cannot preview one, and no
+// check switches it.
+const themes = [require('./site-theme.cjs').siteTheme()];
 const WRONG = 'That code did not work. Check it, or send a new one.';
 
 // A one-time code worked out here, not by the code under test (RFC 6238).
@@ -85,7 +86,6 @@ async function askTelegram(page, who, js = true) {
 
 async function signInPageInEveryTheme(browsers) {
     for (const theme of themes) {
-        fixture('theme', `${theme.slug}-v${theme.version}`);
         for (const [name, type] of browsers) {
             for (const width of [1440, 390]) {
                 const {ctx, page} = await context(type, {width});
@@ -343,7 +343,6 @@ async function run(type, name, state) {
         const browsers = [['Chromium', await chromium.launch()], ['Firefox', await firefox.launch()]];
         await signInPageInEveryTheme(browsers);
         for (const [, browser] of browsers) await browser.close();
-        fixture('restore-theme');
         await run(chromium, 'Chromium', state);
         await run(firefox, 'Firefox', state);
         const after = JSON.parse(fixture('counts'));

@@ -161,14 +161,14 @@ final class BundleService
      */
     public function cardsByIds(array $ids): array
     {
-        $cards = [];
+        $presented = [];
         $courses = $this->bundles->coursesOf($ids);
         foreach ($ids as $id) {
             $bundle = $this->bundles->find($id);
             if ($bundle === null || $bundle['status'] === 'draft') continue;
-            $cards[] = self::card($this->present($bundle, [], $courses[$id] ?? []));
+            $presented[] = $this->present($bundle, [], $courses[$id] ?? []);
         }
-        return $cards;
+        return $this->cards($presented);
     }
 
     /**
@@ -390,7 +390,7 @@ final class BundleService
     {
         $rows = $this->bundles->published($limit, $offset);
         $courses = $this->bundles->coursesOf(array_map(static fn(array $row): int => (int) $row['id'], $rows));
-        return $this->markFavourites($viewer?->id, array_map(fn(array $bundle): array => self::card($this->present($bundle, [], $courses[(int) $bundle['id']] ?? [])), $rows));
+        return $this->markFavourites($viewer?->id, $this->cards(array_map(fn(array $bundle): array => $this->present($bundle, [], $courses[(int) $bundle['id']] ?? []), $rows)));
     }
 
     /**
@@ -422,15 +422,15 @@ final class BundleService
      * The catalogue's "Save with a bundle" row (owner, 2026-11-06, the approved mockup): on All courses
      * (no category) every published bundle that can be bought now, on a category's page those holding a
      * course in its branch, drawn with the Bundles page's cards, the larger saving first. A company
-     * account sees none. The catalogue decides where the row shows: never with a search, on a tag's
-     * page or after the first page.
+     * account sees none. The catalogue pages them six at a time in a section of their own, whatever
+     * page of courses or search is shown (owner, 2026-11-07, the approved mockup); never on a tag's page.
      *
      * @return list<array<string,mixed>> course cards, as catalogue() gives them
      */
     public function catalogueRow(?int $categoryId, ?CurrentUser $viewer): array
     {
         if ($viewer !== null && $this->commerce->isCompanyAccount($viewer->id)) return [];
-        return $this->markFavourites($viewer?->id, array_map(static fn(array $bundle): array => self::card($bundle), $this->buyable($this->bundles->publishedFor($categoryId === null ? [] : ['category' => $categoryId]), null)));
+        return $this->markFavourites($viewer?->id, $this->cards($this->buyable($this->bundles->publishedFor($categoryId === null ? [] : ['category' => $categoryId]), null)));
     }
 
     /**
@@ -470,21 +470,49 @@ final class BundleService
     }
 
     /**
-     * A bundle as a catalogue card: the course card with its own address, link and facts, and what it
-     * saves as a "Save R..." under its price while it can be bought (the approved mockup, 2026-11-06).
+     * Bundles as catalogue cards, with their courses' covers read at once.
+     *
+     * @param list<array<string,mixed>> $presented as present() gives them
+     * @return list<array<string,mixed>>
+     */
+    private function cards(array $presented): array
+    {
+        $courseIds = [];
+        foreach ($presented as $bundle) foreach ($bundle['courses'] as $course) $courseIds[] = (int) $course['course_id'];
+        $covers = $this->bundles->coverVersions(array_values(array_unique($courseIds)));
+        return array_map(static fn(array $bundle): array => self::card($bundle, $covers), $presented);
+    }
+
+    /**
+     * A bundle as a catalogue card (partials/bundle-card.html.twig, the approved mockup of 2026-11-07: a card of its own,
+     * not a course's): its own drawing, its address, short description, how many courses and their covers, its price with the was price,
+     * what it saves while it can be bought, its access and when a later sale starts. The facts rows and link label stay
+     * for Favourites' list, which reads the price from them.
      *
      * @param array<string,mixed> $presented as present() gives it
+     * @param array<int,string> $covers course id => cover version, as coverVersions() gives them
      * @return array<string,mixed>
      */
-    private static function card(array $presented): array
+    private static function card(array $presented, array $covers = []): array
     {
         $facts = [['label' => 'Courses', 'value' => $presented['course_count']], ['label' => 'Access', 'value' => $presented['access_label'] ?? '—'], ['label' => 'Price', 'value' => $presented['price_label'] ?? '—', 'was' => $presented['was_label']]];
         $later = $presented['on_sale_from'] !== null;
         if ($presented['unavailable'] !== null && !$later) $facts[] = ['label' => 'Availability', 'value' => 'Not available now'];
+        $courseCovers = [];
+        foreach ($presented['courses'] as $course) {
+            $version = $covers[(int) $course['course_id']] ?? null;
+            $courseCovers[] = ['title' => (string) $course['title'], 'cover' => $version === null ? null : '/courses/' . $course['slug'] . '/cover.svg?v=' . $version,
+                'initial' => mb_strtoupper(mb_substr((string) $course['title'], 0, 1))];
+        }
         // bundle_id gives the card its star (owner, 2026-11-06), and a bundle on sale later says when, under its price.
         return ['bundle_id' => (int) $presented['id'], 'title' => (string) $presented['title'], 'slug' => (string) $presented['slug'], 'href' => '/bundles/' . $presented['slug'], 'link_label' => 'View bundle',
             'summary' => (string) $presented['short_description'], 'cover_svg' => (string) $presented['cover_svg'], 'cover_media_public_id' => null,
+            // Its own drawing, the strip across the top of its card (owner, 2026-11-07, the approved mockup).
+            'cover_href' => str_starts_with(ltrim((string) $presented['cover_svg']), '<svg') ? '/bundles/' . $presented['slug'] . '/cover.svg?v=' . substr(md5((string) $presented['cover_svg']), 0, 12) : null,
             'cover_initial' => mb_strtoupper(mb_substr((string) $presented['title'], 0, 1)), 'facts' => $facts,
+            'course_count' => (int) $presented['course_count'], 'course_covers' => $courseCovers,
+            'access_label' => $presented['access_label'], 'price_label' => $presented['price_label'], 'was_label' => $presented['was_label'],
+            'not_available' => $presented['unavailable'] !== null && !$later,
             'saving_badge' => ($presented['unavailable'] === null || $later) && $presented['save_label'] !== null ? 'Save ' . $presented['save_label'] : null,
             'availability_badge' => $later ? (string) $presented['on_sale_from_short'] : null];
     }

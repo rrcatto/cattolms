@@ -21,8 +21,9 @@ filter was distinguishable only by aria-current.
 None of that could fail a build, because the markup was valid and the class simply did nothing.
 
 This asserts the property that makes it fail instead: every cl- class emitted by a core-owned view
-is styled by core CSS or by the bundled Factory Reset theme. Factory Reset is the recovery theme and
-ships inside the code root, so the pair is the floor below which no installation can fall - an
+is styled by core CSS or by the bundled default theme. The default theme (Saharan Sunset since 2026-11-07,
+Factory Reset before) is the recovery theme and ships inside the code root, so the pair is the floor below
+which no installation can fall - an
 externally installed theme may restyle any of it, but nothing may be left to chance.
 
 The exception cl-ui-list is for classes that deliberately carry no styling: htmx and JavaScript targets,
@@ -30,6 +31,10 @@ and wrapper hooks a theme may opt into. Adding to it is a decision to be stated,
 of it being a literal cl-ui-list rather than a pattern.
 
 Changelog:
+2026/11/07 SAST
+- Saharan Sunset is the floor with core CSS. The five classes only Factory Reset had styled (an assessment's timer, the
+  card around its question and its words, a course card's cover picture, the import review's module number) have Core
+  rules, so none is excused.
 2026/10/17 SAST
 - cl-admin-standalone-section and cl-company-section are no longer behaviour hooks: rows take their width from the page width.
 2026/09/09 14:01 SAST
@@ -55,9 +60,7 @@ final class CoreStyleNamespaceContractTest extends TestCase
      */
     private const BEHAVIOUR_HOOKS = [
         'cl-company-picker',
-        'cl-course-head',
         'cl-course-presentation',
-        'cl-rich-editor',
         'cl-section-body',
     ];
 
@@ -116,7 +119,7 @@ final class CoreStyleNamespaceContractTest extends TestCase
     {
         $stylesheets = [
             self::root() . '/public_html/css/catto-platform.css',
-            self::root() . '/themes/factory-reset/public/css/theme.css',
+            self::root() . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/public/css/theme.css',
         ];
         $styled = [];
         foreach ($stylesheets as $stylesheet) {
@@ -153,7 +156,7 @@ final class CoreStyleNamespaceContractTest extends TestCase
         }
 
         self::assertSame([], $unstyled, sprintf(
-            "These core-owned classes are styled by neither core CSS nor the bundled Factory Reset theme,\n"
+            "These core-owned classes are styled by neither core CSS nor the bundled default theme (Saharan Sunset),\n"
             . "so they render as whatever the active theme happens to define and as nothing at all under a\n"
             . "theme that does not. Add a rule to public_html/css/catto-platform.css, or declare the class a\n"
             . "behaviour hook in BEHAVIOUR_HOOKS and say why:\n  %s",
@@ -172,7 +175,7 @@ final class CoreStyleNamespaceContractTest extends TestCase
                 $hook
             ));
             self::assertNotContains($hook, $styled, sprintf(
-                'BEHAVIOUR_HOOKS names %s, but core or Factory Reset now styles it. Remove the exception.',
+                'BEHAVIOUR_HOOKS names %s, but core or the default theme now styles it. Remove the exception.',
                 $hook
             ));
         }

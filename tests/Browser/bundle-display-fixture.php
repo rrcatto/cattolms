@@ -46,6 +46,8 @@ $expect = static function () use ($container, $db): array {
     return [
         'course' => ['slug' => (string) $db->fetchOne('SELECT slug FROM courses WHERE id = :id', ['id' => $best['id']]), 'notes' => array_map($note, $best['notes'])],
         'all' => array_column($bundles->catalogueRow(null, null), 'title'),
+        // The bundles with a drawing of their own, which their cards and pages show (owner, 2026-11-07).
+        'drawn' => array_column(array_filter($bundles->catalogueRow(null, null), static fn(array $card): bool => $card['cover_href'] !== null), 'title'),
         'with' => $with,
         'without' => $without,
     ];

@@ -11,6 +11,9 @@
      the timer, Skip for now and Finish now, brings a skipped question back with its own number, ends on the result page
      with its question report, and ticks its part; practice gives feedback after an answer; a readiness check ends Ready
      or Review and ticks its part;
+   - a readiness check's wrong answers say what to study first: each module they name, in course order, with its study
+     parts opening in the reader the reader is in, and in the public preview a module it does not show named as part of
+     the full course (2026-11-07), at 1440 and 390;
    - Mark complete and the assessment work without JavaScript;
    - in Course Modules only the section the reader is in starts open: none on the course introduction or a part in no
      section, the next one as the reader moves into it, and any section opened or closed by hand with its arrow, without
@@ -21,6 +24,8 @@
    - nothing scrolls sideways and no script errors.
    Fixture: php tests/Browser/reader-preview-fixture.php create|cleanup (in env_php_1). */
 const {chromium, firefox} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
+// Loaded and settled (fonts in, two frames), never half a second of network quiet: pages are drawn by the server.
+const {open: arrive} = require('./pace.cjs');
 const fs = require('node:fs');
 const base = process.env.CATTO_BASE_URL || 'https://catto.test';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-reader-preview-state.json'));
@@ -38,7 +43,7 @@ async function admin(browser, options) {
 }
 
 async function startPreview(page) {
-    await page.goto(`${base}/admin/courses/${state.course_code}/preview`, {waitUntil: 'networkidle'});
+    await arrive(page, `${base}/admin/courses/${state.course_code}/preview`);
     const start = page.locator('button:has-text("Start course")');
     if (await start.count()) {
         for (const box of await page.locator('form[action*="/start"] input[type=checkbox][required]').all()) await box.check();
@@ -245,6 +250,35 @@ async function visitorAssessment(page, at) {
     check(`${at}: the readiness check ends Ready and ticks its part`, await page.getByText('Diagnostic result').count() === 1 && (await page.locator('.cl-result-score span').innerText()).trim() === 'Ready' && await ticked(page, state.readiness_node) === 1);
 }
 
+/* A readiness check's wrong answers name the modules to study first (COURSE-SPECIFICATION.md section 11, 2026-11-07):
+   each module the answers name, in course order, with its study parts opening where the reader is; the public preview
+   names a module it does not show as part of the full course. */
+async function studyFirst(page, at, where) {
+    const preview = where === 'preview';
+    await page.goto(preview ? pub(`${state.readiness_node}/assessment/${state.readiness_key}`) : learn(`${state.readiness_node}/assessment/${state.readiness_key}`), {waitUntil: 'load'});
+    await press(page, page.locator('button:has-text("Start diagnostic")'));
+    for (let turn = 0; turn < 4 && await page.locator('.cl-question-focus').count() === 1; turn++) {
+        await page.locator('.cl-question-focus label.cl-option').filter({hasText: /^\s*Wrong\s*$/}).locator('input').check();
+        await press(page, page.locator('button:has-text("Submit answer")'));
+    }
+    const box = page.locator('[data-study-suggestions]');
+    check(`${at}: wrong answers end Review and say what to study first`, /\/result(\?|$)/.test(page.url()) && (await page.locator('.cl-result-score span').innerText()).trim() === 'Review'
+        && await box.getByRole('heading', {name: 'What to study first'}).count() === 1, page.url());
+    const modules = await box.locator('[data-study-suggestion]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-study-module')));
+    check(`${at}: each module the wrong answers name, in course order`, modules.join(',') === '1,2', modules.join(','));
+    const first = box.locator('[data-study-module="1"]');
+    const links = await first.locator('[data-study-parts] a').evaluateAll((anchors) => anchors.map((a) => `${a.textContent.trim()} ${new URL(a.href).pathname}${new URL(a.href).search}`));
+    const opens = (part) => preview ? `/courses/${state.slug}/preview/${part}` : `/learn/${state.slug}/${part}?preview=1`;
+    const expected = [`Lesson ${opens(state.lesson_node)}`, `Summary ${opens(state.summary_node)}`];
+    check(`${at}: Module 1 lists its lesson and summary, opening in the ${preview ? 'public preview' : 'reader'}, and not its assessment`, links.join(' | ') === expected.join(' | '), links.join(' | '));
+    const second = box.locator('[data-study-module="2"]');
+    if (preview) check(`${at}: Module 2, which the preview does not show, is named as part of the full course`, (await second.locator('[data-study-elsewhere]').innerText()).trim() === 'in the full course' && await second.locator('a').count() === 0, await second.innerText());
+    else check(`${at}: Module 2 lists its lesson, opening in the reader`, await second.locator(`[data-study-parts] a[href$="/${state.second_lesson_node}?preview=1"]`).count() === 1);
+    check(`${at}: the suggestions do not scroll sideways`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+    await press(page, first.locator('[data-study-parts] a').first());
+    check(`${at}: a suggestion opens its part`, new URL(page.url()).pathname.endsWith(`/${state.lesson_node}`) && await page.locator('.cl-course-item').count() === 1, page.url());
+}
+
 async function visitorTicks(page, at) {
     await page.goto(pub(state.lesson_node), {waitUntil: 'load'});
     const before = await progress(page);
@@ -281,6 +315,7 @@ async function run(browserType, name) {
     await row(student, `${name} student preview, the course page`, `${base}/learn/${state.slug}?preview=1`, {next: true});
     await studentSections(student, name);
     await gradedWayOn(student, `${name} student preview`);
+    await studyFirst(student, `${name} student preview`, 'reader');
 
     // The public preview, as a visitor who is not signed in.
     const visitor = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'})).newPage());
@@ -290,12 +325,14 @@ async function run(browserType, name) {
     await visitorTicks(visitor, `${name} public preview`);
     await visitorSections(visitor, `${name} public preview`);
     await visitorAssessment(visitor, `${name} public preview`);
+    await studyFirst(visitor, `${name} public preview`, 'preview');
     check(`${name}: nothing scrolls sideways`, await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
     const phone = listen(await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 390, height: 844}, reducedMotion: 'reduce'})).newPage());
     await row(phone, `${name} public preview at 390, a part`, pub(state.lesson_node), {complete: 'above'});
     check(`${name} at 390: nothing scrolls sideways`, await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     await visitorSections(phone, `${name} at 390`);
+    await studyFirst(phone, `${name} public preview at 390`, 'preview');
 
     // Without JavaScript the toggle and the assessment are plain forms.
     const plain = await (await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, javaScriptEnabled: false, reducedMotion: 'reduce'})).newPage();

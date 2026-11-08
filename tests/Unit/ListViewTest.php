@@ -49,11 +49,13 @@ final class ListViewTest extends TestCase
         // A company's own page shows the courses it provides 4 to a row (owner-approved mockup, 2026-10-27); Mailing's
         // Subscribers 5 to a row, like People (owner, 2026-10-28). Administration's bundles and a person's Favourites 4 to a
         // row, as courses (owner, 2026-11-06).
-        self::assertSame(['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4], ListView::COLUMNS);
+        // The catalogue's and the Bundles page's bundles 3 to a row, their own cards (owner, 2026-11-07, the approved mockup).
+        self::assertSame(['people' => 5, 'companies' => 5, 'company_creators' => 5, 'courses' => 4, 'catalogue' => 4, 'company_people' => 5, 'company_courses' => 4, 'subscribers' => 5, 'bundles' => 4, 'favourites' => 4, 'catalogue_bundles' => 3], ListView::COLUMNS);
         self::assertSame([30, 60, 90], ListView::pageSizes('subscribers', 'grid'));
         self::assertSame([24, 48, 96], ListView::pageSizes('bundles', 'grid'));
         self::assertSame([24, 48, 96], ListView::pageSizes('favourites', 'grid'));
         self::assertSame('list', ListView::chosen('bundles', [], []), 'The bundle list opens as its table.');
+        self::assertSame('grid', ListView::chosen('catalogue_bundles', [], []), 'The catalogue\'s bundles open as their cards.');
         self::assertSame('grid', ListView::chosen('favourites', [], []), 'Favourites opens as cards.');
 
         $page = Pagination::within('2', '60', 284, [30, 60, 90]);

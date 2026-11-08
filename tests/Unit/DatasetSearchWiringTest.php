@@ -271,6 +271,8 @@ final class DatasetSearchWiringTest extends TestCase
 
         self::assertStringContainsString('hx-target="#{{ ds_name }}-region"', $control);
         self::assertStringContainsString('hx-select="#{{ ds_name }}-results"', $control);
-        self::assertStringContainsString('hx-swap="innerHTML"', $control, 'outerHTML on the target is what destroyed it.');
+        // innerHTML unless a list morphs its inside (the catalogue, owner 2026-11-07): never outerHTML on the target.
+        self::assertStringContainsString('hx-swap="{{ ds_swap|default(\'innerHTML\') }}"', $control, 'outerHTML on the target is what destroyed it.');
+        self::assertStringNotContainsString('outerHTML', $control);
     }
 }
