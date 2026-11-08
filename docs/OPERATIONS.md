@@ -202,12 +202,12 @@ Owner, 2026-11-05, the approved mockup (`REPORTS/telegram-sign-in-mockup/`). Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with Saharan Sunset, the bundled theme, active: integration tests draw pages through the active theme, and the browser checks check the bundled theme without switching the active one. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.1`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.2`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.1.1  # the tag being released
+   V=v1.1.2  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

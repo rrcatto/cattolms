@@ -2,6 +2,17 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-11-08 — v1.1.2 Bundle cards that glow, grow and pulse their saving under the pointer
+
+### Installing and updating
+
+- **No clean installation is needed from v1.1.1:** the schema is unchanged, so a v1.1.1 site updates in place (the Podman kit's `update --version 1.1.2`) with no SQL to run first. No `.env` setting is new or removed, no package is added or removed, no page or command is removed, no legal text changed and no third party is added.
+
+### Changes
+
+- **A bundle card answers the pointer** (UX rule 8.8): under the mouse, or when the keyboard is inside it, it grows a little above its neighbours, its edge lights up in the bundle's highlight colour with a warm glow beyond it, and its Save badge swells and sends out a ring of its own colour every 1.6 seconds. A tap on a phone leaves it alone, and with motion turned off it only lights up. Stylesheet only; `tests/Browser/bundle-display.cjs` checks it in Chromium and Firefox.
+- **Two checks brought up to date** with v1.1.1's bundles: `bundles.cjs` looks for bundle cards on the Bundles page, not course cards, and `bundle-display.cjs` waits until every picture has arrived or failed (15 seconds at most) rather than asking Chromium to decode one still arriving.
+
 ## 2026-11-08 — v1.1.1 Bundles as bundles in the catalogue, each with its own drawing, one theme, refused forms kept as typed, and faster pages
 
 ### Installing and updating

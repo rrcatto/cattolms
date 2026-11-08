@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/08 SAST (v1.1.2)
+- Advanced PLATFORM_ASSET_VERSION to 1.1.2.
 2026/11/08 SAST (v1.1.1)
 - Advanced PLATFORM_ASSET_VERSION to 1.1.1.
 2026/11/07 SAST (v1.1.0)
@@ -156,7 +158,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.1.1';
+    private const PLATFORM_ASSET_VERSION = '1.1.2';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,

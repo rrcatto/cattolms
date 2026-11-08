@@ -7,6 +7,8 @@
  *     mockup), "Course bundles" with List, Grid and View all bundles in its head: the bundles' own cards, three to a row,
  *     shorter than a course card, in the bundle colour, View bundle at the bottom left under a line, six to a page with
  *     their own pages; the line about bundles stays only where no bundle shows (a category without bundles);
+ *   - under the pointer and from the keyboard a bundle card grows by 3.5%, lights its edge and pulses its Save badge, and
+ *     settles back when left; with motion turned off it only lights up (owner, 2026-11-08, the approved mockup);
  *   - every bundled theme at 1440 and 390: nothing out of its card or its grid, no sideways scrolling, no inline style,
  *     and the shared page checks (page-construction.cjs);
  *   - a company account sees no note and no row;
@@ -52,7 +54,8 @@ async function scenario(name, run) {
 }
 async function open(browser, options = {}) {
     // Without JavaScript the themes' smooth scrolling never settles under Playwright; they turn it off for reduced motion.
-    const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: options.width || 1440, height: 900}, javaScriptEnabled: options.js !== false, reducedMotion: 'reduce'});
+    // Only the card's own movement is checked with motion allowed (motion: 'no-preference').
+    const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: options.width || 1440, height: 900}, javaScriptEnabled: options.js !== false, reducedMotion: options.motion || 'reduce'});
     if (options.token) await ctx.addCookies([{name: 'catto_learning_session', value: options.token, url: base, secure: true}]);
     const page = await ctx.newPage();
     const errors = [];
@@ -62,9 +65,11 @@ async function open(browser, options = {}) {
 async function visit(page, url) {
     const response = await arrive(page, `${base}${url}`);
     // The cards' drawings load as they come into view: here every one is asked for, so the check sees them all (with
-    // JavaScript; without it a browser loads them at once, and Firefox never settles decode() there), three seconds at most.
+    // JavaScript; without it a browser loads them at once), until each has arrived or failed, fifteen seconds at most.
+    // Not decode(): Chromium can refuse it for a picture still on its way, which a busy server made a false failure.
     if (await page.evaluate(() => typeof window.htmx !== 'undefined')) {
-        await page.evaluate(() => Promise.race([Promise.all([...document.querySelectorAll('img[loading="lazy"]')].map((img) => { img.loading = 'eager'; return img.decode().catch(() => {}); })), new Promise((done) => setTimeout(done, 3000))]));
+        await page.evaluate(() => { for (const img of document.querySelectorAll('img[loading="lazy"]')) img.loading = 'eager'; });
+        await page.waitForFunction(() => [...document.querySelectorAll('img')].every((img) => img.complete), null, {timeout: 15000}).catch(() => {});
     }
     assert.equal(response.status(), 200, `${url} answers`);
     const problems = judge(await page.evaluate(inspect), url);
@@ -340,6 +345,73 @@ function expectNoRow(found, label, line = true) {
             await page.locator('#catalogue-bundles').getByRole('link', {name: 'Show as a grid of cards'}).click();
             await page.locator('#catalogue-bundles .cl-bundle-cards').waitFor({timeout: 10000});
             assert.ok(await page.evaluate(() => window.__samePage === true), 'the page never loaded again');
+            assert.deepEqual(errors, []);
+            await ctx.close();
+        });
+
+        await scenario(`${browserName}: a bundle card grows, lights up and pulses its saving under the pointer and from the keyboard, and with motion turned off only lights up`, async () => {
+            const look = (index) => {
+                const card = document.querySelectorAll('#catalogue-bundles .cl-bundle-card')[index];
+                const style = getComputedStyle(card);
+                const save = card.querySelector('.cl-bundle-card-badges .cl-ui-badge--success');
+                const other = card.querySelector('.cl-bundle-card-badges .cl-ui-badge:not(.cl-ui-badge--success)');
+                return {
+                    scale: style.transform === 'none' ? 1 : new DOMMatrixReadOnly(style.transform).a,
+                    lit: /0px 0px 0px 2px/.test(style.boxShadow),
+                    above: style.zIndex,
+                    pulse: getComputedStyle(save).animationName,
+                    other: other ? getComputedStyle(other).animationName : 'none',
+                };
+            };
+            // Until the card has finished growing or shrinking: its glow is drawn in as it grows, so read before its transitions
+            // end it is not quite lit (its edge 1.98 pixels wide, not 2).
+            const settled = (page, index, scale) => page.waitForFunction(([i, want]) => {
+                const card = document.querySelectorAll('#catalogue-bundles .cl-bundle-card')[i];
+                const t = getComputedStyle(card).transform;
+                return card.getAnimations().length === 0 && Math.abs((t === 'none' ? 1 : new DOMMatrixReadOnly(t).a) - want) < 0.0002;
+            }, [index, scale], {timeout: 3000});
+            // Scrolled to first and pointed at in steps, as the star is above (Firefox takes :hover that way).
+            const pointAt = async (page, index) => {
+                const title = page.locator('#catalogue-bundles .cl-bundle-card').nth(index).locator('.cl-bundle-card-title');
+                await title.scrollIntoViewIfNeeded();
+                const box = await title.boundingBox();
+                await page.mouse.move(box.x + 4, box.y + box.height / 2, {steps: 4});
+            };
+            let {ctx, page, errors} = await open(browser, {motion: 'no-preference'});
+            await visit(page, '/courses');
+            const index = await page.evaluate(() => [...document.querySelectorAll('#catalogue-bundles .cl-bundle-card')].findIndex((c) => c.querySelector('.cl-bundle-card-badges .cl-ui-badge--success')));
+            assert.ok(index >= 0, 'a bundle card in the catalogue says what it saves');
+            await page.mouse.move(0, 0);
+            const rest = await page.evaluate(look, index);
+            assert.deepEqual([rest.scale, rest.lit, rest.pulse], [1, false, 'none'], `at rest the card is its own size, unlit and still (${JSON.stringify(rest)})`);
+            await pointAt(page, index);
+            await settled(page, index, 1.035);
+            const pointed = await page.evaluate(look, index);
+            assert.ok(pointed.lit && pointed.above === '1', `under the pointer its edge lights up above its neighbours (${JSON.stringify(pointed)})`);
+            assert.equal(pointed.pulse, 'cl-bundle-save-pulse', 'its saving pulses');
+            assert.equal(pointed.other, 'none', 'and only its saving');
+            await page.mouse.move(0, 0);
+            await settled(page, index, 1);
+            assert.deepEqual([(await page.evaluate(look, index)).lit, (await page.evaluate(look, index)).pulse], [false, 'none'], 'it settles back when the pointer leaves');
+            // From the keyboard: tabbing from View all bundles into the card.
+            await page.locator('#catalogue-bundles').getByRole('link', {name: 'View all bundles'}).focus();
+            for (let presses = 0; presses < 40; presses += 1) {
+                await page.keyboard.press('Tab');
+                if (await page.evaluate((i) => document.activeElement?.closest('#catalogue-bundles .cl-bundle-card') === document.querySelectorAll('#catalogue-bundles .cl-bundle-card')[i], index)) break;
+            }
+            await settled(page, index, 1.035);
+            const keyed = await page.evaluate(look, index);
+            assert.ok(keyed.lit && keyed.pulse === 'cl-bundle-save-pulse', `tabbing into it does the same (${JSON.stringify(keyed)})`);
+            assert.deepEqual(errors, []);
+            await ctx.close();
+            // With motion turned off it lights up and nothing moves.
+            ({ctx, page, errors} = await open(browser));
+            await visit(page, '/courses');
+            await page.mouse.move(0, 0);
+            await pointAt(page, index);
+            await page.waitForFunction((i) => /0px 0px 0px 2px/.test(getComputedStyle(document.querySelectorAll('#catalogue-bundles .cl-bundle-card')[i]).boxShadow), index, {timeout: 3000});
+            const still = await page.evaluate(look, index);
+            assert.deepEqual([still.scale, still.lit, still.pulse], [1, true, 'none'], `with motion turned off it lights up without growing or pulsing (${JSON.stringify(still)})`);
             assert.deepEqual(errors, []);
             await ctx.close();
         });

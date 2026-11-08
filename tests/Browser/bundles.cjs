@@ -213,7 +213,7 @@ async function checkoutToReview(page) {
         const admin = await open(chromium, fixture.admin_token);
         for (const theme of themes) {
             for (const width of [1440, 390]) {
-                for (const [page, url, selector] of [[buyer.page, '/bundles', '.cl-course-card'], [buyer.page, bundleUrl, PRICE_BOX], [buyer.page, '/cart', '.cl-bundle-line'], [admin.page, '/admin/bundles', 'table'], [admin.page, editorUrl.replace(base, ''), '.cl-bundle-courses']]) {
+                for (const [page, url, selector] of [[buyer.page, '/bundles', '.cl-bundle-card'], [buyer.page, bundleUrl, PRICE_BOX], [buyer.page, '/cart', '.cl-bundle-line'], [admin.page, '/admin/bundles', 'table'], [admin.page, editorUrl.replace(base, ''), '.cl-bundle-courses']]) {
                     await page.setViewportSize({width, height: 1200});
                     const response = await page.goto(`${base}${url}${url.includes('?') ? '&' : '?'}theme_preview=${theme}`);
                     assert.equal(response.status(), 200, `${theme} ${url}`);

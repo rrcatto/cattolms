@@ -1496,6 +1496,17 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-bundle-card-foot{display:flex;justify-content:flex-start;padding-top:.875rem;border-top:1px solid var(--cl-bundle-rule)}
 .cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary{background:var(--cl-bundle-mark);border-color:var(--cl-bundle-mark);color:var(--cl-ink,#1f1915)}
 .cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary:hover,.cl-bundle-card .cl-bundle-card-foot .cl-ui-action--primary:focus-visible{background:var(--cl-bundle-ink);border-color:var(--cl-bundle-ink);color:var(--cl-ink,#1f1915)}
+/* A bundle card answers the pointer (owner, 2026-11-08, the approved mockup: "Border glow, scale-up and pulsing save
+   badge"): it grows a little above its neighbours, its edge lights up in the bundle's highlight with a warm glow beyond
+   it, and its saving badge swells and sends out a ring of its own colour every 1.6 seconds. Under a pointer that can
+   hover (a tap on a phone leaves it alone) and when the keyboard is inside it. With motion turned off it only lights up. */
+@keyframes cl-bundle-save-pulse{0%{transform:scale(1);outline-offset:0;outline-color:color-mix(in srgb,var(--cl-bundle-save-pulse) 95%,transparent)}30%{transform:scale(1.07)}60%{transform:scale(1)}100%{transform:scale(1);outline-offset:11px;outline-color:color-mix(in srgb,var(--cl-bundle-save-pulse) 0%,transparent)}}
+.cl-bundle-card{--cl-bundle-save-pulse:color-mix(in srgb,var(--cl-success,#18582c) 14%,#fff);--cl-bundle-glow:0 0 0 2px var(--cl-bundle-mark),0 0 0 6px color-mix(in srgb,var(--cl-bundle-mark) 40%,transparent),0 0 36px 10px color-mix(in srgb,color-mix(in srgb,var(--cl-bundle-mark) 62%,var(--cl-bundle-surface)) 70%,transparent),0 22px 44px rgb(31 25 21 / .22);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1)}
+.cl-bundle-card .cl-bundle-card-badges .cl-ui-badge--success{transform-origin:left center;outline:2px solid transparent}
+.cl-bundle-card:has(:focus-visible){z-index:1;transform:scale(1.035);box-shadow:var(--cl-bundle-glow)}
+.cl-bundle-card:has(:focus-visible) .cl-bundle-card-badges .cl-ui-badge--success{animation:cl-bundle-save-pulse 1.6s ease-out infinite}
+@media(hover:hover){.cl-bundle-card:hover{z-index:1;transform:scale(1.035);box-shadow:var(--cl-bundle-glow)}.cl-bundle-card:hover .cl-bundle-card-badges .cl-ui-badge--success{animation:cl-bundle-save-pulse 1.6s ease-out infinite}}
+@media(prefers-reduced-motion:reduce){.cl-bundle-card{transition:none}.cl-bundle-card:is(:hover,:has(:focus-visible)){transform:none}.cl-bundle-card .cl-bundle-card-badges .cl-ui-badge--success{animation:none!important}}
 .cl-bundle-list .cl-ui-table table thead th{background:var(--cl-bundle-surface);color:var(--cl-bundle-ink);border-bottom-color:var(--cl-bundle-surface)}
 .cl-bundle-list .cl-ui-table td.cl-bundle-list-count{font-weight:600}
 .cl-bundle-list .cl-bundle-list-title{font-weight:600}
