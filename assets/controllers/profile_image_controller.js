@@ -19,7 +19,15 @@ Description:
   crop - a rotation about the corner would swing it out of frame and the reader would have to drag
   it back every time.
 
+  The site logo uses the same controls (owner, 2026-11-09: "I want the same controls for the site logo
+  that you provided for the account profile image") with frame 'picture': the frame is the picture's
+  own shape, turned as it is turned, so at the smallest size nothing is cut off and a larger size cuts
+  in; what is submitted is a PNG of that shape within maxWidth by maxHeight, never larger than the
+  pixels the frame holds, its transparency kept. An SVG is left to the server, which draws it.
+
 Changelog:
+  2026/11/09 SAST
+  - frame 'picture', maxWidth and maxHeight, for the site logo.
   2026/09/10 07:10 SAST
   - Created so a profile image can be oriented, sized and previewed before it is stored.
 */
@@ -32,6 +40,10 @@ export default class extends Controller {
         // The square the server stores. The stage is drawn larger for the sake of the person using
         // it, and the submitted canvas is rendered at exactly this size.
         size: { type: Number, default: 256 },
+        // 'square', or 'picture' for a frame of the picture's own shape (the site logo).
+        frame: { type: String, default: 'square' },
+        maxWidth: { type: Number, default: 1200 },
+        maxHeight: { type: Number, default: 600 },
     };
 
     connect() {
@@ -65,7 +77,8 @@ export default class extends Controller {
     /** A file was chosen. Decode it, fit it to the frame, and show the editor. */
     async choose() {
         const file = this.fileTarget.files && this.fileTarget.files[0];
-        if (!file) {
+        // An SVG logo is drawn by the server at its full size; a canvas would only give it the size the browser guessed.
+        if (!file || (this.framesPicture() && file.type === 'image/svg+xml')) {
             this.editorTarget.hidden = true;
             this.dataTarget.value = '';
             return;
@@ -88,18 +101,49 @@ export default class extends Controller {
         if (this.hasPlaceholderTarget) {
             this.placeholderTarget.hidden = true;
         }
+        this.fitFrame();
         this.draw();
+    }
+
+    framesPicture() {
+        return this.frameValue === 'picture';
+    }
+
+    /** The picture's width and height as it is turned now. */
+    turnedSize() {
+        const turned = this.rotation === 90 || this.rotation === 270;
+        return turned ? [this.bitmap.height, this.bitmap.width] : [this.bitmap.width, this.bitmap.height];
+    }
+
+    /**
+     * With frame 'picture', the stage and the preview take the picture's shape as it is turned: the stage within
+     * 480 by 320, the preview within 240 by 120. A square frame keeps the canvases as they are drawn.
+     */
+    fitFrame() {
+        if (!this.framesPicture() || !this.bitmap) return;
+        const [width, height] = this.turnedSize();
+        for (const [canvas, boxWidth, boxHeight] of [[this.stageTarget, 480, 320], [this.previewTarget, 240, 120]]) {
+            const fit = Math.min(boxWidth / width, boxHeight / height);
+            canvas.width = Math.max(1, Math.round(width * fit));
+            canvas.height = Math.max(1, Math.round(height * fit));
+        }
+        this.offsetX = 0;
+        this.offsetY = 0;
     }
 
     /** Quarter turn anticlockwise. */
     rotateLeft() {
         this.rotation = (this.rotation + 270) % 360;
+        this.fitFrame();
+        this.clampOffset();
         this.draw();
     }
 
     /** Quarter turn clockwise. */
     rotateRight() {
         this.rotation = (this.rotation + 90) % 360;
+        this.fitFrame();
+        this.clampOffset();
         this.draw();
     }
 
@@ -115,6 +159,7 @@ export default class extends Controller {
         this.offsetX = 0;
         this.offsetY = 0;
         this.zoomTarget.value = '1';
+        this.fitFrame();
         this.draw();
     }
 
@@ -148,10 +193,10 @@ export default class extends Controller {
     /** Keep the frame inside the picture, so a corner can never be dragged into empty space. */
     clampOffset() {
         if (!this.bitmap) return;
-        const stage = this.stageTarget.width;
-        const [width, height] = this.drawnSize(stage);
-        const slackX = Math.max(0, (width - stage) / 2);
-        const slackY = Math.max(0, (height - stage) / 2);
+        const [frameWidth, frameHeight] = [this.stageTarget.width, this.stageTarget.height];
+        const [width, height] = this.drawnSize(frameWidth, frameHeight);
+        const slackX = Math.max(0, (width - frameWidth) / 2);
+        const slackY = Math.max(0, (height - frameHeight) / 2);
         this.offsetX = Math.max(-slackX, Math.min(slackX, this.offsetX));
         this.offsetY = Math.max(-slackY, Math.min(slackY, this.offsetY));
     }
@@ -162,11 +207,9 @@ export default class extends Controller {
      * Cover, not contain: the frame is always full. A picture fitted inside it would leave bars,
      * and a profile image with bars baked into it is a worse result than one that is cropped.
      */
-    drawnSize(frame) {
-        const turned = this.rotation === 90 || this.rotation === 270;
-        const sourceWidth = turned ? this.bitmap.height : this.bitmap.width;
-        const sourceHeight = turned ? this.bitmap.width : this.bitmap.height;
-        const cover = Math.max(frame / sourceWidth, frame / sourceHeight) * this.scale;
+    drawnSize(frameWidth, frameHeight = frameWidth) {
+        const [sourceWidth, sourceHeight] = this.turnedSize();
+        const cover = Math.max(frameWidth / sourceWidth, frameHeight / sourceHeight) * this.scale;
 
         return [sourceWidth * cover, sourceHeight * cover];
     }
@@ -179,16 +222,15 @@ export default class extends Controller {
     }
 
     paint(canvas) {
-        const frame = canvas.width;
         const context = canvas.getContext('2d');
-        context.clearRect(0, 0, frame, frame);
+        context.clearRect(0, 0, canvas.width, canvas.height);
         context.save();
 
-        const ratio = frame / this.stageTarget.width;
-        context.translate(frame / 2 + this.offsetX * ratio, frame / 2 + this.offsetY * ratio);
+        const ratio = canvas.width / this.stageTarget.width;
+        context.translate(canvas.width / 2 + this.offsetX * ratio, canvas.height / 2 + this.offsetY * ratio);
         context.rotate((this.rotation * Math.PI) / 180);
 
-        const [width, height] = this.drawnSize(this.stageTarget.width);
+        const [width, height] = this.drawnSize(this.stageTarget.width, this.stageTarget.height);
         // Measured unrotated and drawn inside the rotated space, so the axes are the picture's own.
         const turned = this.rotation === 90 || this.rotation === 270;
         const drawWidth = (turned ? height : width) * ratio;
@@ -209,8 +251,19 @@ export default class extends Controller {
             return;
         }
         const canvas = document.createElement('canvas');
-        canvas.width = this.sizeValue;
-        canvas.height = this.sizeValue;
+        if (this.framesPicture()) {
+            // The frame's shape, within the largest stored size, and never more pixels than the frame holds of the picture.
+            const [frameWidth, frameHeight] = [this.stageTarget.width, this.stageTarget.height];
+            const [sourceWidth] = this.turnedSize();
+            // How many of the picture's own pixels lie across the frame.
+            const held = (frameWidth * sourceWidth) / this.drawnSize(frameWidth, frameHeight)[0];
+            const fit = Math.min(this.maxWidthValue / frameWidth, this.maxHeightValue / frameHeight, held / frameWidth);
+            canvas.width = Math.max(1, Math.round(frameWidth * fit));
+            canvas.height = Math.max(1, Math.round(frameHeight * fit));
+        } else {
+            canvas.width = this.sizeValue;
+            canvas.height = this.sizeValue;
+        }
         this.paint(canvas);
         this.dataTarget.value = canvas.toDataURL('image/png');
     }

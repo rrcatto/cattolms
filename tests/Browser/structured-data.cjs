@@ -44,7 +44,21 @@ async function picture(context, url) {
     const response = await context.request.get(url);
     const body = await response.body();
     const png = body.length > 24 && body.slice(1, 4).toString() === 'PNG';
-    return {status: response.status(), type: response.headers()['content-type'] || '', width: png ? body.readUInt32BE(16) : 0, height: png ? body.readUInt32BE(20) : 0};
+    // A JPEG (the site logo may be one, Settings > Site Owner, 2026-11-09): its size is in its first frame header.
+    const [jpegWidth, jpegHeight] = png ? [0, 0] : jpegSize(body);
+    return {status: response.status(), type: response.headers()['content-type'] || '', width: png ? body.readUInt32BE(16) : jpegWidth, height: png ? body.readUInt32BE(20) : jpegHeight};
+}
+
+function jpegSize(body) {
+    if (body.length < 4 || body[0] !== 0xFF || body[1] !== 0xD8) return [0, 0];
+    let at = 2;
+    while (at + 9 < body.length) {
+        if (body[at] !== 0xFF) { at++; continue; }
+        const marker = body[at + 1];
+        if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) return [body.readUInt16BE(at + 7), body.readUInt16BE(at + 5)];
+        at += 2 + body.readUInt16BE(at + 2);
+    }
+    return [0, 0];
 }
 
 async function judge(context, path, seen, expect) {
@@ -152,7 +166,8 @@ async function shared(context, path, seen) {
         if (path === '/') {
             check('/: the home page is shared with the site\'s picture', Boolean(seen.meta['og:image']) && seen.meta['twitter:card'] === 'summary_large_image');
             const image = await picture(visitorContext, seen.meta['og:image']);
-            check('/: the site\'s picture is a 1200 by 630 PNG', image.status === 200 && image.width === 1200 && image.height === 630, JSON.stringify(image));
+            // The site picture uploaded at Settings > Site Owner (owner, 2026-11-09: the hero), its 1200 by 630 copy.
+            check('/: the site\'s picture is the uploaded one, 1200 by 630', /\/site-picture\/[0-9a-f]{16}\.jpg$/.test(seen.meta['og:image'] || '') && image.status === 200 && image.width === 1200 && image.height === 630, JSON.stringify(image));
         }
     }
     check(`${pages.length} public pages read, ${marked} items checked`, marked >= pages.length);

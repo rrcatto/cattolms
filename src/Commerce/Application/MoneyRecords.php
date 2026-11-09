@@ -17,6 +17,9 @@ period; a row opens its own page; that page links to the order, the account, the
 that belong with it.
 
 Changelog:
+2026/11/08 SAST
+- The Money Ledger's downloads (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"): the page
+  gives the PDF and Excel addresses with its filters, and ledgerFiltersShown() the filters as the page checks them.
 2026/11/07 SAST
 - A person and a wallet are linked by their account references (owner, 2026-11-06).
 - An order is named by its number in every address (owner, 2026-11-06: no row id in an address): its page
@@ -594,6 +597,19 @@ final class MoneyRecords
     }
 
     /**
+     * The Money Ledger's filters for an address, checked as its page checks them, a group of kinds named by its key: what
+     * the ledger's downloads say they show (LedgerFiles).
+     *
+     * @param array<string,mixed> $query
+     * @return array<string,mixed>
+     */
+    public function ledgerFiltersShown(array $query): array
+    {
+        $f = $this->ledgerFilters($query);
+        return ['kind' => $f['kind_group'] ?? $f['kind']] + $f;
+    }
+
+    /**
      * The Money Ledger: every movement of money or wallet credit, newest first, filtered and totalled.
      *
      * @param array<string,mixed> $query
@@ -614,6 +630,9 @@ final class MoneyRecords
                 'net_label' => ($totals['money_in'] - $totals['money_out'] < 0 ? '−' : '') . self::money(abs($totals['money_in'] - $totals['money_out'])),
                 'wallet_in_label' => self::money($totals['wallet_in']), 'wallet_out_label' => self::money($totals['wallet_out'])],
             'filtered' => $carried !== [],
+            // Every line the filters match as a PDF or an Excel file (owner, 2026-11-08), the filters carried.
+            'downloads' => ['pdf' => '/admin/commerce/ledger.pdf' . ($carried === [] ? '' : '?' . http_build_query($carried)),
+                'xlsx' => '/admin/commerce/ledger.xlsx' . ($carried === [] ? '' : '?' . http_build_query($carried))],
             'ledger_pagination' => PlatformAdministrationService::paginationPayload('ledger', $pagination, '/admin/commerce/ledger', 'Ledger entries', $carried + $sort->toPrefixedArray('ledger')),
         ] + PlatformAdministrationService::sortViewFor('ledger', $sort, '/admin/commerce/ledger',
             ['account' => 'Account|18', 'occurred' => 'When|12', 'kind' => 'What happened|35', 'money_in' => 'Money in|10', 'money_out' => 'Money out|10', 'wallet' => 'Wallet|9', 'actions' => '|6'],

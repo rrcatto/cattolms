@@ -1,7 +1,8 @@
 {#
 	One bundle's card in Administration > Bundles' grid as a form, edited in place (owner, 2026-11-06): the same fields as
 	its row (bundle-row-edit.html.twig), one under another, Save and Cancel at the card's foot. With JavaScript only this
-	card changes. Variables as the row's.
+	card changes. Variables as the row's. An empty was price is filled with the courses' total, and the percentage off is
+	said under the prices as they are typed (owner, 2026-11-09).
 #}
 {% set bq = bundle_edit %}
 {% set bq_form = 'bundle-quick-' ~ bundle.id %}
@@ -10,7 +11,7 @@
 {% block title %}Editing <code class="cl-course-code">{{ bundle.code }}</code>{% endblock %}
 {% block details %}
 	<span id="{{ bundle_anchor(bundle) }}" class="cl-course-anchor"></span>
-	<form id="{{ bq_form }}" class="cl-course-quick-card" action="{{ bundle_admin_url(bundle, '/row') }}" method="post" hx-post="{{ bundle_admin_url(bundle, '/row') }}" hx-target="closest li" hx-swap="outerHTML">
+	<form id="{{ bq_form }}" class="cl-course-quick-card" action="{{ bundle_admin_url(bundle, '/row') }}" method="post" hx-post="{{ bundle_admin_url(bundle, '/row') }}" hx-target="closest li" hx-swap="outerHTML" data-controller="bundle-price" data-bundle-price-total-value="{{ bq.courses_total }}" data-bundle-price-currency-value="{{ bq.currency }}" data-bundle-price-locale-value="{{ bq.locale }}">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		<input type="hidden" name="view" value="grid">
 		<input type="hidden" name="return" value="{{ bundles_list_href }}">
@@ -18,8 +19,9 @@
 		<label class="cl-course-quick-field"><span>Code</span><input class="cl-input" name="code" value="{{ bq.code }}" maxlength="20" autocomplete="off" autofocus></label>
 		<label class="cl-course-quick-field"><span>Title</span><input class="cl-input" name="title" value="{{ bq.title }}" required maxlength="240" autocomplete="off"></label>
 		{% include '@platform/partials/admin/bundle-status-choice.html.twig' with {bsc_selected: bq.status, bsc_stacked: true} only %}
-		<label class="cl-course-quick-field"><span>Now price ({{ currency }})</span><input class="cl-input" name="price" value="{{ bq.price }}" inputmode="decimal" autocomplete="off" placeholder="2500.00"></label>
-		<label class="cl-course-quick-field"><span>Was price</span><input class="cl-input" name="was_price" value="{{ bq.was_price }}" inputmode="decimal" autocomplete="off"></label>
+		<label class="cl-course-quick-field"><span>Now price ({{ currency }})</span><input class="cl-input" name="price" value="{{ bq.price }}" inputmode="decimal" autocomplete="off" placeholder="2500.00" data-bundle-price-target="price" data-action="input->bundle-price#update"></label>
+		<label class="cl-course-quick-field"><span>Was price</span><input class="cl-input" name="was_price" value="{{ bq.was_price }}" inputmode="decimal" autocomplete="off" data-bundle-price-target="was" data-action="input->bundle-price#update"{% if bq.courses_total %} title="The courses' prices add up to {{ bq.courses_total_label }}"{% endif %}></label>
+		<output class="cl-bundle-discount cl-bundle-discount--quick" aria-live="polite" data-bundle-price-target="discount"{% if not bq.discount %} hidden{% endif %}>{{ bq.discount }}</output>
 		<label class="cl-course-quick-field"><span>On sale from</span><input class="cl-input" type="datetime-local" name="available_from" value="{{ bq.available_from }}"></label>
 		<label class="cl-course-quick-field"><span>On sale until</span><input class="cl-input" type="datetime-local" name="available_until" value="{{ bq.available_until }}"></label>
 		<span class="cl-course-quick-field"><span>Access period</span><span class="cl-course-quick-period"><input class="cl-input" type="number" min="1" max="3650" name="access_period_value" value="{{ bq.access_period_value }}" aria-label="Access period"><select class="cl-select" name="access_period_unit" aria-label="Unit">{% for unit in units %}<option value="{{ unit }}"{% if unit == bq.access_period_unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select></span></span>

@@ -13,7 +13,14 @@ published course, at /courses/{slug}, and every published landing page of a publ
 /landing/{slug}, with when each last changed. A narrow projection - the address and a date - read a
 page at a time, never the whole catalogue in one query.
 
+The SEO brief (2026-11-09) adds every category with a course to find in it or beneath it (/courses/category/{slug}), every
+tag one of them carries (/courses/tag/{slug}) and every published bundle (/bundles/{slug}), each with the later of its own
+change and its courses'; and leaves out a course ADMIN keeps out of search engines (courses.search_hidden), with its
+landing page. latest() gives the public pages that list courses their last change.
+
 Changelog:
+2026/11/09 SAST
+- Categories, tags and bundles; a course kept out of search engines left out; latest().
 2026/10/19 SAST
 - Created.
 */
@@ -26,14 +33,38 @@ use CattoLearning\Infrastructure\Persistence\Database;
 
 final class SitemapRepository
 {
+    /** A course the public finds: published, and not kept out of search engines. */
+    private const FOUND = "c.status = 'published' AND NOT c.search_hidden";
+
     private const ENTRIES = "SELECT '/courses/' || c.slug AS path, c.updated_at AS changed_at, 0 AS kind, c.id
-                               FROM courses c WHERE c.status = 'published'
+                               FROM courses c WHERE " . self::FOUND . "
                              UNION ALL
                              SELECT '/landing/' || lp.slug AS path, GREATEST(lp.updated_at, lp.published_at) AS changed_at, 1 AS kind, lp.id
                                FROM course_landing_pages lp JOIN courses c ON c.id = lp.course_id
-                              WHERE lp.status = 'published' AND c.status = 'published'";
+                              WHERE lp.status = 'published' AND " . self::FOUND . "
+                             UNION ALL
+                             SELECT '/courses/category/' || cc.slug AS path, GREATEST(cc.updated_at, MAX(c.updated_at)) AS changed_at, 2 AS kind, cc.id
+                               FROM course_categories cc
+                               JOIN course_categories c1 ON c1.id = cc.id OR c1.parent_id = cc.id
+                                    OR c1.parent_id IN (SELECT c2.id FROM course_categories c2 WHERE c2.parent_id = cc.id)
+                               JOIN courses c ON c.category_id = c1.id AND " . self::FOUND . "
+                              GROUP BY cc.id, cc.slug, cc.updated_at
+                             UNION ALL
+                             SELECT '/courses/tag/' || t.slug AS path, GREATEST(t.updated_at, MAX(c.updated_at)) AS changed_at, 3 AS kind, t.id
+                               FROM tags t JOIN course_tags ct ON ct.tag_id = t.id JOIN courses c ON c.id = ct.course_id AND " . self::FOUND . "
+                              GROUP BY t.id, t.slug, t.updated_at
+                             UNION ALL
+                             SELECT '/bundles/' || b.slug AS path, b.updated_at AS changed_at, 4 AS kind, b.id
+                               FROM bundles b WHERE b.status = 'published'";
 
     public function __construct(private readonly Database $db) {}
+
+    /** When a course the public finds, or a published bundle, last changed: for the pages that list them. Null for none. */
+    public function latest(): ?string
+    {
+        $latest = $this->db->fetchOne("SELECT GREATEST((SELECT MAX(c.updated_at) FROM courses c WHERE " . self::FOUND . "), (SELECT MAX(b.updated_at) FROM bundles b WHERE b.status = 'published'))");
+        return $latest === false || $latest === null ? null : (string) $latest;
+    }
 
     public function count(): int
     {

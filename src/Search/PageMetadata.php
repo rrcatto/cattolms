@@ -17,7 +17,19 @@ draws (StructuredData::breadcrumbs) and partials/head-meta.html.twig prints it a
 
 Every address is absolute, from APP_URL. A site without one gets its description and nothing else.
 
+The SEO brief (2026-11-09) adds: ADMIN's own title and description for a course, a category and each public page
+(SearchOverrides), and a course kept out of search engines (noindex); complete(), through which ThemeRenderer passes every
+public page, so each has its own description (PublicPages), its canonical address (its own page of a list included, as
+Google asks, and never the reader's view or page size), Open Graph and X's card with the site picture where it has none
+of its own, and asks not to be indexed when it shows a search's results; a category's and a tag's page described by what
+they hold; og:locale; and the site logo (Settings > Site Owner) as the business's logo when there is one.
+
 Changelog:
+2026/11/09 SAST
+- The site's picture is the one uploaded at Settings > Site Owner (SitePicture), never a picture in the code; without one, a
+  page without a picture of its own is shared without one.
+- complete(), category and tag pages, ADMIN's overrides, the noindex of a hidden course and of search results, og:locale,
+  and the site logo as the Organization's logo.
 2026/11/06 SAST
 - Created.
 */
@@ -27,7 +39,10 @@ declare(strict_types=1);
 namespace CattoLearning\Search;
 
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Configuration\SiteLogo;
+use CattoLearning\Configuration\SitePicture;
 use CattoLearning\Configuration\SiteOwner;
+use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Course\Landing\LandingCopy;
 use CattoLearning\Support\AccessPeriod;
@@ -39,10 +54,6 @@ final class PageMetadata
 {
     /** The longest description a head carries, as a landing page's. */
     public const DESCRIPTION_LIMIT = 300;
-    /** The site's own picture, the home page's hero (img/hero-learning.svg) drawn at 1200 by 630 by rsvg-convert. */
-    public const SITE_PICTURE = '/img/hero-learning-1200x630.png';
-    /** What it shows, in the picture's own words (its desc). */
-    private const SITE_PICTURE_ALT = 'Layered books, connected nodes and a terminal window on a dark blue background.';
     /** The site's mark, 512 by 512: the Organization's logo. */
     public const LOGO = '/img/favicon-512x512.png';
 
@@ -53,6 +64,9 @@ final class PageMetadata
         private readonly SharePictures $pictures,
         private readonly SearchRepository $records,
         private readonly CourseRepository $courses,
+        private readonly ?SearchOverrides $overrides = null,
+        private readonly ?SiteLogo $siteLogo = null,
+        private readonly ?SitePicture $sitePicture = null,
     ) {
     }
 
@@ -68,8 +82,13 @@ final class PageMetadata
     public function course(array $course, array $page, array $rating, array $blocks): array
     {
         $base = self::base();
-        $description = self::describe((string) ($course['summary'] ?? ''), (string) ($course['subtitle'] ?? ''), (string) $course['title']);
-        if ($base === null) return ['description' => $description];
+        // ADMIN's own words for search engines, else the course's own (SearchOverrides).
+        $own = SearchOverrides::plain((string) ($course['search_description'] ?? ''));
+        $description = $own !== '' ? $own : self::describe((string) ($course['summary'] ?? ''), (string) ($course['subtitle'] ?? ''), (string) $course['title']);
+        $title = SearchOverrides::plain((string) ($course['search_title'] ?? ''));
+        $hidden = in_array($course['search_hidden'] ?? false, [true, 't', 1, '1'], true);
+        $head = ($title !== '' ? ['title' => $title] : []) + ($hidden ? ['robots' => 'noindex, follow'] : []);
+        if ($base === null) return ['description' => $description] + $head;
         $url = $base . '/courses/' . rawurlencode((string) $course['slug']);
         $picture = $this->picture('course', (string) $course['slug'], (string) ($course['cover_svg'] ?? ''));
         $node = StructuredData::course([
@@ -82,7 +101,7 @@ final class PageMetadata
             'offers' => self::offers((array) ($course['price_variants'] ?? []), $url),
             'rating' => self::rating($rating),
         ]);
-        return $this->shared($url, (string) $course['title'], $description, $picture, self::alt((string) ($course['cover_svg'] ?? ''), (string) $course['title'])) + ['structured_data' => [StructuredData::encode($node)]];
+        return $head + $this->shared($url, $title !== '' ? $title : (string) $course['title'], $description, $picture, self::alt((string) ($course['cover_svg'] ?? ''), (string) $course['title'])) + ['structured_data' => [StructuredData::encode($node)]];
     }
 
     /**
@@ -185,14 +204,13 @@ final class PageMetadata
         $owner = $this->owner->details();
         $organisation = StructuredData::organisation([
             'id' => $base . '/#organization', 'name' => $owner['trading_name'] !== '' ? $owner['trading_name'] : $name, 'legal_name' => $owner['legal_name'],
-            'url' => $base . '/', 'logo' => $base . self::LOGO, 'email' => $owner['email'], 'telephone' => $owner['phone'],
+            'url' => $base . '/', 'logo' => $this->siteLogo?->url($base) ?? $base . self::LOGO, 'email' => $owner['email'], 'telephone' => $owner['phone'],
             'address' => $this->owner->addressLine(), 'country' => self::country($this->owner->addressLine()), 'contact_url' => $base . '/contact',
             // The footer's social marks that are the site's own profiles, never a platform's home page.
             'same_as' => SocialPlatform::profiles([]), 'description' => '',
         ]);
         $website = StructuredData::website($base . '/#website', $name, $base . '/', self::language(), $base . '/#organization');
-        $fingerprint = is_file(self::sitePicturePath()) ? md5_file(self::sitePicturePath()) : false;
-        return $this->shared($base . '/', $name, $description, $fingerprint === false ? '' : $base . self::SITE_PICTURE . '?v=' . substr($fingerprint, 0, 12), self::SITE_PICTURE_ALT)
+        return $this->shared($base . '/', $name, $description, $this->sitePictureUrl($base), $this->sitePictureAlt(), 'image/jpeg')
             + ['verification' => $verification, 'structured_data' => [StructuredData::encode($organisation), StructuredData::encode($website)]];
     }
 
@@ -201,14 +219,86 @@ final class PageMetadata
      * search's results are not marked up.
      *
      * @param list<array<string,mixed>> $courses the page's course cards, in its order
+     * @param array<string,mixed>|null $category the category shown (CourseService::browsableCategory), null for All courses
      * @return array<string,mixed> page_meta, or nothing to add
      */
-    public function catalogue(string $path, string $name, array $courses, bool $searched): array
+    public function catalogue(string $path, string $name, array $courses, bool $searched, ?array $category = null): array
     {
         $base = self::base();
-        if ($base === null || $searched) return [];
+        // A category is described by ADMIN's words, else its own description, else by the courses it holds; All courses by
+        // the catalogue's own (PublicPages, through complete()).
+        $head = [];
+        if ($category !== null) {
+            $own = SearchOverrides::plain((string) ($category['search_description'] ?? ''));
+            $description = $own !== '' ? $own : self::describe((string) ($category['description'] ?? ''), self::holding((string) $category['name'] . ' courses', $courses));
+            $title = SearchOverrides::plain((string) ($category['search_title'] ?? ''));
+            $head = ['description' => $description] + ($title !== '' ? ['title' => $title] : []);
+        }
+        // A search's results are not a page to be found: they are not marked up and ask not to be indexed.
+        if ($searched) return $head + ['robots' => 'noindex, follow'];
+        if ($base === null) return $head;
         $list = StructuredData::courseList($base . $path, $name, array_map(static fn(array $course): string => $base . '/courses/' . rawurlencode((string) $course['slug']), $courses));
-        return $list === null ? [] : ['structured_data' => [StructuredData::encode($list)]];
+        return $head + ($list === null ? [] : ['structured_data' => [StructuredData::encode($list)]]);
+    }
+
+    /**
+     * A tag's page: described by the courses it holds, with them as a Course list; the tag browser itself by its own words.
+     *
+     * @param list<array<string,mixed>> $courses
+     * @return array<string,mixed> page_meta
+     */
+    public function tag(string $path, string $name, array $courses, bool $searched): array
+    {
+        if ($searched) return ['robots' => 'noindex, follow'];
+        $head = ['description' => self::holding('Courses tagged ' . $name, $courses)];
+        $base = self::base();
+        if ($base === null) return $head;
+        $list = StructuredData::courseList($base . $path, 'Courses tagged ' . $name, array_map(static fn(array $course): string => $base . '/courses/' . rawurlencode((string) $course['slug']), $courses));
+        return $head + ($list === null ? [] : ['structured_data' => [StructuredData::encode($list)]]);
+    }
+
+    /**
+     * What every public page's head needs and it did not set (ThemeRenderer, for each page StructuredData::PUBLIC_PAGES
+     * lists): ADMIN's own title and description for a page PublicPages lists, else its own description; its canonical
+     * address, the path with its page number beyond the first and nothing else, so the reader's view, page size and sort
+     * are never indexed apart (Google: give each page of a list its own canonical); a search's results asked not to be
+     * indexed; the Open Graph set and X's card with the site picture when the page has none; and ", page N" after the title
+     * of a later page of a list, so no two pages share a title.
+     *
+     * @param array<string,mixed> $meta the page's own page_meta
+     * @param array<string,mixed> $query the request's query
+     * @return array<string,mixed> page_meta, with title when the document's title changes
+     */
+    public function complete(string $template, array $meta, string $path, array $query, string $title): array
+    {
+        $key = PublicPages::key($template, $path);
+        $own = $key === null ? ['title' => '', 'description' => ''] : ($this->overrides?->page($key) ?? ['title' => '', 'description' => '']);
+        if ($own['description'] !== '') $meta['description'] = $own['description'];
+        elseif (trim((string) ($meta['description'] ?? '')) === '' && $key !== null) $meta['description'] = PublicPages::description($key);
+        $named = trim((string) ($meta['title'] ?? ''));
+        if ($own['title'] !== '') $named = $own['title'];
+        $page = max(1, (int) ($query['page'] ?? 1));
+        $searched = false;
+        foreach ($query as $name => $value) {
+            if (is_string($value) && trim($value) !== '' && preg_match('/(^|_)q$/', (string) $name) === 1) $searched = true;
+        }
+        if ($searched && trim((string) ($meta['robots'] ?? '')) === '') $meta['robots'] = 'noindex, follow';
+        $shown = ($named !== '' ? $named : $title) . ($page > 1 ? ', page ' . $page : '');
+        if ($shown !== $title) $meta['title'] = $shown;
+        $base = self::base();
+        // A page that asks not to be indexed (a search's results, an ADMIN preview) claims no address and no share card.
+        if ($base === null || str_contains((string) ($meta['robots'] ?? ''), 'noindex')) return $meta;
+        $canonical = $base . ($path === '' ? '/' : $path) . ($page > 1 ? '?page=' . $page : '');
+        if (trim((string) ($meta['canonical'] ?? '')) === '') $meta['canonical'] = $canonical;
+        if (((array) ($meta['og'] ?? [])) === []) {
+            $shared = $this->shared((string) $meta['canonical'], $named !== '' ? $named : $title, (string) ($meta['description'] ?? ''), $this->sitePictureUrl($base), $this->sitePictureAlt(), 'image/jpeg');
+            $meta['og'] = $shared['og'];
+            $meta['twitter_card'] = $shared['twitter_card'];
+        } elseif ($named !== '' && isset($meta['og']['title'])) {
+            $meta['og']['title'] = $named;
+        }
+        if ($own['description'] !== '' && isset($meta['og']['description'])) $meta['og']['description'] = $own['description'];
+        return $meta;
     }
 
     /**
@@ -222,6 +312,64 @@ final class PageMetadata
         $base = self::base();
         if ($base === null || $answered === []) return ['description' => $description];
         return ['description' => $description, 'canonical' => $base . '/faq', 'structured_data' => [StructuredData::encode(StructuredData::faq($base . '/faq', $answered))]];
+    }
+
+    /**
+     * What a course's search result and shared link say now, for its Search engines tab: ADMIN's words where given, else the
+     * course's own; its address and share picture.
+     *
+     * @param array<string,mixed> $course
+     * @return array{url:string,title:string,description:string,default_title:string,default_description:string,picture:string}
+     */
+    public function coursePreview(array $course): array
+    {
+        $defaultDescription = self::describe((string) ($course['summary'] ?? ''), (string) ($course['subtitle'] ?? ''), (string) $course['title']);
+        return $this->preview('/courses/' . rawurlencode((string) $course['slug']), (string) $course['title'], $defaultDescription,
+            (string) ($course['search_title'] ?? ''), (string) ($course['search_description'] ?? ''), $this->picture('course', (string) $course['slug'], (string) ($course['cover_svg'] ?? '')));
+    }
+
+    /**
+     * What a category's page says in a search result and a shared link now, for its Search engines card.
+     *
+     * @param array<string,mixed> $category
+     * @return array{url:string,title:string,description:string,default_title:string,default_description:string,picture:string}
+     */
+    public function categoryPreview(array $category): array
+    {
+        $courses = $this->courses->publishedCourses(new CatalogueFilter((int) $category['id'], [], ''), 24, 0);
+        $name = (string) $category['name'] . ' courses';
+        return $this->preview('/courses/category/' . rawurlencode((string) $category['slug']), $name, self::describe((string) ($category['description'] ?? ''), self::holding($name, $courses)),
+            (string) ($category['search_title'] ?? ''), (string) ($category['search_description'] ?? ''), '');
+    }
+
+    /**
+     * What a public page says in a search result and a shared link now, for Settings > Search engines and AI.
+     *
+     * @return array{url:string,title:string,description:string,default_title:string,default_description:string,picture:string}
+     */
+    public function pagePreview(string $key): array
+    {
+        $own = $this->overrides?->page($key) ?? ['title' => '', 'description' => ''];
+        return $this->preview(PublicPages::path($key), PublicPages::title($key), PublicPages::description($key), $own['title'], $own['description'], '');
+    }
+
+    /**
+     * @return array{url:string,title:string,description:string,default_title:string,default_description:string,picture:string}
+     */
+    private function preview(string $path, string $defaultTitle, string $defaultDescription, string $title, string $description, string $picture): array
+    {
+        $base = self::base() ?? '';
+        $title = SearchOverrides::plain($title);
+        $description = SearchOverrides::plain($description);
+        if ($picture === '' && $base !== '') $picture = $this->sitePictureUrl($base);
+        return ['url' => $base . $path, 'title' => $title !== '' ? $title : $defaultTitle, 'description' => $description !== '' ? $description : $defaultDescription,
+            'default_title' => $defaultTitle, 'default_description' => $defaultDescription, 'picture' => $picture];
+    }
+
+    /** The site's name, as a search result shows it after a page's title. */
+    public function siteName(): string
+    {
+        return $this->settings->platformName();
     }
 
     /** APP_URL without its trailing slash, or null. */
@@ -245,10 +393,10 @@ final class PageMetadata
      *
      * @return array<string,mixed>
      */
-    private function shared(string $url, string $title, string $description, string $picture, string $alt): array
+    private function shared(string $url, string $title, string $description, string $picture, string $alt, string $type = 'image/png'): array
     {
-        $og = ['type' => 'website', 'title' => $title, 'description' => $description, 'url' => $url];
-        if ($picture !== '') $og += ['image' => $picture, 'image:type' => 'image/png', 'image:width' => (string) SharePictures::WIDTH, 'image:height' => (string) SharePictures::HEIGHT, 'image:alt' => $alt];
+        $og = ['type' => 'website', 'title' => $title, 'description' => $description, 'url' => $url, 'locale' => str_replace('-', '_', self::language())];
+        if ($picture !== '') $og += ['image' => $picture, 'image:type' => $type, 'image:width' => (string) SharePictures::WIDTH, 'image:height' => (string) SharePictures::HEIGHT, 'image:alt' => $alt];
         return ['description' => $description, 'canonical' => $url, 'og' => $og, 'twitter_card' => $picture !== '' ? 'summary_large_image' : 'summary'];
     }
 
@@ -315,6 +463,21 @@ final class PageMetadata
         return '';
     }
 
+    /**
+     * A list described by what it holds: "Property courses: Start an Airbnb in South Africa, Run a Guest House and 4 more."
+     *
+     * @param list<array<string,mixed>> $courses
+     */
+    private static function holding(string $name, array $courses): string
+    {
+        $titles = array_values(array_filter(array_map(static fn(array $course): string => trim((string) ($course['title'] ?? '')), $courses)));
+        if ($titles === []) return '';
+        $shown = array_slice($titles, 0, 3);
+        $more = count($titles) - count($shown);
+        $words = count($shown) === 1 ? $shown[0] : implode(', ', array_slice($shown, 0, -1)) . ($more > 0 ? ', ' : ' and ') . $shown[count($shown) - 1];
+        return LandingCopy::excerpt($name . ': ' . $words . ($more > 0 ? ' and ' . $more . ' more.' : '.'), self::DESCRIPTION_LIMIT);
+    }
+
     /** The cover's own words for what it shows (its aria-label), else the title. */
     private static function alt(string $cover, string $title): string
     {
@@ -344,8 +507,19 @@ final class PageMetadata
         return preg_match('/\bsouth\s+africa\.?\s*$/i', $address) === 1 ? 'ZA' : '';
     }
 
-    private static function sitePicturePath(): string
+    /**
+     * The site's picture (Settings > Site Owner; the owner's hero, 2026-11-09) as shared: its 1200 by 630 copy, or '' when
+     * none is uploaded, and then a page without a picture of its own is shared without one.
+     */
+    private function sitePictureUrl(string $base): string
     {
-        return dirname(__DIR__, 2) . '/public_html' . self::SITE_PICTURE;
+        return $this->sitePicture?->shareUrl($base) ?? '';
+    }
+
+    /** The site's picture in words, for those who cannot see it: the business's name. */
+    private function sitePictureAlt(): string
+    {
+        $name = $this->owner->value('trading_name');
+        return $name !== '' ? $name : $this->settings->platformName();
     }
 }

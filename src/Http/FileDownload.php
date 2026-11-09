@@ -17,6 +17,8 @@ final class FileDownload
         $response->headers->set('Content-Type', $mimeType !== '' ? $mimeType : 'application/octet-stream');
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $name, self::asciiFallback($name));
         $response->headers->set('X-Content-Type-Options', 'nosniff');
+        // A download is never a search result in its own right (the SEO brief, 2026-11-09): its page is.
+        $response->headers->set('X-Robots-Tag', 'noindex');
         $response->setPrivate();
         $response->headers->addCacheControlDirective('no-store');
         return $response;

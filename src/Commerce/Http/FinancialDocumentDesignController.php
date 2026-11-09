@@ -15,6 +15,8 @@ version of each document's template, which documents issued from then on are dra
 already issued keep theirs. Nothing about templates, HTML or versions is shown here.
 
 Changelog:
+2026/11/09 SAST
+- The logo choice: the site logo (shown), the documents' own or none.
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K), in the manner of the
   certificate designs (owner's choice, 2026/10/08: a design form, not a template editor).
@@ -27,6 +29,7 @@ namespace CattoLearning\Commerce\Http;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Document\FinancialDocumentDesign;
 use CattoLearning\Commerce\Document\FinancialDocumentDesignService;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Commerce\Document\FinancialDocumentSamples;
 use CattoLearning\Document\DocumentType;
 use CattoLearning\Http\Controller\BaseController;
@@ -45,6 +48,7 @@ final class FinancialDocumentDesignController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly FinancialDocumentDesignService $designs,
+        private readonly SiteLogo $siteLogo,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -141,6 +145,8 @@ final class FinancialDocumentDesignController extends BaseController
             'notes' => $notes,
             'note_limit' => FinancialDocumentDesign::NOTE_LIMIT,
             'logo' => $design->logo === null ? null : self::BASE . '/pictures/' . $design->logo->sha . '.png',
+            'logo_choice' => $design->logoChoice,
+            'site_logo' => $this->siteLogo->url(''),
             'errors' => $errors,
             'preview_src' => $errors === [] ? self::BASE . '/' . $type->value . '/preview.pdf?sample=' . $sample : '',
             'saved' => $summary,

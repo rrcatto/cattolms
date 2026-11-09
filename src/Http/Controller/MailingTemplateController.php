@@ -15,6 +15,9 @@ is a sandboxed page the form posts its unsaved values to ("Update the preview", 
 change by the certificate-preview controller), so it works without JavaScript too. A proof goes to any address.
 
 Changelog:
+2026/11/09 SAST
+- The account email sample in the preview and the proof, the default for account and order emails, and the site logo
+  shown beside the template's choice of logo.
 2026/11/07 SAST
 - A refused new template comes back as it was typed and chosen (keepTyped).
 2026/10/28 SAST
@@ -26,6 +29,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Mailing\CampaignRepository;
 use CattoLearning\Mailing\EmailRenderer;
 use CattoLearning\Mailing\MailingTemplates;
@@ -49,6 +53,7 @@ final class MailingTemplateController extends BaseController
         private readonly EmailRenderer $renderer,
         private readonly TemplateProof $proofs,
         private readonly CampaignRepository $campaigns,
+        private readonly SiteLogo $siteLogo,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -111,7 +116,7 @@ final class MailingTemplateController extends BaseController
     {
         $user = $this->requirePermission('PLATFORM.MAILING.VIEW');
         $template = $this->found();
-        $sample = ($_GET['sample'] ?? '') === 'digest' ? 'digest' : 'message';
+        $sample = in_array($_GET['sample'] ?? '', ['digest', 'account'], true) ? (string) $_GET['sample'] : 'message';
 
         return $this->render('mailing-template', ['title' => $template['name'] . ' · Templates', 'active_nav' => 'mailing', 'template' => $template,
             'sample' => $sample, 'phone' => ($_GET['width'] ?? '') === 'phone', 'can_manage' => $user->hasPermission('PLATFORM.MAILING.MANAGE'), 'samples' => self::samples(false),
@@ -119,7 +124,8 @@ final class MailingTemplateController extends BaseController
             'logo_sizes' => TemplateDesign::LOGO_SIZES, 'alignments' => TemplateDesign::ALIGNMENTS, 'text_sizes' => TemplateDesign::TEXT_SIZES, 'widths' => TemplateDesign::WIDTHS,
             'corners' => TemplateDesign::CORNERS, 'spacings' => TemplateDesign::SPACINGS, 'button_shapes' => TemplateDesign::BUTTON_SHAPES, 'social' => TemplateDesign::SOCIAL,
             'placeholders' => MailingTemplates::PLACEHOLDERS, 'proof_to' => $this->primaryEmail($user->id),
-            'logo_url' => $this->pictureUrl((string) $template['design']['logo']), 'header_picture_url' => $this->pictureUrl((string) $template['design']['header_picture'])]);
+            'logo_url' => $this->pictureUrl((string) $template['design']['logo']), 'header_picture_url' => $this->pictureUrl((string) $template['design']['header_picture']),
+            'site_logo' => $this->siteLogo->url('')]);
     }
 
     #[Route('/mailing/templates/{id}', name: 'mailing_template_save', requirements: ['id' => '\d+'], methods: ['POST'])]
@@ -142,7 +148,7 @@ final class MailingTemplateController extends BaseController
     {
         $user = $this->requirePermission('PLATFORM.MAILING.VIEW');
         $template = $this->found();
-        $sample = (($_POST['sample'] ?? $_GET['sample'] ?? '') === 'digest') ? 'digest' : 'message';
+        $sample = in_array($_POST['sample'] ?? $_GET['sample'] ?? '', ['digest', 'account'], true) ? (string) ($_POST['sample'] ?? $_GET['sample']) : 'message';
         if ($this->request()->isMethod('POST')) {
             $this->requireCsrf();
             $template = $this->unsaved($template);
@@ -205,7 +211,7 @@ final class MailingTemplateController extends BaseController
             if ($action === 'default') {
                 $for = (string) ($_POST['for'] ?? '');
                 $this->templates->makeDefault($id, $for, $user->id);
-                $this->flash('success', $for === 'digest' ? 'It is now the default for the digest.' : 'It is now the default for messages.');
+                $this->flash('success', match ($for) { 'digest' => 'It is now the default for the digest.', 'account' => 'Account and order emails are now drawn in it: sign-in links, order confirmations, receipts and the rest.', default => 'It is now the default for messages.' });
                 $this->redirect(self::BASE);
             }
             $this->templates->delete($id, $user->id);

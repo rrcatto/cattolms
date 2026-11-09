@@ -1,5 +1,9 @@
 # The catalogue file
 
+**LMS:** 1.1.2 · **Updated:** 2026-11-08
+
+Keep this guide to what the catalogue file and package hold now, and under 150,000 characters: when something here stops being true, change it or take it out. The Git history keeps every earlier version.
+
 `catalogue.json` holds the starter categories and tags for a CattoLMS site, so a site never has to make them from nothing. It is published with the code so it can be edited and installed:
 
 - **categories**: a tree of up to three levels, each with a name, slug, description and SVG icon;
@@ -9,7 +13,7 @@ It is version 2 of the catalogue file (`"format": "cattolms-catalogue", "version
 
 ## A site's whole catalogue
 
-A site's own courses travel in a **catalogue package**, a `.zip` made at Administration → Courses → Import & Export Catalogue: tick the courses to export (or Tick every course, or Tick the published courses), then Download catalogue package. It holds only the ticked courses and only their categories (with the categories above them) and tags, and a related course link only between ticked courses. It holds this file (with the courses' codes in catalogue order), one course package per course (`courses/GDN-101.json`, `catto-learning-course` 2.1: the course's content as it stands on the site, its course code, and its category, tags, cover, position, related courses, prices and status) and the Resource Library files the courses use. Import it on another site from the same page: the review shows every course as new, updated, unchanged or left out before anything changes. Courses are matched by their course code only. Keep a site's package privately: it holds your own courses and prices.
+A site's own courses travel in a **catalogue package**, a `.zip` made at Administration → Courses → Import & Export Catalogue: tick the courses to export (or Tick every course, or Tick the published courses), then Download catalogue package (.zip). It holds only the ticked courses and only their categories (with the categories above them) and tags, a related course link only between ticked courses, and the bundles whose courses are all ticked. It holds this file (with the courses' codes in catalogue order, and those bundles), one course package per course (`courses/GDN-101.json`, `catto-learning-course` 2.1: the course's content as it stands on the site, its course code, and its category, tags, cover, position, related courses, prices, page layout and status), the Resource Library files the courses use (`resources/`), their presentations' narration (`narrations/`) and the site's own presentation (`site-presentation.json`). Import it on another site from the same page: before anything changes, the review shows every course and bundle as new, updated, unchanged or left out, and lists every difference with Use the file's (the default) or Keep this site's. A course is matched by its course code alone, a bundle by its code and a file by the name its course links; what a course already on the site takes from the file is in [docs/COURSES.md](../../docs/COURSES.md), "The catalogue import is canonical". Keep a site's package privately: it holds your own courses and prices.
 
 ## Loading it
 
@@ -19,6 +23,6 @@ A site's own courses travel in a **catalogue package**, a `.zip` made at Adminis
 
 ## Changing it
 
-Edit the file directly. Or change categories, tags and icons in Administration and download them again: Import & Export Catalogue → Download their categories and tags (.json), saved over this file. With no course ticked it holds every category and tag on the site; with courses ticked, only theirs. For scripts, `php bin/console catalogue:export --categories-and-tags - > resources/catalogue/catalogue.json` writes the same file, and `catalogue:import <file>` loads a file or package without the review.
+Edit the file directly. Or change categories, tags and icons in Administration and download them again: Import & Export Catalogue → Download their categories and tags (.json), saved over this file. With no course ticked it holds every category and tag on the site; with courses ticked, only theirs. For scripts, `php bin/console catalogue:export --categories-and-tags - > resources/catalogue/catalogue.json` writes the same file, and `catalogue:import <file>` loads a file or package without the review, taking the file's version of every difference.
 
 The development walkthrough, `tests/Browser/one-learner-scenario.cjs`, builds its example site from a private catalogue package (`CATTO_CATALOGUE`), imported through the page.

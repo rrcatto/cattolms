@@ -106,7 +106,7 @@ final class CourseController extends BaseController
 
         return $this->render('courses', [
             // The courses it shows, for search engines (owner, 2026-11-06): the summary page of Google's Course list.
-            'page_meta' => $this->metadata->catalogue($base, $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses', $courses, $search !== ''),
+            'page_meta' => $this->metadata->catalogue($base, $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses', $courses, $search !== '', $category),
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
             'category_picker' => $this->courses->catalogueCategoryPicker($category),
             'catalogue_search' => $search,

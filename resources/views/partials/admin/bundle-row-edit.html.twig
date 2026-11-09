@@ -5,11 +5,12 @@
 	attribute. With JavaScript, Save sends it and the row comes back as it now is (or as it was typed, with why it was
 	refused), and Cancel draws the row again unchanged; only this row changes. Without JavaScript the same buttons send it
 	and the list comes back. Variables: bundle, bundle_edit (BundleService::form), bundle_error, bundles_list_href, units,
-	currency, csrf.
+	currency, csrf. An empty was price is filled with the courses' total, and the percentage off is said under the prices as
+	they are typed (owner, 2026-11-09; BundleService::form, bundle_price_controller.js).
 #}
 {% set bq = bundle_edit %}
 {% set bq_form = 'bundle-quick-' ~ bundle.id %}
-<tr id="{{ bundle_anchor(bundle) }}" class="cl-course-quick" data-bundle-id="{{ bundle.id }}">
+<tr id="{{ bundle_anchor(bundle) }}" class="cl-course-quick" data-bundle-id="{{ bundle.id }}" data-controller="bundle-price" data-bundle-price-total-value="{{ bq.courses_total }}" data-bundle-price-currency-value="{{ bq.currency }}" data-bundle-price-locale-value="{{ bq.locale }}">
 	<td><input class="cl-input" form="{{ bq_form }}" name="code" value="{{ bq.code }}" maxlength="20" autocomplete="off" aria-label="Bundle code" autofocus></td>
 	<td class="cell-text">
 		<input class="cl-input" form="{{ bq_form }}" name="title" value="{{ bq.title }}" required maxlength="240" autocomplete="off" aria-label="Bundle title">
@@ -17,8 +18,9 @@
 	</td>
 	<td class="cl-bundle-quick-status">{% include '@platform/partials/admin/bundle-status-choice.html.twig' with {bsc_selected: bq.status, bsc_form: bq_form, bsc_stacked: true} only %}</td>
 	<td class="cl-course-quick-price">
-		<label class="cl-course-quick-field"><span>Now ({{ currency }})</span><input class="cl-input" form="{{ bq_form }}" name="price" value="{{ bq.price }}" inputmode="decimal" autocomplete="off" placeholder="2500.00"></label>
-		<label class="cl-course-quick-field"><span>Was</span><input class="cl-input" form="{{ bq_form }}" name="was_price" value="{{ bq.was_price }}" inputmode="decimal" autocomplete="off"></label>
+		<label class="cl-course-quick-field"><span>Now ({{ currency }})</span><input class="cl-input" form="{{ bq_form }}" name="price" value="{{ bq.price }}" inputmode="decimal" autocomplete="off" placeholder="2500.00" data-bundle-price-target="price" data-action="input->bundle-price#update"></label>
+		<label class="cl-course-quick-field"><span>Was</span><input class="cl-input" form="{{ bq_form }}" name="was_price" value="{{ bq.was_price }}" inputmode="decimal" autocomplete="off" data-bundle-price-target="was" data-action="input->bundle-price#update"{% if bq.courses_total %} title="The courses' prices add up to {{ bq.courses_total_label }}"{% endif %}></label>
+		<output class="cl-bundle-discount cl-bundle-discount--quick" aria-live="polite" data-bundle-price-target="discount"{% if not bq.discount %} hidden{% endif %}>{{ bq.discount }}</output>
 	</td>
 	<td class="cl-bundle-quick-when"><input class="cl-input" form="{{ bq_form }}" type="datetime-local" name="available_from" value="{{ bq.available_from }}" aria-label="On sale from"></td>
 	<td class="cl-bundle-quick-when"><input class="cl-input" form="{{ bq_form }}" type="datetime-local" name="available_until" value="{{ bq.available_until }}" aria-label="On sale until"></td>

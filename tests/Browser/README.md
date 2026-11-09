@@ -1,8 +1,13 @@
-# UI stabilisation browser checks
+# Browser checks
 
-These tests run Chromium against the existing development instance. They create one temporary
-administrator session. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
-No Node dependency or frontend build is added; use an existing Playwright installation.
+**LMS:** 1.1.2 · **Updated:** 2026-11-08
+
+These checks drive Chromium and Firefox, through an existing Playwright installation, against the development site. Each
+makes the records it needs through the site's own services and removes them afterwards (below), and fails if a sign-in
+redirects or the site is drawn in the wrong theme. No Node dependency or frontend build is added.
+
+Keep this guide to the checks as they are now, and under 150,000 characters: when something here stops being true, change
+it or take it out. The Git history keeps every earlier version.
 
 ## One theme, and checks that take minutes
 
@@ -83,9 +88,8 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 Always run cleanup after a failed browser check too. Delete the host copy of the session state
 when finished. `CATTO_BASE_URL`, `CATTO_BROWSER_STATE` and `CATTO_BROWSER_OUTPUT` override the
 component runner’s local URL, state file and screenshot/results directory. The canonical runner uses the default `/tmp/catto-ui-stabilisation-state.json`; keep that default when running both matrices. Default output is `/tmp/catto-ui-stabilisation`.
-The native pagination navigation check requires the development People list to contain at least
-three pages; the large development dataset supplies that fixture. The gallery supplies stable
-multi-page pagination examples independently of the database size.
+The native pagination check pages the People list, which the fixture's 110 people make at least three pages long; the
+gallery supplies stable multi-page pagination examples independently of the database size.
 
 The matrix covers the component gallery, Reports, People, Company, Account, Catalogue and Help in
 every bundled theme at 1440px and 390px. Checks measure heading content/action positions,
@@ -113,13 +117,11 @@ The combined sequence above runs this matrix before cleanup. To run it separatel
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/canonical-page.cjs
 ```
 
-Anonymous requests exercise the actual shell of the active theme; until 2026-11-07 this matrix activated each bundled
-theme in turn (`canonical-page-theme.php`, removed with the other themes). Keep theme installation/publication complete
+Anonymous requests exercise the actual shell of the active theme. Keep theme installation/publication complete
 before starting either matrix. The matrices validate development source themes; they do not build a release or
 regenerate distributable theme ZIPs.
 
-The canonical construction fixed a blank mobile row in a sidebar theme (Factory Reset Sidebar, now out of the code). Its
-frame also accounts for margins and a desktop sidebar's width, including on the gallery and Reports.
+The canonical frame accounts for margins and a desktop sidebar's width, including on the gallery and Reports.
 With JavaScript disabled, mobile top navigation stays in normal flow so its expanded links cannot
 cover pagination or other page controls. The component matrix exercises native Next and jump
 navigation as a regression for that behaviour.
@@ -198,8 +200,8 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAI
 `figure-fit.cjs` gives every small money amount on the ADMIN dashboard longer figures in turn (a million, a negative
 million, a hundred million, a trillion, nothing) in every bundled theme at 1440 and 390px, with reduced motion and
 without, and requires each to fit its card again within a moment (UX rule 2.6f, `fitFigures`). The amounts the
-dashboard shows depend on the day's data, so the menu pages found a spill only by chance (Gilded Noir, whose transition
-on every property made the refit read an amount's old size, 2026-10-26); this finds one on purpose. It changes text in
+dashboard shows depend on the day's data, so the menu pages would find a spill only by chance; this finds one on
+purpose. It changes text in
 the browser only and uses `section-pages.cjs`'s fixture; `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run:
 
 ```sh
@@ -226,7 +228,7 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 
 ## Section pages
 
-`section-pages.cjs` opens every Account, Company and Administration menu page (60, Sign-up Attempts and Company Profile added 2026-10-26, and the fixture company's page) in every bundled
+`section-pages.cjs` opens every Account, Company and Administration menu page, and the fixture company's page, in every bundled
 theme at 1440 and 390px through the theme preview, so nothing is activated. It checks the one
 construction every page shares (UX rule 1.7, `PageStructureContractTest`): exactly one `h1`; only page
 rows directly in main (flash stack, page head, identity band, page sections, a theme's page-family
@@ -532,7 +534,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 ## Course landing pages
 
-`landing-pages.cjs` checks course marketing landing pages (Phase L) in 14 scenarios:
+`landing-pages.cjs` checks course marketing landing pages in 14 scenarios:
 
 - **Editor.** ADMIN opens Landing page from the course editor's tools, creates the page (the hero and eight sections, Publish waiting for the empty lists), writes the hero, fills Who this course is for, Learning outcomes and a question, hides and shows Benefits, adds a call to action from Add section (Pricing is refused as already on the page) and removes it from its ⋯ menu.
 - **Order.** A section dragged by its handle and another moved with ↑ on its handle are saved and survive a reload; without JavaScript the ⋯ menu's Move to bottom moves a section; Firefox repeats a drag.
@@ -621,10 +623,10 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 `legal-pages.cjs` checks the public legal pages and the checkout acceptance box (77 checks):
 
-- **Every theme, signed out and signed in, at 1440, 820 and 390px (36).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title and last-updated date (no version since 2026-10-17); every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
+- **Every theme, signed out and signed in, at 1440, 820 and 390px (36).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title and last-updated date (no version); every numbered section is a closed accordion with its number and title; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
 - **Every theme at the three widths, both checkouts (36).** The learner's review step and the company credit checkout show the one acceptance box: required, unticked, worded "I have read and accept the Terms and Conditions and the Refund Policy.", with both documents linked from the label in a new tab, whole, inside the form and before the button that places the order.
 - **Chromium and Firefox (4).** Place my order without the tick places nothing; the Terms link opens in a new tab and leaves the checkout where it was; a form that lost its `required` attribute is refused by the server with the reason, for the learner and for the company; the details step has no identity number field.
-- **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms and a contents entry jumps to its section.
+- **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms, and every section starts closed and opens when chosen.
 
 The pages are read in the site's own theme, Saharan Sunset (a visitor cannot preview a theme, and nothing is activated). The script creates and cleans up its own fixture (a paid course, a learner, a company administrator and an ADMIN); it places no order, so cleanup removes everything. If a run is killed, run the cleanup yourself. Screenshots and `results.json` are written to `/tmp/catto-legal-pages` (`CATTO_BROWSER_OUTPUT`).
 
@@ -648,7 +650,7 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/demo-site-fixture.php cleanup'   # only after a killed run
 ```
 
-`commerce-wallets.cjs` checks the launch commerce work of 2026-10-17, the money records of 2026-10-18 and Record EFT Payment, Unmatched Money and the EFT buyer's email of 2026-10-19:
+`commerce-wallets.cjs` checks wallets, refunds, the commerce settings, the money records, Record EFT Payment, Unmatched Money and the EFT buyer's email:
 
 - **Chromium and Firefox, a fresh learner each (14).** A private learner is offered no Request from my company. A company learner (owner, 2026-10-18) is offered only Request from my company, with the reason it cannot buy; it has no cart in the header, checkout sends it to My Cart with that reason, and its request reaches its company. The learner's R200.00 of wallet credit (the fixture makes it as a person would: the learner orders a R100.00 course by EFT, ADMIN records R300.00 from the bank and marks the overpayment dealt with) pays part of a R300.00 course and the rest is chosen as EFT; checkout keeps the form until both boxes are ticked; the order page quotes the account reference and the R100.00 still to pay. The check runs the commerce worker once (`commerce:maintain`) and reads the learner's "Order CL-… received: how to pay by EFT" in Mailpit: the account and order, R200.00 paid and R100.00 to pay, the account reference as the payment reference, the demo site's fake bank details labelled, the deadline, when the course starts and the invoice attached (owner, 2026-10-19). ADMIN records an EFT of R150.00 (Chromium: on Record EFT Payment, where the account is found from the reference on the statement and the order has its own button; Firefox: on the order's page): the course starts and R50.00 goes to the wallet, which My Wallet and its statement show, and the dashboard says the course started on payment. The ADMIN dashboard lists the overpayment; ADMIN opens it, sends the prepared email (Mailpit receives it, `CATTO_MAILPIT_URL`) and marks it dealt with. The learner asks for money back on the order page; ADMIN approves it at Refund Requests with an override reason, the wallet part goes back to the wallet, and ADMIN records the payout on the order. Start course on an ADMIN-assigned course needs its confirmation box, and a form without it is refused by the server.
 - **Without JavaScript (1).** A refund request is sent and withdrawn, and Start course works, as plain forms.
@@ -699,9 +701,9 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 7. Thandi's order confirmation, with her receipt attached and her account reference, and the email saying her course has started, with its link, arrive in Mailpit (the commerce worker sends them within a minute; the script waits up to two and a half minutes), and every email sent is listed.
 8. The catalogue package downloaded from Import & Export Catalogue holds the same categories, tags and courses, each with its address, category, position, related courses, tags and prices.
 
-`CATTO_BASE_URL`, `CATTO_MAILPIT_URL` and `CATTO_ADMIN_EMAIL` point it at another site, such as a fresh test site installed with `deploy/podman/` (2026-10-23: run there against its own database and Mailpit, all 11 steps passed).
+`CATTO_BASE_URL`, `CATTO_MAILPIT_URL` and `CATTO_ADMIN_EMAIL` point it at another site, such as a fresh test site installed with `deploy/podman/`.
 
-It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database (`docs/OPERATIONS.md`) and make the theme you want active first.
+It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database first (`docs/OPERATIONS.md`); it starts on Saharan Sunset.
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/one-learner-scenario.cjs
@@ -750,13 +752,13 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-section-pages-state.json'
 ```
 
-`no-row-ids.cjs` (2026-11-06; UX rule 11.4) follows the links twice and reads every address each page can open: its links, form actions and formactions, sources, `hx-get` and `hx-post`, every `data-*-url`, the address the page landed on, and the address each GET form would ask for with each of its named buttons and choices. As a visitor, from the home page, the catalogue and the public pages through the course pages and their public preview, any row id fails: a path segment of digits only, a query value of digits only unless it is a count (`page`, `*_page`, `*_page_size`, `page_size`, `v`, `insert_index`, `reviews_stars`, `month`), an anchor ending in a dash and digits, or a follow carried through signing in by a number. As an ADMIN who also runs a company, from Administration, the Company workspace and Account, only an address naming a course by a number fails (`/admin/courses/12`, the popularity report, the Company workspace's star, Follow, `?course=`, `?course_id=`, `courses[]`, `assign_course`, a course list's `edit=`, `#course-12`, `follow=course:12`). `ALLOWED` names what a visitor may still meet and why (the public preview's part numbers; following a category or a tag by its number), and every entry must still be met, so the list only shrinks. It uses the section pages fixture's session, at its own state path:
+`no-row-ids.cjs` (2026-11-06 and 2026-11-07; UX rules 11.4 and 11.5) follows the links as four readers and reads every address each page can open: its links, form actions and formactions, sources, `hx-get` and `hx-post`, every `data-*-url`, the address the page landed on, and the address each GET form would ask for with each of its named buttons and choices. A row id is a path segment of digits only, a query value of digits only unless it is a count (`page`, `*_page`, `*_page_size`, `page_size`, `v`, `insert_index`, `reviews_stars`, `month`, `after`, `sample_category`), or an anchor ending in a dash and digits. A signed-out visitor, from the home page, the catalogue and the public pages through the course pages and their public preview, may meet none (`ALLOWED` is empty and only shrinks). A learner (My Orders, an order and its documents, My Courses, the reader), a Company Administrator (the Company workspace, its people, orders and requests) and an ADMIN who also runs a company (Administration, Mailing, the Company workspace and Account) may meet one only for a record that keeps its number behind a sign-in, listed in `KEEP` with why. Its own fixture makes the three signed-in readers and what they need, at its own state path:
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php create /tmp/catto-no-row-ids-state.json'
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/no-row-ids-fixture.php create /tmp/catto-no-row-ids-state.json'
 podman exec env_php_1 cat /tmp/catto-no-row-ids-state.json > /tmp/catto-no-row-ids-state.json
 CATTO_BROWSER_STATE=/tmp/catto-no-row-ids-state.json CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/no-row-ids.cjs
-podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-no-row-ids-state.json'
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/no-row-ids-fixture.php cleanup /tmp/catto-no-row-ids-state.json'
 ```
 
 `course-file.cjs` opens a course file the site wrote beside its original, in Chromium and Firefox with the network off (owner, 2026-11-03), for its styling and how it works, never its words: the stylesheet rules a browser accepts from the course's CSS tab, the look of the same elements with panels closed and open, the build (progress strip, masthead, coloured word, pills, scale, reset button, results panel), its cover showing, every panel a `<details>`, the same learner through the whole course by the file's own script, every word of every slide and flash card on the screen, and every panel opening without JavaScript. Its fixture writes a made-up course and its file inside a transaction it rolls back, so there is nothing to clean up. A JSON list of `{name, original, file}` as its first argument checks other files, and a pair's `allow` names what an edit on the site has since taken away. `course-file-contents.php`, in `env_php_1`, looks for every word a course holds on the site in its file, for every course or those named, and changes nothing.

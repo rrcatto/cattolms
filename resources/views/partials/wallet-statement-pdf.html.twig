@@ -1,0 +1,87 @@
+{#
+	A wallet's statement as a PDF (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"): A4, drawn by
+	DocumentPdfRenderer::renderPage from LedgerFiles::statement(), in the look of the money report PDF. Whose wallet, its
+	account reference and the period at the top, with the site logo, the Site Owner's trading name and when it was made; a demo site says
+	so there; the balance before the period, the credit added and used, and the balance at its end; then every movement,
+	oldest first, with the balance after it. The page number is on every page's foot.
+#}
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Wallet statement, {{ doc.owner_name }}, {{ doc.period }} - {{ trading_name }}</title>
+<style>
+	@page { margin: 16mm 16mm 22mm 16mm; }
+	body { font-family: 'Plex Sans', sans-serif; font-size: 9pt; line-height: 1.35; color: #1f1915; }
+	#pdf-foot { position: fixed; left: 0; right: 0; bottom: -14mm; height: 9mm; border-top: 0.6pt solid #d8c8b4; padding-top: 1.8mm; font-size: 7.6pt; color: #5a4d42; }
+	.pdf-foot-row { display: table; width: 100%; }
+	.pdf-foot-words, .pdf-foot-page { display: table-cell; vertical-align: top; }
+	.pdf-foot-page { text-align: right; white-space: nowrap; }
+	{# The PDF engine counts the page but not the pages, so the statement is drawn twice and the second knows how many. #}
+	.pdf-page-number:after { content: "Page " counter(page){% if page_total|default(0) > 0 %} " of {{ page_total }}"{% endif %}; }
+
+	.pdf-top { display: table; width: 100%; border-bottom: 1.6pt solid #1f1915; padding-bottom: 3mm; margin-bottom: 4.5mm; }
+	.pdf-top-title, .pdf-top-who { display: table-cell; vertical-align: bottom; }
+	.pdf-top-who { text-align: right; color: #5a4d42; }
+	.pdf-site-logo { margin: 0 0 1.5mm; }
+	.pdf-kicker { font-size: 7.8pt; letter-spacing: 1.4pt; text-transform: uppercase; color: #8a3f22; }
+	.pdf-title { font-family: Cormorant, serif; font-size: 22pt; font-weight: bold; line-height: 1.1; margin: 0.5mm 0 0; }
+	.pdf-period { margin: 1mm 0 0; color: #5a4d42; }
+	.pdf-demo { margin: 0 0 4.5mm; padding: 2mm 3mm; border-left: 2pt solid #b07d1e; background: #fbf3dd; font-size: 8.5pt; }
+
+	.cl-ui-table table { border-collapse: collapse; width: 100%; }
+	.cl-ui-table-tip { display: none; }
+	.pdf-figures { display: table; border-collapse: separate; border-spacing: 2.4mm; margin: -2.4mm -2.4mm 1.5mm; width: 100%; }
+	.pdf-figure-row { display: table-row; }
+	.pdf-figure { display: table-cell; width: 25%; border: 0.6pt solid #d8c8b4; padding: 2.4mm 3mm; vertical-align: top; }
+	.pdf-figure-label { display: block; font-size: 7.2pt; letter-spacing: 0.8pt; text-transform: uppercase; color: #5a4d42; }
+	.pdf-figure-value { display: block; font-family: Cormorant, serif; font-size: 16pt; font-weight: bold; line-height: 1.2; }
+	.pdf-figure-note { display: block; font-size: 7.4pt; color: #5a4d42; }
+
+	th { font-size: 7.2pt; letter-spacing: 0.6pt; text-transform: uppercase; color: #5a4d42; text-align: left; font-weight: normal; padding: 1.2mm 2mm 1.2mm 0; border-bottom: 0.6pt solid #d8c8b4; }
+	td { padding: 1.4mm 2mm 1.4mm 0; border-top: 0.4pt solid #efe6d9; vertical-align: top; }
+	.n { text-align: right; white-space: nowrap; }
+	.pdf-quiet { color: #5a4d42; font-size: 8pt; }
+	tfoot td { font-weight: bold; border-top: 0.8pt solid #1f1915; }
+	tr { page-break-inside: avoid; }
+	thead { display: table-header-group; }
+	.pdf-none { color: #5a4d42; margin: 2mm 0 0; }
+</style>
+</head>
+<body>
+	<div id="pdf-foot"><div class="pdf-foot-row">
+		<div class="pdf-foot-words">Wallet credit is spent on {{ doc.is_company ? 'course credits' : 'courses' }} and is not paid out as cash. It earns no interest.</div>
+		<div class="pdf-foot-page"><span class="pdf-page-number"></span></div>
+	</div></div>
+
+	<div class="pdf-top">
+		<div class="pdf-top-title"><div class="pdf-kicker">Wallet statement</div><div class="pdf-title">{{ doc.owner_name }}</div>
+			<div class="pdf-period">Account reference {{ doc.reference }} · {{ doc.period }}</div></div>
+		<div class="pdf-top-who">{% include '@platform/partials/pdf-site-logo.html.twig' with {pdf_logo_break: true} %}{% if trading_name %}{{ trading_name }}<br>{% endif %}Made {{ doc.made_label }}</div>
+	</div>
+	{% if doc_demo %}<div class="pdf-demo"><strong>{{ doc_demo_heading }}.</strong> {{ doc_demo_notice }}</div>{% endif %}
+
+	<div class="pdf-figures"><div class="pdf-figure-row">
+		{% for box in [
+			{label: 'Opening balance', value: doc.opening_label, note: doc.opening_words},
+			{label: 'Credit added', value: doc.added_label, note: ''},
+			{label: 'Credit used or expired', value: doc.used_label, note: ''},
+			{label: 'Closing balance', value: doc.closing_label, note: doc.closing_words},
+		] %}<div class="pdf-figure"><span class="pdf-figure-label">{{ box.label }}</span><span class="pdf-figure-value">{{ box.value }}</span>{% if box.note %}<span class="pdf-figure-note">{{ box.note }}</span>{% endif %}</div>{% endfor %}
+	</div></div>
+
+	{% if doc.lines %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:17%">When</th><th style="width:44%">What happened</th><th class="n" style="width:13%">Added</th><th class="n" style="width:13%">Used</th><th class="n" style="width:13%">Balance</th></tr>{% endblock %}
+	{% block body %}{% for line in doc.lines %}<tr>
+		<td>{{ line.when }}</td>
+		<td>{{ line.what }}{% set extra = [line.order ? 'Order ' ~ line.order : '', line.document, line.note]|filter(v => v) %}{% if extra %}<br><span class="pdf-quiet">{{ extra|join(' · ') }}</span>{% endif %}</td>
+		<td class="n">{{ line.added_label }}</td>
+		<td class="n">{{ line.used_label }}</td>
+		<td class="n">{{ line.balance_label }}</td>
+	</tr>{% endfor %}{% endblock %}
+	{% block footer %}<tfoot><tr><td colspan="2">Total</td><td class="n">{{ doc.added_label }}</td><td class="n">{{ doc.used_label }}</td><td class="n">{{ doc.closing_label }}</td></tr></tfoot>{% endblock %}
+	{% endembed %}
+	{% else %}<p class="pdf-none">No credit was added or used in these dates.</p>{% endif %}
+</body>
+</html>

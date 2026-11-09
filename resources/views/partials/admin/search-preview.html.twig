@@ -1,0 +1,36 @@
+{#
+	How a page may look in a search result and as a shared link (the SEO brief, 2026-11-09: "previews and sensible
+	defaults"), beside the fields that change it: the site and the address, the title with the site's name after it and the
+	description as a search result cuts them (about SearchOverrides::TITLE_SHOWN and DESCRIPTION_SHOWN characters), and the
+	shared link's picture, title and description. A field left empty shows the page's own words. search_preview_controller.js
+	follows the fields as they are typed; without JavaScript the preview shows what is saved. Search engines choose for
+	themselves in the end, so it is a likeness, and says so.
+	sp: {id, title_field, description_field (the inputs' ids), preview (PageMetadata::coursePreview, categoryPreview or
+	pagePreview), site (the site's name), title_shown, description_shown (SearchOverrides::TITLE_SHOWN, DESCRIPTION_SHOWN)}.
+#}
+{% set spv = sp.preview %}
+{% set title_shown = sp.title_shown|default(60) %}
+{% set description_shown = sp.description_shown|default(160) %}
+{% set sp_host = spv.url|split('://')|last|split('/')|first %}
+{% set sp_trail = spv.url|split('://')|last|split('/')|slice(1)|filter(part => part != '') %}
+<div class="cl-search-preview" id="{{ sp.id }}" data-controller="search-preview" data-search-preview-site-value="{{ sp.site }}"
+	data-search-preview-title-field-value="{{ sp.title_field }}" data-search-preview-description-field-value="{{ sp.description_field }}"
+	data-search-preview-default-title-value="{{ spv.default_title }}" data-search-preview-default-description-value="{{ spv.default_description }}"
+	data-search-preview-title-shown-value="{{ title_shown }}" data-search-preview-description-shown-value="{{ description_shown }}">
+	<figure class="cl-search-preview-result">
+		<figcaption>In a search result</figcaption>
+		<p class="cl-search-preview-site"><strong>{{ sp.site }}</strong> <span>{{ sp_host }}{% for part in sp_trail %} › {{ part }}{% endfor %}</span></p>
+		<p class="cl-search-preview-title" data-search-preview-target="title">{{ (spv.title ~ ' · ' ~ sp.site)|length > title_shown ? (spv.title ~ ' · ' ~ sp.site)|slice(0, title_shown - 1)|trim ~ '…' : spv.title ~ ' · ' ~ sp.site }}</p>
+		<p class="cl-search-preview-text" data-search-preview-target="description">{{ spv.description|length > description_shown ? spv.description|slice(0, description_shown - 1)|trim ~ '…' : spv.description }}</p>
+	</figure>
+	<figure class="cl-search-preview-card">
+		<figcaption>As a shared link</figcaption>
+		{% if spv.picture %}<img src="{{ spv.picture }}" alt="" width="1200" height="630" loading="lazy">{% endif %}
+		<span class="cl-search-preview-card-words">
+			<span class="cl-search-preview-domain">{{ sp_host }}</span>
+			<strong data-search-preview-target="cardTitle">{{ spv.title }}</strong>
+			<span data-search-preview-target="cardDescription">{{ spv.description }}</span>
+		</span>
+	</figure>
+	<p class="help cl-search-preview-count" data-search-preview-target="count">The title is {{ spv.title|length }} characters and the description {{ spv.description|length }}: a search result shows about {{ title_shown }} and {{ description_shown }}. Search engines decide for themselves in the end, so this is a likeness.</p>
+</div>

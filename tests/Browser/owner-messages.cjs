@@ -1,6 +1,7 @@
 /* Messages to the owner's Telegram (owner, 2026-11-05: "yes telegram, paid orders only"), Settings > Messages to you, in Chromium and
    Firefox, at 1440 and 390 pixels wide, against a stand-in of Telegram, so no message goes to the real service:
-   - the section comes straight after Site notification, says how to make a bot, and its ticks are feature cards, both on by default;
+   - the section is where the order of Settings puts it (straight after Site Owner in the standard order; the owner may arrange
+     the sections, 2026-11-09), says how to make a bot, and its ticks are feature cards, both on by default;
    - a key of the wrong shape is refused, a good one is saved and never appears in the page again;
    - Connect to Telegram connects only the account Settings names, in any case, never a stranger who pressed Start on the bot, and says
      what to do until that account has, and Send a test message reaches that account's chat, naming the site;
@@ -39,8 +40,13 @@ async function run(browserType, name) {
     fixture('started', 'off'); fixture('down', 'off');
 
     await open(page);
-    const order = await page.locator('.cl-admin-workspace details[id^="settings-"]').evaluateAll((all) => all.map((d) => d.id));
-    check(`${name}: it comes straight after Site notification`, order.indexOf('settings-owner-messages') === order.indexOf('settings-site-notification') + 1, order.slice(0, 4).join(', '));
+    const placed = await page.locator('#settings-sections').evaluate((list) => {
+        const drawn = [...list.querySelectorAll(':scope > li[data-node-id]')].map((li) => li.dataset.nodeId);
+        const order = (list.dataset.order || '').split(',').filter((key) => drawn.includes(key));
+        return {drawn, order};
+    });
+    check(`${name}: it is where the order of Settings puts it`, placed.drawn.indexOf('owner-messages') > -1 && placed.drawn.indexOf('owner-messages') === placed.order.indexOf('owner-messages')
+        && placed.drawn.join(',') === placed.order.join(','), placed.drawn.slice(0, 6).join(', '));
     check(`${name}: the title says it is not connected`, (await title(page)).trim() === 'Not connected', await title(page));
     check(`${name}: so does a status message`, /Not connected|Disconnected/.test(await boxWords(page)), await boxWords(page));
     check(`${name}: the two fields and Connect to Telegram show, and no test or disconnect`, await page.locator('#owner-messages-key').count() === 1 && await page.locator('#owner-messages-username').count() === 1 && await page.locator(`${section} button:has-text("Connect to Telegram")`).count() === 1 && await page.locator(`${section} form[action$="/test"]`).count() === 0 && await page.locator(`${section} form[action$="/disconnect"]`).count() === 0);

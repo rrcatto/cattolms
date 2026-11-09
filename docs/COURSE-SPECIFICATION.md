@@ -1,28 +1,10 @@
-# CattoLMS Course Specification 4.11
+# CattoLMS Course Specification 4.12
 
-**Version 4.11** · 7 November 2026, 02:30 SAST · Authored by Claude Opus 5.5 · Replaces version 4.10 (5 November 2026, 20:30 SAST), version 4.9 (5 November 2026, 07:37 SAST), version 4.8 (5 November 2026, 07:16 SAST), version 4.7 (5 November 2026, 03:45 SAST), version 4.6 (3 November 2026, 02:32 SAST), version 4.5 (2 November 2026, 01:24 SAST), version 4.4 (1 November 2026, 20:41 SAST), version 4.3 (1 November 2026, 19:14 SAST), version 4.2 (1 November 2026, 18:36 SAST), version 4.1 (1 November 2026, 16:15 SAST), version 4.0 (1 November 2026, 16:03 SAST) and version 3.0 (the course package, 28 October 2026): a course is one HTML file.
+**Version 4.12** · 8 November 2026, 22:09 SAST · Authored by Claude Opus 5.5 · Replaces version 4.11 (7 November 2026, 02:30 SAST)
+
+**New in 4.12:** nothing about how a course is written. This opening now gives only the latest change to that, 4.11's below, rather than every version's, and the document is kept under 150,000 characters so that it can always be given whole to an assistant.
 
 **New in 4.11:** the names of a course's parts, `cattolms:part-names` (section 6.6), which CattoLMS writes so that a course replaced from its own file keeps every part's address. A course written by hand leaves it out.
-
-**New in 4.10:** what to call the file (section 3).
-
-**New in 4.9:** the whole course's study time, `cattolms:study-hours` (section 6.5), which the course's page shows.
-
-**New in 4.8:** the files a course uses, named and not held, `.course-files` (section 6.3), and the final assessment's time limit, `cattolms:final-time-limit` (section 6.4).
-
-**New in 4.7:** an optional course description, `.course-description` (section 6.2): what the course's page says to someone deciding whether to buy it. Put a course's strongest selling point there, and first in `.course-summary` too, because nothing else before the modules reaches a buyer's page.
-
-**New in 4.6:** an optional course preview, `PRESENTATIONS.trailer` (section 9.2). The complete example's script now shows every word a slide holds: a case's question, a slide's chapter and caption, and the button on a closing slide.
-
-**New in 4.5:** the cover drawing's exact size and the first line of its `<svg>` tag, the shapes CattoLMS shows it in and what each one trims (section 6.1). Version 4.4 gave the wrong size: a cover drawn to it does not reach the sides of the course page.
-
-**New in 4.4:** Module 0, for a course whose first module only sets the learner up (section 8). The review study aid a module may end with (section 8.6). The review's presentation and self assessment as panels of their own (section 10). CattoLMS writes every course on the site out in this form, and importing such a file gives the course back.
-
-**New in 4.3:** one way to make a panel that opens and closes, everywhere in the file: a `<details>` element with its `<summary>` (section 4). It works without a script, and on the site too, where the course's own script never runs.
-
-**New in 4.2:** the file is built as the original Catto Learning course files are. Every module, and inside it every part (the presentation, the summary, the flash cards, the practical work, the model answers, the self assessment and its answer key), the readiness check, the review and the final assessment, is a panel of its own that opens and closes, all closed when the file opens (sections 4, 8, 10, 11 and the example in section 14). The readiness check goes between the introduction and the modules, and the review after them.
-
-**New in 4.1:** a module is a week of study, about 15 hours (section 8). Every module has a video, found and checked online (section 8.2). Every lesson is illustrated with SVG drawings (section 8.3). How to show code in a lesson (section 8.3) and in questions (section 9.1), and why slides and flash cards cannot hold it (sections 9.2 and 9.3).
 
 **For whoever writes a CattoLMS course, by hand or with an AI assistant such as Claude.** This one document is everything needed: give it, whole, to the assistant. Section 14 is a complete working course to copy from.
 

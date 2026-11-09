@@ -28,7 +28,9 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * an order keeps the price, access period and courses it was placed with in its snapshot, so a later
  * change affects later purchases only. A bundle anyone bought is kept; only an unused draft is deleted.
  * The offer may carry a was price (owner, 2026-10-20), a higher price shown struck through beside the
- * bundle price; only the bundle price is charged.
+ * bundle price; only the bundle price is charged. Its form fills an empty was price with the courses' total and says, as
+ * the price is typed, what percentage it is off (owner, 2026-11-09); a card shows the saving's percentage in a badge of
+ * its own beside the amount.
  */
 final class BundleService
 {
@@ -361,6 +363,9 @@ final class BundleService
         $owned = array_values(array_intersect(array_map(static fn(array $c): int => (int) $c['course_id'], $courses), $ownedCourseIds));
         $comparison = self::comparison($courses, $price, $currency);
         $save = self::saving($price, $bundle['was_price_minor_units'] ?? null, $comparison);
+        // The saving's percentage, of what it is saved from: the was price, else the courses' total (owner, 2026-11-09).
+        $from = is_numeric($bundle['was_price_minor_units'] ?? null) && $price !== null && (int) $bundle['was_price_minor_units'] > $price ? (int) $bundle['was_price_minor_units'] : ($comparison['individual_minor'] ?? 0);
+        $percent = $save === null || $price === null ? null : WasPrice::percentOff($price, $from);
         return $bundle + [
             'courses' => $courses,
             'course_count' => count($courses),
@@ -370,6 +375,7 @@ final class BundleService
             'comparison' => $comparison,
             'save_minor' => $save,
             'save_label' => $save === null ? null : Money::strictMinorUnits($save, $currency)->format(),
+            'save_percent' => $percent,
             'unavailable' => BundleRules::unavailableReason($bundle, $courses, $this->clock->now()),
             // A published bundle whose sale starts later is shown with when (owner, 2026-11-06): the long form on its page,
             // the short one on a card or a note.
@@ -514,6 +520,8 @@ final class BundleService
             'access_label' => $presented['access_label'], 'price_label' => $presented['price_label'], 'was_label' => $presented['was_label'],
             'not_available' => $presented['unavailable'] !== null && !$later,
             'saving_badge' => ($presented['unavailable'] === null || $later) && $presented['save_label'] !== null ? 'Save ' . $presented['save_label'] : null,
+            // The saving's percentage in a badge of its own beside the amount (owner, 2026-11-09), rounded down.
+            'saving_percent_badge' => ($presented['unavailable'] === null || $later) && $presented['save_label'] !== null && ($presented['save_percent'] ?? 0) >= 1 ? $presented['save_percent'] . '% off' : null,
             'availability_badge' => $later ? (string) $presented['on_sale_from_short'] : null];
     }
 
@@ -545,15 +553,41 @@ final class BundleService
     {
         $time = static fn(mixed $value): string => $value === null ? '' : (new DateTimeImmutable((string) $value))->setTimezone(self::timezone())->format('Y-m-d\TH:i');
         [$value, $unit] = AccessPeriod::decompose((int) ($bundle['access_period_seconds'] ?? 31536000));
+        // The courses' total (owner, 2026-11-09: "auto-populate the Was Price with the sum total of the prices of all the
+        // courses in the bundle"): an empty was price is filled with it while it is higher than the price, and saved with
+        // the price. Null when a course has no price of its own in the site's currency.
+        $currency = (string) ($bundle['currency_code'] ?? Money::platformCurrency());
+        $price = isset($bundle['price_minor_units']) ? (int) $bundle['price_minor_units'] : null;
+        $total = isset($bundle['id']) ? (self::comparison($this->bundles->courses((int) $bundle['id']), $price, $currency)['individual_minor'] ?? null) : null;
+        $was = is_numeric($bundle['was_price_minor_units'] ?? null) ? (int) $bundle['was_price_minor_units'] : null;
+        $filled = $was === null && $total !== null && ($price === null || $total > $price);
         return [
             'code' => (string) ($bundle['code'] ?? ''), 'status' => (string) ($bundle['status'] ?? 'draft'),
             'title' => (string) ($bundle['title'] ?? ''), 'slug' => (string) ($bundle['slug'] ?? ''), 'short_description' => (string) ($bundle['short_description'] ?? ''),
             'description_html' => (string) ($bundle['description_html'] ?? ''), 'cover_svg' => (string) ($bundle['cover_svg'] ?? ''),
             'available_from' => $time($bundle['available_from'] ?? null), 'available_until' => $time($bundle['available_until'] ?? null),
             'price' => isset($bundle['price_minor_units']) ? Money::strictMinorUnits((int) $bundle['price_minor_units'], (string) $bundle['currency_code'])->toMajorUnits() : '',
-            'was_price' => WasPrice::input($bundle['was_price_minor_units'] ?? null),
+            'was_price' => WasPrice::input($filled ? $total : $was),
+            'was_from_courses' => $filled,
+            'courses_total' => $total === null ? '' : WasPrice::input($total),
+            'courses_total_label' => $total === null ? '' : Money::strictMinorUnits($total, $currency)->format(),
+            'discount' => self::discountWords($price, $filled ? $total : $was, $currency),
+            'currency' => $currency, 'locale' => str_replace('_', '-', \CattoLearning\Support\Env::string('APP_LOCALE') ?: 'en_ZA'),
             'access_period_value' => $value, 'access_period_unit' => $unit, 'is_active' => $bundle === null || $bundle['offer_id'] === null || (bool) $bundle['offer_active'],
         ];
+    }
+
+    /**
+     * What a bundle's price form says beside the price (owner, 2026-11-09: "When I type in the bundle price, can you display
+     * the percentage discount?"): its percentage off the was price and the amount saved, rounded down as every saving is.
+     * bundle_price_controller.js says the same as the price is typed.
+     */
+    public static function discountWords(?int $priceMinor, ?int $wasMinor, string $currency): string
+    {
+        if ($priceMinor === null || $wasMinor === null) return '';
+        $percent = WasPrice::percentOff($priceMinor, $wasMinor);
+        if ($percent === null) return 'The was price must be higher than the bundle price.';
+        return $percent . '% off the was price: the buyer saves ' . Money::strictMinorUnits($wasMinor - $priceMinor, $currency)->format() . '.';
     }
 
     public static function timezone(): DateTimeZone

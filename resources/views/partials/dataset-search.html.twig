@@ -18,7 +18,8 @@
 	#}
 	{# ds_hidden: what else the list shown depends on, kept by the search (My Courses' chosen list). ds_include: a part of the
 	   page whose fields go with the search too, kept current by the list itself (the catalogue's bundles' page,
-	   #catalogue-state), and ds_swap how the results are put in (the catalogue morphs, innerMorph). #}
+	   #catalogue-state), and ds_swap how the results are put in (the catalogue morphs, innerMorph). ds_morph_skip: the box is
+	   inside what its answer morphs (the catalogue's courses), so the morph leaves it, and what is being typed, alone. #}
 	{% for hidden_name, hidden_value in ds_hidden|default({}) %}<input type="hidden" name="{{ hidden_name }}" value="{{ hidden_value }}">{% endfor %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (ds_label), full_width: false, for: (ds_name) ~ '-search-input'})} %}
 {% block control %}
@@ -32,7 +33,7 @@
 		       hx-swap="{{ ds_swap|default('innerHTML') }}"
 		       hx-include="closest form{% if ds_include|default('') %}, {{ ds_include }}{% endif %}"
 		       hx-sync="this:replace"
-		       hx-indicator="closest .dataset-search" {{ ui_field_attrs(props) }}>
+		       hx-indicator="closest .dataset-search"{% if ds_morph_skip|default(false) %} hx-morph-skip{% endif %} {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

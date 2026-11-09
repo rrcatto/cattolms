@@ -9,7 +9,9 @@ Version: 0.8.9
 
 Description:
 The design of invoices, receipts and credit notes, as ADMIN makes it on Commerce → Financial
-Documents: an optional logo, a typeface, an accent colour and the closing note each document prints.
+Documents: an optional logo, a typeface, an accent colour and the closing note each document prints. The logo is the
+site logo (Configuration\SiteLogo, from Settings > Site Owner), one of the design's own or none (owner, 2026-11-09), the
+site logo until another is chosen; forPrinting() gives the design with the logo it prints, for the compiler.
 One design draws all three documents, so they always match. It is stored as it was made in each
 financial template version (document_template_versions.design); FinancialDocumentDesignCompiler
 turns it into the template HTML and CSS the document engine renders.
@@ -18,6 +20,8 @@ Everything else on the documents - the business and customer details, the lines,
 promotion, the payment and the refund - is data from the issued order, never part of the design.
 
 Changelog:
+2026/11/09 SAST
+- The logo choice (logo_choice: the site logo, its own or none) and forPrinting().
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -26,6 +30,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Document;
 
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Course\Certificate\CertificateImage;
 use CattoLearning\Document\DocumentType;
 
@@ -45,17 +50,28 @@ final class FinancialDocumentDesign
         'credit_note' => 'Wallet credit can be spent on courses and is not paid out as cash. Money back is paid separately and is not recorded on this document.',
     ];
 
-    /** @param array<string,string> $notes document type value => its closing note */
+    /**
+     * @param array<string,string> $notes document type value => its closing note
+     * @param string $logoChoice a key of SiteLogo::CHOICES; $logo is the design's own
+     */
     public function __construct(
         public readonly ?CertificateImage $logo,
         public readonly string $typeface,
         public readonly string $colour,
         public readonly array $notes,
+        public readonly string $logoChoice = 'site',
     ) {}
 
     public static function standard(): self
     {
         return new self(null, 'dejavu', self::STANDARD_COLOUR, self::STANDARD_NOTES);
+    }
+
+    /** The design with the logo it prints as its own: the site logo, its own or none. */
+    public function forPrinting(?CertificateImage $siteLogo): self
+    {
+        $printed = match ($this->logoChoice) { 'site' => $siteLogo, 'own' => $this->logo, default => null };
+        return new self($printed, $this->typeface, $this->colour, $this->notes, 'own');
     }
 
     /** @return list<DocumentType> the documents one design draws, in the order they are shown */
@@ -78,6 +94,11 @@ final class FinancialDocumentDesign
     public function problems(): array
     {
         $problems = [];
+        if (!isset(SiteLogo::CHOICES[$this->logoChoice])) {
+            $problems[] = 'Choose which logo the documents print.';
+        } elseif ($this->logoChoice === 'own' && $this->logo === null) {
+            $problems[] = 'Upload the documents\' own logo, or choose the site logo or no logo.';
+        }
         if (!isset(self::TYPEFACES[$this->typeface])) {
             $problems[] = 'Choose one of the typefaces offered.';
         }
@@ -92,10 +113,10 @@ final class FinancialDocumentDesign
         return $problems;
     }
 
-    /** @return array{logo:?array{sha:string,width:int,height:int},typeface:string,colour:string,notes:array<string,string>} */
+    /** @return array{logo:?array{sha:string,width:int,height:int},logo_choice:string,typeface:string,colour:string,notes:array<string,string>} */
     public function toArray(): array
     {
-        return ['logo' => $this->logo?->toArray(), 'typeface' => $this->typeface, 'colour' => $this->colour, 'notes' => $this->notes];
+        return ['logo' => $this->logo?->toArray(), 'logo_choice' => $this->logoChoice, 'typeface' => $this->typeface, 'colour' => $this->colour, 'notes' => $this->notes];
     }
 
     /** @param array<string,mixed> $row as stored; anything missing is the standard design's */
@@ -107,11 +128,15 @@ final class FinancialDocumentDesign
             $note = $row['notes'][$type->value] ?? null;
             $notes[$type->value] = is_string($note) ? $note : $standard->note($type);
         }
+        $logo = CertificateImage::fromArray(is_array($row['logo'] ?? null) ? $row['logo'] : null);
+        // A design saved before the choice prints its own logo if it had one, else the site logo.
+        $choice = is_string($row['logo_choice'] ?? null) && isset(SiteLogo::CHOICES[$row['logo_choice']]) ? $row['logo_choice'] : ($logo !== null ? 'own' : 'site');
         return new self(
-            CertificateImage::fromArray(is_array($row['logo'] ?? null) ? $row['logo'] : null),
+            $logo,
             is_string($row['typeface'] ?? null) ? $row['typeface'] : $standard->typeface,
             is_string($row['colour'] ?? null) ? strtoupper($row['colour']) : $standard->colour,
             $notes,
+            $choice,
         );
     }
 }

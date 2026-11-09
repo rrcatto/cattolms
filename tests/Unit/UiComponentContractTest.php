@@ -165,7 +165,9 @@ final class UiComponentContractTest extends TestCase
             $path = 'resources/views/pages/' . $page . '.html.twig';
             $source = $templates[$path];
             self::assertStringContainsString("ui('catalogue.workspace'", $source, $path);
-            self::assertStringContainsString('partials/dataset-search.html.twig', $source, $path);
+            // The catalogue's search heads its courses, inside the workspace (owner, 2026-11-09); a tag's page keeps its own.
+            if ($page === 'courses') self::assertStringContainsString('search: {value: catalogue_search', $source, $path . ' gives the workspace its search.');
+            else self::assertStringContainsString('partials/dataset-search.html.twig', $source, $path);
             self::assertDoesNotMatchRegularExpression('/<(article|details|input)\b/', $source, $path . ' must compose canonical controls.');
             self::assertStringNotContainsString('partials/course-card.html.twig', $source, $path . ' must use the canonical course grid.');
             self::assertStringNotContainsString('partials/pagination.html.twig', $source, $path . ' pagination belongs to the workspace.');
@@ -176,6 +178,8 @@ final class UiComponentContractTest extends TestCase
         }
         // The courses' pagination above and below them, and the bundles' own under theirs (owner, 2026-11-07).
         self::assertSame(3, substr_count($workspace, 'partials/pagination.html.twig'));
+        self::assertSame(1, substr_count($workspace, 'partials/dataset-search.html.twig'), 'The courses\' search, at the head of their section.');
+        self::assertStringContainsString('ds_morph_skip: true', $workspace, 'The box is left alone by the morph its answer makes.');
         self::assertStringContainsString("ui('catalogue.bundles'", $workspace);
         self::assertStringContainsString("ui('catalogue.course-grid'", $workspace);
         self::assertSame(1, substr_count($templates['resources/views/ui/catalogue/course-grid.html.twig'], 'partials/course-card.html.twig'));

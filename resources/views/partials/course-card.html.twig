@@ -59,9 +59,9 @@
 		{# A marked-down course is flagged as a special (owner, 2026-10-20), its was price struck through in the Price row. A bundle says what it saves under its price instead. #}
 		{% if course.saving_percent|default(null) %}<p class="cl-course-card-special">{{ ui('feedback.badge', {label: 'Special: save ' ~ course.saving_percent ~ '%', tone: 'success'}) }}</p>{% endif %}
 		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label), was: course.default_was_label|default(null)}]}) }}
-		{# A bundle says what it saves under its price (owner, 2026-11-06, the approved mockup). #}
+		{# A bundle says what it saves under its price (owner, 2026-11-06, the approved mockup), and its percentage (2026-11-09). #}
 		{# One whose sale starts later says when (owner, 2026-11-06: "show me WHEN the bundle will be available to purchase"). #}
-		{% if course.saving_badge|default(null) or course.availability_badge|default(null) %}<p class="cl-course-card-saving">{% if course.saving_badge|default(null) %}{{ ui('feedback.badge', {label: course.saving_badge, tone: 'success'}) }}{% endif %}{% if course.availability_badge|default(null) %} {{ ui('feedback.badge', {label: course.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
+		{% if course.saving_badge|default(null) or course.availability_badge|default(null) %}<p class="cl-course-card-saving">{% if course.saving_badge|default(null) %}{{ ui('feedback.badge', {label: course.saving_badge, tone: 'success'}) }}{% endif %}{% if course.saving_percent_badge|default(null) %} {{ ui('feedback.badge', {label: course.saving_percent_badge, tone: 'success'}) }}{% endif %}{% if course.availability_badge|default(null) %} {{ ui('feedback.badge', {label: course.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
 		<div class="cl-course-card-foot">
 			{{ ui('action.link', {label: course.link_label|default('View course'), variant: 'primary', size: 'small', href: course.href|default('/courses/' ~ (course.slug)), icon: 'action-view'}) }}
 		</div>

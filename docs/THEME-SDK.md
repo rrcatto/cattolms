@@ -1,10 +1,13 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 1.1.0 · **Updated:** 2026-11-07
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 1.1.2 · **Updated:** 2026-11-08
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
 components. Themes own their shell, typography, palette, decorative imagery and visual treatment.
+
+Keep this guide to how themes work now, and under 150,000 characters: when something here stops being true,
+change it or take it out. The Git history keeps every earlier version.
 
 ## Package structure
 
@@ -15,8 +18,7 @@ content. Optional partials and public assets belong to the same package. ZIPs ma
 package at their root or under one enclosing directory. Paths must be safe relative paths.
 A certificate is a PDF drawn by the document template engine in its course's certificate design and
 shown in the browser's own PDF viewer: a theme styles the certificate page and the certificate design
-pages around it, never the certificate itself (the themes' old `.cl-certificate` rules were removed in
-Phase J). The design pages' picture choices, preview frame (full width, above the form) and wording editor
+pages around it, never the certificate itself. The design pages' picture choices, preview frame (full width, above the form) and wording editor
 are core-owned (`cl-ui-picture-choice`, `cl-certificate-*`, and the financial document design page's `cl-document-*`).
 A course landing page (`/landing/…`) is in the course-detail page family: its hero is a `cl-page-head`
 band like the course page's, its sections are ordinary surfaces, and its classes (`cl-landing-*`, and the
@@ -58,8 +60,9 @@ dark; it does not follow `prefers-color-scheme`.
 Platform pages extend the resolved theme layout and supply `page_body`. A base retains that block,
 the required resource arrays, navigation, flash messages and appropriate footer. Its head includes
 `@platform/partials/head-meta.html.twig` after the title and writes no description of its own: core
-draws the page's description, and for pages that set them (a course landing page) its canonical
-address, robots rule and Open Graph tags, from the view model's `meta`. For example:
+draws the page's description and, where a page sets them, its canonical address, robots rule, Open
+Graph and X tags, verification codes and structured data, from the view model's `meta`
+([UI-COMPONENTS.md](UI-COMPONENTS.md), "Head metadata"). For example:
 
 ```twig
 <!doctype html>
@@ -122,8 +125,6 @@ cover page controls. At narrow widths the open enhanced menu also scrolls with t
 Themes retain decoration, header/sidebar dimensions and unique elements; do not hide core navigation
 independently or install a second toggle handler.
 
-
-
 Family wrappers extend the base and retain the `page_body` block, optionally surrounding it with
 family decoration. They do not replace core forms, table rows or catalogue results. Use
 `theme.asset_url` for package assets and `platform.icon_sprite` for the platform navigation sprite.
@@ -147,31 +148,33 @@ navigation controls. Navigation destinations are not a theme-maintained route ca
 
 The current menus provide Account (All sections, Dashboard, a Profile group holding Personal
 Particulars, Billing Address, Email Addresses, My Subscriptions and Social Media, a Courses group holding My Orders, My Wallet, My Courses,
-Favourites, Course Requests (a company account only) and My Certificates, Sign-in and security, Sessions, Activity), Company (All sections, Dashboard, a People group holding People,
+Favourites, Course Requests (a company account only) and My Certificates, Sign-in and security, Sessions, Activity), Company (All sections, Dashboard, Company Profile, a People group holding People,
 Course Requests, Enrolments and Performance, a Courses group holding Courses Created, Favourites, Courses
-Bought and Credits, then Billing details), and Administration in six groups: Courses (courses, the Course Item and Resource
-Libraries, categories, tags, Course Reviews, Bundles, Certificate Designs, requests, enrolments), People & Companies,
-Credits & Orders (credits, Orders & Payments, Record EFT Payment, Unmatched Money, Money Ledger, Refund Requests, Wallets,
-Promotions, Financial Documents), Site Analytics (Overview, Site Log, Flagged Activity, Lockouts, Site protection settings), Insights (activity and reports) and
-System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-level entries
-are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
+Bought, Credits and Orders, then Billing details), Administration in six groups: Courses (courses, Course Page Layouts,
+the Course Item and Resource Libraries, categories, tags, Import & Export Catalogue, Course Reviews, Bundles, Certificate
+Designs, Issued Certificates, requests, enrolments), People & Companies (people, companies, Course Creators, Contact
+Messages, Sign-up Attempts), Credits & Orders (credits, Orders & Payments, Record EFT Payment, Unmatched Money, Money
+Ledger, Money Reports, Refund Requests, Wallets, Promotions, Financial Documents), Site Analytics (Overview, Site Log,
+Telegram log, Flagged Activity, Lockouts, Site protection settings), Insights (activity and reports) and System (Setup,
+Themes, Roles & ACL, Seed Database, Settings, UI Components), and Mailing, a menu of its own (Overview, Send, Design,
+People, Setup and Reports, each with its pages). Third-level entries are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
 these examples do not authorise hard-coded destinations in themes.
 
 The standard footer destination array is core-owned. A theme either delegates to the site-footer partial
 (`partials/site-footer.html.twig`) or composes a footer of its own from the same standard destinations and
 platform action component, as Saharan Sunset does.
 
-Since v0.9.1 `footer_navigation` also carries the public legal documents - Terms (`/terms`), Refunds
+`footer_navigation` also carries the public legal documents - Terms (`/terms`), Refunds
 (`/refunds`) and Privacy (`/privacy`) - after Contact, for every visitor. Each link is in one place (owner,
 2026-10-18): the menu has Home and Catalogue but not Help and Contact, and the footer has Home, Catalogue,
 Help, Contact, Terms, Refunds and Privacy, the same for everyone, but not Account, Company and
 Administration. A footer draws every entry of the array in the order core gives it and never writes a legal
 link of its own. The one exception: a footer with its own contact form button (Saharan Sunset)
 leaves the Contact entry out, `footer_navigation|filter(link => link.key != 'contact')`, so the contact form
-is offered once; a footer without the button keeps it (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
-(`layout.surface`, `layout.section-head`, `data.key-value-list`): a theme styles them as it styles any page.
+is offered once; a footer without the button keeps it (`NavigationContractTest`). The legal pages themselves are ordinary platform pages (a
+`layout.surface` head, then each section an `overlay.accordion-section`): a theme styles them as it styles any page.
 
-Since v0.9.2 the footer's social marks come only from `footer_social`: Facebook, WhatsApp, X, LinkedIn,
+The footer's social marks come only from `footer_social`: Facebook, WhatsApp, X, LinkedIn,
 Instagram and YouTube, each a link to its platform's home page (`SocialPlatform::home()`) until the settings
 give the installation's profile address in `platform_social`. A theme may draw the marks from its own sprite
 (Saharan Sunset draws them from the platform sprite), but never writes a social link of its own or a link to `#` (`NavigationContractTest`).
@@ -371,7 +374,7 @@ pagination, htmx replacement and plain GET/POST fallbacks. Every installed theme
 
 Existing canonical component classes such as `cl-ui-*`, `cl-cart-*` and other established core classes remain part of the same core vocabulary.
 
-### Page width and rows (v0.9)
+### Page width and rows
 
 Every page is the one standard width. Core puts `cl-width-wide` on the body beside `cl-page-texture`, or
 `cl-width-full` on Home and course landing pages; there are no narrow or medium pages (owner, 2026-10-18),
@@ -406,7 +409,6 @@ the title stands on the cards' edge (Saharan Sunset). `tests/Browser/page-constr
 painted notice, head or band whose edges differ from the cards'.
 
 Theme-specific elements may use theme-owned classes such as Saharan Sunset's `ss-footer-art` and `ss-footnote`, or a third-party theme's own.
-
 
 `cl-identity-details`, `cl-footer-grid` and `cl-footer-section` name the inner identity and rich-footer
 structures shown in the canonical samples. `cl-page-family` is a div around a decorated page family.

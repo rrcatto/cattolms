@@ -70,13 +70,13 @@ final class PlatformUi
         'feedback.progress' => ['template' => 'feedback/progress', 'defaults' => ['value' => null, 'min' => 0, 'max' => 100, 'label' => null, 'show_value' => false, 'size' => 'normal']],
         'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post', 'upload' => false, 'open' => false]],
         // eyebrow and icon (owner, 2026-10-20, the FAQ): a category line above the heading and an SVG icon before both.
-        'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'summary_tone' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '', 'eyebrow' => '', 'icon' => '']],
+        'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'summary_tone' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '', 'eyebrow' => '', 'icon' => '', 'picture' => '']],
         'icon' => ['template' => 'helpers/icon', 'defaults' => ['name' => null, 'label' => '', 'decorative' => true, 'size' => 'normal']],
         'catalogue.course-grid' => ['template' => 'catalogue/course-grid', 'defaults' => ['courses' => []]],
         // Bundles as bundles (owner, 2026-11-07, the approved mockup: "it needs to be obvious they are bundles not courses"):
         // their own cards, three to a row, or their own list (view 'list'), in the catalogue and on the Bundles page.
         'catalogue.bundles' => ['template' => 'catalogue/bundles', 'defaults' => ['bundles' => [], 'view' => 'grid']],
-        'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'courses' => [], 'catalogue_pagination' => []]],
+        'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'courses' => [], 'catalogue_pagination' => [], 'search' => []]],
         'catalogue.tag-browser' => ['template' => 'catalogue/tag-browser', 'defaults' => ['tags' => [], 'selected_slug' => '']],
         'catalogue.tag-chip' => ['template' => 'catalogue/tag-chip', 'defaults' => ['tag' => [], 'selected' => false, 'compact' => false]],
     ];
@@ -143,6 +143,10 @@ final class PlatformUi
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
         ];
         if ($component === 'overlay.accordion-section') {
+            // A picture is one on this site, by its path: never another site's or a script's.
+            if (!is_string($values['picture']) || ($values['picture'] !== '' && preg_match('#^/(?!/)[A-Za-z0-9/_.?=&-]+$#', $values['picture']) !== 1)) {
+                throw new InvalidArgumentException('An accordion picture is a path on this site.');
+            }
             $enums['workspace'] = ['', 'admin', 'account', 'company', 'library'];
             $enums['summary_tone'] = ['', 'success', 'danger', 'neutral'];
         }

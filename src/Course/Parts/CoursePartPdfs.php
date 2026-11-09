@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course\Parts;
 
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Document\DocumentPdfRenderer;
 use RuntimeException;
 
@@ -32,8 +33,19 @@ final class CoursePartPdfs
     /** The parts a learner can download as a PDF. */
     public const PRINTABLE = ['lesson', 'summary', 'review', 'flashcards', 'practical'];
 
-    public function __construct(private readonly DocumentPdfRenderer $pdfs, private readonly string $storageRoot)
+    public function __construct(private readonly DocumentPdfRenderer $pdfs, private readonly string $storageRoot, private readonly ?SiteLogo $siteLogo = null)
     {
+    }
+
+    /**
+     * The site logo for the top of the page (owner, 2026-11-09), or null without one. It is part of the page, so a new
+     * logo makes a new file.
+     *
+     * @return array{src:string,width_mm:float,height_mm:float}|null
+     */
+    public function logo(): ?array
+    {
+        return $this->siteLogo?->forPdf(40, 12);
     }
 
     /** @param array<string,mixed> $node a structure row */

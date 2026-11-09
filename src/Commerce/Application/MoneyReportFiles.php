@@ -27,6 +27,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Configuration\SiteMode;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Document\DocumentPdfRenderer;
 use CattoLearning\View\ThemeRenderer;
@@ -54,6 +55,7 @@ final class MoneyReportFiles
         private readonly ThemeRenderer $view,
         private readonly SiteOwner $owner,
         private readonly SiteMode $site,
+        private readonly ?SiteLogo $logo = null,
     ) {
     }
 
@@ -91,7 +93,7 @@ final class MoneyReportFiles
     {
         $demo = $this->site->isDemo();
 
-        return $this->view->renderFragment('partials/admin/money-report-pdf', ['report' => $report, 'trading_name' => $this->owner->value('trading_name'), 'page_total' => $pageTotal,
+        return $this->view->renderFragment('partials/admin/money-report-pdf', ['report' => $report, 'trading_name' => $this->owner->value('trading_name'), 'page_total' => $pageTotal, 'pdf_logo' => $this->logo?->forPdf(45, 14),
             'report_demo' => $demo, 'report_demo_heading' => $demo ? $this->site->heading() : '', 'report_demo_notice' => $demo ? $this->site->notice() : '']);
     }
 

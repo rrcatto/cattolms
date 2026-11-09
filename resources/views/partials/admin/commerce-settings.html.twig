@@ -4,6 +4,8 @@
 	already placed keep the values they were placed with. Durations are lengths of time written the one
 	way (Support\Duration, owner 2026-10-26): y, w, d, h, m (minutes) and s, in that order, such as 3y,
 	4w2d, 1h30m or 90s, each field saying so. commerce_fields comes from CommerceSettingsController::fieldsView().
+	commerce_only names the one section to draw (fees, references, wallet or orders), so Settings places each where the
+	owner arranged it (owner, 2026-11-09); without it all four are drawn.
 #}
 {% set fields = commerce_fields %}
     {% set sections = [
@@ -12,7 +14,7 @@
         {key: 'wallet', heading: 'Commerce: wallet credit', summary: 'How long credit lasts and when the reminder is sent.'},
         {key: 'orders', heading: 'Commerce: orders and refunds', summary: 'The refund window, unpaid order cancellation and payment links.'}
     ] %}
-        {% for section in sections %}
+        {% for section in sections|filter(s => commerce_only|default('') in ['', s.key]) %}
         {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: section.heading, summary: section.summary, id: 'commerce-settings-' ~ section.key, open: settings_open_section|default('') in ['commerce-' ~ section.key, 'commerce']})} %}{% block body %}
             <form action="/admin/settings/commerce/{{ section.key }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
             {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}

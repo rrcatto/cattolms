@@ -22,6 +22,9 @@ issued from then on are drawn in it, and documents already issued keep the versi
 save is audited (commerce.document_design_updated) with the versions it made.
 
 Changelog:
+2026/11/09 SAST
+- The logo the documents print is the site logo, their own or none (logo_choice); followSiteLogo() publishes new versions
+  when the site logo changes and the design prints it.
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -30,6 +33,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Document;
 
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Course\Certificate\CertificateImage;
 use CattoLearning\Document\DocumentAssetRepository;
 use CattoLearning\Document\DocumentBusinessData;
@@ -60,6 +64,7 @@ final class FinancialDocumentDesignService
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         ?\Closure $isUploadedFile = null,
+        private readonly ?SiteLogo $siteLogo = null,
     ) {
         $this->isUploadedFile = $isUploadedFile ?? static fn(string $path): bool => is_uploaded_file($path);
     }
@@ -122,14 +127,17 @@ final class FinancialDocumentDesignService
         } catch (InvalidArgumentException $refused) {
             $errors[] = $refused->getMessage();
         }
+        $uploaded = $logo !== null;
         if ($logo === null && !isset($post['remove_logo'])) {
             $logo = $this->stored((string) ($post['logo_asset'] ?? ''));
         }
+        // Uploading a logo of its own means printing it; otherwise the choice made, the site logo when none is sent.
+        $choice = $uploaded ? 'own' : (string) ($post['logo_choice'] ?? 'site');
         $notes = [];
         foreach (FinancialDocumentDesign::types() as $type) {
             $notes[$type->value] = trim(str_replace(["\r\n", "\r"], "\n", (string) ($post['note_' . $type->value] ?? '')));
         }
-        $design = new FinancialDocumentDesign($logo, (string) ($post['typeface'] ?? 'dejavu'), strtoupper(trim((string) ($post['colour'] ?? FinancialDocumentDesign::STANDARD_COLOUR))), $notes);
+        $design = new FinancialDocumentDesign($logo, (string) ($post['typeface'] ?? 'dejavu'), strtoupper(trim((string) ($post['colour'] ?? FinancialDocumentDesign::STANDARD_COLOUR))), $notes, $choice);
         return ['design' => $design, 'errors' => $errors];
     }
 
@@ -172,24 +180,46 @@ final class FinancialDocumentDesignService
         if ($errors !== []) {
             return ['errors' => array_values(array_unique($errors)), 'design' => $form['design'], 'changed' => []];
         }
-        $changed = $this->transactions->run(function () use ($form, $actorId): array {
+        return ['errors' => [], 'design' => $form['design'], 'changed' => $this->publish($form['design'], $actorId, 'commerce.document_design_updated')];
+    }
+
+    /**
+     * After the site logo changes (SiteLogoFollowers): a design that prints it publishes new versions with the new one, so
+     * documents issued from now on carry it and those already issued keep theirs.
+     *
+     * @return list<string> the documents given a new version
+     */
+    public function followSiteLogo(int $actorId): array
+    {
+        $design = $this->design();
+        return $design->logoChoice === 'site' ? $this->publish($design, $actorId, 'commerce.document_design_site_logo') : [];
+    }
+
+    /**
+     * A new version of each template the design changes, in one transaction, and the Activity log line.
+     *
+     * @return list<string>
+     */
+    private function publish(FinancialDocumentDesign $design, int $actorId, string $event): array
+    {
+        $printed = $design->forPrinting($this->siteLogo?->image());
+        return $this->transactions->run(function () use ($design, $printed, $actorId, $event): array {
             $current = $this->templates->current(true);
             $versions = [];
             foreach (FinancialDocumentDesign::types() as $type) {
                 $row = $current[$type->value];
-                $compiled = $this->compiler->compile($form['design'], $type);
+                $compiled = $this->compiler->compile($printed, $type);
                 // The HTML and CSS hold everything the design sets, so unchanged ones draw the same document.
                 if ($compiled['html'] === (string) $row['html'] && $compiled['css'] === (string) $row['css']) {
                     continue;
                 }
-                $versions[$type->value] = $this->templates->publish((int) $row['id'], $type, $form['design']->toArray(), $compiled['html'], $compiled['css'], $compiled['settings'], $actorId);
+                $versions[$type->value] = $this->templates->publish((int) $row['id'], $type, $design->toArray(), $compiled['html'], $compiled['css'], $compiled['settings'], $actorId);
             }
             if ($versions !== []) {
-                $this->audit->record($actorId, 'commerce.document_design_updated', ['versions' => $versions]);
+                $this->audit->record($actorId, $event, ['versions' => $versions]);
             }
             return array_keys($versions);
         });
-        return ['errors' => [], 'design' => $form['design'], 'changed' => $changed];
     }
 
     /** A document of the design for a sample order, as a PDF. */
@@ -227,7 +257,7 @@ final class FinancialDocumentDesignService
      */
     private function draw(FinancialDocumentDesign $design, DocumentType $type, string $sample): RenderedDocument
     {
-        $compiled = $this->compiler->compile($design, $type);
+        $compiled = $this->compiler->compile($design->forPrinting($this->siteLogo?->image()), $type);
         $example = FinancialDocumentSamples::for($sample, $type);
         $data = FinancialDocumentDataBuilder::assemble($type, $example['order'], $example['snapshot'], $example['number'], $example['issued_at'],
             $example['context'], $this->business->values(), $this->builder->bank());

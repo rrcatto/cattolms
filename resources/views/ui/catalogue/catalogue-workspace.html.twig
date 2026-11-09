@@ -1,6 +1,7 @@
 {% set workspace = props.workspace %}
 {% set courses = props.courses %}
 {% set catalogue_pagination = props.catalogue_pagination %}
+{% set search = props.search %}
 {#
 	The bundles have a section of their own between the page's head and the courses (owner, 2026-11-07, the approved
 	mockup: "each section (bundles and courses) should page independently of the other and should not affect the other"):
@@ -44,6 +45,11 @@
 					{% endif %}
 {% endset %}
 {% set courses_body %}
+					{# The courses' search heads their own section (owner, 2026-11-09: it was "too far away from the courses to see
+					   the effect of typing in a search term"), so what it finds shows right under it. The page is morphed as the
+					   reader types, and the box itself is left alone (ds_morph_skip), so a letter typed while an answer is on its
+					   way is never put back. #}
+					{% if search %}<div id="catalogue-search" class="cl-catalogue-search">{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: search.value, ds_action: search.action, ds_push_url: true, ds_swap: 'innerMorph', ds_include: '#catalogue-state', ds_morph_skip: true} %}</div>{% endif %}
 					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
 					{# With bundles, the courses' List and Grid are in their own head, at the right, as the bundles' are (owner, 2026-11-07). #}
 					{% if not bundles and courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: in_place ? 'innerMorph' : 'innerHTML'} %}</div>{% endif %}

@@ -13,7 +13,7 @@
 	{% set ph_kicker = 'Mailing · Templates' %}
 	{% set ph_title = template.name %}
 	{% set ph_lead = 'Change the look on the left and see it on the right with a sample. Messages and digests drawn in this template look like this once it is saved.' %}
-	{% set ph_badges %}{% if template.default_for_messages %}{{ ui('feedback.badge', {label: 'Default for messages', tone: 'success'}) }} {% endif %}{% if template.default_for_digest %}{{ ui('feedback.badge', {label: 'Default for the digest', tone: 'success'}) }} {% endif %}{{ ui('feedback.badge', {label: template.mode == 'html' ? 'Written in HTML' : 'Designed', tone: 'neutral'}) }} {{ ui('feedback.badge', {label: template.used == 1 ? 'Used by 1 message or digest' : 'Used by ' ~ template.used ~ ' messages and digests', tone: 'neutral'}) }}{% endset %}
+	{% set ph_badges %}{% if template.default_for_messages %}{{ ui('feedback.badge', {label: 'Default for messages', tone: 'success'}) }} {% endif %}{% if template.default_for_digest %}{{ ui('feedback.badge', {label: 'Default for the digest', tone: 'success'}) }} {% endif %}{% if template.default_for_account %}{{ ui('feedback.badge', {label: 'Account and order emails', tone: 'success'}) }} {% endif %}{{ ui('feedback.badge', {label: template.mode == 'html' ? 'Written in HTML' : 'Designed', tone: 'neutral'}) }} {{ ui('feedback.badge', {label: template.used == 1 ? 'Used by 1 message or digest' : 'Used by ' ~ template.used ~ ' messages and digests', tone: 'neutral'}) }}{% endset %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{{ importmap() }}
 
@@ -36,7 +36,9 @@
 
 				<fieldset class="cl-template-group">
 					<legend class="h6">Header</legend>
-					<p class="help">Used when the template is designed here. The logo and the header picture are uploaded below.</p>
+					<p class="help">Used when the template is designed here. The template's own logo and the header picture are uploaded below.</p>
+					{% include '@platform/partials/admin/logo-choice.html.twig' with {lc: {name: 'design[logo_source]', value: d.logo_source, site_logo: site_logo, what: 'emails in this template', id: 'design-logo-source',
+						own_note: 'One for this template alone, uploaded under Logo and header picture.', none_note: 'The site\'s name in the header\'s text colour.'}} %}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Logo size', for: 'design-logo-size'})} %}{% block control %}<select class="cl-input" id="design-logo-size" name="design[logo_size]" {{ ui_field_attrs(props) }}>{% for key, px in logo_sizes %}<option value="{{ key }}"{{ d.logo_size == key ? ' selected' : '' }}>{{ key|capitalize }} ({{ px }} pixels wide at most)</option>{% endfor %}</select>{% endblock %}{% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Logo sits', for: 'design-align'})} %}{% block control %}<select class="cl-input" id="design-align" name="design[align]" {{ ui_field_attrs(props) }}>{% for key, label in alignments %}<option value="{{ key }}"{{ d.align == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
@@ -112,17 +114,18 @@
 			<div class="cl-mailing-choices">
 				{{ ui('action.link', {label: 'Sample message', variant: sample == 'message' ? 'primary' : 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ (phone ? '?width=phone' : '') ~ '#preview', icon: 'action-email'}) }}
 				{{ ui('action.link', {label: 'Sample digest', variant: sample == 'digest' ? 'primary' : 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ '?sample=digest' ~ (phone ? '&width=phone' : '') ~ '#preview', icon: 'action-view-list'}) }}
+				{{ ui('action.link', {label: 'Sample account email', variant: sample == 'account' ? 'primary' : 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ '?sample=account' ~ (phone ? '&width=phone' : '') ~ '#preview', icon: 'action-email'}) }}
 				{{ ui('action.link', {label: phone ? 'As on a computer' : 'As on a phone', variant: 'secondary', size: 'small', href: '/mailing/templates/' ~ template.id ~ '?sample=' ~ sample ~ (phone ? '' : '&width=phone') ~ '#preview', icon: 'action-preview'}) }}
 			</div>
 			<iframe class="cl-mailing-preview{{ phone ? ' cl-mailing-preview--phone' : '' }}" name="template-preview" src="/mailing/templates/{{ template.id }}/preview?sample={{ sample }}" title="Preview of {{ template.name }} with a sample {{ sample }}" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
 		{% endblock %}{% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'pictures'})} %}{% block surface_body %}
-			{{ ui('layout.section-head', {heading: 'Logo and header picture', summary: 'PNG, JPEG or GIF. Without a logo, the site\'s name is shown in the header\'s text colour.'}) }}
+			{{ ui('layout.section-head', {heading: 'Logo and header picture', summary: 'PNG, JPEG or GIF. The logo here is the template\'s own: uploading one chooses it. The site logo is uploaded at Settings, Site Owner.'}) }}
 			{% for slot, label in {logo: 'Logo', header_picture: 'Header picture'} %}
 				{% set url = slot == 'logo' ? logo_url : header_picture_url %}
 				<h3 class="h6">{{ label }}</h3>
-				{% if url %}<p><img class="cl-mailing-picture" src="{{ url }}" alt="The template's {{ label|lower }}" width="240"></p>{% else %}<p class="small cl-text-secondary">{{ slot == 'logo' ? 'None: the site\'s name stands in its place.' : 'None.' }}</p>{% endif %}
+				{% if url %}<p><img class="cl-mailing-picture" src="{{ url }}" alt="The template's {{ label|lower }}" width="240"></p>{% else %}<p class="small cl-text-secondary">{{ slot == 'logo' ? 'None of its own.' : 'None.' }}</p>{% endif %}
 				{% if can_manage %}
 				<form action="/mailing/templates/{{ template.id }}/picture" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="slot" value="{{ slot }}">
@@ -151,19 +154,20 @@
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send it to', for: 'proof-to'})} %}{% block control %}<input class="cl-input" type="email" id="proof-to" name="email" value="{{ proof_to }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'With', for: 'proof-sample'})} %}{% block control %}<select class="cl-input" id="proof-sample" name="sample" {{ ui_field_attrs(props) }}><option value="message"{{ sample == 'message' ? ' selected' : '' }}>A sample message</option><option value="digest"{{ sample == 'digest' ? ' selected' : '' }}>A sample digest</option></select>{% endblock %}{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'With', for: 'proof-sample'})} %}{% block control %}<select class="cl-input" id="proof-sample" name="sample" {{ ui_field_attrs(props) }}><option value="message"{{ sample == 'message' ? ' selected' : '' }}>A sample message</option><option value="digest"{{ sample == 'digest' ? ' selected' : '' }}>A sample digest</option><option value="account"{{ sample == 'account' ? ' selected' : '' }}>A sample account email</option></select>{% endblock %}{% endembed %}
 				{% endblock %}{% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send the proof', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}{% endembed %}
 			</form>
 		{% endblock %}{% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'use'})} %}{% block surface_body %}
-			{{ ui('layout.section-head', {heading: 'Where it is used', summary: 'One template is the default for messages and one for the digest. A message may choose another.'}) }}
+			{{ ui('layout.section-head', {heading: 'Where it is used', summary: 'One template is the default for messages, one for the digest and one for account and order emails: sign-in links, order confirmations, receipts and the rest. A message may choose another.'}) }}
 			<div class="cl-mailing-choices">
 				{% if not template.default_for_messages %}<form action="/mailing/templates/{{ template.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="messages">{{ ui('action.button', {label: 'Make it the default for messages', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
 				{% if not template.default_for_digest %}<form action="/mailing/templates/{{ template.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="digest">{{ ui('action.button', {label: 'Make it the default for the digest', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
+				{% if not template.default_for_account %}<form action="/mailing/templates/{{ template.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="for" value="account">{{ ui('action.button', {label: 'Use it for account and order emails', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>{% endif %}
 				<form action="/mailing/templates/{{ template.id }}/copy" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Copy this template', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-copy'}) }}</form>
-				{% if not template.default_for_messages and not template.default_for_digest %}<form action="/mailing/templates/{{ template.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete this template', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete ' ~ template.name ~ '? Messages that chose it will use the default for messages.', icon: 'action-remove'}) }}</form>{% endif %}
+				{% if not template.default_for_messages and not template.default_for_digest and not template.default_for_account %}<form action="/mailing/templates/{{ template.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete this template', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete ' ~ template.name ~ '? Messages that chose it will use the default for messages.', icon: 'action-remove'}) }}</form>{% endif %}
 			</div>
 		{% endblock %}{% endembed %}
 		{% endif %}

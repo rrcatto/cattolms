@@ -3,7 +3,8 @@
 	kind, method, direction and account, searched by name, email, account reference, order number or
 	reference, totalled for what matches, sorted and paged like every Administration table. Each row is
 	whose account first, then what happened as one sentence (MoneyRecords::ledgerSentence), with money in
-	and money out in their own columns (owner, 2026-10-18). A row opens its own page.
+	and money out in their own columns (owner, 2026-10-18). A row opens its own page. Every line the filters match
+	downloads, oldest first, as a PDF or an Excel file (owner, 2026-11-08; LedgerFiles).
 #}
 {% extends layout %}
 {% block page_body %}
@@ -31,7 +32,12 @@
 		</form>
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Totals', summary: filtered ? 'What the ' ~ totals.entries ~ ' lines that match add up to.' : 'What all ' ~ totals.entries ~ ' lines add up to.'}) }}
+		{{ ui('layout.section-head', {heading: 'Totals', summary: (filtered ? 'What the ' ~ totals.entries ~ ' lines that match add up to.' : 'What all ' ~ totals.entries ~ ' lines add up to.') ~ ' Download them, oldest first, as a PDF or an Excel file.'}) }}
+		{# Every line the filters match, as a file (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"). #}
+		<div class="cl-money-period">
+			{{ ui('action.link', {label: 'Download PDF', variant: 'primary', size: 'normal', href: downloads.pdf, icon: 'action-download'}) }}
+			{{ ui('action.link', {label: 'Download Excel', variant: 'secondary', size: 'normal', href: downloads.xlsx, icon: 'action-download'}) }}
+		</div>
 		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}{% block body %}
 			{{ ui('data.stat-card', {value: totals.money_in_label, label: 'Money in', note: 'Payments received'}) }}
 			{{ ui('data.stat-card', {value: totals.money_out_label, label: 'Money out', note: 'Refunds and payment fees'}) }}

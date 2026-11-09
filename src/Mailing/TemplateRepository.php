@@ -11,6 +11,8 @@ Description:
 The mailing templates (owner, 2026-10-28, decision 5B), each with how many messages and digests use it.
 
 Changelog:
+2026/11/09 SAST
+- The default for account and order emails (default_for_account).
 2026/10/28 SAST
 - Created.
 */
@@ -23,7 +25,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 
 final class TemplateRepository
 {
-    private const COLUMNS = 't.id, t.name, t.mode, t.design, t.html, t.text_mode, t.text_part, t.default_for_messages, t.default_for_digest, t.updated_at,
+    private const COLUMNS = 't.id, t.name, t.mode, t.design, t.html, t.text_mode, t.text_part, t.default_for_messages, t.default_for_digest, t.default_for_account, t.updated_at,
         (SELECT COUNT(*) FROM mailing_campaigns c WHERE c.template_id = t.id) AS used';
 
     public function __construct(private readonly Database $db)
@@ -34,7 +36,7 @@ final class TemplateRepository
     public function all(): array
     {
         return array_map(self::decode(...), $this->db->fetchAllAssociative(
-            'SELECT ' . self::COLUMNS . ' FROM mailing_templates t ORDER BY t.default_for_messages DESC, t.default_for_digest DESC, lower(t.name), t.id'
+            'SELECT ' . self::COLUMNS . ' FROM mailing_templates t ORDER BY t.default_for_messages DESC, t.default_for_digest DESC, t.default_for_account DESC, lower(t.name), t.id'
         ));
     }
 
@@ -46,10 +48,10 @@ final class TemplateRepository
         return $row === false ? null : self::decode($row);
     }
 
-    /** @return array<string,mixed>|null the default for messages or for the digest */
+    /** @return array<string,mixed>|null the default for messages, for the digest or for account and order emails */
     public function defaultFor(string $kind): ?array
     {
-        $row = $this->db->fetchAssociative('SELECT ' . self::COLUMNS . ' FROM mailing_templates t WHERE ' . ($kind === 'digest' ? 't.default_for_digest' : 't.default_for_messages') . ' LIMIT 1');
+        $row = $this->db->fetchAssociative('SELECT ' . self::COLUMNS . ' FROM mailing_templates t WHERE t.' . self::column($kind) . ' LIMIT 1');
 
         return $row === false ? null : self::decode($row);
     }
@@ -81,10 +83,10 @@ final class TemplateRepository
         );
     }
 
-    /** Makes one template the default for messages or for the digest, and no other. */
+    /** Makes one template the default for messages, for the digest or for account and order emails, and no other. */
     public function makeDefault(int $id, string $kind, ?int $userId): void
     {
-        $column = $kind === 'digest' ? 'default_for_digest' : 'default_for_messages';
+        $column = self::column($kind);
         $this->db->executeStatement("UPDATE mailing_templates SET $column = FALSE WHERE $column AND id <> :id", ['id' => $id]);
         $this->db->executeStatement("UPDATE mailing_templates SET $column = TRUE, updated_by_user_id = :user, updated_at = NOW() WHERE id = :id", ['id' => $id, 'user' => $userId]);
     }
@@ -92,6 +94,11 @@ final class TemplateRepository
     public function delete(int $id): void
     {
         $this->db->executeStatement('DELETE FROM mailing_templates WHERE id = :id', ['id' => $id]);
+    }
+
+    private static function column(string $kind): string
+    {
+        return match ($kind) { 'digest' => 'default_for_digest', 'account' => 'default_for_account', default => 'default_for_messages' };
     }
 
     /**
@@ -108,6 +115,7 @@ final class TemplateRepository
             'html' => (string) $row['html'], 'text_mode' => (string) $row['text_mode'], 'text_part' => (string) $row['text_part'],
             'default_for_messages' => in_array($row['default_for_messages'], [true, 't', 1, '1'], true),
             'default_for_digest' => in_array($row['default_for_digest'], [true, 't', 1, '1'], true),
+            'default_for_account' => in_array($row['default_for_account'] ?? false, [true, 't', 1, '1'], true),
             'updated_at' => (string) $row['updated_at'], 'used' => (int) $row['used'],
         ];
     }

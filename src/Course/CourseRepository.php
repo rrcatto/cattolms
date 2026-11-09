@@ -856,7 +856,7 @@ final class CourseRepository
     public function browsableCategory(string $slug): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT cc.id, cc.parent_id, cc.level, cc.name, cc.slug, cc.description,
+            "SELECT cc.id, cc.parent_id, cc.level, cc.name, cc.slug, cc.description, cc.search_title, cc.search_description,
                     (SELECT COUNT(*)::int FROM courses dc
                       WHERE dc.status = 'published' AND " . self::inBranchOf('dc', 'cc.id')
                         . '' . ") AS descendant_course_count

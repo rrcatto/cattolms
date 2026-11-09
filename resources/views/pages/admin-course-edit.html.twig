@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {# The Page layout tab's controllers (page_layout_choice and page_layout, owner 2026-10-30 and 2026-11-01). #}
-{% if active_tab == 'page-layout' %}{{ importmap() }}{% endif %}
+{% if active_tab in ['page-layout', 'search'] %}{{ importmap() }}{% endif %}
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
 	{% set ph_kicker = course.status|capitalize ~ ' · approval ' ~ course.publication_approval_status %}
@@ -322,6 +322,16 @@
 			{% if active_tab == 'page-layout' %}
 				{{ ui('layout.section-head', {heading: 'Page layout', heading_level: 2, summary: 'Which layout this course\'s catalogue page uses under its header. The header itself stays as it is.'}) }}
 				{% include '@platform/partials/admin/course-page-layout-tab.html.twig' with {pl: page_layout} %}
+			{% endif %}
+
+			{# What search engines are told about the course (the SEO brief, 2026-11-09; Search\SearchOverrides). #}
+			{% if active_tab == 'search' and search_fields %}
+				{{ ui('layout.section-head', {heading: 'Search engines', heading_level: 2, summary: 'What a search result and a shared link say about the course\'s page. Leave a field empty for the course\'s own words.' ~ (course.status != 'published' ? ' Search engines see the page only once the course is published.' : '')}) }}
+				<form action="{{ course_admin_url(course, '/search') }}" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% include '@platform/partials/admin/search-fields.html.twig' with {sf: search_fields} only %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save for search engines', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+				</form>
 			{% endif %}
 
 			{% if active_tab == 'grades' %}

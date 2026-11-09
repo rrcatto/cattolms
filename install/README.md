@@ -1,5 +1,9 @@
 # Installing CattoLMS
 
+**LMS:** 1.1.2 · **Updated:** 2026-11-08
+
+Keep this guide to what the installer does now, and under 150,000 characters: when something here stops being true, change it or take it out. The Git history keeps every earlier version.
+
 `install.sh` puts a clean installation of CattoLMS on a Linux server, running with the server's own PHP. Run it as root. After it finishes, Administration → System → Setup takes you through the rest of the setup in the browser.
 
 To run the site in rootless Podman containers instead (its own user, the code read-only, behind the server's own web server, database and mail), follow [deploy/podman/README.md](../deploy/podman/README.md).
@@ -48,16 +52,16 @@ It then does the following:
 3. Prepares the database named in `.env`:
    - creates it, when PostgreSQL runs on this server and it is missing;
    - empties it, when it already holds tables. This is a clean installation, so every table and everything in it is deleted. The installer asks you to type the username first.
-4. Builds the database's tables and installs the themes. The site starts on Saharan Sunset, the theme that comes with the code.
+4. Builds the database's tables (the baseline, then every migration after it) and installs the themes. The site starts on Saharan Sunset, the theme that comes with the code.
 5. Copies the web files to `/home/<username>/public_html` and makes `storage` and `themes` there, all owned by the site's user.
 6. Points `/usr/local/lib/php/cattolms/current` at the new version.
-7. Runs the scheduler every minute from cron, in `/etc/cron.d/cattolms-<username>`. The scheduler sends order emails, cancels unpaid orders, expires wallet credit, recalculates course popularity and does the daily clean-up.
+7. Runs the scheduler every minute from cron, in `/etc/cron.d/cattolms-<username>`. The scheduler runs every scheduled job: order emails and unpaid orders, news emails, site protection, messages by Telegram, the monthly money report, course popularity, review requests, the course video check, the sign-up check lists, the log archive and the daily clean-up ([docs/OPERATIONS.md](../docs/OPERATIONS.md), "Scheduled work").
 
 ### Options
 
 | Option | Meaning |
 |---|---|
-| `--version 1.1.0` | Install this version. The default is the newest release. |
+| `--version 1.1.2` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -89,8 +93,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  1.1.0/                    the code of each installed version (root)
-  current -> 1.1.0          the version the site runs
+  1.1.2/                    the code of each installed version (root)
+  current -> 1.1.2          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

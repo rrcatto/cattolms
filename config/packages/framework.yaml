@@ -3,6 +3,11 @@ framework:
     # The platform validates APP_KEY itself in App::run() and refuses to start without a private
     # random value, so the same key is the framework secret rather than a second one to manage.
     http_method_override: false
+    # Whether search engines may list the site follows the site mode, not APP_ENV (owner, 2026-10-24: APP_ENV only says how the
+    # program runs; the SEO brief, 2026-11-09): a demo site's every response says noindex, nofollow
+    # (PlatformResponseHeadersListener), a live site's does not, in development as in production. Symfony's own header,
+    # added in debug, would hide a live site that runs in development.
+    disallow_search_engine_index: false
     trusted_hosts: ~
     php_errors:
         log: true

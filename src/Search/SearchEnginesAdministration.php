@@ -34,6 +34,8 @@ final class SearchEnginesAdministration
         private readonly AuditRepository $audit,
         private readonly SiteMode $site,
         private readonly LlmsTxt $llms,
+        private readonly ?SearchOverrides $overrides = null,
+        private readonly ?PageMetadata $metadata = null,
     ) {
     }
 
@@ -68,7 +70,38 @@ final class SearchEnginesAdministration
                 'sitemap' => !$this->site->isDemo() && $base !== null ? $base . '/sitemap.xml' : '',
                 'site' => $base === null ? '' : $base . '/',
             ],
+            // Each public page's own title and description (the SEO brief, 2026-11-09), with its previews.
+            'pages' => $this->pages(),
         ];
+    }
+
+    /**
+     * Each public page PublicPages lists, with ADMIN's own words and the previews.
+     *
+     * @return list<array{key:string,label:string,own:bool,fields:array<string,mixed>}>
+     */
+    private function pages(): array
+    {
+        if ($this->overrides === null || $this->metadata === null) return [];
+        $own = $this->overrides->pages();
+        $pages = [];
+        foreach (array_keys(PublicPages::PAGES) as $key) {
+            $mine = $own[$key];
+            $pages[] = ['key' => $key, 'label' => PublicPages::label($key), 'own' => $mine['title'] !== '' || $mine['description'] !== '',
+                'fields' => SearchOverrides::fields('page-search-' . $key, 'pages[' . $key . '][title]', 'pages[' . $key . '][description]', $mine, $this->metadata->pagePreview($key), $this->metadata->siteName())];
+        }
+        return $pages;
+    }
+
+    /**
+     * Saves the public pages' own titles and descriptions.
+     *
+     * @param array<string,mixed> $input pages[key][title], pages[key][description]
+     * @return list<string> the pages that changed
+     */
+    public function savePages(array $input, int $actorUserId): array
+    {
+        return $this->overrides?->savePages($input, $actorUserId) ?? [];
     }
 
     /** @param array<string,mixed> $input ai_crawlers, google, bing */

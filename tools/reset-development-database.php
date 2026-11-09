@@ -12,6 +12,9 @@ Description:
 Provides the Catto Learning command-line reset development database utility used for development, validation, diagnostics or release management.
 
 Changelog:
+2026/11/08 SAST
+- Reads the .env that CATTO_LEARNING_ENV_FILE names first, as phinx.php and CliBootstrap do, so the development pod
+  no longer has to mount a second copy beside the code (which left an empty code/.env on the host).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -26,11 +29,12 @@ declare(strict_types=1);
 use Dotenv\Dotenv;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-$deploymentRoot = dirname(dirname(__DIR__));
-if (!is_file($deploymentRoot . '/.env')) {
-    throw new RuntimeException('Deployment .env is missing: ' . $deploymentRoot . '/.env');
+// The site's .env as CATTO_LEARNING_ENV_FILE names it, as phinx.php and the console read it, else beside the code.
+$envFile = (string) (getenv('CATTO_LEARNING_ENV_FILE') ?: dirname(dirname(__DIR__)) . '/.env');
+if (!is_file($envFile)) {
+    throw new RuntimeException('Deployment .env is missing: ' . $envFile);
 }
-Dotenv::createImmutable($deploymentRoot)->load();
+Dotenv::createImmutable(dirname($envFile), basename($envFile))->load();
 
 $dbName = trim((string) ($_ENV['DB_NAME'] ?? ''));
 $confirmation = trim((string) ($argv[1] ?? ''));

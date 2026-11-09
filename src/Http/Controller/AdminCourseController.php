@@ -101,7 +101,9 @@ final class AdminCourseController extends BaseController
         private readonly \CattoLearning\Course\CoursePageLayouts $pageLayouts,
         private readonly \CattoLearning\Course\CourseQuickEdit $quickEdit,
         private readonly \CattoLearning\Course\CourseFile $courseFile,
-        private readonly \CattoLearning\Course\CataloguePackage $cataloguePackage
+        private readonly \CattoLearning\Course\CataloguePackage $cataloguePackage,
+        private readonly \CattoLearning\Search\SearchOverrides $searchOverrides,
+        private readonly \CattoLearning\Search\PageMetadata $searchMetadata
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -186,6 +188,7 @@ final class AdminCourseController extends BaseController
             'tab_url' => CourseAddress::admin($course, $activeTab === 'overview' ? '' : '?tab=' . $activeTab),
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
             'page_layout' => $activeTab === 'page-layout' ? $this->pageLayoutView($courseId) : null,
+            'search_fields' => $activeTab === 'search' ? $this->searchFields($courseId, $course) : null,
             'category_picker' => null,
             'category_places' => null,
             'tag_options' => [],
@@ -228,6 +231,8 @@ final class AdminCourseController extends BaseController
         'css' => ['CSS', null],
         // The course's catalogue page, block by block (Page Builder, owner 2026-10-30).
         'page-layout' => ['Page layout', null],
+        // Its own title and description for search engines, and whether they are asked to leave it out (the SEO brief, 2026-11-09).
+        'search' => ['Search engines', null],
         'grades' => ['Grades', null],
         'publication' => ['Publication', null],
         'history' => ['History', null],
@@ -455,6 +460,33 @@ final class AdminCourseController extends BaseController
         }, $this->courseUrl($courseId));
     }
 
+
+    /** The course's own title and description for search engines, and whether they are asked to leave it out (the SEO brief, 2026-11-09). */
+    #[Route('/admin/courses/{code}/search', name: 'admin_course_search', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
+    public function search(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $courseId = $this->courseId();
+        $course = $this->requireManagedCourse($courseId);
+        $back = CourseAddress::admin($course, '?tab=search');
+        return $this->handle(function () use ($user, $courseId, $back): void {
+            $this->searchOverrides->saveCourse($courseId, ['title' => $_POST['title'] ?? '', 'description' => $_POST['description'] ?? '', 'hidden' => $_POST['hidden'] ?? ''], $user->id);
+            $this->flash('success', 'What search engines are told about the course was saved.');
+            $this->redirect($back);
+        }, $back);
+    }
+
+    /**
+     * @param array<string,mixed> $course
+     * @return array<string,mixed>
+     */
+    private function searchFields(int $courseId, array $course): array
+    {
+        $own = $this->searchOverrides->course($courseId);
+        $preview = $this->searchMetadata->coursePreview(['search_title' => $own['title'], 'search_description' => $own['description']] + $course);
+        return \CattoLearning\Search\SearchOverrides::fields('course-search', 'title', 'description', $own, $preview, $this->searchMetadata->siteName(), $own['hidden']);
+    }
 
     #[Route('/admin/courses/{code}/people', name: 'admin_course_update_people', requirements: ['code' => CourseAddress::REQUIREMENT], methods: ['POST'])]
     public function updatePeople(): Response

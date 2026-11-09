@@ -15,6 +15,8 @@ Only the price is ever charged: the was price never reaches a total, a discount 
 The saving's percentage is rounded down, so it never says more than the purchaser saves.
 
 Changelog:
+2026/11/09 SAST
+- percentOff(), which a bundle's card, its form and labels() share.
 2026/10/20 SAST
 - Created.
 */
@@ -59,12 +61,22 @@ final class WasPrice
             return ['was_label' => null, 'saving_label' => null, 'saving_percent' => null];
         }
         $saving = $was - $priceMinor;
-        $percent = intdiv($saving * 100, $was);
+        $percent = (int) self::percentOff($priceMinor, $was);
         return [
             'was_label' => Money::strictMinorUnits($was, $currency)->format(),
             'saving_label' => Money::strictMinorUnits($saving, $currency)->format() . ($percent > 0 ? ' (' . $percent . '%)' : ''),
             'saving_percent' => $percent,
         ];
+    }
+
+    /**
+     * How much lower the price is than the higher amount it is compared with, as a whole percentage rounded down, so it
+     * never says more than the purchaser saves: 2500 against 5000 is 50, 2600 against 5000 is 48. Null when the price is
+     * not lower.
+     */
+    public static function percentOff(int $priceMinor, int $higherMinor): ?int
+    {
+        return $higherMinor > 0 && $higherMinor > $priceMinor ? intdiv(($higherMinor - $priceMinor) * 100, $higherMinor) : null;
     }
 
     /** The amount a pricing form shows for a stored was price: "2400.00", or empty. */

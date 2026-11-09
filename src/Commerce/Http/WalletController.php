@@ -8,6 +8,7 @@ use CattoLearning\Support\Address\CompanyAddress;
 use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Commerce\Application\LedgerFiles;
 use CattoLearning\Commerce\Application\MoneyRecords;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Settings\CommerceSettings;
@@ -30,7 +31,9 @@ use Symfony\Component\Routing\Attribute\Route;
  * Wallet pages (owner, 2026-10-17): My Wallet (Account > Courses), the company's Wallet (Company), and
  * for ADMIN every wallet with its statement and corrections. A wallet shows its balance, the credit that
  * expires soon and a statement of every movement with the balance after it. Wallet credit is spent on
- * courses and company credits and is never paid out as cash; it earns no interest.
+ * courses and company credits and is never paid out as cash; it earns no interest. The statement downloads as a PDF or
+ * an Excel file for any dates (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"), each wallet's
+ * from its own page and only by whoever may see that page (LedgerFiles).
  */
 final class WalletController extends BaseController
 {
@@ -38,7 +41,7 @@ final class WalletController extends BaseController
         private readonly WalletService $wallets, private readonly WalletRepository $walletRecords,
         private readonly CommerceSettings $settings, private readonly SelectedCompanyContext $companyContext,
         private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
-        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys)
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys, private readonly LedgerFiles $files)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -67,6 +70,47 @@ final class WalletController extends BaseController
             'title' => 'Wallet', 'active_nav' => 'company',
             'owner_name' => (string) ($context['company']['name'] ?? 'Company'), 'reference' => $this->records->companyAccountReference($companyId),
         ]);
+    }
+
+    /** My Wallet's statement for the form's dates, as a PDF or an Excel file. */
+    #[Route('/account/wallet/statement.{format}', name: 'account_wallet_statement', requirements: ['format' => 'pdf|xlsx'], methods: ['GET'])]
+    public function myStatement(): Response
+    {
+        $actor = $this->requirePermission('COMMERCE.WALLET.VIEW');
+        return $this->statementFile(WalletOwner::person($actor->id), $actor->displayName, $this->records->userAccountReference($actor->id), '/account/wallet');
+    }
+
+    /** The company's statement, for whoever may see its Wallet page. */
+    #[Route('/company/wallet/statement.{format}', name: 'company_wallet_statement', requirements: ['format' => 'pdf|xlsx'], methods: ['GET'])]
+    public function companyStatement(): Response
+    {
+        $actor = $this->requirePermission('COMPANY.WALLET.VIEW');
+        $context = $this->companyContext->resolve($actor);
+        $companyId = (int) $context['company_id'];
+        if ($companyId < 1) throw new RuntimeException('Select a company first.');
+        return $this->statementFile(WalletOwner::company($companyId), (string) ($context['company']['name'] ?? 'Company'), $this->records->companyAccountReference($companyId), '/company/wallet');
+    }
+
+    /** Any wallet's statement, from its page in Administration. */
+    #[Route('/admin/wallets/{type}/{reference}/statement.{format}', name: 'admin_wallet_statement', requirements: ['type' => 'person|company', 'reference' => PersonAddress::REQUIREMENT, 'format' => 'pdf|xlsx'], methods: ['GET'])]
+    public function walletStatement(): Response
+    {
+        $this->requirePermission('PLATFORM.WALLET.VIEW');
+        $owner = $this->ownerFromRoute();
+        return $this->statementFile($owner, $owner->isCompany() ? $this->records->companyName((int) $owner->companyId) : $this->records->userName((int) $owner->userId),
+            $owner->isCompany() ? $this->records->companyAccountReference((int) $owner->companyId) : $this->records->userAccountReference((int) $owner->userId), $this->walletAddress());
+    }
+
+    /** A statement as a file; a refusal (the dates the wrong way round, too many movements) goes back to the wallet's page and says why. */
+    private function statementFile(WalletOwner $owner, string $name, string $reference, string $page): Response
+    {
+        $format = $this->param('format');
+        $query = $this->request()->query->all();
+        return $this->handle(function () use ($owner, $name, $reference, $format, $query): Response {
+            $statement = $this->files->statement($owner, $name, $reference, $query, $format);
+            $bytes = $format === 'pdf' ? $this->files->statementPdf($statement) : $this->files->statementExcel($statement);
+            return new Response($bytes, 200, ['Content-Type' => LedgerFiles::FORMATS[$format], 'Content-Disposition' => 'attachment; filename="' . LedgerFiles::name($statement, $format) . '"', 'Cache-Control' => 'no-store']);
+        }, $page);
     }
 
     #[Route('/admin/wallets', name: 'admin_wallets', methods: ['GET'])]
@@ -143,6 +187,7 @@ final class WalletController extends BaseController
             'is_company' => $owner->isCompany(),
             'rows' => $statement['rows'],
             'statement_pagination' => PlatformAdministrationService::paginationPayload('statement', $pagination, $base, 'wallet movements'),
+            'statement_href' => $base . '/statement',
         ]);
     }
 

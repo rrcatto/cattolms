@@ -49,6 +49,19 @@ final class AdminSearchEnginesController extends BaseController
         }, self::SECTION);
     }
 
+    /** Each public page's own title and description for search engines (the SEO brief, 2026-11-09). */
+    #[Route('/admin/settings/search-engines/pages', name: 'admin_save_search_pages', methods: ['POST'])]
+    public function savePages(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $changed = $this->searchEngines->savePages($_POST, $user->id);
+            $this->flash('success', $changed === [] ? 'Nothing had changed.' : 'Saved what search engines are told about ' . implode(', ', $changed) . '.');
+            $this->redirect(self::SECTION);
+        }, self::SECTION);
+    }
+
     #[Route('/admin/settings/search-engines/share-pictures', name: 'admin_make_share_pictures', methods: ['POST'])]
     public function makeSharePictures(): Response
     {

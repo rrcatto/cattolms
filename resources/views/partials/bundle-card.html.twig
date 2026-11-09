@@ -8,7 +8,8 @@
 	how long its courses stay open; then View bundle at the bottom left, under a line (owner, 2026-11-07). In a row of
 	bundles every card is as tall as the row, the covers and everything under them at its foot; among course cards
 	(Favourites) it keeps its own height. Under the pointer it grows, lights up and pulses its saving (owner, 2026-11-08, the
-	approved mockup: "Border glow, scale-up and pulsing save badge"), drawn by catto-platform.css alone.
+	approved mockup: "Border glow, scale-up and pulsing save badge"), drawn by catto-platform.css alone. Beside what it saves,
+	a badge of its own says the saving's percentage (owner, 2026-11-09), rounded down; only the amount pulses.
 	bundle: a card as BundleService::card() gives it.
 #}
 {% set bundle_covers = bundle.course_covers|default([]) %}
@@ -34,7 +35,7 @@
 		{% if bundle.price_label %}<p class="cl-bundle-card-price">{% include '@platform/partials/price.html.twig' with {price: bundle} %}</p>{% endif %}
 	</div>
 	<div class="cl-bundle-card-terms">
-		{% if bundle.saving_badge or bundle.availability_badge %}<p class="cl-bundle-card-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
+		{% if bundle.saving_badge or bundle.availability_badge %}<p class="cl-bundle-card-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success'}) }}{% endif %}{% if bundle.saving_percent_badge|default(null) %} {{ ui('feedback.badge', {label: bundle.saving_percent_badge, tone: 'success'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info'}) }}{% endif %}</p>{% endif %}
 		{% if bundle.not_available %}<p class="cl-bundle-card-access">Not available now</p>{% elseif bundle.access_label %}<p class="cl-bundle-card-access">{{ bundle.access_label }} of access to every course</p>{% endif %}
 	</div>
 	<div class="cl-bundle-card-foot">

@@ -78,7 +78,9 @@ final class AdminCourseCategoryController extends BaseController
         private readonly CourseService $courses,
         private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
         private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
-        private readonly AddressKeyRepository $keys
+        private readonly AddressKeyRepository $keys,
+        private readonly \CattoLearning\Search\SearchOverrides $searchOverrides,
+        private readonly \CattoLearning\Search\PageMetadata $searchMetadata
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -162,7 +164,35 @@ final class AdminCourseCategoryController extends BaseController
             'category_path' => $this->courses->categoryTrail($categoryId),
             'replacement_picker' => $this->courses->replacementCategoryPicker($categoryId),
             'tree_href' => $this->revealing($categoryId),
+            // Its own words for search engines (the SEO brief, 2026-11-09).
+            'search_fields' => $this->searchFields($categoryId, $category),
         ]);
+    }
+
+    /** The category's own title and description for search engines (the SEO brief, 2026-11-09; Search\SearchOverrides). */
+    #[Route('/admin/courses/categories/{slug}/search', name: 'admin_course_category_search', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]
+    public function search(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
+        $id = $this->categoryId();
+        $back = CatalogueAddress::category($this->courses->category($id), '#search');
+        return $this->handle(function () use ($user, $id, $back): void {
+            $this->searchOverrides->saveCategory($id, ['title' => $_POST['title'] ?? '', 'description' => $_POST['description'] ?? ''], $user->id);
+            $this->flash('success', 'What search engines are told about the category was saved.');
+            $this->redirect($back);
+        }, $back);
+    }
+
+    /**
+     * @param array<string,mixed> $category
+     * @return array<string,mixed>
+     */
+    private function searchFields(int $categoryId, array $category): array
+    {
+        $own = $this->searchOverrides->category($categoryId);
+        $preview = $this->searchMetadata->categoryPreview(['search_title' => $own['title'], 'search_description' => $own['description']] + $category);
+        return \CattoLearning\Search\SearchOverrides::fields('category-search', 'title', 'description', $own, $preview, $this->searchMetadata->siteName());
     }
 
     #[Route('/admin/courses/categories/{slug}', name: 'admin_course_category_update', requirements: ['slug' => CatalogueAddress::CATEGORY], methods: ['POST'])]

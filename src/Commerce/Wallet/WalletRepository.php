@@ -13,6 +13,8 @@ reminders and statements. Every table it writes is append-only (database trigger
 the lock every movement of its credit takes first.
 
 Changelog:
+2026/11/08 SAST
+- A statement for a period oldest first, and the balance before it, for the statement downloads (LedgerFiles).
 2026/10/17 SAST
 - Created with the money ledger and wallets; replaces the Account Funds methods of CommerceRepository.
 */
@@ -242,6 +244,41 @@ final class WalletRepository
              ) s WHERE TRUE' . $period . ' ORDER BY s.occurred_at DESC, s.id DESC LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset),
             $params
         );
+    }
+
+    /**
+     * The owner's wallet statement for a period, oldest first, with the balance after each row: a statement to download
+     * (LedgerFiles). At most $limit rows.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function statementOldestFirst(WalletOwner $owner, string $currency, ?string $from, ?string $to, int $limit): array
+    {
+        $column = $owner->isCompany() ? 'owner_company_id' : 'owner_user_id';
+        $params = ['owner' => $owner->userId ?? $owner->companyId, 'currency' => $currency];
+        $period = '';
+        if ($from !== null) { $period .= ' AND s.occurred_at >= :from'; $params['from'] = $from; }
+        if ($to !== null) { $period .= ' AND s.occurred_at < :to'; $params['to'] = $to; }
+
+        return $this->db->fetchAllAssociative(
+            'SELECT s.* FROM (
+                SELECT e.id, e.kind, e.occurred_at, e.amount_minor, e.currency, e.wallet_effect, e.method, e.order_id, e.refund_id, e.document_number, e.external_reference, e.memo,
+                       SUM(e.wallet_effect * e.amount_minor) OVER (ORDER BY e.occurred_at, e.id) AS balance_after
+                  FROM commerce_ledger_entries e
+                 WHERE e.' . $column . ' = :owner AND e.currency = :currency AND e.wallet_effect <> 0
+             ) s WHERE TRUE' . $period . ' ORDER BY s.occurred_at, s.id LIMIT ' . max(1, $limit),
+            $params
+        );
+    }
+
+    /** What the owner's wallet held before a moment: the opening balance of a statement that starts then. */
+    public function balanceBefore(WalletOwner $owner, string $currency, ?string $before): int
+    {
+        if ($before === null) return 0;
+        $column = $owner->isCompany() ? 'owner_company_id' : 'owner_user_id';
+
+        return (int) $this->db->fetchOne('SELECT COALESCE(SUM(wallet_effect * amount_minor), 0) FROM commerce_ledger_entries WHERE ' . $column . ' = :owner AND currency = :currency AND wallet_effect <> 0 AND occurred_at < :before',
+            ['owner' => $owner->userId ?? $owner->companyId, 'currency' => $currency, 'before' => $before]);
     }
 
     public function statementCount(WalletOwner $owner, string $currency, ?string $from = null, ?string $to = null): int

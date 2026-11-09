@@ -1,8 +1,9 @@
 {#
 	Settings, Search engines and AI (owner, 2026-11-06, choices 2A and 3A): what AI crawlers may do, the codes that prove
 	the site is the owner's to Google Search Console and Bing Webmaster Tools with the exact steps to get them, the share
-	pictures, and the site's addresses for search engines and AI assistants. Search\SearchEnginesAdministration gives
-	it everything it shows; AdminSearchEnginesController saves it.
+	pictures, each public page's own title and description with its previews (the SEO brief, 2026-11-09), and the site's
+	addresses for search engines and AI assistants. Search\SearchEnginesAdministration gives it everything it shows;
+	AdminSearchEnginesController saves it.
 #}
 {% set se = search_engines %}
 {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Search engines and AI', summary: se.summary, id: 'settings-search-engines', open: settings_open_section|default('') == 'search-engines'})} %}
@@ -63,6 +64,25 @@
 			</form>
 			{% endif %}
 			</div>
+			{# Each public page's own title and description (the SEO brief, 2026-11-09; Search\SearchOverrides, PublicPages). #}
+			{% if se.pages|default([]) %}
+			<div class="mt-12" id="search-page-words">
+			{{ ui('layout.section-head', {heading: 'Page titles and descriptions', heading_level: 3, summary: 'What a search result and a shared link say about each of the site\'s own pages. Every page has its own words already; type here only to change them, and leave a field empty for the page\'s own. Courses and categories have theirs on their own pages: a course\'s Search engines tab, a category\'s Search engines card.'}) }}
+			<form action="/admin/settings/search-engines/pages" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% for page in se.pages %}
+					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: page.label, summary: page.own ? 'Your own words.' : 'The page\'s own words.', id: 'search-page-' ~ page.key})} %}
+{% block body %}
+						{% include '@platform/partials/admin/search-fields.html.twig' with {sf: page.fields} only %}
+{% endblock %}
+					{% endembed %}
+				{% endfor %}
+				{% if can_manage_settings|default(false) %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save page titles and descriptions', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+				{% endif %}
+			</form>
+			</div>
+			{% endif %}
 			<div class="mt-12">
 			{{ ui('layout.section-head', {heading: 'What search engines and AI assistants read', heading_level: 3}) }}
 			{{ ui('data.key-value-list', {items: [

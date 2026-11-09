@@ -7,6 +7,10 @@ Description:
 Validates the Catto Learning release contract (written for v0.5.8, kept current): PHP 8.5.12 or later, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/11/08 SAST
+- Upgrade migrations are allowed again (owner: "There is NO RULE that says that step by step migrations are
+  disallowed"): one baseline is still required, and every other migration must be named by its time and come after it.
+  The 2026/10/06 "exactly one migration" check had turned a request to consolidate into a ban.
 2026/11/07 SAST
 - The default theme is the one ThemeManager names (Saharan Sunset); its package, its baseline seed and its contracts are
   checked in place of Factory Reset's. The release version is read from composer.json, never pinned here.
@@ -80,14 +84,18 @@ foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bund
 }
 $need(!isset($composer['scripts']['migrate-test']) && !isset($composer['scripts']['migrate:test']), 'A separate test migration command must not be defined.');
 
-// Exactly one migration: the canonical baseline (owner instruction, 2026/10/06). While the system
-// is not live the database is disposable, so a schema change is made in the baseline and the
-// development database is reset and rebuilt from it. Incremental migrations begin only once
-// production is declared; until then a second migration file is a failure.
+// One canonical baseline, into which the migrations were consolidated (owner instruction, 2026/10/06: consolidate,
+// not a ban). A schema change after it is an upgrade migration of its own, newer than the baseline, which the update
+// runs on an existing site and a fresh installation runs after the baseline (owner, 2026-11-08: "there is no rule that
+// says you cannot write an upgrade migration").
 $migrations = glob($root . '/database/migrations/*.php') ?: [];
-$need(count($migrations) === 1, 'Expected exactly one migration, the canonical baseline, found ' . count($migrations) . '. Change the baseline and reset the development database instead.');
 $baselineMatches = glob($root . '/database/migrations/*_baseline.php') ?: [];
 $need(count($baselineMatches) === 1, 'Expected exactly one baseline migration, found ' . count($baselineMatches) . '.');
+$baselineName = basename((string) ($baselineMatches[0] ?? ''));
+foreach ($migrations as $migration) {
+    $need(preg_match('/^\d{14}_[a-z0-9_]+\.php$/', basename($migration)) === 1, 'A migration file is named by its time and what it does, such as 20261108120000_add_course_notes.php: ' . basename($migration) . '.');
+    $need(basename($migration) === $baselineName || strcmp(basename($migration), $baselineName) > 0, 'An upgrade migration must come after the baseline: ' . basename($migration) . '.');
+}
 $baselinePath = $baselineMatches[0] ?? '';
 $baseline = $read($baselinePath);
 foreach (['CREATE TABLE permissions','CREATE TABLE role_permissions','role_description TEXT','CHECK (role_key = UPPER(role_key))',"role_name VARCHAR(120) NOT NULL CHECK (role_name ~ '^[A-Z][A-Za-z0-9]*$')","('ADMIN','Administrator','System Administrator')",'ip_address INET NULL','CREATE TABLE theme_registry'] as $token) {

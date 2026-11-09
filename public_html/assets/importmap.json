@@ -4,7 +4,11 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-08BnGdw.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-hb_Kq2K.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/bundle_price_controller.js": {
+        "path": "\/assets\/controllers\/bundle_price_controller-JjmLsrB.js",
         "type": "js"
     },
     "\/assets\/controllers\/catalogue_export_controller.js": {
@@ -56,7 +60,15 @@
         "type": "js"
     },
     "\/assets\/controllers\/profile_image_controller.js": {
-        "path": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
+        "path": "\/assets\/controllers\/profile_image_controller-xTp1tMa.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/search_preview_controller.js": {
+        "path": "\/assets\/controllers\/search_preview_controller-raNjZW_.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/settings_order_controller.js": {
+        "path": "\/assets\/controllers\/settings_order_controller-J8s8gkR.js",
         "type": "js"
     },
     "\/assets\/controllers\/slide_editor_controller.js": {

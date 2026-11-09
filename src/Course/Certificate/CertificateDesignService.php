@@ -21,6 +21,9 @@ Every change is audited (certificate.design_*); none changes a certificate alrea
 names the version it was drawn with.
 
 Changelog:
+2026/11/09 SAST
+- The logo a design prints is the site logo, its own or none (logo_choice); followSiteLogo() publishes the designs that
+  print the site logo again when it changes, and names any whose words would no longer fit.
 2026/10/08 SAST
 - The signatory's text is measured before compiling, so the signature picture is sized to fit the
   foot; a picture with no room left is refused with a message about the signatory, not the wording.
@@ -37,6 +40,7 @@ use CattoLearning\Document\DocumentAssetRepository;
 use CattoLearning\Document\DocumentPdfRenderer;
 use CattoLearning\Document\DocumentSampleData;
 use CattoLearning\Document\DocumentTemplateRenderer;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Document\DocumentType;
 use CattoLearning\Document\RenderedDocument;
 use CattoLearning\Document\TemplateValidationException;
@@ -61,6 +65,7 @@ final class CertificateDesignService
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         ?\Closure $isUploadedFile = null,
+        private readonly ?SiteLogo $siteLogo = null,
     ) {
         $this->isUploadedFile = $isUploadedFile ?? static fn(string $path): bool => is_uploaded_file($path);
     }
@@ -100,6 +105,8 @@ final class CertificateDesignService
                 $pictures[$kind] = $this->stored((string) ($post[$field . '_asset'] ?? ''));
             }
         }
+        // Uploading a logo of its own means printing it; otherwise the choice made, the site logo when none is sent.
+        $logoChoice = $pictures[CertificateImage::LOGO] !== null && $this->uploaded($files['logo'] ?? null) ? 'own' : (string) ($post['logo_choice'] ?? 'site');
         $look = (string) ($post['look'] ?? 'classic');
         if ($pictures[CertificateImage::BACKGROUND] !== null && $this->uploaded($files['background'] ?? null)) {
             // Uploading a background means using it.
@@ -119,6 +126,7 @@ final class CertificateDesignService
             trim((string) ($post['signature_position'] ?? '')),
             $pictures[CertificateImage::SIGNATURE],
             $smallPrint['html'],
+            $logoChoice,
         );
         return ['name' => trim((string) ($post['name'] ?? '')), 'design' => $design, 'errors' => [...$errors, ...$wording['errors'], ...$smallPrint['errors']]];
     }
@@ -164,6 +172,34 @@ final class CertificateDesignService
             return $id;
         });
         return ['id' => $saved, 'errors' => [], 'name' => $name, 'design' => $form['design']];
+    }
+
+    /**
+     * After the site logo changes (SiteLogoFollowers): each design that prints it is published again with the new one,
+     * so certificates issued from now on carry it and those already issued keep theirs. A design whose words no longer
+     * fit with the new logo keeps the version it has, and is named, so ADMIN can shorten it or choose no logo.
+     *
+     * @return array{changed:list<string>,kept:list<string>} the designs' names
+     */
+    public function followSiteLogo(int $actorId): array
+    {
+        $changed = [];
+        $kept = [];
+        foreach ($this->designs->list() as $row) {
+            $design = $row['design'];
+            if (!$design instanceof CertificateDesign || $design->logoChoice !== 'site') continue;
+            if ($this->check($design)['errors'] !== []) {
+                $kept[] = (string) $row['name'];
+                continue;
+            }
+            $compiled = $this->compile($design);
+            $this->transactions->run(function () use ($row, $design, $compiled, $actorId): void {
+                $this->designs->save((int) $row['id'], (string) $row['name'], $design->toArray(), $compiled['html'], $compiled['css'], $compiled['settings'], $actorId);
+                $this->audit->record($actorId, 'certificate.design_site_logo', ['design_id' => (int) $row['id'], 'name' => (string) $row['name']]);
+            });
+            $changed[] = (string) $row['name'];
+        }
+        return ['changed' => $changed, 'kept' => $kept];
     }
 
     /**
@@ -285,6 +321,8 @@ final class CertificateDesignService
                 $this->assets->store($bytes, 'image/png', (int) $width, (int) $height, null);
             }
         }
+        // The logo it prints: the site logo, its own or none.
+        $design = $design->forPrinting($this->siteLogo?->image());
         return $this->compiler->compile($design, $this->signatoryTextHeight($design));
     }
 

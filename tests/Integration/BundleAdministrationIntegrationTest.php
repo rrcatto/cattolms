@@ -21,7 +21,9 @@ use Symfony\Component\HttpKernel\Exception\{AccessDeniedHttpException, NotFoundH
  * ADMIN bundle management and the public bundle pages on the real services and controllers:
  * creating and validating, composing and reordering with an audit trail, the publishing rules, the
  * offer, retiring, deleting only unused drafts, the list's search and filters, permissions, the
- * bundle lookup, and what the catalogue shows. Every write rolls back.
+ * bundle lookup, and what the catalogue shows. The price form fills an empty was price with the courses' total and says
+ * what percentage the price is off, and a card shows the saving's percentage beside its amount (owner, 2026-11-09). Every
+ * write rolls back.
  */
 #[Group('commerce')]
 final class BundleAdministrationIntegrationTest extends TestCase
@@ -359,6 +361,42 @@ final class BundleAdministrationIntegrationTest extends TestCase
         } catch (NotFoundHttpException) {
             $this->addToAssertionCount(1);
         }
+    }
+
+    public function testTheFormFillsAnEmptyWasPriceWithTheCoursesTotalAndTheCardShowsThePercentageOff(): void
+    {
+        // Three courses at R500, R700 and R400: R1,600 together.
+        [$a, $b, $c] = [$this->course('A', 50000), $this->course('B', 70000), $this->course('C', 40000)];
+        $bundle = BundleFixture::create($this->db, $this->owner, [$a, $b, $c], 120000, ['title' => 'Percentage Bundle']);
+        $form = $this->bundles->form($this->records->find($bundle['id']));
+        self::assertSame(['1600.00', true, '1600.00'], [$form['was_price'], $form['was_from_courses'], $form['courses_total']], 'An empty was price is the courses\' total.');
+        self::assertSame('25% off the was price: the buyer saves ' . \CattoLearning\Support\Money::strictMinorUnits(40000, 'ZAR')->format() . '.', $form['discount']);
+        self::assertStringContainsString('% off the was price', BundleService::discountWords(119999, 160000, 'ZAR'));
+        self::assertStringStartsWith('25%', BundleService::discountWords(119999, 160000, 'ZAR'), 'Rounded down: 25.0006% is 25%.');
+        self::assertStringStartsWith('24%', BundleService::discountWords(120001, 160000, 'ZAR'), 'Rounded down, never up: 24.999% is 24%.');
+        self::assertSame('The was price must be higher than the bundle price.', BundleService::discountWords(160000, 160000, 'ZAR'));
+        self::assertSame('', BundleService::discountWords(null, 160000, 'ZAR'), 'Nothing is said before there is a price.');
+
+        // Saving the price with the filled was price keeps it; a was price of its own is shown as it is.
+        $this->bundles->saveOffer($this->admin, $bundle['id'], ['price' => '1200', 'was_price' => $form['was_price'], 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        self::assertSame(160000, (int) ($this->records->find($bundle['id'])['was_price_minor_units'] ?? 0));
+        $this->bundles->saveOffer($this->admin, $bundle['id'], ['price' => '1200', 'was_price' => '2000', 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        $form = $this->bundles->form($this->records->find($bundle['id']));
+        self::assertSame(['2000.00', false, '1600.00'], [$form['was_price'], $form['was_from_courses'], $form['courses_total']]);
+        self::assertStringStartsWith('40% off the was price', $form['discount']);
+        // A price at or above the courses' total leaves the empty was price empty.
+        $this->bundles->saveOffer($this->admin, $bundle['id'], ['price' => '1700', 'was_price' => '', 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        self::assertSame(['', false], array_values(array_intersect_key($this->bundles->form($this->records->find($bundle['id'])), ['was_price' => 0, 'was_from_courses' => 0])));
+
+        // The card: the amount saved and, beside it, its percentage of the was price.
+        $this->bundles->saveOffer($this->admin, $bundle['id'], ['price' => '1200', 'was_price' => '1600', 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        $card = $this->bundles->cardsByIds([$bundle['id']])[0];
+        self::assertSame(['Save ' . \CattoLearning\Support\Money::strictMinorUnits(40000, 'ZAR')->format(), '25% off'], [$card['saving_badge'], $card['saving_percent_badge']]);
+        // Without a was price the saving is the courses' total's, and so is its percentage.
+        $this->bundles->saveOffer($this->admin, $bundle['id'], ['price' => '1000', 'was_price' => '', 'access_period_value' => '1', 'access_period_unit' => 'years', 'is_active' => '1']);
+        self::assertSame('37% off', $this->bundles->cardsByIds([$bundle['id']])[0]['saving_percent_badge'], 'R600 of R1,600 is 37.5%, said as 37%.');
+        $page = InProcessPage::run(null, BundleController::class, 'index')['body'];
+        self::assertStringContainsString('37% off', $page, 'The catalogue shows it.');
     }
 
     private function course(string $key, int $price): int

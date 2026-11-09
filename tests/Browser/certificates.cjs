@@ -7,7 +7,9 @@
  * the learner took the course, never that they passed (owner, 2026-10-19): the second learner fails the
  * final, is told to verify to receive the certificate and transcript, and once verified receives both,
  * the transcript recording the failed mark. Editing the design changes the next learner's certificate
- * and never the issued one. An uploaded Canva-sized background becomes a design's look.
+ * and never the issued one. An uploaded Canva-sized background becomes a design's look: the check draws its own, A4
+ * landscape at Canva's 3508 by 2480 pixels (CATTO_CERTIFICATE_BACKGROUND names another), so it needs no file of the
+ * workspace's (the samples it once read went with the workspace's design folder, 2026-11-09).
  * Duplicate, the default for new courses and delete (which moves the courses using a design) work.
  * The editor and the course page work without JavaScript, typed [Learner name] fields included; a
  * learner cannot open either; the pages fit every theme at desktop and phone widths; Firefox
@@ -31,7 +33,7 @@ const container = process.env.CATTO_PHP_CONTAINER || 'env_php_1';
 const statePath = process.env.CATTO_BROWSER_STATE || '/tmp/catto-certificates-state.json';
 const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-certificates';
 const root = path.resolve(__dirname, '..', '..');
-const background = process.env.CATTO_CERTIFICATE_BACKGROUND || path.resolve(root, '..', '..', 'design', 'certificate-samples', '01-classic-background.png');
+const givenBackground = process.env.CATTO_CERTIFICATE_BACKGROUND || '';
 fs.mkdirSync(output, {recursive: true});
 
 const state = JSON.parse(execFileSync('podman', ['exec', container, 'cat', statePath], {encoding: 'utf8'}));
@@ -46,6 +48,18 @@ const DESIGN = state.design_name;
 const UPLOADED = state.background_name;
 const ACCREDITATION = 'CPD: 3 points';
 let designUrl = '', uploadedUrl = '', firstCertificate = '', firstText = '';
+
+/** A certificate background as Canva exports one: A4 landscape, 3508 by 2480 pixels, a frame on a warm ground. */
+async function drawnBackground(browser) {
+    const file = path.join(output, 'canva-background.png');
+    const ctx = await browser.newContext({viewport: {width: 1754, height: 1240}, deviceScaleFactor: 2});
+    const page = await ctx.newPage();
+    await page.setContent('<body style="margin:0"><div style="box-sizing:border-box;width:1754px;height:1240px;border:44px solid #1f3a5f;'
+        + 'outline:10px solid #c9a24a;outline-offset:-80px;background:radial-gradient(circle at 50% 40%,#fdf8ee,#ead9b8)"></div></body>');
+    await page.screenshot({path: file});
+    await ctx.close();
+    return file;
+}
 
 let step = '';
 async function scenario(name, browserName, run) {
@@ -397,6 +411,7 @@ async function openCertificate(page) {
     });
 
     await scenario('an uploaded Canva-sized background becomes the design’s look', 'firefox', async () => {
+        const background = givenBackground || await drawnBackground(firefox);
         assert.ok(fs.existsSync(background), `the sample background exists at ${background}`);
         const {ctx, page, previews} = await open(firefox, admin());
         await nextPreview(previews, () => page.goto(`${base}/admin/certificates/designs/new`), 'the first preview, in Classic');

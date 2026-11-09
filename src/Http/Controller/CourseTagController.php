@@ -27,7 +27,8 @@ final class CourseTagController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly \CattoLearning\Mailing\MailingConsents $mailing
+        private readonly \CattoLearning\Mailing\MailingConsents $mailing,
+        private readonly \CattoLearning\Search\PageMetadata $metadata
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -87,6 +88,9 @@ final class CourseTagController extends BaseController
         }
 
         return $this->render('course-tags', [
+            // A tag's page described by the courses it holds, with them as a Course list (the SEO brief, 2026-11-09); the
+            // browser itself by its own words (PublicPages).
+            'page_meta' => $tag !== null ? $this->metadata->tag($base, (string) $tag['name'], $courses, $search !== '') : ($search !== '' ? ['robots' => 'noindex, follow'] : []),
             'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
             'tag_index' => self::weighted($this->courses->tagIndex()),

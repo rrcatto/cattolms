@@ -11,6 +11,9 @@ Description:
 Implements Catto Learning business and application logic for platform administration operations.
 
 Changelog:
+2026/11/09 SAST
+- The Site Owner's view carries the site logo's address, for its upload on Settings > Site Owner.
+- The Settings view carries the sections' order (SettingsOrder).
 2026/11/07 SAST
 - addCredit() refuses a course code no course has, which max(1, …) had read as the first course.
 - The Activity filter names the person and the company by their account references (?actor=, ?company=), and
@@ -481,7 +484,10 @@ final class PlatformAdministrationService
         private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
         private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSetup $ownerMessages = null,
         private readonly ?\CattoLearning\Search\SearchEnginesAdministration $searchEngines = null,
-        private readonly ?\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys = null
+        private readonly ?\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys = null,
+        private readonly ?\CattoLearning\Configuration\SiteLogo $siteLogo = null,
+        private readonly ?\CattoLearning\Configuration\SettingsOrder $settingsOrder = null,
+        private readonly ?\CattoLearning\Configuration\SitePicture $sitePicture = null
     ) {
     }
 
@@ -1640,6 +1646,10 @@ final class PlatformAdministrationService
                     'search_engines' => $this->searchEngines?->view(),
                     'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode(), 'heading' => $this->site->heading(), 'notice' => $this->site->notice(), 'email_notice' => $this->site->emailNotice(), 'simulation' => $this->site->simulation(), 'own_words' => $this->site->ownWords(), 'limits' => array_map(static fn(array $word): int => $word['limit'], \CattoLearning\Configuration\SiteMode::WORDS)],
                     'site_owner' => $this->siteOwnerView(),
+                    // The sections in the order the owner arranged them (owner, 2026-11-09), and whether it is their own.
+                    'settings_order' => $this->settingsOrder?->order() ?? \CattoLearning\Configuration\SettingsOrder::STANDARD,
+                    'settings_arranged' => $this->settingsOrder?->arranged() ?? false,
+                    'settings_titles' => \CattoLearning\Configuration\SettingsOrder::TITLES,
                 ];
             })(),
             default => throw new InvalidArgumentException('Unknown Administration section: ' . $section),
@@ -2811,7 +2821,11 @@ final class PlatformAdministrationService
         foreach (SiteOwner::FIELDS as $field => [$env, $label]) {
             $fields[$field] = ['label' => $label, 'value' => $this->owner->value($field), 'env' => $env, 'environment' => $this->owner->environmentValue($field), 'source' => $this->owner->source($field)];
         }
-        return ['fields' => $fields, 'legal_forms' => SiteOwner::LEGAL_FORMS, 'overridden' => in_array('database', array_column($fields, 'source'), true)];
+        // The site logo (owner, 2026-11-09), uploaded on its own form: every PDF prints it, and emails by their template.
+        $logo = ['url' => $this->siteLogo?->url(''), 'draws_svg' => $this->siteLogo?->drawsSvg() ?? false];
+        // The site's picture (owner, 2026-11-09: the hero), what a page without a picture of its own is shared with.
+        $picture = ['url' => $this->sitePicture?->shareUrl('')];
+        return ['fields' => $fields, 'legal_forms' => SiteOwner::LEGAL_FORMS, 'overridden' => in_array('database', array_column($fields, 'source'), true), 'logo' => $logo, 'picture' => $picture];
     }
 
     /**

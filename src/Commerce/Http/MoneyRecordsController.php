@@ -13,6 +13,10 @@ the Commerce Trail and Payment Events, each a filtered, searched, sorted and pag
 every row. MoneyRecords builds what they show; this checks the permission and draws the page.
 
 Changelog:
+2026/11/08 SAST
+- The Money Ledger as a PDF or an Excel file (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"):
+  every line its filters match, oldest first, with its totals (LedgerFiles); a refusal (too many lines for a PDF) goes back
+  to the ledger with its filters and says why.
 2026/11/06 SAST
 - Money Reports (owner, 2026-11-06, the approved mockup): each month's report on its page, as a PDF and as an Excel file,
   seen with the Money Ledger's permission; its two ticks save as they change, for an administrator who manages Settings.
@@ -25,6 +29,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Commerce\Application\LedgerFiles;
 use CattoLearning\Commerce\Application\MoneyRecords;
 use CattoLearning\Commerce\Application\MoneyReportFiles;
 use CattoLearning\Commerce\Application\MoneyReportJob;
@@ -40,7 +45,7 @@ final class MoneyRecordsController extends BaseController
 {
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly MoneyRecords $money,
         private readonly MoneyReports $reports, private readonly MoneyReportFiles $reportFiles, private readonly MoneyReportSettings $reportSettings,
-        private readonly MoneyReportJob $reportJob)
+        private readonly MoneyReportJob $reportJob, private readonly LedgerFiles $ledgerFiles)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -108,6 +113,30 @@ final class MoneyRecordsController extends BaseController
     {
         $this->requirePermission('PLATFORM.PAYMENT.VIEW');
         return $this->render('admin-money-ledger', ['title' => 'Money Ledger', 'active_nav' => 'admin'] + $this->money->ledger($this->request()->query->all()));
+    }
+
+    /** Every line the Money Ledger's filters match, oldest first, as a PDF (A4 landscape). */
+    #[Route('/admin/commerce/ledger.pdf', name: 'admin_money_ledger_pdf', methods: ['GET'])]
+    public function ledgerPdf(): Response
+    {
+        return $this->ledgerFile('pdf');
+    }
+
+    /** The same lines as an Excel file: a Summary sheet and every line on Lines. */
+    #[Route('/admin/commerce/ledger.xlsx', name: 'admin_money_ledger_excel', methods: ['GET'])]
+    public function ledgerExcel(): Response
+    {
+        return $this->ledgerFile('xlsx');
+    }
+
+    private function ledgerFile(string $format): Response
+    {
+        $this->requirePermission('PLATFORM.PAYMENT.VIEW');
+        $query = $this->request()->query->all();
+        return $this->handle(function () use ($query, $format): Response {
+            $ledger = $this->ledgerFiles->ledger($query, $format);
+            return $this->download($format === 'pdf' ? $this->ledgerFiles->ledgerPdf($ledger) : $this->ledgerFiles->ledgerExcel($ledger), LedgerFiles::name($ledger, $format), LedgerFiles::FORMATS[$format]);
+        }, '/admin/commerce/ledger' . ($query === [] ? '' : '?' . http_build_query($query)));
     }
 
     #[Route('/admin/commerce/ledger/{id}', name: 'admin_money_ledger_entry', requirements: ['id' => '[0-9]+'], methods: ['GET'])]

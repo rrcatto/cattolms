@@ -13,6 +13,8 @@ says more than the purchaser saves. An automatic promotion's totals line says it
 automatically.
 
 Changelog:
+2026/11/09 SAST
+- percentOff().
 2026/10/20 SAST
 - First version.
 */
@@ -72,5 +74,15 @@ final class WasPriceTest extends TestCase
         self::assertSame('Promo SAVE10 (10% off)', OrderTotals::rows(17345, 1735, 15610, 'ZAR', 'SAVE10', '10% off')[1]['label']);
         self::assertSame('Promo SPRING25 (20% off, applied automatically)', OrderTotals::forSnapshot(['items' => [['line_total_minor' => 17345]], 'total_minor' => 13876, 'currency' => 'ZAR',
             'promotion' => ['code' => 'SPRING25', 'label' => '20% off', 'discount_minor' => 3469, 'automatic' => true]])[1]['label']);
+    }
+
+    public function testThePercentageOffIsRoundedDownAndOnlyForALowerPrice(): void
+    {
+        self::assertSame(50, WasPrice::percentOff(250000, 500000));
+        self::assertSame(48, WasPrice::percentOff(260000, 500000));
+        self::assertSame(37, WasPrice::percentOff(100000, 160000), '37.5% is said as 37%.');
+        self::assertNull(WasPrice::percentOff(500000, 500000));
+        self::assertNull(WasPrice::percentOff(600000, 500000));
+        self::assertNull(WasPrice::percentOff(100, 0));
     }
 }

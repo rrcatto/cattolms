@@ -1,5 +1,7 @@
 {% extends layout %}
 {% block page_body %}
+{# Stimulus, for the price form's percentage off as the price is typed (bundle_price_controller.js; owner, 2026-11-09). #}
+{{ importmap() }}
 {% set ph_back_href = '/admin/bundles' %}{% set ph_back_label = 'Bundles' %}{% set ph_kicker = 'Courses' %}{% set ph_title = bundle ? bundle.title : 'New bundle' %}{% set ph_lead = bundle ? 'A bundle of ' ~ bundle.course_count ~ ' courses' ~ (bundle.price_label ? ' for ' ~ bundle.price_label : '') ~ '.' : 'Give the bundle a title and description. You add its courses and set its price after creating it.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
 {% if bundle %}
@@ -48,11 +50,18 @@
 	<div id="bundle-offer">{{ ui('layout.section-head', {heading: 'Price and access', heading_level: 2, summary: 'You choose the bundle price. Each course in the bundle is granted for the access period below. A price change applies to purchases from now on; orders already placed keep their price.'}) }}</div>
 	{% if bundle.comparison %}<p class="help">For context only: the courses’ current individual prices add up to {{ bundle.comparison.individual_label }}{% if bundle.comparison.saving_label %}, so the bundle saves {{ bundle.comparison.saving_label }}{% endif %}. The bundle price is not calculated from them.</p>{% elseif bundle.courses %}<p class="help">Not every course has a current individual price, so no saving is shown to buyers.</p>{% endif %}
 	{% if can_manage %}
-	<form action="{{ bundle_admin_url(bundle, '/offer') }}" method="post">
+	{# The was price is filled with the courses' total when it is empty, and the percentage off is said beside the price as
+	   it is typed (owner, 2026-11-09; BundleService::form, bundle_price_controller.js). #}
+	{% set was_help = form.was_from_courses
+		? 'Filled in with the courses\' prices added up, ' ~ form.courses_total_label ~ ': saving the price saves it. Change it, or empty it for no was price.'
+		: (form.courses_total ? 'The courses\' prices add up to ' ~ form.courses_total_label ~ '. ' : '') ~ 'A higher price shown struck through beside the bundle price, so the bundle is seen to be marked down. Only the bundle price is charged.' %}
+	<form action="{{ bundle_admin_url(bundle, '/offer') }}" method="post" data-controller="bundle-price" data-bundle-price-total-value="{{ form.courses_total }}" data-bundle-price-currency-value="{{ form.currency }}" data-bundle-price-locale-value="{{ form.locale }}">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bundle price (' ~ currency ~ ')', for: 'bundle-price', required: true})} %}{% block control %}<input id="bundle-price" name="price" value="{{ form.price }}" inputmode="decimal" maxlength="16" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (' ~ currency ~ ', optional)', for: 'bundle-was-price', help: 'A higher price shown struck through beside the bundle price, so the bundle is seen to be marked down. Only the bundle price is charged.'})} %}{% block control %}<input id="bundle-was-price" name="was_price" value="{{ form.was_price }}" inputmode="decimal" maxlength="16" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bundle price (' ~ currency ~ ')', for: 'bundle-price', required: true})} %}{% block control %}<input id="bundle-price" name="price" value="{{ form.price }}" inputmode="decimal" maxlength="16" required data-bundle-price-target="price" data-action="input->bundle-price#update" {{ ui_field_attrs(props) }}>
+				<output class="cl-bundle-discount" for="bundle-price bundle-was-price" aria-live="polite" data-bundle-price-target="discount"{% if not form.discount %} hidden{% endif %}>{{ form.discount }}</output>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (' ~ currency ~ ', optional)', for: 'bundle-was-price', help: was_help})} %}{% block control %}<input id="bundle-was-price" name="was_price" value="{{ form.was_price }}" inputmode="decimal" maxlength="16" data-bundle-price-target="was" data-action="input->bundle-price#update" {{ ui_field_attrs(props) }}>
+				{% if form.courses_total %}<span class="cl-bundle-use-total">{{ ui('action.button', {label: 'Use the courses\' total, ' ~ form.courses_total_label, variant: 'quiet', size: 'small', type: 'button', icon: 'action-copy', hidden: true, stimulus_action: 'bundle-price#useTotal'}) }}</span>{% endif %}{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', for: 'bundle-period', required: true})} %}{% block control %}<input id="bundle-period" name="access_period_value" type="number" min="1" max="3650" value="{{ form.access_period_value }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'bundle-unit', required: true})} %}{% block control %}<select id="bundle-unit" name="access_period_unit" required {{ ui_field_attrs(props) }}>{% for unit in units %}<option value="{{ unit }}"{% if form.access_period_unit == unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}

@@ -3,7 +3,8 @@
 	differently and it needs to be obvious they are bundles not courses"), in the catalogue and on the Bundles page.
 	As cards (view 'grid'): three to a row, each partials/bundle-card.html.twig. As a list (view 'list', owner 2026-11-07:
 	"Have the bundle title first, then number of courses ... then have a concise bundle description - and the rest as you
-	have it"): Bundle, No of courses (the number alone), its short description, Access, Price with what it saves, then
+	have it"): Bundle, No of courses (the number alone), its short description, Access, Price with what it saves and its
+	percentage (owner, 2026-11-09), then
 	View bundle and the star, the head in the bundle colour.
 	props.bundles: cards as BundleService::card() gives them.
 #}
@@ -22,7 +23,7 @@
 					<td class="cell-text">
 						<span class="cl-bundle-list-price">
 							{% if bundle.price_label %}{% include '@platform/partials/price.html.twig' with {price: bundle} %}{% endif %}
-							{% if bundle.saving_badge or bundle.availability_badge %}<span class="cl-bundle-list-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success', size: 'small'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info', size: 'small'}) }}{% endif %}</span>{% endif %}
+							{% if bundle.saving_badge or bundle.availability_badge %}<span class="cl-bundle-list-badges">{% if bundle.saving_badge %}{{ ui('feedback.badge', {label: bundle.saving_badge, tone: 'success', size: 'small'}) }}{% endif %}{% if bundle.saving_percent_badge|default(null) %} {{ ui('feedback.badge', {label: bundle.saving_percent_badge, tone: 'success', size: 'small'}) }}{% endif %}{% if bundle.availability_badge %} {{ ui('feedback.badge', {label: bundle.availability_badge, tone: 'info', size: 'small'}) }}{% endif %}</span>{% endif %}
 						</span>
 					</td>
 					<td class="cell-actions">

@@ -241,7 +241,7 @@ services:
     # the AI crawler setting. The structured data's nodes and the AI crawler list are static rules, not services.
     CattoLearning\Search\:
         resource: '../src/Search/'
-        exclude: '../src/Search/{StructuredData.php,AiCrawlers.php}'
+        exclude: '../src/Search/{StructuredData.php,AiCrawlers.php,PublicPages.php}'
     # The FAQ's questions, which its page and its structured data share.
     CattoLearning\Help\:
         resource: '../src/Help/'

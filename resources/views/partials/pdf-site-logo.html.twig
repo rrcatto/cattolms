@@ -1,0 +1,6 @@
+{#
+	The site logo at the top of a PDF drawn from a template (owner, 2026-11-09: "this should appear on PDFs the site
+	generates"), from SiteLogo::forPdf(): its picture as a data: address and its printed size, as large as fits the box
+	the PDF gives it. pdf_logo is that, or null without a site logo, and pdf_logo_break puts a line break after it.
+#}
+{% if pdf_logo|default(null) %}<img class="pdf-site-logo" src="{{ pdf_logo.src }}" alt="" style="width:{{ pdf_logo.width_mm }}mm;height:{{ pdf_logo.height_mm }}mm">{% if pdf_logo_break|default(false) %}<br>{% endif %}{% endif %}

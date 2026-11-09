@@ -1,0 +1,26 @@
+{#
+	A page's own title and description for search engines, beside the previews of how it may look (the SEO brief,
+	2026-11-09; Search\SearchOverrides): each field empty means the page's own words, shown as its placeholder and in the
+	previews. A course's form adds whether search engines are asked to leave it out. The form around it, with its action
+	and csrf, is the caller's. sf: {id (unique, for the fields' ids), title_name, description_name, title, description,
+	preview (PageMetadata's), site, title_limit, description_limit, title_shown, description_shown, hidden (null when the
+	page has no such choice, else whether it is kept out), hidden_name}.
+#}
+<div class="cl-search-fields">
+	<div class="cl-search-fields-form">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search title', for: sf.id ~ '-title', full_width: true,
+			help: 'Optional. Left empty, search engines are given ' ~ sf.preview.default_title ~ '. The site\'s name follows it in a search result. Up to ' ~ sf.title_limit ~ ' characters; a result shows about ' ~ sf.title_shown ~ '.'})} %}
+{% block control %}<input class="cl-input" id="{{ sf.id }}-title" name="{{ sf.title_name }}" value="{{ sf.title }}" maxlength="{{ sf.title_limit }}" placeholder="{{ sf.preview.default_title }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search description', for: sf.id ~ '-description', full_width: true,
+			help: 'Optional. One or two plain sentences saying what the page offers, for the person searching. Left empty, the page\'s own words are used, as the placeholder shows. Up to ' ~ sf.description_limit ~ ' characters; a result shows about ' ~ sf.description_shown ~ '.'})} %}
+{% block control %}<textarea class="cl-input" id="{{ sf.id }}-description" name="{{ sf.description_name }}" rows="3" maxlength="{{ sf.description_limit }}" placeholder="{{ sf.preview.default_description }}" {{ ui_field_attrs(props) }}>{{ sf.description }}</textarea>{% endblock %}
+{% endembed %}
+		{% if sf.hidden is not null %}
+			{{ ui('form.picture-choice', {multiple: true, legend: 'Search engines', legend_hidden: true, size: 'small', selected: sf.hidden ? [sf.hidden_name] : [], items: [
+				{value: sf.hidden_name, label: 'Keep it out of search engines', icon: lucide('eye-off'), note: 'Search engines are asked not to list its page, and it leaves the sitemap. People who have the link can still open it. Untick it to let it be found.'},
+			]}) }}
+		{% endif %}
+	</div>
+	{% include '@platform/partials/admin/search-preview.html.twig' with {sp: {id: sf.id ~ '-preview', title_field: sf.id ~ '-title', description_field: sf.id ~ '-description', preview: sf.preview, site: sf.site, title_shown: sf.title_shown, description_shown: sf.description_shown}} only %}
+</div>

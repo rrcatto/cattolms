@@ -1,0 +1,52 @@
+{#
+	The sections of Settings in the order the owner arranged them (owner, 2026-11-09; Configuration\SettingsOrder), each one a
+	row of the shared sortable list: its drag handle (shown with JavaScript), the section, and a menu that moves it to the
+	top, up, down or to the bottom, which works without JavaScript. Only someone who may change settings sees the handles,
+	the menus and Reset. settings_sections holds each section as settings.html.twig drew it; one with nothing to show is
+	left out. The list's data-order is the whole order, sent with a move so a page left open while the order changed is
+	refused rather than undone.
+#}
+{% set settings_manage = can_manage_settings|default(false) %}
+{# Without an order given (a page drawn with only some of its data), the sections in the order they were drawn. #}
+{% set settings_order = settings_order|default(settings_sections|keys) %}
+{% set settings_drawn = settings_order|filter(key => settings_sections[key] is defined and settings_sections[key]|trim != '') %}
+<div class="cl-tree-wrap cl-settings-order"{% if settings_manage %} data-controller="settings-order" data-settings-order-url-value="/admin/settings/order" data-action="dragstart->settings-order#start dragover->settings-order#over dragleave->settings-order#leave drop->settings-order#drop dragend->settings-order#end submit->settings-order#menu"{% endif %}>
+	{# The page's own card: what Settings is, how to arrange its sections, Reset, and what a move did. #}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Platform settings', eyebrow: 'Settings', summary: 'Open a section to change its settings, then use that section’s save button.'}) }}
+		{% if settings_manage %}
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<div class="cl-settings-order-head">
+				<p class="cl-tree-help" id="settings-order-keys">Put the sections in the order you want with each one's ⋯ menu<span data-settings-order-target="enhanced" hidden>, or drag one by its handle and drop it on the upper or lower part of another. On a focused handle, ↑ and ↓ move it, and Home and End move it to the top or bottom</span>.</p>
+				{% if settings_arranged|default(false) %}
+					<form action="/admin/settings/order/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Back to the standard order', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset', confirm: 'Put the sections of Settings back in their standard order?'}) }}</form>
+				{% endif %}
+			</div>
+			<p class="cl-tree-status" role="status" aria-live="polite" data-settings-order-target="status"></p>
+			<p class="cl-tree-error" role="alert" data-settings-order-target="error" hidden></p>
+		{% endif %}
+{% endblock %}
+	{% endembed %}
+	<ol class="cl-tree-list cl-settings-sections" id="settings-sections" data-parent="" data-order="{{ settings_order|join(',') }}" aria-label="Settings sections"{% if settings_manage %} data-settings-order-target="tree"{% endif %}>
+		{% for key in settings_drawn %}
+			{% set title = (settings_titles|default({}))[key]|default(key) %}
+			{% set first_section = loop.first %}{% set last_section = loop.last %}
+			<li class="cl-tree-node" id="settings-order-{{ key }}" data-node-id="{{ key }}" data-depth="1" data-height="1">
+				<div class="cl-tree-row cl-settings-row">
+					{% if settings_manage %}<button type="button" class="cl-tree-handle" aria-label="Move {{ title }}" aria-describedby="settings-order-keys" data-settings-order-target="handle" data-action="pointerdown->settings-order#arm keydown->settings-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
+					<div class="cl-settings-section">{{ settings_sections[key] }}</div>
+					{% if settings_manage %}
+						{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'Move ' ~ title})} %}
+{% block body %}
+							{% for move in [{direction: 'top', label: 'Move to top', icon: 'action-move-top', allowed: not first_section}, {direction: 'up', label: 'Move up', icon: 'action-move-up', allowed: not first_section}, {direction: 'down', label: 'Move down', icon: 'action-move-down', allowed: not last_section}, {direction: 'bottom', label: 'Move to bottom', icon: 'action-move-bottom', allowed: not last_section}] %}
+								<form action="/admin/settings/order/{{ key }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed, icon: move.icon}) }}</form>
+							{% endfor %}
+{% endblock %}
+						{% endembed %}
+					{% endif %}
+				</div>
+			</li>
+		{% endfor %}
+	</ol>
+</div>

@@ -1,12 +1,17 @@
 {# Each settings form saves independently; presentation uses the shared accordion pattern. #}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-		{{ ui('layout.section-head', {heading: 'Platform settings', eyebrow: 'Settings', summary: 'Open a section to change its settings, then use that section’s save button.'}) }}
-
-{% endblock %}
-{% endembed %}
 <div class="cl-admin-workspace">
+    {#
+        Every section is drawn into settings_sections under its name, then they are drawn in the order the owner arranged
+        (owner, 2026-11-09: "Is it possible for me to be able to drag and drop the settings accordions into the order I wish
+        them to display?", then "yes"; Configuration\SettingsOrder, settings_order). Whoever may change settings drags a
+        section by its handle, moves it from the keyboard on the handle, or uses its menu, which works without JavaScript
+        (settings_order_controller.js); a move puts the sections in their new order and draws nothing again, so what is
+        open and what is typed stay as they are.
+    #}
+    {# Stimulus, once for the page: the sections' order and the site logo's editor. #}
+    {{ importmap() }}
+    {% set settings_sections = {} %}
+    {% set section_html %}
     {% if site_mode|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site mode', summary: site_mode.mode == 'live' ? 'Live: real orders.' : 'Demo: test and development, nothing real.', id: 'settings-site', open: settings_open_section|default('') == 'site'})} %}
 {% block body %}
@@ -73,6 +78,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'site-mode': section_html}) %}
+    {% set section_html %}
     {# The site notification (owner, 2026-11-05: a promotion, or a warning that the site is going offline, with a countdown if wanted). #}
     {% if site_notification|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site notification', summary: site_notification.showing ? (site_notification.on_course_pages ? 'Showing, also while taking a course.' : 'Showing, except while taking a course.') : (site_notification.ended ? 'Its countdown has ended, so it is not showing.' : 'Not showing.'), id: 'settings-site-notification', open: settings_open_section|default('') == 'site-notification'})} %}
@@ -131,6 +138,170 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'site-notification': section_html}) %}
+    {% set section_html %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'The platform name.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
+{% block body %}
+
+		<form action="/admin/settings" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name', full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% block help_content %}
+
+					{{ ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info', size: 'small'}) }} Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+				{{ ui('action.button', {label: 'Save platform identity', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+		{% if platform_name_source=='database' %}
+			<form action="/admin/settings/platform-name/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Use APP_NAME from .env', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-reset'}) }}
+			</form>
+		{% endif %}
+
+{% endblock %}
+{% endembed %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'identity': section_html}) %}
+    {% set section_html %}
+    {# The Site Owner (owner, 2026-10-18): the business hosting the site, which the legal pages, financial
+       documents, certificates and EFT instructions name. Each detail has a .env default; a value saved here
+       replaces it until Reset. Every change is in the Activity log with its old and new value. #}
+    {% if site_owner|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site Owner', summary: 'The business hosting the site, its logo, and its bank account for EFT payments.', picture: site_owner.logo.url ?: '', id: 'settings-site-owner', open: settings_open_section|default('') == 'site-owner'})} %}
+{% block body %}
+
+			<p>The legal pages, invoices, receipts, credit notes, certificates and EFT instructions name the Site Owner. A course no company owns is the Site Owner's. Nobody belongs to it: ADMIN acts for it. A document keeps the details it was issued with, and an order those its buyer accepted.</p>
+			<form action="/admin/settings/site-owner" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% for key, field in site_owner.fields %}
+					{% set help = field.source == 'database' ? 'Set here. .env (' ~ field.env ~ ') says: ' ~ (field.environment ?: 'nothing') ~ '.' : 'From .env (' ~ field.env ~ ').' %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'site-owner-' ~ key, full_width: key in ['address', 'memberships', 'accreditation'], required: key in ['trading_name', 'legal_name', 'legal_form'], help: help})} %}
+{% block control %}
+{% if key == 'legal_form' %}<select id="site-owner-{{ key }}" name="{{ key }}" required {{ ui_field_attrs(props) }}>{% for value, label in site_owner.legal_forms %}<option value="{{ value }}" {{ field.value == value ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% elseif key in ['address', 'memberships', 'accreditation'] %}<textarea id="site-owner-{{ key }}" name="{{ key }}" rows="3" {{ ui_field_attrs(props) }}>{{ field.value }}</textarea>{% else %}<input id="site-owner-{{ key }}" name="{{ key }}" value="{{ field.value }}" {{ key in ['trading_name', 'legal_name'] ? 'required' : '' }}{{ key == 'email' ? ' type=email' : '' }}{{ key == 'bank_account_number' ? ' inputmode=numeric pattern=[0-9]{1,34}' : '' }}{{ key == 'bank_branch_code' ? ' inputmode=numeric pattern=[0-9]{6}' : '' }} {{ ui_field_attrs(props) }}>{% endif %}
+{% endblock %}
+{% endembed %}
+				{% endfor %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Save Site Owner details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+			{% if site_owner.overridden %}
+			<form action="/admin/settings/site-owner/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset Site Owner details to .env', variant: 'danger', size: 'small', confirm: 'Remove every saved Site Owner detail and follow .env?', icon: 'action-reset'}) }}
+			</form>
+			{% endif %}
+			{# The site logo (owner, 2026-11-09: "this should appear on PDFs the site generates"), on its own form: every PDF
+			   prints it, invoices, receipts, credit notes and certificates unless their design chooses another logo or none,
+			   and an email template shows it when it chooses the site logo. #}
+			<div class="cl-site-logo" id="settings-site-logo">
+				<h3 class="h5">Site logo</h3>
+				<p class="help">Your business's logo, in the top bar of every page. Every PDF the site makes prints it at the top: invoices, receipts, credit notes and certificates unless their design chooses another logo or none, and the money reports, ledger, wallet statements, legal pages and course PDFs. An email shows it when its template chooses the site logo (Mailing, Templates). Documents already issued keep the logo they had.</p>
+				{# The same controls as a profile picture (owner, 2026-11-09): turn it, size it, drag it, see it before it is saved;
+				   the frame is the logo's own shape (profile_image_controller.js, frame 'picture'). Without JavaScript the file is
+				   sent as it is. #}
+				<div class="cl-profile-image-panel cl-site-logo-panel" {{ stimulus_controller('profile-image', {frame: 'picture', maxWidth: 1200, maxHeight: 600}) }}>
+					<div class="cl-profile-image-current cl-site-logo-current" {{ stimulus_target('profile-image', 'placeholder') }}>
+						{% if site_owner.logo.url %}
+							<img class="cl-site-logo-preview" src="{{ site_owner.logo.url }}" alt="The site logo now">
+						{% else %}
+							<div class="cl-site-logo-preview cl-site-logo-empty"><span>No logo yet</span></div>
+						{% endif %}
+						<p class="help">{{ site_owner.logo.url ? 'The site logo now.' : 'Upload one to show it in the top bar, the PDFs and the emails that choose it.' }}</p>
+					</div>
+					<div class="cl-profile-image-actions">
+						<form action="/admin/settings/site-owner/logo" method="post" enctype="multipart/form-data" data-action="submit->profile-image#capture">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							<input type="hidden" name="edited_image" {{ stimulus_target('profile-image', 'data') }}>
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: site_owner.logo.url ? 'Replace the site logo' : 'Upload the site logo', for: 'site-owner-logo', required: true,
+								help: 'PNG with a transparent background is best, or JPEG' ~ (site_owner.logo.draws_svg ? ', or SVG, which the site draws as it is' : '') ~ '. At most 12 MB. Stored at most 1200 by 600 pixels, its shape kept.'})} %}
+{% block control %}<input id="site-owner-logo" type="file" name="logo" accept="image/png,image/jpeg{{ site_owner.logo.draws_svg ? ',image/svg+xml,.svg' : '' }}" required {{ stimulus_target('profile-image', 'file') }} data-action="change->profile-image#choose" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+							<div class="cl-image-editor cl-image-editor--picture" {{ stimulus_target('profile-image', 'editor') }} hidden>
+								<div class="cl-image-editor-stage">
+									<canvas class="cl-image-editor-canvas" width="480" height="240" {{ stimulus_target('profile-image', 'stage') }} data-action="pointerdown->profile-image#onPointerDown" aria-label="Drag to move the logo inside the frame"></canvas>
+									<div class="cl-image-editor-mask" aria-hidden="true"></div>
+								</div>
+								<div class="cl-image-editor-controls">
+									<div class="cl-image-editor-buttons">
+										{{ ui('action.button', {label: 'Left', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn anticlockwise', stimulus_action: 'profile-image#rotateLeft', icon: 'action-rotate-left'}) }}
+										{{ ui('action.button', {label: 'Right', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn clockwise', stimulus_action: 'profile-image#rotateRight', icon: 'action-rotate-right'}) }}
+										{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'button', title: 'Back to the starting position', stimulus_action: 'profile-image#recentre', icon: 'action-reset'}) }}
+									</div>
+									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Size', full_width: false, for: 'site-logo-zoom', help: 'At the smallest size the whole logo is kept. Make it larger and drag it to choose what the frame holds.'})} %}
+{% block control %}<input type="range" id="site-logo-zoom" min="1" max="4" step="0.02" value="1" {{ stimulus_target('profile-image', 'zoom') }} data-action="input->profile-image#zoom" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+									<div class="cl-image-editor-preview">
+										<canvas width="240" height="120" {{ stimulus_target('profile-image', 'preview') }} aria-label="Preview of the site logo"></canvas>
+										<span class="help">Preview</span>
+									</div>
+								</div>
+							</div>
+							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save the site logo', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-upload'}) }}{% endblock %}
+{% block secondary_actions %}{% if site_owner.logo.url %}{{ ui('action.button', {label: 'Remove the site logo', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove the site logo? The top bar, the PDFs and the emails that show it will show none until another is uploaded.', form: 'remove-site-logo', icon: 'action-remove'}) }}{% endif %}{% endblock %}
+{% endembed %}
+						</form>
+						{% if site_owner.logo.url %}
+						<form action="/admin/settings/site-owner/logo/remove" method="post" id="remove-site-logo">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+						</form>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+			{# The site's picture (owner, 2026-11-09: the hero), what a page without a picture of its own is shared with. #}
+			<div class="cl-site-logo" id="settings-site-picture">
+				<h3 class="h5">Site picture</h3>
+				<p class="help">The picture the site is shared with: when the home page, the catalogue, Help or any other page without a picture of its own is shared on Facebook, LinkedIn, X or WhatsApp, or shown by a search engine, this is its picture, and the share previews in Settings show it. Use your hero picture. A 1200 by 630 copy is cut from its middle, as below. A course, a bundle and a landing page keep their own pictures.</p>
+				{% if site_owner.picture.url %}
+					<figure class="cl-site-logo-current"><img class="cl-site-picture-preview" src="{{ site_owner.picture.url }}" alt="The site picture as it is shared" width="1200" height="630"></figure>
+				{% endif %}
+				<form action="/admin/settings/site-owner/picture" method="post" enctype="multipart/form-data">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: site_owner.picture.url ? 'Replace the site picture' : 'Upload the site picture', for: 'site-owner-picture', required: true, help: 'PNG, JPEG or WebP, at least 600 by 315 pixels, best 1200 by 630 or larger. At most 12 MB.'})} %}
+{% block control %}<input id="site-owner-picture" type="file" name="picture" accept="image/png,image/jpeg,image/webp" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save the site picture', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-upload'}) }}{% endblock %}
+{% block secondary_actions %}{% if site_owner.picture.url %}{{ ui('action.button', {label: 'Remove the site picture', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove the site picture? Pages without a picture of their own are then shared without one.', form: 'remove-site-picture', icon: 'action-remove'}) }}{% endif %}{% endblock %}
+{% endembed %}
+				</form>
+				{% if site_owner.picture.url %}
+				<form action="/admin/settings/site-owner/picture/remove" method="post" id="remove-site-picture">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+				</form>
+				{% endif %}
+			</div>
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'site-owner': section_html}) %}
+    {% set section_html %}
     {# Messages to you (owner, 2026-11-05: "yes telegram, paid orders only"): a message to the owner's phone by Telegram. The key is never shown back. #}
     {% if owner_messages|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Messages to you', summary: owner_messages.title, summary_tone: owner_messages.title_tone, id: 'settings-owner-messages', open: settings_open_section|default('') == 'owner-messages'})} %}
@@ -201,6 +372,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'owner-messages': section_html}) %}
+    {% set section_html %}
     {# Who can sign in (owner, 2026-10-21: "disallow all non-admin logins ... a whitelist of allowed emails"). #}
     {% if sign_in|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Who can sign in', summary: sign_in.restricted ? 'Administrators and the listed addresses only.' : 'Everyone.', id: 'settings-sign-in', open: settings_open_section|default('') == 'sign-in'})} %}
@@ -230,6 +403,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'sign-in': section_html}) %}
+    {% set section_html %}
     {# Two-step sign-in (owner, 2026-11-05, the approved mockup): who has to use a code from an authenticator app, over AUTH_TWO_STEP. #}
     {% if two_step_policy|default(null) %}
     {% set tsp = two_step_policy %}
@@ -257,7 +432,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
-    {# Mailing (owner, 2026-10-26): how news is sent, through what, and the sending discipline. #}
+    {% endset %}{% set settings_sections = settings_sections|merge({'two-step': section_html}) %}
+    {% set section_html %}
     {# Sign-up checks (owner, 2026-10-26): the countries registrations are judged by, and what the check reads. #}
     {% if signup_checks|default(null) %}
     {% set sc = signup_checks %}
@@ -299,46 +475,12 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'signup-checks': section_html}) %}
+    {% set section_html %}
     {# Search engines and AI (owner, 2026-11-06): AI crawlers, the Search Console and Bing codes, and share pictures. #}
     {% if search_engines|default(null) %}{% include '@platform/partials/admin/settings-search-engines.html.twig' %}{% endif %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'The platform name.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
-{% block body %}
-
-		<form action="/admin/settings" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name', full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% block help_content %}
-
-					{{ ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info', size: 'small'}) }} Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-				{{ ui('action.button', {label: 'Save platform identity', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-		{% if platform_name_source=='database' %}
-			<form action="/admin/settings/platform-name/reset" method="post" class="cl-mt-2">
-				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Use APP_NAME from .env', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-reset'}) }}
-			</form>
-		{% endif %}
-
-{% endblock %}
-{% endembed %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'search-engines': section_html}) %}
+    {% set section_html %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'SMTP / outgoing email', summary: 'Mail server and sender details.', id: 'settings-mail', open: settings_open_section|default('') == 'mail'})} %}
 {% block body %}
 
@@ -450,44 +592,8 @@
 
 {% endblock %}
 {% endembed %}
-    {# The Site Owner (owner, 2026-10-18): the business hosting the site, which the legal pages, financial
-       documents, certificates and EFT instructions name. Each detail has a .env default; a value saved here
-       replaces it until Reset. Every change is in the Activity log with its old and new value. #}
-    {% if site_owner|default(null) %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site Owner', summary: 'The business hosting the site, and its bank account for EFT payments.', id: 'settings-site-owner', open: settings_open_section|default('') == 'site-owner'})} %}
-{% block body %}
-
-			<p>The legal pages, invoices, receipts, credit notes, certificates and EFT instructions name the Site Owner. A course no company owns is the Site Owner's. Nobody belongs to it: ADMIN acts for it. A document keeps the details it was issued with, and an order those its buyer accepted.</p>
-			<form action="/admin/settings/site-owner" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{% for key, field in site_owner.fields %}
-					{% set help = field.source == 'database' ? 'Set here. .env (' ~ field.env ~ ') says: ' ~ (field.environment ?: 'nothing') ~ '.' : 'From .env (' ~ field.env ~ ').' %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'site-owner-' ~ key, full_width: key in ['address', 'memberships', 'accreditation'], required: key in ['trading_name', 'legal_name', 'legal_form'], help: help})} %}
-{% block control %}
-{% if key == 'legal_form' %}<select id="site-owner-{{ key }}" name="{{ key }}" required {{ ui_field_attrs(props) }}>{% for value, label in site_owner.legal_forms %}<option value="{{ value }}" {{ field.value == value ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% elseif key in ['address', 'memberships', 'accreditation'] %}<textarea id="site-owner-{{ key }}" name="{{ key }}" rows="3" {{ ui_field_attrs(props) }}>{{ field.value }}</textarea>{% else %}<input id="site-owner-{{ key }}" name="{{ key }}" value="{{ field.value }}" {{ key in ['trading_name', 'legal_name'] ? 'required' : '' }}{{ key == 'email' ? ' type=email' : '' }}{{ key == 'bank_account_number' ? ' inputmode=numeric pattern=[0-9]{1,34}' : '' }}{{ key == 'bank_branch_code' ? ' inputmode=numeric pattern=[0-9]{6}' : '' }} {{ ui_field_attrs(props) }}>{% endif %}
-{% endblock %}
-{% endembed %}
-				{% endfor %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-{{ ui('action.button', {label: 'Save Site Owner details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-			{% if site_owner.overridden %}
-			<form action="/admin/settings/site-owner/reset" method="post" class="cl-mt-2">
-				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Reset Site Owner details to .env', variant: 'danger', size: 'small', confirm: 'Remove every saved Site Owner detail and follow .env?', icon: 'action-reset'}) }}
-			</form>
-			{% endif %}
-
-{% endblock %}
-{% endembed %}
-    {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'smtp': section_html}) %}
+    {% set section_html %}
     {# Payment methods (owner, 2026-10-19): one tick box per method; a method can be ticked only when it is configured. #}
     {% if payment_methods|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Payment methods', summary: 'What checkout offers. The wallet is always available to spend.', id: 'settings-payment-methods', open: settings_open_section|default('') == 'payment-methods'})} %}
@@ -506,6 +612,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'payment-methods': section_html}) %}
+    {% set section_html %}
     {# Identity verification (owner, 2026-10-19): through Didit's hosted page; the keys come from .env only. #}
     {% if identity_settings|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? (identity_settings.key_kind == 'sandbox' ? 'Connected to Didit\'s sandbox.' : 'Connected to Didit.') : (identity_settings.sandbox_on_live ? 'Not available: a sandbox key on a live site.' : 'Not available: keys missing from .env.'), id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity-verification'})} %}
@@ -530,7 +638,9 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
-    {% include '@platform/partials/admin/commerce-settings.html.twig' %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'identity-verification': section_html}) %}
+    {% for commerce_key in ['fees', 'references', 'wallet', 'orders'] %}{% set section_html %}{% include '@platform/partials/admin/commerce-settings.html.twig' with {commerce_only: commerce_key} %}{% endset %}{% set settings_sections = settings_sections|merge({('commerce-' ~ commerce_key): section_html}) %}{% endfor %}
+    {% set section_html %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Configuration model', summary: 'How platform configuration is stored.', id: 'settings-configuration', open: settings_open_section|default('') == 'configuration'})} %}
 {% block body %}
 
@@ -569,6 +679,8 @@
 
 {% endblock %}
 {% endembed %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'configuration': section_html}) %}
+    {% set section_html %}
     {# Course positions (owner, 2026-11-01: "yes, build automatic ranges"): a course arriving with no position takes the
        next free number in its code's range. #}
     {% if course_positions|default(null) %}
@@ -596,6 +708,8 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'course-positions': section_html}) %}
+    {% set section_html %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Maintenance', summary: 'The scheduled jobs, and expired login and session records.', id: 'settings-maintenance', open: settings_open_section|default('') == 'maintenance'})} %}
 {% block body %}
 
@@ -714,4 +828,6 @@
 
 {% endblock %}
 {% endembed %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'maintenance': section_html}) %}
+    {% include '@platform/partials/admin/settings-order.html.twig' %}
 </div>

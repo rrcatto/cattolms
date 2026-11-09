@@ -1,12 +1,14 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 1.1.0 (development) **Date time:** 2026/11/07 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 1.1.2 (development) **Date time:** 2026/11/08 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
 **How to use it.** Before building or changing any interface surface, read the section that covers it. After changing a shared control, re-check every surface that uses it. Where a rule is machine- checkable it names the test or tool that enforces it; a rule with an enforcement entry is not allowed to regress silently.
 
 **Rule numbering is stable.** Add new rules at the end of their section with the next free number. Never renumber, because reports and commit messages cite these numbers.
+
+**Only the rules in force are kept here, under 150,000 characters.** Change a rule in place; when one no longer applies, mark it withdrawn with the date and keep its number, as 1.5 and 6.1a are. A change is recorded in `CHANGELOG.md` under the release that brings it, citing the rule's number, and the Git history keeps every earlier version.
 
 ---
 
@@ -221,7 +223,7 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.1a Withdrawn 2026/11/07.** It described Gilded Noir's own texture (gold hairlines raked up from the left at about 14 degrees on the theme's fixed canvas), which replaced the platform canvas. Gilded Noir left the code with the other themes on 2026-11-07 (rule 7.1) and remains in the Git history at v1.1.0. The principle stands for any theme that brings its own texture: it suppresses the platform canvas rather than carrying both, because two textures on one page fight each other.
 
-**6.2 Course card.** A course card carries, in this order: the course icon or image, the course name, the description, the category breadcrumb with every ancestor category clickable, the tags under a "Tags" label, the price, the level, the number of Course Items, the favourite star, and a "View course" button. It does **not** show the access period. Public catalogue cards use one canonical grid: four columns on large desktops, three on smaller desktops, two on tablets and one on phones. Public results paginate in pages of 24. A course bundle in the bundle catalogue is shown with this same card and grid (owner instruction, 2026/10/06: reuse the course card rather than duplicating its markup), with its own facts — number of courses, access, price — and a "View bundle" button. Under its price a bundle's card says what it saves, "Save R ..." (owner, 2026-11-06, the approved mockup), where a marked-down course's card says "Special: save n%"; one whose sale starts later says "On sale from 16 Nov 2026" beside it, and a bundle's card has the same favourite star as a course's (owner, 2026-11-06). → Enforced by `CourseCardContractTest` and `UiComponentContractTest`.
+**6.2 Course card.** A course card carries, in this order: the course icon or image, the course name, the description, the category breadcrumb with every ancestor category clickable, the tags under a "Tags" label, the price, the level, the number of Course Items, the favourite star, and a "View course" button. It does **not** show the access period. Public catalogue cards use one canonical grid: four columns on large desktops, three on smaller desktops, two on tablets and one on phones. Public results paginate in pages of 24. A course bundle has a card of its own (rule 8.8), not this one: under its price it says what it saves, "Save R ..." (owner, 2026-11-06, the approved mockup), where a marked-down course's card says "Special: save n%"; one whose sale starts later says "On sale from 16 Nov 2026" beside it, and it has the same favourite star as a course's card (owner, 2026-11-06). → Enforced by `CourseCardContractTest` and `UiComponentContractTest`.
 
 **6.3 Row menu.** The stacked action panel described in section 3.
 
@@ -279,9 +281,9 @@ When duplicating a palette selector to match both forms, rewrite each selector i
 
 **8.1 The catalogue shows the data that exists.** There is one kind of data and no universe switch.
 
-**8.2 `/courses` reads top to bottom: category, search, courses.** Owner instruction, 2026/10/01. Page head, then one card holding the optional category picker and the shared catalogue search, then the course workspace. The picker is the canonical `form.tree-select`: one form-control row showing the chosen path (`Business › Management › Project Management`), opening a native popover that starts with the main categories, each with a disclosure button that opens its subcategories (only the branches leading to the current category open by themselves, and only the button opens or closes a branch), with the current category highlighted and focused. Without JavaScript the whole tree is listed. Every level is selectable; choosing one opens the category's own page, `/courses/category/{slug}` (owner, 2026-11-06: an address a visitor can open carries the category's name, for search engines, never its number): the picker and the cards name a category by its slug, and with JavaScript they go straight to its page (`data-named-pages`); without it the form asks `/courses?category={slug}`, which sends the reader there. A category's number opens nothing. The tile grid and Tier 2/Tier 3 rails it replaced are removed. The workspace opens on every published course, newest first, 24 to a page (owner, 2026-10-19); it never loads more than one page.
+**8.2 `/courses` reads top to bottom: category, search, courses.** Owner instruction, 2026/10/01. Page head, then one card holding the optional category picker and the shared catalogue search, then the course workspace. The picker is the canonical `form.tree-select`: one form-control row showing the chosen path (`Business › Management › Project Management`), opening a native popover that starts with the main categories, each with a disclosure button that opens its subcategories (only the branches leading to the current category open by themselves, and only the button opens or closes a branch), with the current category highlighted and focused. Without JavaScript the whole tree is listed. Every level is selectable; choosing one opens the category's own page, `/courses/category/{slug}` (owner, 2026-11-06: an address a visitor can open carries the category's name, for search engines, never its number): the picker and the cards name a category by its slug, and with JavaScript they go straight to its page (`data-named-pages`); without it the form asks `/courses?category={slug}`, which sends the reader there. A category's number opens nothing. The workspace opens on every published course, newest first, 24 to a page (owner, 2026-10-19); it never loads more than one page.
 
-A category shows every course in it and in all its subcategories, down to the third level, and search covers the same scope: higher up shows more, lower down fewer (owner, 2026-10-19). Above the courses, one light line traces the way down from All courses to the category (`layout.breadcrumb`, labelled "Category path") and beneath it the categories directly beneath (the main categories on All courses) are short feature cards (`form.picture-choice`, `size: 'small'`, `columns: 4`, owner 2026-10-20): four to a row, further rows beneath, left-aligned, each with its icon (a plain one when it has none), its name as the bold title and its description (`CourseService::categoryNavigation`). They are native radios in a GET form to `/courses`: a pointer choice, Space or Enter opens the category at once (`data-choose-submits`, arrow keys only move), and without JavaScript Show courses does. The deepest level shows no cards. Courses with a position in the catalogue (the course's Details tab, `courses.catalogue_position`) come first, lowest first, then the rest newest first; positions are numbered in hundreds to leave room between courses. Category links and card breadcrumbs use `/courses/category/{slug}`. Recursive public accordions, lazy-open fragments and the old `open` query parameter are obsolete.
+A category shows every course in it and in all its subcategories, down to the third level, and search covers the same scope: higher up shows more, lower down fewer (owner, 2026-10-19). Above the courses, one light line traces the way down from All courses to the category (`layout.breadcrumb`, labelled "Category path") and beneath it the categories directly beneath (the main categories on All courses) are short feature cards (`form.picture-choice`, `size: 'small'`, `columns: 4`, owner 2026-10-20): four to a row, further rows beneath, left-aligned, each with its icon (a plain one when it has none), its name as the bold title and its description (`CourseService::categoryNavigation`). They are native radios in a GET form to `/courses`: a pointer choice, Space or Enter opens the category at once (`data-choose-submits`, arrow keys only move), and without JavaScript Show courses does. The deepest level shows no cards. Courses with a position in the catalogue (the course's Details tab, `courses.catalogue_position`) come first, lowest first, then the rest newest first; positions are numbered in hundreds to leave room between courses. Category links and card breadcrumbs use `/courses/category/{slug}`.
 
 **8.3 `/courses/tags` is a tag cloud of the tags in use, as server-rendered links.** Only tags that label at least one published course are listed. The more courses a tag labels, the bigger it is: five sizes on a logarithmic scale (`CourseTagController::weighted`), so the most used tags stand out at a glance (owner, 2026-10-18). An optional TagCloud.js sphere animates the 30 most used, each at its size, beside the list on desktop; the two areas stack on narrower screens. The vocabulary is a visible, keyboard-scrollable pane, never a disclosure. Reduced motion disables the animation, and script failure leaves every real tag link usable. Selecting `/courses/tag/{slug}` marks that tag, retains the browser and scopes search to the tag. Tag chips on cards and in the browser use the same canonical component.
 
@@ -321,7 +323,7 @@ A category shows every course in it and in all its subcategories, down to the th
 
 **9.4 Social Media holds the profile's outbound links:** LinkedIn, YouTube, GitHub, Google, Facebook, Instagram, X, Threads, TikTok, WhatsApp, Telegram, Signal.
 
-**9.5 Signing in by Telegram, and two-step sign-in, look as the approved mockup draws them.** Owner instruction, 2026-11-05: "telegram login mockup looks good. approved" (`REPORTS/telegram-sign-in-mockup/`). While Telegram is offered, the Sign in page asks "How should we reach you?" with two feature cards, Email address and Telegram account, and shows only the chosen way's field and button; without JavaScript both show, and the button pressed is the way read. The page after asking by Telegram is the same whether or not the account exists. Account > Sign-in and security has one card for Telegram and one for two-step sign-in, each changing in place (rule 8.6a), each with its state as a badge in its head. A code is typed in one large spaced field (`cl-input-code`); a QR code sits on white in every theme; recovery codes are shown once, in a grid. Settings > Messages to you shows its four ticks as one row of short feature cards, Login via Telegram, New Account, New Order and Payment made, in that order (owner, 2026-11-06: "You should be able to get 4 checkboxes on one row"). → Checked by `tests/Browser/telegram-sign-in.cjs`.
+**9.5 Signing in by Telegram, and two-step sign-in, look as the approved mockup draws them.** Owner instruction, 2026-11-05: "telegram login mockup looks good. approved". While Telegram is offered, the Sign in page asks "How should we reach you?" with two feature cards, Email address and Telegram account, and shows only the chosen way's field and button; without JavaScript both show, and the button pressed is the way read. The page after asking by Telegram is the same whether or not the account exists. Account > Sign-in and security has one card for Telegram and one for two-step sign-in, each changing in place (rule 8.6a), each with its state as a badge in its head. A code is typed in one large spaced field (`cl-input-code`); a QR code sits on white in every theme; recovery codes are shown once, in a grid. Settings > Messages to you shows its four ticks as one row of short feature cards, Login via Telegram, New Account, New Order and Payment made, in that order (owner, 2026-11-06: "You should be able to get 4 checkboxes on one row"). → Checked by `tests/Browser/telegram-sign-in.cjs`.
 
 **9.6 Favourites and Course Requests are pages of their own, after My Courses.** Owner instruction, 2026-11-06: "Allow bundles to be added to favourites - it must appear in course favourites. Under Account>Courses, there is no Favourites menu-item - you bury it on My Courses. The My Courses page should be restricted to showing courses you're currently taking and completed courses. Favourites must get its own page and menu-item." Account > Courses lists My Orders, My Wallet, My Courses, Favourites, Course Requests (only for an account that belongs to a company) and My Certificates. My Courses has two feature cards, Current courses and Completed courses. Favourites (`/account/favourites`) shows the courses and bundles the person starred, newest first, with the catalogue's cards or a table (List and Grid, remembered), a feature card each for All favourites, Courses and Bundles saying how many each holds, the search from five and the paging My Courses uses; each card opens its page and its star unstars it in place. Course Requests (`/account/requests`) is the table that was on My Courses. → Enforced by `AccountFavouritesIntegrationTest`, `AccountLibraryListsIntegrationTest`, `NavigationContractTest` and `tests/Browser/bundles-round-two.cjs`.
 
@@ -353,8 +355,8 @@ A category shows every course in it and in all its subcategories, down to the th
 
 **11.3 An error says what happened in plain words.** The error page is built like every page: a title that names the kind (We could not find that page, You can't open this page, Something went wrong on our side), the reason as a plain sentence (the router's "No route found" and an expired form's token are put in words), a card with what the reader can do next, and the status code in small print. A record that is someone else's is not found to them, as a record that does not exist, never "it belongs to another …": numbers count up, and that sentence tells a stranger the record exists. Someone who manages it is taken to it in Administration instead (an order link opened by ADMIN opens the order there). → `tests/Browser/order-links.cjs`.
 
-
 **11.4 A course is named by its code in every address that is not one of its public pages, and no address a visitor can open carries a row id.** Owner instructions, 2026-11-06: "You must not use internal db id fields in any urls ... All courses must be referred to by their course code in urls", narrowed the same day ("every url that is public, that is not hidden behind a login screen needs to prioritise SEO. things like courses, categories, tags, should all use their names in the url ... If the data is not sensitive or is already protected ... then it is okay to keep the id field in the url"), and "in my admin pages, to identify important things, a recogniseable code is better such as the course code". A course's public pages keep its name (`/courses/{slug}`, its public preview, its landing page, its share picture); everywhere else, Administration, the Company workspace's star, Follow, the API and the MCP tool, it is its code: `/admin/courses/GDN-101/content`, `#course-GDN-101`, `?course=GDN-101`, `course:GDN-101`. A code holds a letter, so it never looks like a number, and a category's slug is never new, inline or field, words its Administration addresses use. Every course address is made by `Course\CourseAddress` in PHP and `course_admin_url()`, `course_anchor()` and `course_url()` in templates; a script reads the address the page gives it (`data-*-url`). A number stays only where a sign-in protects it, for a record nobody names by a code (11.5). → Enforced by `RowIdRouteContractTest`, `RowIdAddressScanTest`, `CourseAddressTest` and `tests/Browser/no-row-ids.cjs`.
+
 **11.5 Every other record with a code is named by it in its address, and only records nobody names by a code keep their numbers.** Owner instructions, 2026-11-06: "to identify important things, a recogniseable code is better ... if they have one ... they should use that too", "Never may a guessable number open private information to the public", and the part name for a course's parts ("yes, do it that way"). A person is their account reference as the site stores it (`/admin/people/CL2026011510423Z`, `/company/people/CL…`, `/mailing/subscribers/CL…`, `/admin/wallets/person/CL…`), a company its account reference (`/admin/companies/CL…`), an order its number (`/account/orders/CL-00000689`, `/admin/commerce/orders/CL-00000689`, `?order=CL-00000689`, an underpaid order on Needs your attention), an invoice, receipt or credit note its number (`…/documents/INV-00000044`), a bundle its code (`/admin/bundles/BDL-GARDEN`, `#bundle-BDL-GARDEN`), a promotion its code (`/admin/promotions/SUMMER25`), a category or a tag its slug (`/admin/courses/categories/garden-design`, `/follow/tag/raised-beds`, `category:garden-design`), an issued certificate its number (`/admin/certificates/CL-2026-…`, `/account/certificates/CL-2026-…`), a contact message its reference (`/admin/messages/MSG-000043`), a Course Item the slug of its name, which is unique as a slug too (`/admin/course-items/gdn-101-module-1-presentation`), and a course's part its part name, made from its place when it is placed and kept when it moves (`/learn/growing-vegetables/module-1-presentation`, `/courses/growing-vegetables/preview/module-1-presentation`). Every key holds a letter and is never a fixed word beside it, and a lookup by it is exact. Each record's address is made in one place (`Support\Address`, and in templates `person_url()`, `company_url()`, `order_url()`, `my_order_url()`, `order_document_url()`, `bundle_admin_url()`, `promotion_url()`, `category_admin_url()`, `tag_admin_url()`, `follow_url()`, `certificate_url()`, `message_url()`, `course_item_url()`, `part_url()`, `preview_part_url()` and `content_part_url()`), and emails link the same addresses. Old numeric addresses answer not found, with no redirect. Roles, page layouts, certificate designs, landing sections, price options, resources, reviews, enrolments, credits, requests, refunds, deposits, ledger lines, trail and payment events, the activity log, sign-ins, identity checks, sign-up attempts, lockouts, refused addresses and everything in Mailing keep their numbers, behind a sign-in. → Enforced by `RowIdRouteContractTest` (`RECORDS`, `KEEP_NUMBERS`), `RowIdAddressScanTest` (`RECORDS_BY_HAND`, `BUILT_FROM_IDS` with why), `RecordAddressTest`, `tests/Browser/no-row-ids.cjs` (a visitor, a learner, a Company Administrator and an administrator) and `tests/Browser/mail-links.cjs`.
 
 ---
@@ -371,154 +373,15 @@ A category shows every course in it and in all its subcategories, down to the th
 
 ---
 
-## Changelog
-
-2026/11/08 SAST (bundle cards under the pointer)
-
-- 8.8: a bundle's card grows, lights up and pulses its Save badge under the pointer or the keyboard, from the approved mockup; it only lights up with motion turned off.
-
-2026/11/07 SAST (bundles' own drawings)
-
-- 8.8: each bundle has a drawing of its own across the top of its card, at the head of its page (which opens as its card does) and as its shared-link picture, from the approved mockup.
-
-2026/11/07 SAST (bundles as bundles)
-
-- 8.8: the catalogue's bundles have a section, cards and a list of their own, shorter than a course card and in the bundle colour, six to a page, and page and change view apart from the courses on every page of courses and with a search, from the approved mockup; the Bundles page and Favourites draw a bundle with its own card.
-
-2026/11/07 SAST (refused forms)
-
-- 4.10: a refused form comes back as it was typed and chosen, its window open; every create form keeps what was sent.
-
-2026/11/07 SAST (one bundled theme)
-
-- 7.1: Saharan Sunset is the one bundled theme, the default and the acceptance theme; the other five left the code and remain in the Git history at v1.1.0, and Factory Reset is no longer the recovery theme. 6.1a withdrawn, keeping its principle. 1.6b, 1.7, 1.8, 1.10, 6.6, 6.7, 7.2, 7.4, 7.9, 8.7 and the cart note no longer describe the removed themes, and the browser checks named in the rules check the bundled theme.
-
-2026/11/07 SAST (no row ids in addresses, stage 2)
-
-- 11.5: every other record with a code is named by it in its address (people and companies by account reference, orders and documents by number, bundles and promotions by code, categories and tags by slug, certificates by number, contact messages by reference, Course Items by the slug of their name, a course's parts by their part name), and only records nobody names by a code keep their numbers.
-
-2026/11/06 SAST (no row ids in addresses)
-
-- 11.4: a course is named by its code in every address that is not one of its public pages, and no address a visitor can open carries a row id. 8.2: the category picker and the cards open the category's own page by its slug.
-
-2026/11/06 SAST (bundles, round two)
-
-- 2.6k: the bundle list is edited in place, as the course list is, and the bundle form chooses its status from three cards. 8.8: a bundle whose sale starts later stays, saying when. 9.6: Favourites and Course Requests are pages of their own after My Courses, which keeps current and completed courses. 2.6c follows.
-
-2026/11/06 SAST (money reports)
-
-- 2.6j: Money Reports, each figure counted as the list it opens, from the approved mockup.
-
-2026/11/06 SAST (search engines and AI)
-
-- 8.9: a public page tells search engines and AI assistants only what it shows, in structured data and a share picture; Settings > Search engines and AI.
-
-2026/11/06 SAST (bundles beside the courses)
-
-- 8.8: a course's page offers each bundle it is in under the buy button, and the catalogue shows a row of bundles above the courses, from the approved mockup. 6.2: a bundle's card says what it saves.
-
-2026/11/05 SAST (Telegram sign-in and two-step sign-in)
-
-- 9.5: signing in by Telegram and two-step sign-in as the approved mockup draws them.
-
-2026/10/23 SAST (errors in plain words)
-
-- 11.2: the error page gets the reader from `Http\ViewIdentity`. 11.3: errors in plain words, built like every page; someone else's record is not found to them, and someone who manages it goes to it in Administration.
-
-2026/10/17 SAST (tables on phones)
-
-- 2.3 and 2.8: no table scrolls or pushes the page sideways at any width, and an action column is never narrower than its control.
-- 2.9: on a phone a table shows its essential columns, in 7pt, with the whole row in a tooltip and one Actions menu for several actions. 3.4: the Themes table uses that menu on a phone.
-
-2026/10/17 SAST
-
-- 7.10: Bootstrap 6 underneath (reboot, grid and utilities only); the browser floor is cascade layers; the colours a reader needs are stated in plain values by Core and every theme; a theme declares its colour scheme and keeps its look in a dark operating system.
-- 1.7: one construction for every page - the page's width chosen once, rows on Core's width variables, sections on cards with a grid only around two or more, section actions in the page head, no back links on menu pages, no group tabs.
-- 3.3 and 3.4: no typed plus beside the add icon; one row action is a small button, two or more the Actions menu.
-- 6.8: the page's CSS gives the social marks the link colour too, because Firefox drew them black; each mark links to its platform's home page until the settings give a profile address.
-
-2026/10/13 SAST
-
-- Commerce rules: the one terms acceptance box both checkouts share, and the legal pages (`/terms`, `/refunds`, `/privacy`) with their writing conventions.
-
-2026/10/09 SAST
-
-- 6.14: the course landing page and its editor.
-
-2026/10/08 SAST
-
-- 6.13: the financial document preview comes first as an A4 portrait page at about its printed size, with the form below it.
-
-2026/10/07 SAST — second pass
-
-- 6.12: the certificate preview comes first at the full width, about twice its former size, with the form below it.
-
-2026/10/07 SAST
-
-- 8.2: the catalogue's category picker opens on the main categories with every branch closed and a disclosure button per branch; the whole tree is listed without JavaScript.
-- 4.6: a course's category is chosen in the same picker on the course forms and the import review, with Uncategorised and + New at a chosen place.
-
-2026/10/06 SAST
-
-- 9.1: Billing Address is its own Profile page after Personal Particulars; Personal Particulars holds the particulars and the profile image again.
-
-- 6.2: the course card also presents course bundles, with their own facts; the card counts Course Items (it said modules).
-- Commerce checkout: the details step separates personal particulars from billing details; the promo code field and the subtotal/promotion/total lines; how bundles appear in the cart, on their page and in the ADMIN editor.
-- Course Components presentation: content is added only through "+ Add here".
-
-2026/10/05 SAST
-
-- 6.9: Popular Courses replaces the nine-course showcase: a sixteen-course pool rotated in the browser four at a time, pausable, held while in use, and still on reduced motion.
-
-2026/09/12 SAST — third pass
-
-- 6.11: a flash message takes its container with it, so the page head returns to the top of the box.
-
-2026/09/12 SAST — second pass
-
-- 1.6a: elements in a row line up, and the mixed-element rows are where it goes wrong.
-- 1.6b: Gilded Noir is insulated from cross-theme UI work; navigation is the exception.
-- 6.1a: GN texture — the theme keeps its own and suppresses the platform canvas.
-- 6.9: the nine-course home showcase, paging to ninety and sampling beyond it.
-- 6.10: the tags page shows its tags on arrival, behind nothing.
-
-2026/09/12 SAST
-
-- Recorded the page shape the platform now uses throughout: 1.7 how every page is built, 1.8 that nothing renders on the page canvas and that the check is the delivered HTML, 1.9 the boxed container the body sits in.
-- Navigation gained 5.5 to 5.7: marking the current entry at every level, why a group takes `nav-group-current` rather than `active`, why the state goes on the link and not on the icon inside it, why a flyout anchors to its own group, and keeping the scroll position across a load.
-- Named elements 6.5 to 6.8: the page canvas, the identity band, the core-owned site footer and the social marks — including why the marks are the one exception to the stroked-icon rule.
-- Themes gained 7.7 to 7.9: a theme may not define a rule in the `cl-` namespace, the palette is applied before the page paints rather than after, and palette colours are ordered darkest to lightest because the platform reads them positionally.
-- 7.1 corrected. Radiant Learning was listed as not warranting investment; from 2026/09/10 the owner worked in it and in Factory Reset directly and both were shaped extensively, so a defect in either is a defect.
-
-2026/09/10 09:15 SAST
-
-- 0.2 now states which shapes are exempt and why, after applying it to every form on the platform: a modal footer already is the action row, and inline row, compact act and list controls are controls rather than forms.
-
-2026/09/10 07:45 SAST
-
-- Added section 0 — the owner's overriding rule that a UI which is not obvious is broken, the single action row every form ends in, and the spacing point that produced the report.
-
-2026/09/10 07:10 SAST
-
-- Added 9.2.1 and 9.2.2 after the owner reported two upright photographs importing rotated, and asked to orient, size and preview an image before storing it.
-
-2026/09/10 04:50 SAST
-
-- Added 2.5 (widths are measured), 4.4 (both full-width spellings), section 11 (routing and page identity), and the comment-stripping half of 12.3. All four came out of applying the rules above to every screen rather than from a new instruction.
-
-2026/09/10 02:25 SAST
-
-- Created. Records every interface rule the owner has given through 2026/09/10, including the slanted texture definition, the table column-width rule, the row-action stacking rule, the course card contract, the profile submenu and the company type inference.
-
 ## Commerce checkout (owner instruction, 2026/09/13)
 
 - “Add to cart” stays on the course; “Buy now” adds the selection and opens checkout. Guests can build a cart before signing in.
 - Put the count-bearing cart icon and hover summary on the right of the breadcrumb bar, with “Proceed to checkout now” and Checkout to its left. Keep the disclosure usable by keyboard and touch.
 - Use My Cart (`/cart`). Account → COURSES contains My Orders (`/account/orders`) and My Courses (`/account/courses`); do not add a Purchases navigation item.
 - Checkout collects sign-in, then the learner's details (personal particulars and, separately, billing details from the reusable billing profile), then payment method and invoice-email preference, before review and “Place my order”. Orders retain downloadable PDF invoices.
-- A failed payment offers another method or paying later. Unpaid orders cancel after seven days; EFT uses the unique order number as its reference.
+- A failed payment offers another method or paying later. An unpaid order is cancelled at its due date (seven days by default). An EFT payer quotes their account reference, which every invoice opens with.
 - Terms acceptance (owner instruction, 2026/10/13): the review step and the company credit checkout end with one required tick box, "I have read and accept the Terms and Conditions and the Refund Policy.", both documents linked from the label and opening in a new tab so the checkout keeps what was entered. Both checkouts include `partials/commerce-terms-acceptance.html.twig`; do not write a second box or different wording. The server refuses an order without it. Checkout does not ask for an identity number.
-- Legal pages (owner instruction, 2026/10/13): `/terms`, `/refunds` and `/privacy` are Core pages for everyone, signed in or not. Each opens with `partials/legal-document-head.html.twig` (version, last-updated date, contents) and then one `layout.surface` per numbered section with a `layout.section-head`; label and value lists use `data.key-value-list`. The text is plain prose in British English with hyphens, no em dashes, no semicolons and straight quotes (`LegalDocumentsTest`). Themes list the pages only through the Core `footer_navigation`.
+- Legal pages (owner instruction, 2026/10/13): `/terms`, `/refunds` and `/privacy` are Core pages for everyone, signed in or not. Each opens with `partials/legal-document-head.html.twig` (the last-updated date, no version number, the document's opening sentence, the other two documents and its PDF), and each numbered section is a closed accordion (below). The text is plain prose in British English with hyphens, no em dashes, no semicolons and straight quotes (`LegalDocumentsTest`). Themes list the pages only through the Core `footer_navigation`.
 
 - Cart colours, opaque dropdown surfaces and button treatments belong to each theme. Core cart CSS owns geometry and interaction only.
 
@@ -532,7 +395,7 @@ A category shows every course in it and in all its subcategories, down to the th
 - Course cards and pages (owner instruction, 2026/10/20): every card's picture is one size (16:10). A course page opens with its cover picture and its title over it, says access starts "Immediately", lists the modules and other learning items but not the assessments, and shows a Reviews section (and a rating under the title) only when the course has an approved review; grading is explained in the FAQ (`/faq`), whose answers stay closed until their question, shown with an icon and its category, is chosen.
 - Was prices and automatic promotions (owner instruction, 2026/10/20): a marked-down price shows its was price struck through before it (read as "Was … now …") wherever the price is shown, with "Save R … (n%)" where the purchaser chooses or reviews it; the percentage is rounded down and only the price is charged. A promotion that applies automatically shows its code with "applied automatically" in the cart, at checkout and in the totals, with no Remove button, and the course and bundle pages announce it above the buttons with what the price comes to. One promotion applies to an order, the one that saves the most; a typed code that saves less is refused with the reason, and when the automatic one saves more the review says why.
 - Bundles (owner instruction, 2026/10/06): the cart and review identify a bundle clearly (“Includes N courses”) at its own price; the bundle page shows its courses with the catalogue's course cards, its price and, only where every course has a current price, the individual-course total and the saving. A learner who already has some of the courses is told so (“You already have access to 1 of the 3 courses in this bundle.”); the price never changes for it. The ADMIN bundle editor lists the courses in order with Add course, Move up/Move down and Remove.
-- Administration → Settings uses one shared-pattern accordion per section. Each editable section has its own save action; keep the saved section open. Bank details belong in `app_options`, never `.env`, and EFT orders display the current details and unique order reference.
+- Administration → Settings uses one shared-pattern accordion per section. Each editable section has its own save action; keep the saved section open. Bank details are the Site Owner's: `SITE_OWNER_BANK_*` in `.env` give the starting values and Settings → Site Owner overrides them, as for every setting; EFT instructions give the details in force and the account reference to quote.
 
 ## 13. Platform design system enforcement
 
@@ -544,15 +407,14 @@ A category shows every course in it and in all its subcategories, down to the th
 
 **13.4 Dataset composition delegates to the existing shared search and pagination.** Paired pagers have unique control IDs, stable results targets and ordinary GET URLs. No page invents its own pager.
 
-
 ### Remediation contracts
 
 Use `ui_field_attrs(props)` in every `form.field` native-control slot. Dynamic question controls must clone the server-rendered canonical prototypes; JavaScript may reindex controls but must not create a competing UI. Themes must not redefine canonical display, grids, overflow, positioning, visibility or touch dimensions. Notice headings have a dedicated hook, separate from prose emphasis. See `UI-COMPONENTS.md` for the helper, native action contracts and ownership enforcement.
 
-## v0.8.5 navigation regression rules
+## Navigation regression rules
 
 Core owns the mobile toggle and Escape handling. With JavaScript disabled, navigation stays visible and functional. Expanded narrow top headers stay in normal flow so they cannot cover page controls. Sidebar groups expand inline; desktop top-navigation groups use flyouts. Menu text must meet 4.5:1 contrast. Compact identity must not inherit full-band padding or avatar sizing. Verify both browser matrices after changes; do not infer shell correctness from component assertions alone.
 
 ## Course Components presentation ownership
 
-Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry. Course Content moves are saved at once; other authoring forms use explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Content is added to a course only through "+ Add here" in Course Content. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. Themes must not style or replace it. Ordinary content has no completion controls or progress indicators.
+Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry. Course Content moves are saved at once; other authoring forms use explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Content is added to a course only through "+ Add here" in Course Content. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. Themes must not style or replace it. Every reader page ends with the one paging row: Previous, the part's Mark complete and Next (rule 11.2a).

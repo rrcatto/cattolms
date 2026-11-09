@@ -8,11 +8,14 @@ Date time: 2026/10/06 SAST
 Version: 0.8.8.4
 
 Description:
-Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
+Creates the complete Catto Learning PostgreSQL schema and its reference data, the baseline into which the development migrations were consolidated (owner, 2026-10-06). There is one kind of data. SYSTEM.* is reserved for platform infrastructure. Later schema changes are upgrade migrations after it, which an existing site's update and a fresh installation both run.
 
 Changelog:
+2026/11/08 SAST
+- The description no longer says incremental migrations wait for production: that was never the owner's rule (owner,
+  2026-11-08: "there is no rule that says you cannot write an upgrade migration").
 2026/11/07 SAST (one theme)
-- A fresh database's active theme is Saharan Sunset 1.0.7 (saharan-sunset-v1.0.7), the one theme the code now bundles
+- A fresh database's active theme is Saharan Sunset 1.0.8 (saharan-sunset-v1.0.8), the one theme the code now bundles
   and its default (owner, 2026-11-07: the other themes "on ice until further notice").
 2026/11/07 SAST (no row ids in addresses, stage 2)
 - course_structure_nodes.part_name: each part's name in the reader's and the public preview's addresses, unique within
@@ -806,7 +809,7 @@ CREATE TABLE app_options (
     updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO app_options (option_key, option_value) VALUES
-    ('active_theme', 'saharan-sunset-v1.0.7'),
+    ('active_theme', 'saharan-sunset-v1.0.8'),
     ('acl_revision', '1');
 
 CREATE TABLE theme_registry (

@@ -11,6 +11,9 @@ Description:
 Provides mail infrastructure for Symfony Mailer, resolving the effective SMTP transport and sender identity from administrator-managed database settings with .env fallback at send time.
 
 Changelog:
+2026/11/09 SAST
+- Every email but a message to the site's own inbox is drawn in the template chosen for account and order emails
+  (Mailing\EmailRenderer::account), with its logo; it goes plain if the template cannot be drawn.
 2026/11/06 SAST
 - sendMoneyReport(): last month's money report with its PDF and Excel file, each attached as its own kind of file.
 2026/10/26 SAST
@@ -39,6 +42,7 @@ namespace CattoLearning\Infrastructure\Mail;
 use CattoLearning\Support\Duration;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Configuration\SiteMode;
+use CattoLearning\Mailing\EmailRenderer;
 use CattoLearning\Support\Env;
 use RuntimeException;
 use Symfony\Component\Mailer\Mailer;
@@ -48,7 +52,8 @@ use Symfony\Component\Mime\Email;
 
 class SymfonyMailerAdapter implements MailerInterface
 {
-    public function __construct(private readonly RuntimeSettings $settings, private readonly ?SiteMode $site = null)
+    /** $design draws each email in the template chosen for account and order emails (owner, 2026-11-09). */
+    public function __construct(private readonly RuntimeSettings $settings, private readonly ?SiteMode $site = null, private readonly ?EmailRenderer $design = null)
     {
     }
 
@@ -400,9 +405,23 @@ class SymfonyMailerAdapter implements MailerInterface
         }
 
         // Every email from a demo site says so (SiteMode, owner 2026-10-18), in its subject and first line.
-        if ($this->site !== null && $this->site->isDemo()) {
+        $demo = $this->site !== null && $this->site->isDemo();
+        if ($demo) $subject = SiteMode::EMAIL_PREFIX . $subject;
+        // Drawn in the template chosen for account and order emails (owner, 2026-11-09), which puts the demo notice at the
+        // top; a message to the site's own inbox stays plain. An email is never lost to its design: if the template cannot
+        // be drawn, it goes plain.
+        $designed = null;
+        if ($this->design !== null && $to !== $this->settings->mailConfiguration()['from_address']) {
+            try {
+                $designed = $this->design->account($subject, $html, $text);
+            } catch (\Throwable) {
+                $designed = null;
+            }
+        }
+        if ($designed !== null) {
+            [$html, $text] = [$designed['html'], $designed['text']];
+        } elseif ($demo) {
             $notice = $this->site->emailNotice();
-            $subject = SiteMode::EMAIL_PREFIX . $subject;
             $html = '<p><strong>' . $this->escape($notice) . '</strong></p>' . $html;
             $text = $notice . "\n\n" . $text;
         }

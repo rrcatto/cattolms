@@ -4,7 +4,8 @@
 	headings, and at the bottom of each one, my name, address, contact details"). DocumentPdfRenderer::renderPage
 	draws it from the same sections the page shows (partials/legal/*-sections.html.twig): each accordion prints
 	open, its number and title as a heading, its icon and toggle left out. Every page's foot carries the seller's
-	name and how to reach them, and the document ends with the seller's full details. Fonts are the bundled ones.
+	name and how to reach them, and the document ends with the seller's full details. Fonts are the bundled ones. The site
+	logo, when there is one, heads the first page (owner, 2026-11-09; pdf_logo).
 #}
 <!doctype html>
 <html lang="en" data-bs-theme="light">
@@ -29,6 +30,7 @@
 	#pdf-foot strong { color: #1f1915; }
 
 	.pdf-masthead { border-bottom: 1.6pt solid #9a4a2a; padding-bottom: 4.5mm; margin-bottom: 6mm; }
+	.pdf-logo-line { margin: 0 0 3mm; }
 	.pdf-site { font-family: Cormorant, serif; font-size: 12pt; font-weight: bold; letter-spacing: 2.5pt; text-transform: uppercase; color: #9a4a2a; }
 	.pdf-title { font-family: Cormorant, serif; font-size: 27pt; font-weight: bold; line-height: 1.1; margin: 1.5mm 0 2mm; }
 	.pdf-updated { font-size: 10pt; font-weight: bold; }
@@ -63,6 +65,7 @@
 	</div></div>
 
 	<div class="pdf-masthead">
+		{% if pdf_logo|default(null) %}<div class="pdf-logo-line">{% include '@platform/partials/pdf-site-logo.html.twig' %}</div>{% endif %}
 		<div class="pdf-site">{{ app_name }}</div>
 		<div class="pdf-title">{{ legal.title }}</div>
 		<div class="pdf-updated">Last updated {{ legal.updated_label }}</div>

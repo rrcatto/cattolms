@@ -1,0 +1,18 @@
+{#
+	Which logo a design prints (owner, 2026-11-09: the site logo "should appear on PDFs the site generates ... included in
+	emails ... determined by admin on a per email template / design basis"): the site logo from Settings > Site Owner, a
+	logo of the design's own, uploaded beside it, or none, as three feature cards, with the site logo shown so the choice
+	is made by sight. Financial documents, certificate designs and email templates share it.
+	lc: {name: the field (logo_choice when left out), value: a key of SiteLogo::CHOICES, site_logo: the site logo's
+	address or null, what: what prints it, such as 'the documents', id: the cards' id, own_note: what the own card says,
+	none_note: what the none card says, form: a form elsewhere on the page the cards belong to, or ''}.
+#}
+{% set lc_site_note = lc.site_logo ? 'The logo from Settings, Site Owner. Change it there and ' ~ lc.what ~ ' follow.' : 'None is uploaded yet: add it at Settings, Site Owner. Until then it is as if No logo were chosen.' %}
+<div class="cl-logo-choice">
+	{{ ui('form.picture-choice', {name: lc.name|default('logo_choice'), legend: 'Which logo', id: lc.id, size: 'small', selected: lc.value, form: lc.form|default(''), items: [
+		{value: 'site', label: 'The site logo', icon: lucide('building-2'), note: lc_site_note},
+		{value: 'own', label: 'A logo of its own', icon: lucide('image-plus'), note: lc.own_note},
+		{value: 'none', label: 'No logo', icon: lucide('image-off'), note: lc.none_note},
+	]}) }}
+	{% if lc.site_logo %}<figure class="cl-logo-choice-site"><img src="{{ lc.site_logo }}" alt="The site logo"><figcaption>The site logo</figcaption></figure>{% endif %}
+</div>

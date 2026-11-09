@@ -162,10 +162,17 @@ final class CourseFileIntegrationTest extends TestCase
         $courseId = $this->import(SpecificationExample::html(), 'example.html');
         $records = $this->container->get(CourseRepository::class);
         $this->db->executeStatement('UPDATE courses SET estimated_minutes = 9000 WHERE id = :id', ['id' => $courseId]);
+        // A second module, so a share is not the whole.
+        $this->container->get(CourseItemService::class)->addSection($courseId, ['title' => 'A second module', 'numbered' => '1'], $this->admin);
         $structure = $this->container->get(CourseItemService::class)->availability($courseId, null, false);
         $modules = array_values(array_filter($structure, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered'])));
         self::assertNotSame([], $modules);
         self::assertSame((int) (round(9000 / count($modules) / 5) * 5), (int) $modules[0]['total_minutes'], 'A learner sees each module\'s share of it too.');
+        // The public preview shows Module 1 alone, and still its share, not the whole course's (2026-11-08).
+        $this->db->executeStatement('UPDATE course_sections SET public_preview = TRUE WHERE node_id = :id', ['id' => (int) $modules[0]['id']]);
+        $shown = array_values(array_filter($this->container->get(CourseItemService::class)->availability($courseId, null, true), static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered'])));
+        self::assertCount(1, $shown);
+        self::assertSame((int) $modules[0]['total_minutes'], (int) $shown[0]['total_minutes'], 'A visitor sees the same share.');
         $page = $this->container->get(\CattoLearning\Course\CoursePageView::class)->view(['estimated_minutes' => 9000, 'structure' => $structure, 'slug' => 'x'], false);
         self::assertSame('about 150 hours', $page['total']);
 

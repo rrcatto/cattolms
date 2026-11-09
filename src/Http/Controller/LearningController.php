@@ -266,7 +266,7 @@ final class LearningController extends BaseController
     {
         if (!\CattoLearning\Course\Parts\CoursePartPdfs::printable($node)) { throw $this->notFound('This part has no PDF.'); }
         $heading = \CattoLearning\Course\Parts\CoursePartPdfs::heading($course, $node);
-        $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, (string) $node['rendered_html'])]]);
+        $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf_logo' => $this->partPdfs->logo(), 'pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, (string) $node['rendered_html'])]]);
         $file = $this->partPdfs->file($html);
         return FileDownload::attachment($file, \CattoLearning\Course\Parts\CoursePartPdfs::filename($heading['module'], $heading['part'] === 'Lesson' ? '' : $heading['part']), 'application/pdf');
     }

@@ -10,6 +10,11 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/09 SAST (v1.1.3)
+- Advanced PLATFORM_ASSET_VERSION to 1.1.3.
+- app.logo: the site logo's address, for the theme's top bar.
+- A public page's head completed by PageMetadata::complete (canonical, description, Open Graph, ADMIN's title and words,
+  searches not indexed, a later page titled as such); every other page asks not to be indexed.
 2026/11/08 SAST (v1.1.2)
 - Advanced PLATFORM_ASSET_VERSION to 1.1.2.
 2026/11/08 SAST (v1.1.1)
@@ -158,7 +163,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '1.1.2';
+    private const PLATFORM_ASSET_VERSION = '1.1.3';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -186,7 +191,9 @@ final class ThemeRenderer
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
         private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null,
         private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
-        private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null
+        private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
+        private readonly ?\CattoLearning\Configuration\SiteLogo $siteLogo = null,
+        private readonly ?\CattoLearning\Search\PageMetadata $metadata = null
     ) {
     }
 
@@ -401,7 +408,9 @@ final class ThemeRenderer
         if ((bool) ($data['load_narration_recorder'] ?? false)) $platformScripts[] = $this->platformAsset('/js/narration-recorder.js');
         if ((bool) ($data['load_assessment_timer'] ?? false)) $platformScripts[] = $this->platformAsset('/js/assessment-timer.js');
 
-        $model['app'] = ['name' => $appName, 'base_url' => $appUrl !== '' ? $appUrl : '/'];
+        // The site logo, for the theme's top bar (owner, 2026-11-09): its address, or '' without one.
+        $bar = $this->siteLogo?->bar();
+        $model['app'] = ['name' => $appName, 'base_url' => $appUrl !== '' ? $appUrl : '/', 'logo' => $bar['address'] ?? '', 'logo_width' => $bar['width'] ?? 0];
         $model['platform'] = [
             'styles' => $platformStyles,
             'scripts' => $platformScripts,
@@ -461,10 +470,22 @@ final class ThemeRenderer
         $model['footer_social'] = $this->footerSocial($data);
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
-        $model['meta'] = self::pageMeta((array) ($data['page_meta'] ?? []));
+        // A public page's head completed (the SEO brief, 2026-11-09; PageMetadata::complete): its own description, its
+        // canonical address, Open Graph, ADMIN's title and words, a search's results not indexed and a later page of a list
+        // titled as such. Every other page (signing in, the cart, checkout, a lesson's preview, Administration) asks not to
+        // be indexed, so only the public pages are found.
+        $pageMeta = (array) ($data['page_meta'] ?? []);
+        $public = \CattoLearning\Search\StructuredData::isPublicPage($page);
+        if ($public && $this->metadata !== null) {
+            $pageMeta = $this->metadata->complete($page, $pageMeta, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'), $_GET, $model['page']['title']);
+        } elseif (!$public && trim((string) ($pageMeta['robots'] ?? '')) === '') {
+            $pageMeta['robots'] = 'noindex';
+        }
+        if (trim((string) ($pageMeta['title'] ?? '')) !== '') $model['page']['title'] = trim((string) $pageMeta['title']);
+        $model['meta'] = self::pageMeta($pageMeta);
         // The trail every theme draws above a public page, as structured data (owner, 2026-11-06): never on a page that is
         // not public or asks not to be indexed (an ADMIN preview), and never on a demo site's word alone, which follows.
-        if (\CattoLearning\Search\StructuredData::isPublicPage($page) && !str_contains($model['meta']['robots'], 'noindex')) {
+        if ($public && !str_contains($model['meta']['robots'], 'noindex')) {
             $base = \CattoLearning\Search\StructuredData::base($appUrl);
             $trail = $base === null ? null : \CattoLearning\Search\StructuredData::breadcrumbs($model['breadcrumbs'], $base, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'));
             if ($trail !== null) $model['meta']['structured_data'][] = \CattoLearning\Search\StructuredData::encode($trail);
@@ -1208,7 +1229,7 @@ final class ThemeRenderer
     private static function pageMeta(array $meta): array
     {
         $og = [];
-        foreach (['type', 'title', 'description', 'url', 'image', 'image:type', 'image:width', 'image:height', 'image:alt'] as $property) {
+        foreach (['type', 'title', 'description', 'url', 'locale', 'image', 'image:type', 'image:width', 'image:height', 'image:alt'] as $property) {
             $value = trim((string) (((array) ($meta['og'] ?? []))[$property] ?? ''));
             if ($value !== '') {
                 $og[$property] = $value;

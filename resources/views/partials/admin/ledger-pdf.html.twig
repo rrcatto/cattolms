@@ -1,0 +1,91 @@
+{#
+	The Money Ledger as a PDF (owner, 2026-11-08: "export PDF and xlsx files for ledger and statements"): A4 landscape, drawn
+	by DocumentPdfRenderer::renderPage from LedgerFiles::ledger(), in the look of the money report PDF. The period, the
+	filters, the site logo, the Site Owner's trading name and when it was made at the top; a demo site says so there, as its documents do;
+	what the lines add up to; then every line, oldest first, as the ledger's sentence with its account, its order or
+	document and its bank reference or note. The page number is on every page's foot.
+#}
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Money Ledger, {{ doc.period }} - {{ trading_name }}</title>
+<style>
+	@page { margin: 14mm 14mm 20mm 14mm; }
+	body { font-family: 'Plex Sans', sans-serif; font-size: 8.4pt; line-height: 1.35; color: #1f1915; }
+	#pdf-foot { position: fixed; left: 0; right: 0; bottom: -13mm; height: 9mm; border-top: 0.6pt solid #d8c8b4; padding-top: 1.8mm; font-size: 7.4pt; color: #5a4d42; }
+	.pdf-foot-row { display: table; width: 100%; }
+	.pdf-foot-words, .pdf-foot-page { display: table-cell; vertical-align: top; }
+	.pdf-foot-page { text-align: right; white-space: nowrap; }
+	{# The PDF engine counts the page but not the pages, so the ledger is drawn twice and the second knows how many. #}
+	.pdf-page-number:after { content: "Page " counter(page){% if page_total|default(0) > 0 %} " of {{ page_total }}"{% endif %}; }
+
+	.pdf-top { display: table; width: 100%; border-bottom: 1.6pt solid #1f1915; padding-bottom: 3mm; margin-bottom: 4mm; }
+	.pdf-top-title, .pdf-top-who { display: table-cell; vertical-align: bottom; }
+	.pdf-top-who { text-align: right; color: #5a4d42; }
+	.pdf-site-logo { margin: 0 0 1.5mm; }
+	.pdf-kicker { font-size: 7.6pt; letter-spacing: 1.4pt; text-transform: uppercase; color: #8a3f22; }
+	.pdf-title { font-family: Cormorant, serif; font-size: 22pt; font-weight: bold; line-height: 1.1; margin: 0.5mm 0 0; }
+	.pdf-filters { margin: 1mm 0 0; color: #5a4d42; }
+	.pdf-demo { margin: 0 0 4mm; padding: 2mm 3mm; border-left: 2pt solid #b07d1e; background: #fbf3dd; font-size: 8.2pt; }
+
+	.cl-ui-table table { border-collapse: collapse; width: 100%; }
+	.cl-ui-table-tip { display: none; }
+	.pdf-figures { display: table; border-collapse: separate; border-spacing: 2.2mm; margin: -2.2mm -2.2mm 1.5mm; width: 100%; }
+	.pdf-figure-row { display: table-row; }
+	.pdf-figure { display: table-cell; width: 16%; border: 0.6pt solid #d8c8b4; padding: 2.2mm 2.8mm; vertical-align: top; }
+	.pdf-figure-label { display: block; font-size: 6.8pt; letter-spacing: 0.7pt; text-transform: uppercase; color: #5a4d42; }
+	.pdf-figure-value { display: block; font-family: Cormorant, serif; font-size: 14pt; font-weight: bold; line-height: 1.2; }
+
+	th { font-size: 6.9pt; letter-spacing: 0.6pt; text-transform: uppercase; color: #5a4d42; text-align: left; font-weight: normal; padding: 1.2mm 2mm 1.2mm 0; border-bottom: 0.6pt solid #d8c8b4; }
+	td { padding: 1.3mm 2mm 1.3mm 0; border-top: 0.4pt solid #efe6d9; vertical-align: top; }
+	.n { text-align: right; white-space: nowrap; }
+	.pdf-when { white-space: nowrap; }
+	.pdf-quiet { color: #5a4d42; font-size: 7.6pt; }
+	tfoot td { font-weight: bold; border-top: 0.8pt solid #1f1915; }
+	tr { page-break-inside: avoid; }
+	thead { display: table-header-group; }
+	.pdf-none { color: #5a4d42; margin: 2mm 0 0; }
+</style>
+</head>
+<body>
+	<div id="pdf-foot"><div class="pdf-foot-row">
+		<div class="pdf-foot-words">From the site's money ledger. A line is never changed: a mistake is put right by a new line. Wallet credit is not money in the bank.</div>
+		<div class="pdf-foot-page"><span class="pdf-page-number"></span></div>
+	</div></div>
+
+	<div class="pdf-top">
+		<div class="pdf-top-title"><div class="pdf-kicker">Money Ledger</div><div class="pdf-title">{{ doc.period }}</div>
+			{% if doc.filters %}<div class="pdf-filters">Showing only: {{ doc.filters|join(' · ') }}</div>{% endif %}</div>
+		<div class="pdf-top-who">{% include '@platform/partials/pdf-site-logo.html.twig' with {pdf_logo_break: true} %}{% if trading_name %}{{ trading_name }}<br>{% endif %}Made {{ doc.made_label }}</div>
+	</div>
+	{% if doc_demo %}<div class="pdf-demo"><strong>{{ doc_demo_heading }}.</strong> {{ doc_demo_notice }}</div>{% endif %}
+
+	<div class="pdf-figures"><div class="pdf-figure-row">
+		{% for box in [
+			{label: 'Lines', value: doc.lines|length|number_format},
+			{label: 'Money in', value: doc.totals.money_in_label},
+			{label: 'Money out', value: doc.totals.money_out_label},
+			{label: 'Net money', value: doc.totals.net_label},
+			{label: 'Wallet credit added', value: doc.totals.wallet_in_label},
+			{label: 'Wallet credit used or expired', value: doc.totals.wallet_out_label},
+		] %}<div class="pdf-figure"><span class="pdf-figure-label">{{ box.label }}</span><span class="pdf-figure-value">{{ box.value }}</span></div>{% endfor %}
+	</div></div>
+
+	{% if doc.lines %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+	{% block header %}<tr><th style="width:5%">Line</th><th style="width:11%">When</th><th style="width:16%">Account</th><th style="width:41%">What happened</th><th class="n" style="width:9%">Money in</th><th class="n" style="width:9%">Money out</th><th class="n" style="width:9%">Wallet credit</th></tr>{% endblock %}
+	{% block body %}{% for line in doc.lines %}<tr>
+		<td>{{ line.id }}</td>
+		<td class="pdf-when">{{ line.when }}</td>
+		<td>{% if line.reference %}<strong>{{ line.reference }}</strong><br>{% endif %}{{ line.account }}</td>
+		<td>{{ line.what }}{% set extra = [line.document, line.bank_reference ? 'Bank reference ' ~ line.bank_reference : '', line.note]|filter(v => v) %}{% if extra %}<br><span class="pdf-quiet">{{ extra|join(' · ') }}</span>{% endif %}</td>
+		<td class="n">{{ line.money_in_label }}</td>
+		<td class="n">{{ line.money_out_label }}</td>
+		<td class="n">{{ line.wallet_label }}</td>
+	</tr>{% endfor %}{% endblock %}
+	{% block footer %}<tfoot><tr><td colspan="4">Total</td><td class="n">{{ doc.totals.money_in_label }}</td><td class="n">{{ doc.totals.money_out_label }}</td><td class="n">+{{ doc.totals.wallet_in_label }}<br>−{{ doc.totals.wallet_out_label }}</td></tr></tfoot>{% endblock %}
+	{% endembed %}
+	{% else %}<p class="pdf-none">No line matches.</p>{% endif %}
+</body>
+</html>

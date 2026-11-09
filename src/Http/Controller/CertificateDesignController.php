@@ -18,6 +18,8 @@ The editor can be opened from a course's certificate page; it then returns there
 course certificate page is accepted).
 
 Changelog:
+2026/11/09 SAST
+- The logo choice: the site logo (shown), the design's own or none.
 2026/11/07 SAST
 - The last editor is linked by their account reference (owner, 2026-11-06).
 2026/10/07 SAST
@@ -29,6 +31,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Course\Certificate\CertificateDesign;
 use CattoLearning\Course\Certificate\CertificateDesignService;
 use CattoLearning\Course\Certificate\CertificateLooks;
@@ -48,6 +51,7 @@ final class CertificateDesignController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CertificateDesignService $designs,
+        private readonly SiteLogo $siteLogo,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -245,6 +249,8 @@ final class CertificateDesignController extends BaseController
                 'logo' => $design->logo === null ? null : self::pictureUrl($design->logo->sha),
                 'signature' => $design->signature === null ? null : self::pictureUrl($design->signature->sha),
             ],
+            'logo_choice' => $design->logoChoice,
+            'site_logo' => $this->siteLogo->url(''),
             'errors' => $errors,
             'preview_src' => $previewSource,
             'saved' => $saved === null ? null : ['updated_at' => $saved['updated_at'], 'updated_by' => self::lastEditor($saved), 'course_count' => $saved['course_count']],

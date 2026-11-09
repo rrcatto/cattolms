@@ -1,5 +1,7 @@
 {% extends layout %}
 {% block page_body %}
+{# Stimulus, for a row's or card's percentage off as its prices are typed (bundle_price_controller.js; owner, 2026-11-09). #}
+{{ importmap() }}
 {% set ph_kicker = 'Administration' %}{% set ph_title = 'Bundles' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New bundle', variant: 'primary', href: '/admin/bundles/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Several published courses sold together for one bundle price. A bundle is not a course: each of its courses is granted to the buyer as an ordinary course purchase, and an order keeps the bundle exactly as it was sold.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}

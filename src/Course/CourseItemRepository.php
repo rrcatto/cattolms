@@ -766,6 +766,12 @@ final class CourseItemRepository
         return (int) $this->db->fetchOne('SELECT COALESCE(estimated_minutes, 0) FROM courses WHERE id = :id', ['id' => $courseId]);
     }
 
+    /** How many modules (numbered sections) the whole course has, shown or not: what its study time is shared among. */
+    public function moduleCount(int $courseId): int
+    {
+        return (int) $this->db->fetchOne('SELECT count(*) FROM course_structure_nodes n JOIN course_sections s ON s.node_id = n.id WHERE n.course_id = :id AND s.numbered', ['id' => $courseId]);
+    }
+
     /** @return array<string,mixed>|null The Resource with this file's name, the name it was uploaded under first. */
     public function resourceByFilename(string $filename): ?array
     {

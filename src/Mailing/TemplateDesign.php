@@ -9,7 +9,8 @@ Version: 1.0.0
 
 Description:
 The look of a designed mailing template (owner, 2026-10-27: "How am I supposed to design the look and feel of what goes
-out? I need control over every aspect"; decision 5B, 2026-10-28): the logo and its size and place, a header picture, the
+out? I need control over every aspect"; decision 5B, 2026-10-28): the logo (the site logo from Settings > Site Owner, the
+template's own or none, owner 2026-11-09; logo_source) and its size and place, a header picture, the
 colours of the page around the email, the email, its header, text, headings, links and buttons, the two fonts, the text
 size, the width, the corners, the spacing, the button shape, the footer's words and the social profile links.
 
@@ -24,6 +25,8 @@ customise if necessary") start a new template or give an existing one their look
 for the template cards and the samples' choice.
 
 Changelog:
+2026/11/09 SAST
+- logo_source: the site logo, the template's own or none, the site logo until another is chosen.
 2026/10/28 SAST
 - Created.
 - The six sample designs and thumbnail().
@@ -33,6 +36,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Mailing;
 
+use CattoLearning\Configuration\SiteLogo;
 use InvalidArgumentException;
 
 final class TemplateDesign
@@ -73,7 +77,7 @@ final class TemplateDesign
     public const SOCIAL = ['facebook' => 'Facebook', 'instagram' => 'Instagram', 'linkedin' => 'LinkedIn', 'x' => 'X', 'youtube' => 'YouTube'];
 
     public const DEFAULTS = [
-        'logo' => '', 'logo_size' => 'large', 'align' => 'left', 'header_picture' => '',
+        'logo' => '', 'logo_source' => 'site', 'logo_size' => 'large', 'align' => 'left', 'header_picture' => '',
         'colours' => ['page' => '#f3efe9', 'email' => '#ffffff', 'header' => '#9a3f12', 'header_text' => '#ffffff', 'text' => '#2b2420',
             'headings' => '#2b2420', 'links' => '#9a3f12', 'button' => '#9a3f12', 'button_text' => '#ffffff'],
         'heading_font' => 'arial', 'body_font' => 'arial', 'text_size' => 16, 'width' => 600,
@@ -165,6 +169,10 @@ final class TemplateDesign
         foreach (['logo', 'header_picture'] as $picture) {
             if (is_string($stored[$picture] ?? null) && preg_match('/^[0-9a-f]{64}$/', $stored[$picture]) === 1) $design[$picture] = $stored[$picture];
         }
+        // Which logo the header shows (owner, 2026-11-09): a design saved before the choice shows its own logo if it had
+        // one, else the site logo.
+        $source = $stored['logo_source'] ?? null;
+        $design['logo_source'] = is_string($source) && isset(SiteLogo::CHOICES[$source]) ? $source : ($design['logo'] !== '' ? 'own' : 'site');
         foreach (self::COLOURS as $key => $_) {
             $colour = $stored['colours'][$key] ?? null;
             if (is_string($colour) && preg_match('/^#[0-9a-f]{6}$/', strtolower($colour)) === 1) $design['colours'][$key] = strtolower($colour);
@@ -205,6 +213,7 @@ final class TemplateDesign
             if (!isset($choices[$value])) throw new InvalidArgumentException('Choose ' . $label . ' from the list.');
             $design[$key] = $value;
         };
+        $choose('logo_source', SiteLogo::CHOICES, 'which logo the header shows');
         $choose('logo_size', self::LOGO_SIZES, 'the logo\'s size');
         $choose('align', self::ALIGNMENTS, 'where the logo sits');
         $choose('heading_font', self::FONTS, 'the headings\' font');

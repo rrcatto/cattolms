@@ -12,7 +12,10 @@ Mailing templates (owner, 2026-10-27: "When I wrote and designed ctnlist, I had 
 have any templates. How am I supposed to design the look and feel of what goes out?"; decision 5B, 2026-10-28:
 "Designed in a form, or written in HTML for full control"). A template is the look of an email. It is either designed
 in a form (TemplateDesign) or written in HTML around {content}, the place the message goes, with placeholders for the
-rest. One template is the default for messages and one for the digest; a message may choose another.
+rest. One template is the default for messages, one for the digest and one for account and order emails (owner,
+2026-11-09: "the account and order emails should get a design with choice of logo"; the default for messages until one
+is chosen); a message may choose another. A designed template prints the site logo, its own logo or none
+(TemplateDesign logo_source); an HTML template places the site logo with {site_logo_url}.
 
 An HTML template must hold {content}, {unsubscribe_link} and {site_owner_address}: every news email carries its
 unsubscribe link and the business's name and address, as the law and inbox providers require, and a template without
@@ -23,6 +26,8 @@ The first template, "Standard", is made the first time one is needed, from the a
 held before templates existed, and is the default for both.
 
 Changelog:
+2026/11/09 SAST
+- The default for account and order emails, and {site_logo_url}.
 2026/10/28 SAST
 - Created.
 */
@@ -54,6 +59,7 @@ final class MailingTemplates
         '{site_url}' => 'The site\'s address.',
         '{demo_notice}' => 'On a demo site, the notice that it is a demo. Added at the top when the template leaves it out.',
         '{year}' => 'This year.',
+        '{site_logo_url}' => 'The address of the site logo from Settings, Site Owner, for an img tag. Empty when none is uploaded.',
     ];
     public const REQUIRED = ['{content}', '{unsubscribe_link}', '{site_owner_address}'];
     public const HTML_LIMIT = 200000;
@@ -96,12 +102,14 @@ final class MailingTemplates
         return $template ?? $this->defaultFor(in_array((string) ($campaign['kind'] ?? 'message'), ['digest', 'updates'], true) ? 'digest' : 'messages');
     }
 
-    /** @return array<string,mixed> */
+    /** @return array<string,mixed> the default for messages, the digest or account and order emails ('account') */
     public function defaultFor(string $kind): array
     {
         $this->ensureStandard();
+        // Account and order emails are drawn in the default for messages until a template is chosen for them.
+        $fallback = $kind === 'messages' ? 'digest' : 'messages';
 
-        return $this->templates->defaultFor($kind) ?? $this->templates->defaultFor($kind === 'digest' ? 'messages' : 'digest') ?? $this->templates->all()[0];
+        return $this->templates->defaultFor($kind) ?? $this->templates->defaultFor($fallback) ?? $this->templates->all()[0];
     }
 
     /**
@@ -114,7 +122,7 @@ final class MailingTemplates
         $this->transactions->run(function () use ($id, $look, $sample, $userId): void {
             $template = $this->get($id);
             $design = $look;
-            foreach (['logo', 'header_picture', 'footer_words', 'social', 'logo_size'] as $kept) $design[$kept] = $template['design'][$kept] ?? TemplateDesign::DEFAULTS[$kept];
+            foreach (['logo', 'logo_source', 'header_picture', 'footer_words', 'social', 'logo_size'] as $kept) $design[$kept] = $template['design'][$kept] ?? TemplateDesign::DEFAULTS[$kept];
             $this->templates->update($id, (string) $template['name'], 'design', $design, (string) $template['html'], (string) $template['text_mode'], (string) $template['text_part'], $userId);
             $this->audit->record($userId, 'mailing.template_sample_applied', ['template_id' => $id, 'sample' => $sample]);
         });
@@ -162,10 +170,10 @@ final class MailingTemplates
         });
     }
 
-    /** Makes it the default for messages or for the digest. */
+    /** Makes it the default for messages, for the digest or for account and order emails. */
     public function makeDefault(int $id, string $kind, int $userId): void
     {
-        if (!in_array($kind, ['messages', 'digest'], true)) throw new InvalidArgumentException('Choose what it is the default for.');
+        if (!in_array($kind, ['messages', 'digest', 'account'], true)) throw new InvalidArgumentException('Choose what it is the default for.');
         $this->get($id);
         $this->transactions->run(fn() => $this->templates->makeDefault($id, $kind, $userId));
         $this->audit->record($userId, 'mailing.template_default', ['template_id' => $id, 'for' => $kind]);
@@ -180,6 +188,8 @@ final class MailingTemplates
             $template = $this->templates->find($id, true) ?? throw new InvalidArgumentException('That template could not be found.');
             $design = $template['design'];
             $design[$slot] = $sha;
+            // Uploading a logo of its own means showing it.
+            if ($slot === 'logo') $design['logo_source'] = 'own';
             $this->templates->update($id, $template['name'], $template['mode'], $design, $template['html'], $template['text_mode'], $template['text_part'], $userId);
         });
         $this->audit->record($userId, 'mailing.template_picture', ['template_id' => $id, 'slot' => $slot]);
@@ -211,6 +221,7 @@ final class MailingTemplates
         $template = $this->get($id);
         if ($template['default_for_messages']) throw new InvalidArgumentException('It is the default for messages. Make another template the default for messages first.');
         if ($template['default_for_digest']) throw new InvalidArgumentException('It is the default for the digest. Make another template the default for the digest first.');
+        if ($template['default_for_account']) throw new InvalidArgumentException('It is the default for account and order emails. Make another template the default for them first.');
         $this->templates->delete($id);
         $this->audit->record($userId, 'mailing.template_deleted', ['template_id' => $id, 'name' => $template['name']]);
     }

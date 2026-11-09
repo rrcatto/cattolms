@@ -29,7 +29,8 @@
 		<div class="cl-shell">
 			<header class="cl-header" data-theme-nav>
 				<div class="cl-header-inner">
-					<a class="cl-brand" href="{{ app.base_url }}" aria-label="{{ app.name }} home"><span class="cl-brand-copy"><strong>{{ app.name }}</strong><small>Self-study courses</small></span></a>
+					{# The site logo first on the row, before the name (owner, 2026-11-09), when one is uploaded at Settings > Site Owner. #}
+					<a class="cl-brand" href="{{ app.base_url }}" aria-label="{{ app.name }} home">{% if app.logo|default('') %}<img class="cl-brand-logo" src="{{ app.logo }}" alt="" width="{{ app.logo_width|default(44) }}" height="44">{% endif %}<span class="cl-brand-copy"><strong>{{ app.name }}</strong><small>Self-study courses</small></span></a>
 					<button class="cl-nav-toggle" type="button" data-cl-nav-toggle aria-expanded="false" aria-controls="cl-primary-navigation">Menu</button>
 					{% include '@platform/partials/navigation.html.twig' %}
 				</div>

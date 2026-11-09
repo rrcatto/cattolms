@@ -14,6 +14,7 @@ tags). The "catalogue" block of a catto-learning-course 2.1 package holds:
 
   {"category": "Design › Gardens", "tags": ["Planting"], "cover": "<svg …>", "position": 100,
    "related": ["GDN-102"], "status": "published", "page_layout": null,
+   "search": {"title": "", "description": "", "hidden": false},
    "prices": [{"period": 6, "unit": "months", "price": "950.00", "was_price": "1250.00", "currency": "ZAR",
                "label": "Six months", "active": true, "default": true}]}
 
@@ -42,6 +43,9 @@ place; the cover, position and page layout), and replaceRelated(), which makes i
 the package's own courses. Nothing replaced is kept.
 
 Changelog:
+2026/11/09 SAST
+- search: the course's own words for search engines and whether it is kept out of them (the SEO brief); a package
+  without it changes nothing.
 2026/11/06 SAST
 - differences(), applyChosen(), replaceRelated() and ensureCategoryPath() for the canonical catalogue import.
 2026/10/23 SAST
@@ -56,6 +60,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Search\SearchOverrides;
 use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Slug;
@@ -71,6 +76,7 @@ final class CourseCatalogueSettings
         private readonly CourseRepository $repository,
         private readonly CoursePageLayouts $pageLayouts,
         private readonly CoursePageLayoutRepository $layoutRepository,
+        private readonly ?SearchOverrides $search = null,
     ) {}
 
     /**
@@ -111,7 +117,38 @@ final class CourseCatalogueSettings
             'status' => (string) $course['status'],
             'page_layout' => $this->pageLayoutOf($courseId),
             'prices' => $prices,
+            // Its own words for search engines (the SEO brief, 2026-11-09): empty for the course's own.
+            'search' => ['title' => (string) ($course['search_title'] ?? ''), 'description' => (string) ($course['search_description'] ?? ''), 'hidden' => in_array($course['search_hidden'] ?? false, [true, 't', 1, '1'], true)],
         ];
+    }
+
+    /**
+     * The block's words for search engines, as the site keeps them, or null when the block has none (an older package).
+     *
+     * @param array<string,mixed> $block
+     * @return array{title:string,description:string,hidden:bool}|null
+     */
+    private static function searchWords(array $block): ?array
+    {
+        if (!is_array($block['search'] ?? null)) return null;
+        return ['title' => SearchOverrides::plain((string) ($block['search']['title'] ?? '')), 'description' => SearchOverrides::plain((string) ($block['search']['description'] ?? '')),
+            'hidden' => in_array($block['search']['hidden'] ?? false, [true, 1, '1', 'true'], true)];
+    }
+
+    /**
+     * @param array<string,mixed> $course
+     * @return array{title:string,description:string,hidden:bool}
+     */
+    private static function searchHere(array $course): array
+    {
+        return ['title' => (string) ($course['search_title'] ?? ''), 'description' => (string) ($course['search_description'] ?? ''), 'hidden' => in_array($course['search_hidden'] ?? false, [true, 't', 1, '1'], true)];
+    }
+
+    /** @param array{title:string,description:string,hidden:bool} $words */
+    private static function searchLine(array $words): string
+    {
+        $parts = array_filter([$words['title'] !== '' ? 'title "' . $words['title'] . '"' : '', $words['description'] !== '' ? 'its own description' : '', $words['hidden'] ? 'kept out of search engines' : '']);
+        return $parts === [] ? 'the course\'s own words' : implode(', ', $parts);
     }
 
     /**
@@ -171,6 +208,8 @@ final class CourseCatalogueSettings
         if ($prices && $this->repository->priceVariants($courseId) === [] && (array) ($block['prices'] ?? []) !== []) {
             $changes[] = 'Prices: ' . implode(', ', array_map(static fn(array $price): string => self::priceWords($price), self::prices($block)));
         }
+        $search = self::searchWords($block);
+        if ($search !== null && $search !== self::searchHere($course)) $changes[] = 'Search engines: ' . self::searchLine($search);
         return $changes;
     }
 
@@ -228,6 +267,11 @@ final class CourseCatalogueSettings
                 ], $actor);
                 $done[] = 'Price: ' . self::priceWords($price);
             }
+        }
+        $search = self::searchWords($block);
+        if ($search !== null && $this->search !== null && $search !== self::searchHere($course)) {
+            $this->search->saveCourse($courseId, $search, $actor);
+            $done[] = 'Search engines: ' . self::searchLine($search);
         }
         return $done;
     }
@@ -319,6 +363,10 @@ final class CourseCatalogueSettings
         if ($adds !== [] || $removes !== []) {
             $found[] = ['kind' => 'related', 'words' => 'Related courses: ' . implode(', ', array_filter([$adds === [] ? '' : 'adds ' . implode(', ', $adds), $removes === [] ? '' : 'removes ' . implode(', ', $removes)])), 'problem' => null];
         }
+        $search = self::searchWords($block);
+        if ($search !== null && $search !== self::searchHere($course)) {
+            $found[] = ['kind' => 'search', 'words' => 'Search engines: ' . self::searchLine(self::searchHere($course)) . ' → ' . self::searchLine($search), 'problem' => null];
+        }
         $status = (string) ($block['status'] ?? '');
         if (in_array($status, ['draft', 'published', 'retired', 'archived'], true) && $status !== (string) $course['status']) {
             $found[] = ['kind' => 'status', 'words' => 'Status: ' . $course['status'] . ' → ' . $status, 'problem' => null];
@@ -375,6 +423,11 @@ final class CourseCatalogueSettings
                     ?? $this->pageLayouts->create($layout['name'], $layout['purpose'], $layout['blocks'], $actor);
             }
             $this->pageLayouts->choose($courseId, $layout['choice'], $layoutId, $layout['choice'] === 'custom' ? $layout['blocks'] : null, $actor);
+        }
+        $search = self::searchWords($block);
+        if (in_array('search', $kinds, true) && $search !== null && $this->search !== null && $search !== self::searchHere($course)) {
+            $this->search->saveCourse($courseId, $search, $actor);
+            $done[] = 'Search engines: ' . self::searchLine($search);
         }
         return $done;
     }

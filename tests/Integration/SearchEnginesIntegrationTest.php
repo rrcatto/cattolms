@@ -239,15 +239,41 @@ final class SearchEnginesIntegrationTest extends TestCase
         $organisation = self::node($html, 'Organization');
         self::assertNotNull($organisation);
         self::assertSame('https://learning.example.test/', $organisation['url']);
-        self::assertSame('https://learning.example.test/img/favicon-512x512.png', $organisation['logo']);
+        // The site logo when one is uploaded (Settings > Site Owner, 2026-11-09), else the site's own mark.
+        $logo = IntegrationContainer::get()->get(\CattoLearning\Configuration\SiteLogo::class)->url('https://learning.example.test');
+        self::assertSame($logo ?? 'https://learning.example.test/img/favicon-512x512.png', $organisation['logo']);
+        $options->delete(\CattoLearning\Configuration\SiteLogo::OPTION);
+        $without = self::node(InProcessPage::run(null, HomeController::class, 'index')['body'], 'Organization');
+        self::assertSame('https://learning.example.test/img/favicon-512x512.png', $without['logo'] ?? '', 'Without a site logo, the site\'s own mark.');
         self::assertSame('https://learning.example.test/contact', $organisation['contactPoint'][0]['url']);
         self::assertArrayNotHasKey('sameAs', $organisation, 'The footer links to platforms\' home pages, not the business\'s profiles.');
         $site = self::node($html, 'WebSite');
         self::assertNotNull($site);
         self::assertSame('https://learning.example.test/', $site['url']);
         self::assertNull(self::node($html, 'BreadcrumbList'), 'The home page has no trail.');
-        self::assertMatchesRegularExpression('#<meta property="og:image" content="https://learning\.example\.test/img/hero-learning-1200x630\.png\?v=[0-9a-f]{12}">#', $html);
-        self::assertFileExists(dirname(__DIR__, 2) . '/public_html/img/hero-learning-1200x630.png');
+        // The site picture (owner, 2026-11-09: the hero, uploaded at Settings > Site Owner): a page without a picture of
+        // its own is shared with its 1200 by 630 copy, cut from the middle; without one, with no picture at all.
+        $sitePicture = IntegrationContainer::get()->get(\CattoLearning\Configuration\SitePicture::class);
+        $wide = imagecreatetruecolor(1672, 941);
+        imagefill($wide, 0, 0, (int) imagecolorallocate($wide, 200, 150, 60));
+        ob_start();
+        imagepng($wide);
+        $sitePicture->upload((string) ob_get_clean(), $actor);
+        $version = (string) $sitePicture->version();
+        $shared = InProcessPage::run(null, HomeController::class, 'index')['body'];
+        self::assertStringContainsString('<meta property="og:image" content="https://learning.example.test/site-picture/' . $version . '.jpg">', $shared);
+        self::assertStringContainsString('<meta property="og:image:type" content="image/jpeg">', $shared);
+        self::assertStringContainsString('<meta name="twitter:card" content="summary_large_image">', $shared);
+        $copy = $sitePicture->picture($version);
+        self::assertNotNull($copy);
+        self::assertSame([1200, 630, 'image/jpeg'], array_slice(array_values((array) getimagesizefromstring($copy['bytes'])), 0, 2) + [2 => $copy['mime']]);
+        self::assertSame([1672, 941], array_slice(array_values((array) getimagesizefromstring((string) ($sitePicture->picture($version, true)['bytes'] ?? ''))), 0, 2));
+        $sitePicture->remove($actor);
+        $bare = InProcessPage::run(null, HomeController::class, 'index')['body'];
+        self::assertStringNotContainsString('<meta property="og:image"', $bare);
+        self::assertStringContainsString('<meta name="twitter:card" content="summary">', $bare);
+        self::assertNotNull($sitePicture->picture($version), 'A picture shared already stays served.');
+        foreach ([$html, $shared, $bare] as $page) self::assertStringNotContainsString('hero-learning', $page, 'The old picture is never used.');
     }
 
     public function testAPageThatIsNotPublicCarriesNoStructuredData(): void

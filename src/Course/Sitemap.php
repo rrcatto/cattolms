@@ -19,7 +19,14 @@ no sitemap (its addresses answer "not found") and its robots.txt does not mentio
 their "do not index" note (SiteMode). It is never told to keep search engines away entirely, because a
 search engine kept away never reads that note.
 
+The SEO brief (2026-11-09) adds the public pages (PublicPages: the home page, the catalogue, the tag browser, bundles,
+Help, the FAQ, Contact, About and the three legal pages) at the start of the first file, the pages that list courses
+with when a course or bundle last changed and the legal pages with their own date (no date where none is known, which
+the protocol allows), and robots.txt names the mailing pages and each email's and person's token links as private.
+
 Changelog:
+2026/11/09 SAST
+- The public pages, first; the mailing pages and token links in robots.txt's private paths.
 2026/10/19 SAST
 - Created.
 2026/11/06 SAST
@@ -32,6 +39,8 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Configuration\SiteMode;
+use CattoLearning\Legal\LegalDocuments;
+use CattoLearning\Search\PublicPages;
 use CattoLearning\Search\AiCrawlers;
 use CattoLearning\Search\SearchSettings;
 use CattoLearning\Support\Env;
@@ -49,7 +58,8 @@ final class Sitemap
     private const DISALLOW = [
         '# Single-use sign-in links: a crawler that follows one uses it up.' => ['/auth/'],
         '# Signing in carries nothing to index.' => ['/login', '/login/', '/logout'],
-        '# Signed-in workspaces.' => ['/admin/', '/account/', '/company/', '/learn/'],
+        '# Signed-in workspaces.' => ['/admin/', '/account/', '/company/', '/learn/', '/mailing/'],
+        '# Each email\'s own links and a person\'s own pages, by a token: nobody else\'s to read.' => ['/m/', '/leaving/', '/join/'],
         '# Machine interfaces, not documents.' => ['/api/', '/theme/', '/webhooks/'],
         '# Certificates and transcripts name a learner, and course media is served by opaque id.' => ['/certificates/', '/transcripts/', '/course-media/'],
     ];
@@ -60,7 +70,11 @@ final class Sitemap
         private readonly CacheInterface $cache,
         private readonly int $limit = self::LIMIT,
         private readonly ?SearchSettings $search = null,
+        private readonly ?LegalDocuments $legal = null,
     ) {}
+
+    /** The public pages the sitemap starts with: those that list courses, the guides and the legal pages. */
+    public const PAGES = ['home', 'courses', 'course-tags', 'bundles', 'help', 'faq', 'contact', 'about', 'terms', 'refunds', 'privacy'];
 
     /** Whether this site has a sitemap: a live site that knows its own address. */
     public function available(): bool
@@ -71,7 +85,7 @@ final class Sitemap
     /** The number of sitemap files: 1 is /sitemap.xml itself, more makes it an index. */
     public function pages(): int
     {
-        return max(1, (int) ceil($this->entries->count() / $this->limit));
+        return max(1, (int) ceil((count(self::PAGES) + $this->entries->count()) / $this->limit));
     }
 
     /** /sitemap.xml: the sitemap itself, or the index of its pages when there are too many addresses. */
@@ -147,10 +161,37 @@ final class Sitemap
     {
         $base = (string) self::base();
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-        foreach ($this->entries->entries($this->limit, $offset) as $entry) {
-            $xml .= '<url><loc>' . self::escape($base . $entry['path']) . '</loc><lastmod>' . (new DateTimeImmutable($entry['changed_at']))->format(DATE_ATOM) . '</lastmod></url>' . "\n";
+        // The public pages first, then the courses, landing pages, categories, tags and bundles.
+        $pages = $this->publicPages();
+        $first = array_slice($pages, $offset, $this->limit);
+        $rest = $this->limit - count($first);
+        $entries = $rest > 0 ? [...$first, ...$this->entries->entries($rest, max(0, $offset - count($pages)))] : $first;
+        foreach ($entries as $entry) {
+            $changed = $entry['changed_at'] === null ? '' : '<lastmod>' . (new DateTimeImmutable($entry['changed_at']))->format(DATE_ATOM) . '</lastmod>';
+            $xml .= '<url><loc>' . self::escape($base . $entry['path']) . '</loc>' . $changed . '</url>' . "\n";
         }
         return $xml . '</urlset>' . "\n";
+    }
+
+    /**
+     * The public pages, each with when what it shows last changed: a list of courses when a course or bundle did, a legal
+     * page on its own date; null where no date is known.
+     *
+     * @return list<array{path:string,changed_at:?string}>
+     */
+    private function publicPages(): array
+    {
+        $latest = $this->entries->latest();
+        $pages = [];
+        foreach (self::PAGES as $key) {
+            $changed = match ($key) {
+                'home', 'courses', 'course-tags', 'bundles' => $latest,
+                'terms', 'refunds', 'privacy' => $this->legal?->document($key)['updated'] ?? null,
+                default => null,
+            };
+            $pages[] = ['path' => PublicPages::path($key), 'changed_at' => $changed];
+        }
+        return $pages;
     }
 
     private function index(int $pages): string

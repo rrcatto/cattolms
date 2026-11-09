@@ -31,6 +31,8 @@ Search engines and AI. Each picture is a stored file named by the SHA-256 of the
 version of its address, and a request only asks whether the file is there.
 
 Changelog:
+2026/11/09 SAST
+- Drawn by Support\SvgRaster, which the site logo shares.
 2026/11/06 SAST
 - Created.
 */
@@ -39,6 +41,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Search;
 
+use CattoLearning\Support\SvgRaster;
 use DOMDocument;
 use DOMElement;
 use RuntimeException;
@@ -61,11 +64,7 @@ final class SharePictures
     /** The full path of rsvg-convert, or null when this server has none. */
     public function tool(): ?string
     {
-        if ($this->tool !== null) return is_file($this->tool) && is_executable($this->tool) ? $this->tool : null;
-        foreach (['/usr/bin/rsvg-convert', '/usr/local/bin/rsvg-convert', '/opt/homebrew/bin/rsvg-convert'] as $candidate) {
-            if (is_file($candidate) && is_executable($candidate)) return $candidate;
-        }
-        return null;
+        return SvgRaster::tool($this->tool);
     }
 
     public function available(): bool
@@ -162,32 +161,7 @@ final class SharePictures
 
     private function draw(string $tool, string $svg): string
     {
-        $process = proc_open([$tool, '--format=png', '--background-color=white'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if (!is_resource($process)) throw new RuntimeException('rsvg-convert could not be started.');
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-        fwrite($pipes[0], $svg);
-        fclose($pipes[0]);
-        $png = '';
-        $deadline = microtime(true) + self::TIMEOUT;
-        while (true) {
-            $png .= (string) stream_get_contents($pipes[1]);
-            stream_get_contents($pipes[2]);
-            $status = proc_get_status($process);
-            if (!$status['running']) {
-                $png .= (string) stream_get_contents($pipes[1]);
-                break;
-            }
-            if (microtime(true) > $deadline) {
-                proc_terminate($process);
-                fclose($pipes[1]); fclose($pipes[2]); proc_close($process);
-                throw new RuntimeException('rsvg-convert took too long.');
-            }
-            usleep(20000);
-        }
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        proc_close($process);
+        $png = SvgRaster::png($tool, $svg, ['--background-color=white'], self::TIMEOUT);
         $size = $png === '' ? false : @getimagesizefromstring($png);
         if ($size === false || $size[0] !== self::WIDTH || $size[1] !== self::HEIGHT || $size['mime'] !== 'image/png') throw new RuntimeException('rsvg-convert drew nothing usable.');
         return $png;

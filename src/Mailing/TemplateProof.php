@@ -13,6 +13,8 @@ the template drawn with a sample message or digest, as a preview draws it, its l
 nothing recorded. It goes the way a message's test goes, through the site's own mail.
 
 Changelog:
+2026/11/09 SAST
+- An account email sample, drawn as account and order emails are.
 2026/10/28 SAST
 - Created.
 */
@@ -42,7 +44,7 @@ final class TemplateProof
     {
         $email = trim($email);
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new InvalidArgumentException('Enter the address to send the proof to, such as you@example.com.');
-        $copy = $this->renderer->sample($template, $sample === 'digest' ? 'digest' : 'message', $firstName);
+        $copy = $this->renderer->sample($template, in_array($sample, ['digest', 'account'], true) ? $sample : 'message', $firstName);
         $mail = $this->runtime->mailConfiguration();
         $message = (new Email())->from(new Address((string) $mail['from_address'], (string) $mail['from_name']))->to($email)
             ->subject('[Proof] ' . $copy['subject'])->html($copy['html'])->text($copy['text']);

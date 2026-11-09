@@ -1,7 +1,7 @@
 {#
 	A month's money report as a PDF (owner, 2026-11-06, the approved mockup REPORTS/money-reports-mockup/Pdf.dc.html): A4,
 	drawn by DocumentPdfRenderer::renderPage from the one report MoneyReports makes, so it carries the page's numbers. The
-	month and the Site Owner's trading name and when it was made at the top; a demo site's month says so there, as its
+	month, the site logo, the Site Owner's trading name and when it was made at the top; a demo site's month says so there, as its
 	documents do; the figures, then money in by method, the orders, what was sold and the refunds and payouts, each the
 	platform's table; and at every page's foot where the figures come from and the page number. VAT is never charged, and
 	only the foot says so. The figures are laid out as table cells, not a grid, because the PDF engine lays out tables.
@@ -25,6 +25,7 @@
 	.pdf-top { display: table; width: 100%; border-bottom: 1.6pt solid #1f1915; padding-bottom: 3mm; margin-bottom: 4.5mm; }
 	.pdf-top-month, .pdf-top-who { display: table-cell; vertical-align: bottom; }
 	.pdf-top-who { text-align: right; color: #5a4d42; }
+	.pdf-site-logo { margin: 0 0 1.5mm; }
 	.pdf-kicker { font-size: 7.8pt; letter-spacing: 1.4pt; text-transform: uppercase; color: #8a3f22; }
 	.pdf-month { font-family: Cormorant, serif; font-size: 24pt; font-weight: bold; line-height: 1.1; margin: 0.5mm 0 0; }
 	.pdf-demo { margin: 0 0 4.5mm; padding: 2mm 3mm; border-left: 2pt solid #b07d1e; background: #fbf3dd; font-size: 8.5pt; }
@@ -60,7 +61,7 @@
 
 	<div class="pdf-top">
 		<div class="pdf-top-month"><div class="pdf-kicker">Money report</div><div class="pdf-month">{{ report.month.label }}{% if report.month.so_far %}, so far{% endif %}</div></div>
-		<div class="pdf-top-who">{% if trading_name %}{{ trading_name }}<br>{% endif %}Made {{ report.made }}</div>
+		<div class="pdf-top-who">{% include '@platform/partials/pdf-site-logo.html.twig' with {pdf_logo_break: true} %}{% if trading_name %}{{ trading_name }}<br>{% endif %}Made {{ report.made }}</div>
 	</div>
 	{% if report_demo %}<div class="pdf-demo"><strong>{{ report_demo_heading }}.</strong> {{ report_demo_notice }}</div>{% endif %}
 

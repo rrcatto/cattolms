@@ -41,7 +41,8 @@ final class LegalController extends BaseController
         private readonly LegalDocuments $legal,
         private readonly CommerceSettings $settings,
         private readonly \CattoLearning\Document\DocumentPdfRenderer $pdfs,
-        private readonly \CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection
+        private readonly \CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection,
+        private readonly \CattoLearning\Configuration\SiteLogo $siteLogo
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -91,13 +92,16 @@ final class LegalController extends BaseController
     private function pdf(string $key): Response
     {
         $data = $this->data($key);
-        $pdf = $this->pdfs->renderPage($this->view->renderFragment('partials/legal/document-pdf', $data));
+        // The site logo at the top of the PDF (owner, 2026-11-09).
+        $pdf = $this->pdfs->renderPage($this->view->renderFragment('partials/legal/document-pdf', $data + ['pdf_logo' => $this->siteLogo->forPdf(50, 16)]));
         // Saved as, for example, Terms-and-Conditions-2026-10-20.pdf.
         $name = trim((string) preg_replace('/[^A-Za-z0-9]+/', '-', $data['legal']['title'] . ' ' . $data['legal']['updated']), '-');
         return new Response($pdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $name . '.pdf"',
             'Cache-Control' => 'public, max-age=300',
+            // The page is the search result, not its PDF (the SEO brief, 2026-11-09).
+            'X-Robots-Tag' => 'noindex',
         ]);
     }
 

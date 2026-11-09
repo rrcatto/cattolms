@@ -1,12 +1,16 @@
 # CattoLMS on rootless Podman
 
+**LMS:** 1.1.3 · **Updated:** 2026-11-09
+
+Keep this guide to what the kit does now, and under 150,000 characters: when something here stops being true, change it or take it out. The Git history keeps every earlier version.
+
 One CattoLMS site runs as its own Linux user in a Podman pod of three containers. The server's own web server keeps ports 80 and 443 and the site's certificate, and forwards the site to the pod on `127.0.0.1`. PostgreSQL and the mail server stay on the server. This suits a server that already hosts other sites (with nginx, Apache or a control panel such as Virtualmin) and is the other way to install CattoLMS beside [`install/install.sh`](../../install/README.md), which runs the site with the server's own PHP.
 
 | Container | Image | Job |
 |---|---|---|
 | `web` | `nginxinc/nginx-unprivileged` (pinned) | Serves `public_html`, passes PHP to `php` |
 | `php` | CattoLMS's image from [`Containerfile`](Containerfile): PHP 8.5.12 or later with the extensions `composer.json` requires | Runs the site (PHP-FPM) |
-| `scheduler` | the same image | `php bin/console schedule:run --watch`: the commerce job every minute, popularity hourly, the clean-up daily |
+| `scheduler` | the same image | `php bin/console schedule:run --watch`: every scheduled job ([docs/OPERATIONS.md](../../docs/OPERATIONS.md), "Scheduled work") |
 
 Why: PHP runs in a container as the site's user, with the code mounted read-only. A break-in through PHP cannot change the code, reach the user's SSH keys or cron, or touch the server's other sites. The PHP version is pinned in the image, the same on every machine that builds it.
 
@@ -62,10 +66,10 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/rrcatto/cattolms/main/deploy/podman/cattolms-podman.sh
-bash cattolms-podman.sh install --version 1.1.0 --port 8081
+bash cattolms-podman.sh install --version 1.1.3 --port 8081
 ```
 
-It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600; `APP_ENV` keeps the site's existing value, `development` for a new site, and only the site's owner changes it to production), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes (the site starts on Saharan Sunset, the theme that comes with the code), copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
+It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600; `APP_ENV` keeps the site's existing value, `development` for a new site, and only the site's owner changes it to production), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables (the baseline, then every migration after it), installs the themes (the site starts on Saharan Sunset, the theme that comes with the code), copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
 
 Then sign in at the site with the administrator's email address and open Administration → System → Setup.
 
@@ -74,7 +78,7 @@ Then sign in at the site with the administrator's email address and open Adminis
 Before an update, fetch the script again (the `curl` line above), so the update runs the new release's kit, not the one you installed with.
 
 ```sh
-bash cattolms-podman.sh update --version 1.1.0    # the next release: code, packages, tables, themes, restart
+bash cattolms-podman.sh update --version 1.1.3    # the next release: code, packages, any new migrations, themes, restart
 bash cattolms-podman.sh status                     # the service and the pod
 bash cattolms-podman.sh logs web|php|scheduler     # a container's log
 bash cattolms-podman.sh console about              # php bin/console in the running pod
@@ -85,7 +89,7 @@ An update keeps two versions in `~/cattolms/releases`: the one now running and t
 
 Each release has a whole `vendor` folder of its own, so a release is never changed under a running site, but a new release starts its `vendor` as hard links to the running release's files: a Composer package both use takes its space once (about 115 MB saved per release), and Composer replaces only the packages that changed, as new files. Composer's own record and autoloader (`vendor/composer`), `vendor/bin` and the loose files in `vendor` are real copies, because Composer rewrites them.
 
-Each release also compiles its own cache, in `~/storage/cache/symfony/<version>-<hash>/` (since v0.9.10): the update builds the new release while the site runs and never reads or deletes the running release's cache, so the site stays up until the restart that switches it. The update deletes the cache folders of the releases it deletes, and the one releases before v0.9.10 shared (`~/storage/cache/symfony/<environment>`). Updating from v0.9.9 or earlier, fetch this script first: the update then builds 0.9.10 or later in its own folder.
+Each release also compiles its own cache, in `~/storage/cache/symfony/<version>-<hash>/`: the update builds the new release while the site runs and never reads or deletes the running release's cache, so the site stays up until the restart that switches it. The update then deletes every cache folder but the running release's and the one before it's.
 
 A PHP security release: raise the PHP version in `deploy/podman/Containerfile` (a CattoLMS release does this), then update. The web server's image is pinned in `cattolms-podman.sh`.
 
@@ -95,7 +99,7 @@ A PHP security release: raise the PHP version in `deploy/podman/Containerfile` (
 |---|---|
 | `~/.env` | the site's settings |
 | `~/cattolms/releases/<version>`, `~/cattolms/current` | the code, read-only in the containers |
-| `~/cattolms/pod/` | the pod's definition and its web server configuration, written from the templates here |
+| `~/cattolms/pod/` | the pod's definition and its web server configuration, written from the templates here at every install and update: the web server sends text compressed (gzip) and has browsers keep the static folders for 30 days |
 | `~/public_html`, `~/storage`, `~/themes` | what the site writes: web files, logs, caches, uploads, installed themes |
 | `~/.config/containers/systemd/cattolms.kube` | the systemd user service |
 

@@ -615,9 +615,10 @@ final class CourseItemService
             if ($row['minutes'] === null) { continue; }
             for ($up = $parents[(int) $row['id']]; $up !== null; $up = $parents[$up] ?? null) { $totals[$up] = ($totals[$up] ?? 0) + (int) $row['minutes']; }
         }
-        // A module's time is its share of the study time the course states, where it states one, as the course's page says.
+        // A module's time is its share of the study time the course states, where it states one, as the course's page says:
+        // shared among all its modules, even where the public preview shows only Module 1 (which had the whole course's).
         $stated = $this->items->courseStudyMinutes($courseId);
-        $share = self::moduleShare($stated, count(array_filter($rows, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered']))));
+        $share = self::moduleShare($stated, $this->items->moduleCount($courseId));
         foreach ($rows as &$row) {
             if ($stated > 0 && (string) $row['node_type'] === 'section' && !empty($row['numbered'])) { $totals[(int) $row['id']] = $share; }
             $row['total_minutes'] = (string) $row['node_type'] === 'section' && isset($totals[(int) $row['id']]) ? $totals[(int) $row['id']] : null;

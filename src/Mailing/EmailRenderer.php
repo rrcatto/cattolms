@@ -32,6 +32,10 @@ and their note at the top, a button to create an account, and in the footer why 
 and "Never email me", in place of the unsubscribe and subscriptions links, which are the sender's own.
 
 Changelog:
+2026/11/09 SAST
+- A designed template's header shows the logo it chose: the site logo, its own or none (logo_source); {site_logo_url}
+  for HTML templates. account() draws account and order emails in the template chosen for them, and sample() has an
+  account sample for the template's preview and proof.
 2026/10/28 SAST
 - Updates in place of the new-course digest's courses.
 - The web copy and Forward to a friend links; the forwarded copy.
@@ -47,6 +51,7 @@ declare(strict_types=1);
 namespace CattoLearning\Mailing;
 
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Support\AccessPeriod;
@@ -67,6 +72,7 @@ class EmailRenderer
         private readonly ?SiteMode $site = null,
         private readonly ?MailingTemplates $templates = null,
         private readonly ?UpdateRepository $updates = null,
+        private readonly ?SiteLogo $siteLogo = null,
     ) {
     }
 
@@ -148,9 +154,7 @@ class EmailRenderer
         $because = $forward !== null
             ? 'You get this email because ' . (trim((string) ($forward['from'] ?? '')) ?: 'someone') . ' forwarded it to you. You are not on any of our lists, and we will not email you again unless you ask.'
             : $this->because($reasons, (string) ($campaign['kind'] ?? ''));
-        $ownerName = $this->owner?->value('trading_name') ?: $this->runtime->platformName();
-        $ownerAddress = $this->owner?->addressLine() ?? '';
-        $owner = $ownerName . ($ownerAddress !== '' ? ', ' . $ownerAddress : '');
+        $owner = $this->ownerLine();
         $unsubscribeLabel = 'Unsubscribe from ' . $listName;
         // The footer's links: the reader's own, or for a friend a copy was forwarded to, never to be emailed.
         $links = $forward !== null ? [['Never email me', (string) $forward['never_url']]]
@@ -169,7 +173,8 @@ class EmailRenderer
         $values = ['{content}' => $html, '{unsubscribe_link}' => self::e($forward !== null ? (string) $forward['never_url'] : $unsubscribe), '{site_owner_address}' => self::e($owner), '{subject}' => self::e($subject),
             '{preheader}' => self::e($preheader), '{first_name}' => self::e($first), '{list_name}' => self::e($listName), '{why}' => self::e($because),
             '{subscriptions_link}' => self::e($forward !== null ? (string) $forward['register_url'] : $subscriptions), '{site_name}' => self::e($this->runtime->platformName()), '{site_url}' => self::e($site),
-            '{demo_notice}' => $demo ? self::e($this->demoNotice()) : '', '{year}' => date('Y'), '{web_link}' => self::e($webUrl !== '' ? $webUrl : $site), '{forward_link}' => self::e($forwardUrl !== '' ? $forwardUrl : $site)];
+            '{demo_notice}' => $demo ? self::e($this->demoNotice()) : '', '{year}' => date('Y'), '{web_link}' => self::e($webUrl !== '' ? $webUrl : $site), '{forward_link}' => self::e($forwardUrl !== '' ? $forwardUrl : $site),
+            '{site_logo_url}' => self::e($this->siteLogo?->url($base) ?? '')];
         $page = (string) ($template['mode'] ?? 'design') === 'html' && trim((string) ($template['html'] ?? '')) !== ''
             ? $this->htmlFrame((string) $template['html'], $values, $demo, $pixel)
             : $this->designFrame($s, $html, $subject, $preheader, $demo, $because, $links, $webUrl, $owner, $pixel);
@@ -181,7 +186,7 @@ class EmailRenderer
             $plain = strtr((string) $template['text_part'], ['{content}' => $content, '{unsubscribe_link}' => $forward !== null ? (string) $forward['never_url'] : $unsubscribe, '{site_owner_address}' => $owner, '{subject}' => $subject,
                 '{preheader}' => $preheader, '{first_name}' => $first, '{list_name}' => $listName, '{why}' => $because, '{subscriptions_link}' => $forward !== null ? (string) $forward['register_url'] : $subscriptions,
                 '{site_name}' => $this->runtime->platformName(), '{site_url}' => $site, '{demo_notice}' => $demo ? $this->demoNotice() : '', '{year}' => date('Y'),
-                '{web_link}' => $webUrl !== '' ? $webUrl : $site, '{forward_link}' => $forwardUrl !== '' ? $forwardUrl : $site]);
+                '{web_link}' => $webUrl !== '' ? $webUrl : $site, '{forward_link}' => $forwardUrl !== '' ? $forwardUrl : $site, '{site_logo_url}' => $this->siteLogo?->url($base) ?? '']);
             if ($demo && !str_contains((string) $template['text_part'], '{demo_notice}')) $plain = $this->demoNotice() . "\n\n" . $plain;
         } else {
             $plain = ($demo ? $this->demoNotice() . "\n\n" : '') . ($webUrl !== '' ? 'View it in your browser: ' . $webUrl . "\n\n" : '') . $content
@@ -189,6 +194,46 @@ class EmailRenderer
         }
 
         return ['subject' => $subject, 'html' => $page, 'text' => $plain, 'unsubscribe_url' => $unsubscribe];
+    }
+
+    /**
+     * An account or order email (owner, 2026-11-09: "the account and order emails should get a design with choice of
+     * logo"): the words Infrastructure\Mail\SymfonyMailerAdapter wrote, drawn in the template chosen for account and order
+     * emails, with why the person gets it and the Site Owner's name and address at the foot. It is not news, so it has no
+     * unsubscribe link, web copy or tracking: an HTML template's {unsubscribe_link} and {subscriptions_link} are the
+     * person's subscriptions page. A demo site's notice heads both copies.
+     *
+     * @param array<string,mixed>|null $template the template for account and order emails when null
+     * @return array{html:string,text:string}
+     */
+    public function account(string $subject, string $html, string $text, ?array $template = null): array
+    {
+        $template ??= $this->templates?->defaultFor('account') ?? ['mode' => 'design', 'design' => TemplateDesign::DEFAULTS, 'html' => '', 'text_mode' => 'made', 'text_part' => ''];
+        $s = self::style(TemplateDesign::read((array) ($template['design'] ?? [])));
+        $site = $this->siteUrl();
+        $subscriptions = $site . '/account/subscriptions';
+        $because = 'You get this email from ' . $this->runtime->platformName() . ' because of your account there, or something asked for with this email address.';
+        $owner = $this->ownerLine();
+        $demo = $this->site?->isDemo() ?? false;
+        $content = $this->accountWords($html, $s);
+        $values = ['{content}' => $content, '{unsubscribe_link}' => self::e($subscriptions), '{site_owner_address}' => self::e($owner), '{subject}' => self::e($subject),
+            '{preheader}' => '', '{first_name}' => '', '{list_name}' => '', '{why}' => self::e($because), '{subscriptions_link}' => self::e($subscriptions),
+            '{site_name}' => self::e($this->runtime->platformName()), '{site_url}' => self::e($site), '{demo_notice}' => $demo ? self::e($this->demoNotice()) : '',
+            '{year}' => date('Y'), '{web_link}' => self::e($site), '{forward_link}' => self::e($site), '{site_logo_url}' => self::e($this->siteLogo?->url($site) ?? '')];
+        $page = (string) ($template['mode'] ?? 'design') === 'html' && trim((string) ($template['html'] ?? '')) !== ''
+            ? $this->htmlFrame((string) $template['html'], $values, $demo, '')
+            : $this->designFrame($s, $content, $subject, '', $demo, $because, [], '', $owner, '', $site);
+
+        if ((string) ($template['text_mode'] ?? 'made') === 'own' && trim((string) ($template['text_part'] ?? '')) !== '') {
+            // The plain-text copy written around {content}, with the same values as words, not HTML.
+            $words = array_map(static fn(string $value): string => html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $values);
+            $plain = strtr((string) $template['text_part'], ['{content}' => $text] + $words);
+            if ($demo && !str_contains((string) $template['text_part'], '{demo_notice}')) $plain = $this->demoNotice() . "\n\n" . $plain;
+        } else {
+            $plain = ($demo ? $this->demoNotice() . "\n\n" : '') . $text . "\n\n-- \n" . $because . "\n" . $owner;
+        }
+
+        return ['html' => $page, 'text' => $plain];
     }
 
     /**
@@ -200,6 +245,15 @@ class EmailRenderer
      */
     public function sample(array $template, string $sample, string $firstName): array
     {
+        if ($sample === 'account') {
+            // A sign-in link, as account and order emails are drawn in the template chosen for them.
+            $subject = (($this->site?->isDemo() ?? false) ? SiteMode::EMAIL_PREFIX : '') . 'Your secure sign-in link';
+            $link = $this->siteUrl() . '/login';
+            $copy = $this->account($subject, '<p>Use the link below to sign in to ' . self::e($this->runtime->platformName()) . '.</p><p><a href="' . self::e($link) . '">Sign in securely</a></p><p>This one-time link expires in 30 minutes. If you did not request it, ignore this email.</p>',
+                'Sign in: ' . $link . "\n\nThis one-time link expires in 30 minutes.", $template);
+
+            return ['subject' => $subject, 'html' => $copy['html'], 'text' => $copy['text'], 'unsubscribe_url' => ''];
+        }
         $courses = array_slice($this->campaigns->publishedCourses(), 0, 2);
         $first = $courses[0]['id'] ?? 0;
         if ($sample === 'digest') {
@@ -282,15 +336,24 @@ class EmailRenderer
      * @param array<string,mixed> $s
      * @param list<array{0:string,1:string}> $links the footer's links, label and address
      */
-    private function designFrame(array $s, string $html, string $subject, string $preheader, bool $demo, string $because, array $links, string $webUrl, string $owner, string $pixel): string
+    private function designFrame(array $s, string $html, string $subject, string $preheader, bool $demo, string $because, array $links, string $webUrl, string $owner, string $pixel, ?string $pictureBase = null): string
     {
-        $base = $this->linkBase();
+        $base = $pictureBase ?? $this->linkBase();
         $design = $s['design'];
-        $logo = (string) $design['logo'] !== '' ? $this->campaigns->asset((string) $design['logo']) : null;
         $logoWidth = TemplateDesign::LOGO_SIZES[(string) $design['logo_size']] ?? 240;
         $align = $design['align'] === 'center' ? 'center' : 'left';
-        $header = $logo !== null
-            ? '<img src="' . self::e($base . '/m/i/' . $design['logo'] . self::extension($logo['media_type'])) . '" width="' . min($logoWidth, $logo['width']) . '" alt="' . self::e($this->runtime->platformName()) . '" style="display:' . ($align === 'center' ? 'inline-block' : 'block') . ';border:0;max-width:' . $logoWidth . 'px;height:auto;">'
+        // The logo the template chose (owner, 2026-11-09): the site logo, its own or none; the site's name without one.
+        [$logoUrl, $logoPixels] = [null, 0];
+        if ($design['logo_source'] === 'site') {
+            $siteLogo = $this->siteLogo?->image();
+            if ($siteLogo !== null) [$logoUrl, $logoPixels] = [$this->siteLogo->url($base), $siteLogo->width];
+        } elseif ($design['logo_source'] === 'own' && (string) $design['logo'] !== '') {
+            $own = $this->campaigns->asset((string) $design['logo']);
+            $logoUrl = $own === null ? null : $base . '/m/i/' . $design['logo'] . self::extension($own['media_type']);
+            $logoPixels = (int) ($own['width'] ?? 0);
+        }
+        $header = $logoUrl !== null
+            ? '<img src="' . self::e($logoUrl) . '" width="' . min($logoWidth, max(1, $logoPixels)) . '" alt="' . self::e($this->runtime->platformName()) . '" style="display:' . ($align === 'center' ? 'inline-block' : 'block') . ';border:0;max-width:' . $logoWidth . 'px;height:auto;">'
             : self::e($this->runtime->platformName());
         $picture = (string) $design['header_picture'] !== '' ? $this->campaigns->asset((string) $design['header_picture']) : null;
         $pictureRow = $picture !== null
@@ -318,7 +381,7 @@ class EmailRenderer
             . ((string) $design['footer_words'] !== '' ? '<p style="margin:0 0 8px;">' . nl2br(self::e((string) $design['footer_words']), false) . '</p>' : '')
             . ($social !== [] ? '<p style="margin:0 0 8px;">' . implode(' &middot; ', $social) . '</p>' : '')
             . '<p style="margin:0 0 8px;">' . self::e($because) . '</p>'
-            . '<p style="margin:0 0 8px;">' . implode(' &middot; ', array_map(static fn(array $l): string => '<a href="' . self::e($l[1]) . '" style="color:' . self::MUTED . ';">' . self::e($l[0]) . '</a>', $links)) . '</p>'
+            . ($links !== [] ? '<p style="margin:0 0 8px;">' . implode(' &middot; ', array_map(static fn(array $l): string => '<a href="' . self::e($l[1]) . '" style="color:' . self::MUTED . ';">' . self::e($l[0]) . '</a>', $links)) . '</p>' : '')
             . '<p style="margin:0;">' . self::e($owner) . '</p>'
             . '</td></tr></table></td></tr></table>' . $pixel . '</body></html>';
     }
@@ -482,6 +545,29 @@ class EmailRenderer
         $last = array_pop($names);
 
         return 'You get this email because you follow ' . ($names === [] ? $last : implode(', ', $names) . ' and ' . $last) . (in_array('News and Updates', $reasons, true) ? ' and asked for News and Updates' : '') . '.';
+    }
+
+    /** The Site Owner's name and address, as every email's foot gives them. */
+    private function ownerLine(): string
+    {
+        $name = $this->owner?->value('trading_name') ?: $this->runtime->platformName();
+        $address = $this->owner?->addressLine() ?? '';
+
+        return $name . ($address !== '' ? ', ' . $address : '');
+    }
+
+    /**
+     * An account or order email's words, written as plain HTML by the mailer, given the template's spacing and link colour.
+     *
+     * @param array<string,mixed> $s
+     */
+    private function accountWords(string $html, array $s): string
+    {
+        return strtr((string) preg_replace('#<a href=#', '<a style="color:' . $s['links'] . ';" href=', $html), [
+            '<p>' => '<p style="margin:0 0 16px;">',
+            '<ul>' => '<ul style="margin:0 0 16px;padding-left:24px;">',
+            '<li>' => '<li style="margin:0 0 6px;">',
+        ]);
     }
 
     private function siteUrl(): string

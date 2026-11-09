@@ -91,7 +91,7 @@ final class CoursePresentationController extends BaseController
         if ($node === null || !(bool) ($node['public_preview'] ?? false) || !\CattoLearning\Course\Parts\CoursePartPdfs::printable($node)) { throw $this->notFound('This part has no PDF.'); }
         $rendered = GradeScale::resolve($this->renderer->render($node, (string) $course['slug'], (string) $node['part_name'], true), $this->courses->gradeBands((int) $course['id']));
         $heading = \CattoLearning\Course\Parts\CoursePartPdfs::heading($course, $node);
-        $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, $rendered)]]);
+        $html = $this->view->renderFragment('partials/course-part-pdf', ['pdf_logo' => $this->partPdfs->logo(), 'pdf' => $heading + ['body' => \CattoLearning\Course\Parts\CoursePartPdfs::body($node, $rendered)]]);
         return \CattoLearning\Http\FileDownload::attachment($this->partPdfs->file($html), \CattoLearning\Course\Parts\CoursePartPdfs::filename($heading['module'], $heading['part'] === 'Lesson' ? '' : $heading['part']), 'application/pdf');
     }
 

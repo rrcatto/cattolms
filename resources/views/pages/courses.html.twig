@@ -1,4 +1,5 @@
-{# The catalogue reads top to bottom: choose a category (optional), search, then the courses. #}
+{# The catalogue reads top to bottom: choose a category (optional), then the bundles and the courses, the courses' search
+   at the head of their own section, where what it finds shows as it is typed (owner, 2026-11-09). #}
 {% extends layout %}
 {% block page_body %}
 	{% set catalogue_hero %}{% include '@platform/partials/artwork/catalogue-hero.html.twig' %}{% endset %}
@@ -11,11 +12,8 @@
 {% block control %}{{ ui('form.tree-select', {id: 'catalogue-category-picker', name: 'category', items: category_picker.items, selected: category_picker.selected, placeholder: 'All categories', list_label: 'Course categories'}) }}{% endblock %}
 {% endembed %}
 			</form>
-			<div id="catalogue-search">
-				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true, ds_swap: 'innerMorph', ds_include: '#catalogue-state'} %}
-			</div>
 {% endblock %}
 {% endembed %}
-		{{ ui('catalogue.workspace', {workspace: workspace, courses: courses, catalogue_pagination: catalogue_pagination}) }}
+		{{ ui('catalogue.workspace', {workspace: workspace, courses: courses, catalogue_pagination: catalogue_pagination, search: {value: catalogue_search, action: catalogue_pagination.base}}) }}
 	</section>
 {% endblock %}

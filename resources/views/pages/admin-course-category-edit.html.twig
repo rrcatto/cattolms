@@ -1,5 +1,7 @@
 {% extends layout %}
 {% block page_body %}
+	{# Stimulus, for the search previews (search_preview_controller.js). #}
+	{{ importmap() }}
 	{% set ph_back_href = tree_href %}
 	{% set ph_back_label = 'Course categories' %}
 	{% set ph_kicker = 'Course metadata' %}
@@ -49,6 +51,17 @@
 
 {% endblock %}
 {% endembed %}
+		{# What search engines are told about the category's page (the SEO brief, 2026-11-09; Search\SearchOverrides). #}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'search'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Search engines', heading_level: 2, summary: 'What a search result and a shared link say about the category\'s page. Leave a field empty for its own words: its description, else the courses in it.'}) }}
+			<form action="{{ category_admin_url(category, '/search') }}" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% include '@platform/partials/admin/search-fields.html.twig' with {sf: search_fields} only %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save for search engines', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+{% endblock %}
+		{% endembed %}
 		{# The category's icon (owner, 2026-10-20): shown in the category picker, the catalogue and the tree. #}
 		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: category.icon_svg|default(''), ic_kind: 'category', ic_choice: icon_choice, ic_save: category_admin_url(category, '/icon')} %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}

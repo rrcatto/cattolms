@@ -1,5 +1,10 @@
 # CatWalk, the presentation engine
 
+**LMS:** 1.1.2 · **CatWalk:** 1.0.1 · **Updated:** 2026-11-08
+
+Keep this guide to how CatWalk works now, and under 150,000 characters: when something here stops being true, change it
+or take it out. The Git history keeps every earlier version.
+
 CatWalk plays short, phone-first presentations inside CattoLMS: a module's opening, a course's review, and a course's
 trailer on its landing page (owner, 2026-10-28, decision 7A). The original design is the owner's CatWalk specification;
 this is what is built.
@@ -64,7 +69,7 @@ A slide's picture is the slide itself (`DeckRenderer::thumbnail`): drawn 800 pix
 shrunk by CSS `zoom` (`.cl-slide-thumb--small`, `--medium`, `--large`: 160, 240 or 360 pixels), its buttons drawn as
 text. A new Presentation, made from Course Content or the Library, asks only what it is for and its look and starts with
 a title slide showing its title (a trailer also ends with a call to action). Checks: `PresentationEditorIntegrationTest`,
-`tests/Browser/presentation-editor.cjs` (80).
+`tests/Browser/presentation-editor.cjs`.
 
 ## The markup and the engine
 
@@ -128,4 +133,5 @@ a learner sees them at 1440: a drawing is given the slide's width but only about
 drawing draws larger than a tall one. `tests/Browser/presentation-readable.cjs` measures every word on every slide of every
 presentation against the real pixels behind it: run it after writing or changing a presentation, and before every release.
 
-The engine's two files depend on nothing in CattoLMS, so the same files play a deck on any page.
+The engine's two files are also published on their own as [CatWalk](https://github.com/rrcatto/catwalk) (MIT). The copies
+here and there are the same apart from their header comments: change both together.

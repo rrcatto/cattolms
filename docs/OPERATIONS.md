@@ -1,8 +1,10 @@
 # Operations
 
-**LMS:** 1.1.0 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
+**LMS:** 1.1.3 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
+
+Keep this guide to what is true of the current release, and under 150,000 characters: when something here stops being true, change it or take it out. The Git history keeps every earlier version.
 
 ## Local development environment
 
@@ -27,7 +29,7 @@ The database is disposable, so it is rebuilt rather than upgraded. Run, as the P
 
 ```sh
 php tools/reset-development-database.php --force        # drops and recreates the public schema
-php vendor/bin/phinx migrate -c phinx.php -e development # the one baseline: schema and reference data
+php vendor/bin/phinx migrate -c phinx.php -e development # the baseline, then every migration after it
 composer themes:install && composer themes:sync && composer seeds:publish
 php tools/smoke-app-boot.php
 php bin/console popularity:recalculate --no-debug
@@ -38,7 +40,7 @@ Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to th
 
 The baseline ships no categories. `resources/catalogue/catalogue.json` holds the starter categories and tags, each with its icon. After ADMIN's first sign-in, load it from Administration → System → Setup. A site's catalogue (the courses ADMIN ticks, each with its content, course code, cover, tags, position, related courses among the ticked ones and prices, and only their categories and tags) is one catalogue package: Administration → Courses → Import & Export Catalogue downloads it, and imports it on a rebuilt or new site after a review that shows each course as new, updated, unchanged or left out. Courses are matched by their course code only (`courses.code`, such as GDN-101). Keep a site's package privately. For scripts, `php bin/console catalogue:export <file.zip>` and `catalogue:import <file>` do the same without the review. A package carries the Resource Library files its courses use. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources`, or import the site's package, which brings them with their courses.
 
-To change the schema, edit the baseline and rebuild. Before replacing a large part of it, an equivalence check is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
+To change the schema, add an upgrade migration after the baseline, `database/migrations/<YYYYMMDDHHMMSS>_<what_it_does>.php`, written to run on a site that already holds data: the kit's update and `install.sh` run every migration a site has not yet run, so a fresh installation runs the baseline and then each migration in turn (`tools/validate-release.php` requires one baseline and every other migration to come after it). The baseline itself changes only when migrations are consolidated into it again. Before such a consolidation, an equivalence check is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
 
 ## Commerce operations
 
@@ -62,7 +64,7 @@ To change the schema, edit the baseline and rebuild. Before replacing a large pa
   - Company credit refunds apply only to unused purchased units, at historical LIFO prices.
   - The LMS never pays money out itself; wallet credit is never paid out as cash.
 - **Wallets.** Administration → Wallets lists every wallet with its balance and statement; a correction (more or less credit) needs a written reason and is a new ledger row. Wallet credit expires after the wallet expiry setting (3 years by default), and the holder is emailed once before each credit expires (30 days by default).
-- **Commerce settings.** Administration → Settings has a section for each group of commerce settings (one settings area), showing each setting with its `.env` default (`COMMERCE_*`, `.env.example`) and any override saved there; Reset removes the override. The legal pages print the values in force, and a change applies to later purchases only. Set the real Stitch fees before launch: both default to nothing.
+- **Commerce settings.** Administration → Settings has a section for each group of commerce settings (one settings area), showing each setting with its `.env` default (`COMMERCE_*`, `.env.example`) and any override saved there; Reset removes the override. The legal pages print the values in force, and a change applies to later purchases only. Set the real Stitch fees before a site goes live: both default to nothing.
 - **Account references.** Every person and company has one from the moment the account is made (prefix setting, creation date, a number from a database sequence, a check character). The dashboard, profile and orders show it, and EFT instructions ask the payer to quote it.
 - **Promotions.** A promotion's use is held from order placement until cancellation, and redeemed once when the order is paid. An order that a promotion makes free settles without a payment.
 - **Money Reports** (owner, 2026-11-06, the approved mockup). Administration → Credits & Orders → Money Reports (`/admin/commerce/reports`, `MoneyRecordsController`, after Money Ledger, with the Money Ledger's permission `PLATFORM.PAYMENT.VIEW`) is each month's money in one report (`Commerce\Application\MoneyReports`): the Month changes the page in place (UX rule 8.6a), six figures (money in, refunds and payouts, card fees, what is left, orders paid, new accounts), each set against the month before and, once the site has a year of records, the same month last year, each opening the list it adds up for the month's dates; then money in by method (wallet credit spent beside it, never in it), the orders placed in the month as they stand now, what the orders placed and paid in full bought, course by course and bundle by bundle, and the refunds and payouts. Every figure is counted by the code of the list it opens: the Money Ledger's totals (`MoneyRecords::ledgerTotalsFor`; Card fees is the ledger kind choice `card_fees`, both fee kinds), Orders & Payments' count (`orderCountFor`; the state choices `paid_in_full`, `to_pay` and `refunded_any`) and People's (`people_from`, `people_to`). Download PDF (A4, `MoneyReportFiles::pdf`, drawn by `DocumentPdfRenderer::renderPage` twice so its foot can say "Page 1 of 3") and Download Excel (`money-report-YYYY-MM.xlsx`, written by OpenSpout, MIT: sheets Summary, Money in, Sales, Orders, Refunds and Wallet, one row per entry under headings, amounts as numbers in rand and cents with a number format, dates as dates, every word as text). Email me each month has two ticks, saved as they change, by an administrator with `SYSTEM.SETTING.MANAGE` (one saved option, `money_reports`, no `.env` value; both start on). The `money_report` scheduled job sends last month's report on the 1st.
@@ -70,7 +72,7 @@ To change the schema, edit the baseline and rebuild. Before replacing a large pa
 
 ## Scheduled work
 
-One scheduler runs everything on an installation: `php bin/console schedule:run --no-debug` from cron once a minute, as the application user, or `php bin/console schedule:run --watch --no-debug` kept running under a process supervisor (systemd, or a development pod's scheduler container). `install/install.sh` writes the cron file. Each time it runs the jobs that are due and records each run in `scheduled_jobs` (when it started, finished, last succeeded or failed, and why). One job failing never stops the others. `--job commerce|popularity|cleanup` runs one job now. An example crontab line:
+One scheduler runs everything on an installation: `php bin/console schedule:run --no-debug` from cron once a minute, as the application user, or `php bin/console schedule:run --watch --no-debug` kept running under a process supervisor (systemd, or a development pod's scheduler container). `install/install.sh` writes the cron file. Each time it runs the jobs that are due and records each run in `scheduled_jobs` (when it started, finished, last succeeded or failed, and why). One job failing never stops the others. `--job <name>` runs one job now, due or not, by its name in brackets in the table below. An example crontab line:
 
 ```
 * * * * * cd /path/to/current && php bin/console schedule:run --no-debug >> /path/to/instance/storage/logs/schedule.log 2>&1
@@ -80,8 +82,9 @@ One scheduler runs everything on an installation: `php bin/console schedule:run 
 |---|---|---|
 | Orders and emails (`commerce`) | every minute | the commerce job, below |
 | Course popularity (`popularity`) | every hour | recalculates the popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read; pages never calculate it |
-| Clean-up (`cleanup`) | every day | deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
+| Clean-up (`cleanup`) | every day | deletes activity log entries, analytics events, contact messages, sign-up attempts that never became an account and the records of news emails older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does), Site Log records, flags and ended lockouts older than Site protection settings keep them, and Telegram messages sent more than 30 days ago |
 | Site protection (`site_protection`) | every minute | checks what each address did against the rules in Site protection settings, flags it and times it out, and asks the server's firewall to release any lockout that has ended |
+| Messages to you (`owner_messages`) | every minute | sends the waiting Telegram messages to the site's owner ("Messages to you", below), tries again any that could not go and drops one still unsent after 7 days; while people can sign in with Telegram, it also reads what they send the bot |
 | Sign-up check lists (`signup_lists`) | every day | fetches the Tor exit addresses daily and, weekly, the VPN and hosting networks and the throwaway email domains the sign-up check reads |
 | News emails (`mailing`) | every minute | records course changes as held updates, releases the updates whose time has come and delivers them (at once to people who want them as they happen, in each digest on its day), sends within the sending hours at the pace Mailing › Sending settings allows, pauses a sending whose bounces or complaints are too high, reads back what became of each email and asks sleeping addresses once a day |
 | Review requests (`review_requests`) | every hour | emails each learner who completed a course three days ago, and has not reviewed it, once to ask for a review (`Course\ReviewRequests`); never to an address on Addresses never emailed, never about a course completed more than 30 days ago |
@@ -89,7 +92,7 @@ One scheduler runs everything on an installation: `php bin/console schedule:run 
 | Money reports (`money_report`) | every minute | on the 1st of each month, from the start of the mailing sending hours (Mailing settings' Send from, 00:00 when around the clock), emails last month's money report to the administrator address (`APP_ADMIN_EMAIL`, or the Site Owner's email address saved in Settings) with its PDF and Excel file, while Email the report is ticked, and keeps its one line (money in, what is left, orders paid) for the owner's Telegram while Telegram summary is ticked and Telegram is connected, so the `owner_messages` job sends it and the Telegram log lists it. A month is claimed in `money_report_sends` before anything goes, with what each tick said then, and locked while it is sent, so it goes once whatever restarts; a month is claimed only on the 1st, so a scheduler started later never sends it late (the page always has it); an email that cannot go is tried again each minute within the sending hours for 7 days. A month with no sales still goes, saying so |
 | Log archive (`log_archive`) | every day just after midnight | moves `storage/logs/application.log`, and any other log beside it such as `schedule.log`, into `storage/logs/archive` compressed (`application-2026-10-27.log.gz`), starts each afresh and deletes archives older than `LOG_ARCHIVES_KEPT_FOR` (2 weeks; Settings → Maintenance overrides it). See "Application logging" below |
 
-Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce and news emails after 5 minutes, popularity and review requests after 3 hours, clean-up and the log archive after 2 days, the sign-up check lists and course videos after 3 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
+Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (the jobs that run every minute after 5 minutes, popularity and review requests after 3 hours, clean-up and the log archive after 2 days, the sign-up check lists and course videos after 3 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
 
 The commerce job does these things:
 
@@ -99,8 +102,6 @@ The commerce job does these things:
 - expires wallet credit whose expiry has passed, and emails each wallet holder once before a credit expires;
 - retries requested invoice emails and queued learner notices;
 - sends the buyer's emails, each once: how to pay by EFT with the invoice (when an order is placed for EFT or changed to it), a part payment with its receipt, an unpaid order cancelled, the order confirmation with every receipt, and the courses that started. An email whose moment has passed (the order was paid or cancelled first) is dropped.
-
-`deployment/commerce-worker.compose.yaml` holds a Compose configuration for container setups.
 
 ## Identity verification
 
@@ -134,7 +135,7 @@ Administration → Settings → Who can sign in: everyone, or administrators and
 
 ## Sitemap and robots.txt
 
-`/sitemap.xml` lists every published course and every published landing page of a published course, with absolute addresses from `APP_URL` and each one's last change, cached for an hour; beyond 50,000 addresses it becomes an index of `/sitemap-1.xml` and onward. `/robots.txt` is generated by the site, so its `Sitemap:` line carries the site's own full address. The static `public_html/robots.txt` is gone: remove it from a server's web root when deploying, or the web server keeps serving the old file. A demo site's sitemap addresses answer "not found" and its robots.txt names no sitemap; its pages keep their noindex. It is not told to keep search engines away entirely, because a search engine kept away never reads the noindex.
+`/sitemap.xml` starts with the public pages (the home page, the catalogue, the tag browser, bundles, Help, the FAQ, Contact, About and the three legal pages: the pages that list courses dated by the latest course or bundle change, the legal pages by their own date, the others undated), then lists every published course a search engine may list (not one kept out of search engines on its Search engines tab), every published landing page of such a course, every category with such a course in it or beneath it, every tag one of them carries and every published bundle, with absolute addresses from `APP_URL` and each one's last change, cached for an hour; beyond 50,000 addresses it becomes an index of `/sitemap-1.xml` and onward. `/robots.txt` is generated by the site, so its `Sitemap:` line carries the site's own full address. It keeps crawlers out of the private paths: sign-in links, signing in, the signed-in workspaces (`/admin/`, `/account/`, `/company/`, `/learn/`, `/mailing/`), each email's and person's token links (`/m/`, `/leaving/`, `/join/`), machine interfaces, certificates, transcripts and course media. There is no static `robots.txt`: delete one an old release left in a web root, or the web server serves it instead. A demo site's sitemap addresses answer "not found" and its robots.txt names no sitemap; its pages keep their noindex. It is not told to keep search engines away entirely, because a search engine kept away never reads the noindex.
 
 ## Search engines and AI
 
@@ -142,7 +143,15 @@ What the site gives search engines, AI assistants and the sites its pages are sh
 
 **Structured data.** Every public page's head carries schema.org JSON-LD, built by `Search\PageMetadata` (and `Search\StructuredData`) from what the page already shows and printed by `partials/structured-data.html.twig`, which `partials/head-meta.html.twig` includes in every theme. A course page has its `Course` (name, description, the Site Owner or the owning company as `provider`, `courseCode`, the level when the page shows it, `inLanguage` from `APP_LOCALE`, a `CourseInstance` with `courseMode` Online and the study time as an ISO 8601 `courseWorkload`, an `Offer` for each active price in its currency, and an `AggregateRating` only from approved reviews and only with at least one); a landing page the same `Course`, holding only what its sections show. A bundle's page is a `Product` with its `Offer` while it is on sale, and an `ItemList` of its courses' pages; a catalogue page (All courses or a category, without a search) an `ItemList` of the courses it shows, three or more. The home page has the `Organization` (the Site Owner's names, address, email, telephone, `/contact`, the logo `img/favicon-512x512.png`, and as `sameAs` only footer marks that link to the site's own profiles, never a platform's home page) and the `WebSite`. The FAQ has its `FAQPage`, from `Help\Faq`, the same list its page draws. Every public page whose trail has two steps or more has its `BreadcrumbList`, the trail every theme draws (`ThemeRenderer`). Administration, account, company, sign-in, reader, preview and error pages carry none (`StructuredData::PUBLIC_PAGES`), nor does a page that asks not to be indexed; a demo site's public pages carry it under their noindex. Every address comes from `APP_URL`: without it there is none. What Google does with it, checked on 2026-11-06: Course info rich results were retired in 2025 and FAQ rich results on 7 May 2026, so Google now reads a course for Course list (name, description, provider, and the catalogue's `ItemList`), and Google's Course list asks for courses "led by one or more instructors with a roster of students", which self-study courses may not meet; review snippets still take a course's rating; merchant listings leave out online classes, so a bundle may show only as a product snippet. The rest is schema.org as other search engines and AI assistants read it. Google's Rich Results Test cannot reach a site that is not public: test a live site there.
 
-**Share pictures.** A course, bundle and landing page each has the full Open Graph set (`og:title`, `og:description`, `og:url`, `og:type`, `og:image` with its type, size and words) and X's `twitter:card`, `summary_large_image` with a picture; the home page has the same with the site's picture, `img/hero-learning-1200x630.png` (the home hero drawn once). The picture is the course's cover, a bundle's own cover or else its first course's, drawn as a PNG at 1200 by 630 by **rsvg-convert** (librsvg, LGPL-2.1-or-later; Debian and Ubuntu package `librsvg2-bin`), because covers are SVG and Facebook, LinkedIn and X take only JPEG, PNG, GIF or WebP. It is drawn when a cover is saved, a course is created or imported, or a bundle is saved, never on a request, and kept as `storage/share-pictures/<sha256>.png`, named by the cover and the drawing's version, so a changed cover is a new file and a new `?v=` on its address. It is served as pictures are, by `Http\PictureResponse`, at `/share/course/{slug}.png` and `/share/bundle/{slug}.png`, only for a published course or bundle. Settings shows how many have their picture and has **Make the missing share pictures**, which draws every one not yet drawn (after an update, or on a server that had no rsvg-convert). The Podman kit's image and the development image install `librsvg2-bin` and `fonts-dejavu-core`; `install/install.sh` says when rsvg-convert is missing. Without it nothing is drawn and the pages carry no `og:image`. Old pictures are not removed when a cover changes; they are a few tens of kilobytes each.
+**Share pictures.** A course, bundle and landing page each has the full Open Graph set (`og:title`, `og:description`, `og:url`, `og:type`, `og:image` with its type, size and words) and X's `twitter:card`, `summary_large_image` with a picture; the home page and every other public page without a picture of its own have the same with the site picture, uploaded at Settings > Site Owner under the site logo (`Configuration\SitePicture`): a PNG, JPEG or WebP of at least 600 by 315, kept with the documents' pictures as itself (at most 2400 pixels wide) and as a 1200 by 630 copy cut from its middle, both JPEG, served at `/site-picture/<version>.jpg` and `-full.jpg`; a replaced picture stays served, so a link shared already keeps its picture. Without one, those pages are shared with no picture (`twitter:card` `summary`). The code ships no picture of its own for this: the site's picture is the business's. The picture is the course's cover, a bundle's own cover or else its first course's, drawn as a PNG at 1200 by 630 by **rsvg-convert** (librsvg, LGPL-2.1-or-later; Debian and Ubuntu package `librsvg2-bin`), because covers are SVG and Facebook, LinkedIn and X take only JPEG, PNG, GIF or WebP. It is drawn when a cover is saved, a course is created or imported, or a bundle is saved, never on a request, and kept as `storage/share-pictures/<sha256>.png`, named by the cover and the drawing's version, so a changed cover is a new file and a new `?v=` on its address. It is served as pictures are, by `Http\PictureResponse`, at `/share/course/{slug}.png` and `/share/bundle/{slug}.png`, only for a published course or bundle. Settings shows how many have their picture and has **Make the missing share pictures**, which draws every one not yet drawn (after an update, or on a server that had no rsvg-convert). The Podman kit's image and the development image install `librsvg2-bin` and `fonts-dejavu-core`; `install/install.sh` says when rsvg-convert is missing. Without it nothing is drawn and the pages carry no `og:image`. Old pictures are not removed when a cover changes; they are a few tens of kilobytes each.
+
+**Titles, descriptions and addresses** (the SEO brief, 2026-11-09). Every public page has its own title and description, its canonical address and the Open Graph set with `og:locale` (from `APP_LOCALE`) and X's card: a course, a landing page and a bundle by their own words as before; a category by its description, else the courses in it; a tag by its courses; and the site's own pages (`Search\PublicPages`: the home page, the catalogue, the tag browser, bundles, Help, the FAQ, Contact, About, the site presentation and the legal pages) each by a description of its own, with the site's picture to share. `PageMetadata::complete()`, through which the renderer passes every public page, fills what a page did not set. A later page of a list is its own page: its canonical address keeps `?page=N` and nothing else, so the reader's view, page size and sort are never indexed apart, and its title ends ", page N" (Google: give each page of a paginated list its own canonical address). A search's results ask not to be indexed (`noindex, follow`) and claim no address. Every page that is not public (signing in, registering, the cart, checkout, a lesson's preview, Administration, the account and company workspaces, an error page) asks not to be indexed, and a download or a legal page's PDF says so in an `X-Robots-Tag` header, the page being the search result. The Organization on the home page has the site logo (Settings > Site Owner) as its logo once one is uploaded. Whether search engines may list a site follows its site mode alone: a demo site's every page and response says `noindex, nofollow`, a live site's do not, whether it runs in development or production (`framework.disallow_search_engine_index: false`; Symfony would otherwise add its own noindex in debug and hide a live site that runs in development).
+
+**Your own words.** A course's editor has a **Search engines** tab, a category's page a **Search engines** card, and Settings > Search engines and AI **Page titles and descriptions**, a section for each of the site's own pages: a search title and a search description, each left empty for the page's own words, which show as the placeholder (`Search\SearchOverrides`; plain text, a title up to 120 characters and a description up to 320, a search result showing about 60 and 160). Beside them a likeness of the search result (the site's name after the title, both cut where a result cuts them) and of the shared link, which follows what is typed (`search_preview_controller.js`). A course's tab can also **Keep it out of search engines**: its page then asks not to be indexed and leaves the sitemap; people with the link still open it. A course's words travel in its catalogue package (the `catalogue` block's `search`), and an import lists a difference as Search engines. Courses keep them in `courses.search_title`, `search_description` and `search_hidden`, categories in `course_categories.search_title` and `search_description` (the upgrade migration `20261109140000_search_overrides.php`), and the site's pages in the option `search_pages`; every change is in the Activity log.
+
+**Speed.** The Podman kit's web server sends stylesheets, scripts, pages and drawings compressed (gzip, about a fifth of their size) and has browsers keep the static folders (`/css/`, `/js/`, `/img/`, `/themes/`, `/assets/`) for 30 days; their files are versioned when they change. The top bar shows a small copy of the site logo (`/site-logo/<version>-small.png` or `.jpg`, 88 pixels tall) with its width and height, and a narrow screen's menu is folded from the first paint where scripts run (`partials/head-meta.html.twig`), so nothing moves when the menu's script arrives. Measured on 2026-11-09 as Google's mobile test loads a page (a phone's screen, the processor slowed four times, a slow 4G connection) on the development site: Largest Contentful Paint 1.2 to 1.6 seconds on the home page, the catalogue, a category, a course, bundles, Help and the Terms (4.6 to 6.3 before), layout shift 0.001 to 0.078 (0.65 on the home page before), about 300 KB a page (about 1 MB before).
+
+**Not built yet.** A changed web address of a course, category or bundle is not redirected to the new one: the owner's choice while no site is live (2026-11-09); it is built when a site goes live. The site has one language, so there are no `hreflang` alternates.
 
 **AI crawlers.** robots.txt names every AI crawler in `Search\AiCrawlers`, each in its own group with its company and purpose in a comment, as the setting chooses: **Allow all AI crawlers** (the default, the owner's choice), **Allow AI search and answer assistants, block training-only crawlers**, or **Block all AI crawlers**. A crawler that may come in repeats the private paths, because a crawler named in robots.txt follows only its own group. The list is dated, with each company's documentation page, in that class: update it there. Googlebot, Bingbot and Applebot are search engines, never named, so Google Search with its AI Overviews, Bing with Copilot, and Siri stay as they are; link-preview fetchers are never named either. Google-Extended decides both Gemini's training and its answers from Google's pages, so it stays allowed when only training crawlers are kept out. Some assistants say they may fetch a page a person asks for whatever robots.txt says.
 
@@ -163,23 +172,21 @@ One setting says whether a site is real: `APP_SITE_MODE=demo` or `live` in `.env
 - **What a demo site says** is yours to word at Settings → Site mode, with a button back to the standard words: the heading and notice on every page and the legal PDFs, the first line of every email, and the message at checkout, on orders and on financial documents (`SiteMode::WORDS`, plain text). A document already issued keeps its words. An email's subject still starts with `[DEMO]`.
 - **A demo site** makes every account registered through the site wait for an administrator's approval before it can sign in (Administration → People → the person → Approve account; the administrator is emailed when one registers, the dashboard lists them, and the person is emailed when approved), so nobody can buy courses with the simulated card and read them without your say. Accounts an administrator adds under People are approved already. It also shows "This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation." at the top of every page (`partials/flash-messages.html.twig`, in every theme and the course reader); asks search engines not to list it (`<meta name="robots" content="noindex, nofollow">` on every page and `X-Robots-Tag: noindex, nofollow` on every response from PHP); says at both checkouts that the purchase is a simulation and nothing is being bought or sold; marks every order placed on it as a simulation in its snapshot, so its order pages, invoice, receipt and credit note say so for good, even if the site later goes live; starts every email's subject with `[DEMO]` and its text with a line saying it comes from a demo site; shows fake bank details labelled as fake in EFT instructions and documents (`SiteMode::FAKE_BANK_DETAILS`); offers the simulated card; and lets the seed tools run.
 - **A live site** does none of that: never the simulated card (only the ticked payment methods, Settings → Payment methods), the Site Owner's bank details, a sitemap named in robots.txt, and the seed tools refuse to run.
-- In development (`APP_ENV`, below), Symfony adds `X-Robots-Tag: noindex` to every response by itself, so a development site sends it even when set to live.
+- Whether search engines may list the site follows the site mode alone, never `APP_ENV`: Symfony's own `X-Robots-Tag: noindex` in development is turned off (`framework.disallow_search_engine_index: false`, 2026-11-09), so a live site that runs in development may be listed.
 
 ### The site notification
 
 Administration > Settings > Site notification, straight after Site mode (owner, 2026-11-05; `Configuration\SiteNotification`, `partials/flash-messages.html.twig`): a message at the top of the site's pages, under the demo notice, for everyone, on a demo site and a live one. The pages where a course is taken (the reader and its assessments, the public preview's too) show it only with Also while taking a course ticked (owner, 2026-11-05). It has a kind, each with its own look in every theme and on the pages where a course is taken (Promotion green with a megaphone, Information blue with an information sign, Warning amber with a warning triangle; `feedback.notice` with `solid` and `icon`), an optional heading, plain text and an optional date and time, typed in the site's time, to count down to in weeks, days, hours, minutes and seconds. The server draws the five units and says its own time, so a visitor's wrong clock does not change the count, `platform-overrides.js` keeps it ticking, and it goes away by itself at zero. Unticked it keeps its words; Remove clears them. It has no `.env` value: nothing starts it but this setting. Every change is in the activity log (`platform.site_notification_changed`).
 
-Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Settings → Site Owner) before providing EFT instructions to customers on a live site; a demo site shows fake details instead (below). The Dummy gateway simulates card outcomes only on a demo site. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No live payment-processor credentials are included in the current code.
-
 ### Messages to you
 
-Administration > Settings > Messages to you, straight after Site notification (owner, 2026-11-05; `src/OwnerMessages/`): a message to the owner's phone by Telegram when someone registers and when an order is paid in full, each ending with the site's `APP_DOMAIN`, because one bot may serve several sites. The bot's key is saved encrypted (`SecretCipher`) in one saved option with the Telegram username of the account to message, that account's chat and the two ticks, and there is no `.env` value. A bot cannot write to a username or a phone number, so Connect to Telegram keeps a key Telegram accepts and the username, reads `getUpdates` and connects only the private chat whose `from.username` matches, in any case: a stranger who presses Start on the bot gets nothing, and changing the username clears the chat. The section's title and a status say what is connected to what, the fields go once it is connected and come back after Disconnect, and the two ticks save as they change. The Telegram log, under Site Analytics after Site Log and linked from the section, lists every message, test messages too, with when it went or why it did not; sent ones are kept for 30 days and unsent ones for 7. Telegram holds those updates for about a day. No phone number is kept. Neither hook can fail what it is about: `AuthService::consumeRegistration` and `FulfilmentService::fulfil` keep the message in their own transaction, behind a savepoint, in `telegram_messages` (`owner_messages` until the evening of 2026-11-05), once per person or order by its unique reference, and only when connected and ticked. Nobody invented sends one: an address at `.invalid` (Seed Database, `GeneratedDomainRouter`), `.test`, `.example`, `.localhost` or `example.com`, `.net` or `.org` keeps nothing (`OwnerMessages::invented`), so the checks stay quiet with Telegram connected.
+Administration > Settings > Messages to you, straight after Site notification (owner, 2026-11-05; `src/OwnerMessages/`): a message to the owner's phone by Telegram when someone registers, when an order is placed and when it is paid in full (each its own tick, below), each ending with the site's `APP_DOMAIN`, because one bot may serve several sites. The bot's key is saved encrypted (`SecretCipher`) in one saved option with the Telegram username of the account to message, that account's chat and the ticks, and there is no `.env` value. A bot cannot write to a username or a phone number, so Connect to Telegram keeps a key Telegram accepts and the username, reads `getUpdates` and connects only the private chat whose `from.username` matches, in any case: a stranger who presses Start on the bot gets nothing, and changing the username clears the chat. The section's title and a status say what is connected to what, the fields go once it is connected and come back after Disconnect, and the ticks save as they change. The Telegram log, under Site Analytics after Site Log and linked from the section, lists every message, test messages too, with when it went or why it did not; sent ones are kept for 30 days and unsent ones for 7. Telegram holds those updates for about a day. No phone number is kept. No hook can fail what it is about: `AuthService::consumeRegistration`, the placing of an order (`OrderService`, `CompanyCreditPurchaseService`) and `FulfilmentService::fulfil` keep the message in their own transaction, behind a savepoint, in `telegram_messages`, once per person or order by its unique reference, and only when connected and ticked. Nobody invented sends one: an address at `.invalid` (Seed Database, `GeneratedDomainRouter`), `.test`, `.example`, `.localhost` or `example.com`, `.net` or `.org` keeps nothing (`OwnerMessages::invented`), so the checks stay quiet with Telegram connected.
 
 The `owner_messages` scheduled job sends the waiting ones every minute, oldest first, 30 at a time, and stops at the first failure. It sends and counts only the owner's own (`chat_id` NULL): a person's message went at once or not at all, so someone who blocked the bot never shows at Settings as not getting through, and nothing goes twice. A failed message stays with its error, which Settings shows, and is tried next minute. One still unsent after 7 days is dropped, and the daily clean-up clears sent ones after 30 days. Anything Telegram or the network says is scrubbed of the key before it is stored or shown (`TelegramClient`), because the key is part of Telegram's address. The scheduler must be restarted after an update, or it will not know the job. `owner_messages.telegram_address` is a saved option no page sets, so that `tests/Browser/owner-messages.cjs` can use its stand-in. It must not exist on a real site.
 
 ### Signing in with Telegram and two-step sign-in
 
-Owner, 2026-11-05, the approved mockup (`REPORTS/telegram-sign-in-mockup/`). Settings > Messages to you has one row of four ticks, in the owner's order (owner, 2026-11-06): Login via Telegram (off until it is ticked, working only while a bot key is saved there), New Account, New Order (a message when an order is placed, before it is paid, from either checkout) and Payment made. Then the Sign in page offers Email address or Telegram account as feature cards (without JavaScript both fields show and the button pressed says which is read), and Account > Sign-in and security (`/account/security`) lets a person connect their Telegram account.
+Owner, 2026-11-05, from an approved mockup. Settings > Messages to you has one row of four ticks, in the owner's order (owner, 2026-11-06): Login via Telegram (off until it is ticked, working only while a bot key is saved there), New Account, New Order (a message when an order is placed, before it is paid, from either checkout) and Payment made. Then the Sign in page offers Email address or Telegram account as feature cards (without JavaScript both fields show and the button pressed says which is read), and Account > Sign-in and security (`/account/security`) lets a person connect their Telegram account.
 
 - **Connecting.** A bot can write only to someone who has started it. Connect Telegram makes a one-time token (`auth_login_tokens`, purpose `telegram_connect`, 10 minutes, never counted as a sign-in request) and a button to `https://t.me/<bot>?start=<token>`. When the bot is sent `/start <token>`, the account is connected to that private chat (`telegram_accounts`: the chat, the username if it has one, when), the bot says so, and the page notices by itself (its card asks again every 5 seconds while it waits, which is not a visit) or by I have pressed Start without JavaScript. One Telegram account belongs to one person: a chat connected elsewhere is refused, with a plain answer from the bot and a plain message on the page. A bare `/start` gets one line saying what the bot is for; anything else is ignored. A connected person's username follows what Telegram calls them whenever the bot hears from them. Disconnect forgets it.
 - **How the site hears the bot.** There is no webhook: a laptop site has no public address, and a bot can use only one of the two. `OwnerMessages\TelegramInbox` reads `getUpdates` from an offset kept in the saved option `telegram.inbox`, every minute in the `owner_messages` job and from a waiting connect page at most once every 2 seconds, one reader at a time (a PostgreSQL advisory lock), and only while sign-in by Telegram is on. A message older than 10 minutes (a connect link's life) is read but never answered, so switching sign-in on never answers a Start pressed hours before: Telegram keeps unread messages for a day. Reading from an offset uses the updates up, so the private chats seen in the last day (50 at most) are kept beside the offset, and Connect to Telegram at Settings finds the owner among them. **A bot can serve one site for sign-in**: two sites reading one bot's updates would each use up the other's, so give each site its own bot. Settings says so beside the choice. A bot used for messages to the owner only may still serve several sites.
@@ -187,13 +194,13 @@ Owner, 2026-11-05, the approved mockup (`REPORTS/telegram-sign-in-mockup/`). Set
 - **Two-step sign-in.** RFC 6238 (SHA1, 30 seconds, 6 digits, one step either way), as every authenticator app makes it (`Auth\TwoStep\`): the key is kept encrypted (`user_two_step`, `SecretCipher`) with the last step used, so a code works once; eight recovery codes `XXXX-XXXX`, from an alphabet with no 0, O, 1 or I, are kept only as keyed hashes (`user_two_step_recovery`), each working once. Setting it up shows a QR code drawn on the server (bacon/bacon-qr-code), the key to type, then the recovery codes once. After any sign-in link or code, email or Telegram, and after a registration, someone with two-step on, or whom the policy names, gets no session yet: a sign-in waiting for its second step is kept in their browser's session for 10 minutes (`PendingSignIn`), five wrong codes end it, and only the right code, or a recovery code, opens the session. Turning it off and New recovery codes both ask for a current code (a recovery code works there too); turning it off is refused, and not offered, while the policy names them.
 - **Who must use it.** `AUTH_TWO_STEP` in `.env`: `CHOICE` (anyone may), `ADMINS` (administrators must, others may choose) or `EVERYONE`, in either case, and `ADMINS` when it is missing or says anything else. Settings > Two-step sign-in overrides it, and Reset returns to it; every change is in the activity log. Someone the policy names sets it up at their next sign-in, before they get in. A development site whose browser checks sign administrators in by link sets `CHOICE`.
 - **Lost phone.** A person's page in Administration has a Sign-in card (their Telegram account and their two-step) and Reset two-step (`PLATFORM.PERSON.MANAGE`, in the activity log, never one's own). A sole administrator who has lost their phone and every recovery code runs `php bin/console auth:two-step-reset <email>` on the server (in a Podman kit site, `~/cattolms-podman.sh console auth:two-step-reset <email>`); nothing else depends on the console.
-- **The Telegram log** (`/admin/site-analytics/telegram-log`) lists every message with who it went to (`telegram_messages.chat_id`, `to_user_id`, `to_username`, recorded when it went): the person on this site with their username, or You for the owner's own. Rows from before 2026-11-05's evening show the owner's current username.
+- **The Telegram log** (`/admin/site-analytics/telegram-log`) lists every message with who it went to (`telegram_messages.chat_id`, `to_user_id`, `to_username`, recorded when it went): the person on this site with their username, or You for the owner's own.
 
 ## A site on rootless Podman
 
 `deploy/podman/` (2026-10-22) runs a site as its own Linux user in a pod: `web` (nginx, unprivileged), `php` (PHP-FPM from `deploy/podman/Containerfile`) and `scheduler` (`schedule:run --watch`), a Quadlet systemd user service published on `127.0.0.1:<port>`, behind the server's own web server; PostgreSQL and the mail server stay on the server and are `10.0.2.2` to the pod. The code (`~/cattolms/releases/<version>`, `~/cattolms/current`) is read-only in the containers. Setting up and the root steps: [deploy/podman/README.md](../deploy/podman/README.md).
 
-- **Update:** `cattolms-podman.sh update --version X.Y.Z` as the site's user: the release, its image and Composer packages, the tables, the themes, the web files, then a restart. A database change needs no other step (the one baseline migration, on a fresh database for a new baseline).
+- **Update:** `cattolms-podman.sh update --version X.Y.Z` as the site's user: the release, its image and Composer packages, the tables, the themes, the web files, then a restart. A database change needs no other step: the update runs every migration the site has not yet run (`phinx migrate`), and a fresh installation runs the baseline and every migration after it.
 - **A PHP security release:** a CattoLMS release raises the pinned PHP version in the Containerfile; updating to it rebuilds the image.
 - **Logs and commands:** `cattolms-podman.sh logs web|php|scheduler`, `cattolms-podman.sh console <command>` (in the running pod), `systemctl --user status cattolms`.
 
@@ -202,19 +209,19 @@ Owner, 2026-11-05, the approved mockup (`REPORTS/telegram-sign-in-mockup/`). Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with Saharan Sunset, the bundled theme, active: integration tests draw pages through the active theme, and the browser checks check the bundled theme without switching the active one. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.2`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v1.1.3`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v1.1.2  # the tag being released
+   V=v1.1.3  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
 
    Build the zip outside the code tree and attach it to the release.
 
-Publishing a release deploys no site. `install/install.sh` installs a release on a server. The installation and reset notes in older sections below describe their named historical versions: they are not an upgrade procedure, and a historical reset command must never be applied to a populated site.
+Publishing a release deploys no site. `install/install.sh` installs a release on a server, and the Podman kit's `update` updates a site to one (above).
 
 ## Bundled themes
 
@@ -236,7 +243,7 @@ Never install or update a theme by copying files into `/home/<site-user>/themes/
 
 ## Bootstrap
 
-CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `public_html/css/` (Part C of the merged UI plan):
+CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `public_html/css/`:
 
 | File | SHA-256 |
 |---|---|
@@ -247,7 +254,7 @@ CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `publ
 
 - **Source.** A separate Composer project outside the code tree requires `twbs/bootstrap` 6.0.0-alpha.1 (commit `780627306eb517ca210310a24e10f8186003c127`). The files are copied unchanged from its `vendor/twbs/bootstrap/dist/css/` and `LICENSE`. The application's `composer.json` does not require Bootstrap.
 - **Loading.** `ThemeRenderer` loads the reboot first, because it declares the cascade layer order, then the grid, the utilities and `catto-platform.css`, on every page. No other Bootstrap file and no Bootstrap JavaScript is loaded (`BootstrapSixContractTest`). Each file names its MIT licence in a banner. Each also names a source map, which is not shipped; a browser asks for one only with its developer tools open.
-- **Updating.** Change the version in that project's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in the bundled theme before and after, as Part C did, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
+- **Updating.** Change the version in that project's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in the bundled theme before and after, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
 - **The 5.3.8 files.** A web root that served 5.3.8 still holds `css/bootstrap.min.css` and `js/bootstrap.bundle.min.js`. Nothing loads them under 6.0. Keep them while a 5.3.8 tree may still be served from that web root, and delete them once a release with 6.0 is deployed there.
 
 ## Static validators
@@ -255,130 +262,26 @@ CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `publ
 The project maintains:
 
 ```text
+tools/check-test-suite.php
 tools/check-architecture.php
 tools/check-runtime-hazards.php
 tools/validate-ui-contracts.php
 tools/validate-release.php
 ```
 
-Development instruments, run by hand and never part of the gate:
-
-```text
-tools/benchmark-pagination.php
-```
+`composer qa` runs them all with PHPUnit and PHPStan. `tools/benchmark-pagination.php` is an old development instrument that no longer runs: it was written for v0.6's data model, and a benchmark needs it repaired and test data of its own volume.
 
 An environment without PHP 8.5, Composer and PostgreSQL may run the syntax and static validators, but that is not the gate.
 
-## Pagination benchmark (v0.6)
+## Roles and permissions
 
-Pagination 2.0 is measured rather than assumed, and the two tools that do it are development instruments only — both refuse to run on a live site (`APP_SITE_MODE`, below).
+There are five roles: ADMIN, STUDENT, COMPANY_ADMIN, COURSE_EDITOR and COURSE_OWNER. Business permissions use one resource-first, action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`; `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. A fresh database has 105 permissions: 10 `SYSTEM.*` and 95 business. The API and MCP need their token's scope and the same business permission the web uses; there are no `API.*` permissions. `SYSTEM.SEED.MANAGE` guards Seed Database, which makes ordinary records: there is only one kind of data.
 
-The dataset writer this benchmark used (`tools/seed-benchmark-dataset.php`, which inserted hundreds of thousands of made-up rows) was removed on 2026-10-27 with the bulk generator: test data is made only through the workflows now (Seed Database, below), and a benchmark needs its own volume.
+## Browser checks
 
-```bash
-catto 'php tools/benchmark-pagination.php --runs=3'   # every list at page 1, the middle and the last
-```
+`tests/Browser/every-page.cjs` opens every page and runs the shared page checks (`page-construction.cjs`); the other checks in `tests/Browser/` cover what each page does, in the bundled theme (its README lists them). While building, run the ones for the pages a change touches; before a release, run them all.
 
-**Neither instrument runs on v0.7, and the commands above are the v0.6 ones.** Both were written against the universe model and neither was carried across when it was removed: `benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the class; `seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which no longer exists, and its inserts still name the dropped `seed_token` and `company_type` columns. Every listed command therefore ends in an uncaught `Error` rather than a measurement.
-
-The gate does not catch this and is not wrong to miss it: `tools/check-architecture.php` scans `src/` only, so a banned symbol surviving under `tools/` fails nothing. Widening it is the cheap guard if these are repaired.
-
-Repairing them is bounded work rather than a rewrite — drop the universe argument from the benchmark's calls, and drop set registration, `--list` and `--remove` from the dataset writer, which have nothing to key on now that a generated row is an ordinary row. Removal becomes what it is everywhere else: reset the database. Until then, treat the numbers below as the v0.6 record they are.
-
-`composer qa` passes with the batch loaded — 580 tests in about four and a half minutes rather than the usual one — but it is close to Composer's 300-second per-script process timeout, so a slower machine may need `COMPOSER_PROCESS_TIMEOUT=0 composer qa`. That is a timeout, not a failure. Before the v0.6 foreign-key indexes the same suite took eight minutes and could not finish inside it at all.
-
-Read the benchmark output as relative rather than absolute; a development container shares a machine. What matters is the shape: a healthy list costs roughly the same on its last page as on its first. A list whose deepest page costs seconds is the signal to look at. In v0.6 that signal found the Companies cartesian aggregate, the Activity metadata lookups, a course sub-select the planner was answering by scanning a partial index end to end, and thirty-four unindexed foreign keys.
-
-The v0.6 baseline, at 100,000 rows in every paginated table, page size 25, median of three runs:
-
-```text
-dataset                        rows   count ms     page 1     middle       last
-admin people                 100000       31.6        4.0      124.0      101.1
-admin companies              100002        6.8       32.4        6.9       11.7
-admin enrolments             100000       72.8        3.4      105.1      166.8
-admin requests               100000       68.2        3.8      105.8      109.9
-admin credits                100000       57.2        3.8       81.7      114.0
-admin activity               100000        7.3        3.6       13.5       23.2
-admin courses                 20000        1.7        7.3        3.8        4.7
-course report                 20000        1.5       17.1        2.4        3.8
-company report               100002       14.1       46.4       11.8       25.0
-public catalogue              13334        1.7        1.5        2.3        2.9
-company people                20000       30.1        3.9       53.6       52.5
-```
-
-A number several times these is worth investigating; the same number is not, because the machine underneath is shared. The one list that grows with depth is Administration People, and that is the OFFSET walk itself rather than a defect: reaching row 100,000 means passing the 99,999 before it.
-
-## ACL verification after reset
-
-v0.7 exposes one role family. The `SEED_*` roles are gone with the REAL/SEED split:
-
-```text
-ADMIN
-STUDENT
-COMPANY_ADMIN
-COURSE_EDITOR
-COURSE_OWNER
-```
-
-Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
-
-Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 101 permissions: 10 `SYSTEM.*` and 91 business (`CERTIFICATE.ISSUED.*` and `PLATFORM.IDENTITY.*` since 2026/10/19). `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
-
-## Browser acceptance after clean QA
-
-At minimum review:
-
-```text
-/admin
-/admin/themes
-/admin/roles
-/admin/companies
-/admin/activity
-/account
-/account/dashboard
-/account/profile
-/account/billing
-/account/courses
-/account/orders
-/account/sessions
-/account/activity
-/company
-/company/dashboard
-/company/people
-/company/requests
-/company/enrolments
-/company/credits
-/company/courses
-/company/billing
-/courses
-/bundles
-/cart
-/checkout
-/admin/courses
-/admin/courses/new
-/admin/courses/import
-/admin/courses/categories
-/admin/course-items
-/admin/resources
-/admin/bundles
-/admin/promotions
-/admin/commerce/orders
-/admin/course-reviews
-/admin/certificates/designs
-/admin/reports/popularity
-/admin/analytics/events
-/contact
-/help
-/terms
-/refunds
-/privacy
-```
-
-The browser checks in `tests/Browser/` cover most of these in the bundled theme; see its README.
-
-Also validate the accepted external theme at desktop and mobile widths.
-
-`/terms`, `/refunds` and `/privacy` are public routes too. Their text is in `resources/views/pages/`; when it changes, change that document's date in `src/Legal/LegalDocuments.php` in the same change. The supplier's email address and website on them come from `APP_ADMIN_EMAIL` and `APP_DOMAIN`.
+`/terms`, `/refunds` and `/privacy` are public routes too. Their text is in `resources/views/pages/`; when it changes, change that document's date in `src/Legal/LegalDocuments.php` in the same change. Every seller detail on them comes from the Site Owner (below).
 
 `/help` is a public route and must return the learner-facing guide without an authentication cookie. Keep its instructions focused on finding courses, buying access, course structure and learning; do not turn it into an administration manual.
 
@@ -394,15 +297,15 @@ Request logging records method + URL path only. Query strings are excluded so lo
 
 The log is archived every night (owner, 2026-10-27; `Maintenance\LogArchive`, the `log_archive` job): just after midnight it is moved into `storage/logs/archive/`, compressed as `application-<day>.log.gz` (a second archive of the same day gets `-2`), and started afresh with the same permissions. PHP opens the log for each line it writes, so no line is lost while the old log is compressed. Any other `.log` file in `storage/logs`, such as the `schedule.log` that `install.sh`'s cron line appends to, is archived the same way under its own name. Archives older than `LOG_ARCHIVES_KEPT_FOR` (a length of time, `2w` by default) are deleted; Administration → Settings → Maintenance shows where the log and its archives are and how big they are, and overrides the keep period with a Reset. Read an archive with `zless` or `zcat`.
 
-On a development site the log records every step of every request: the development laptop's grew by about 100 MB a day (4.8 GB in seven weeks), about 4 MB a day once compressed.
+On a development site the log records every step of every request and can grow by about 100 MB a day, about 4 MB once compressed.
 
 Core and theme browser assets are emitted with content fingerprints. A repaired CSS/JS file therefore receives a new browser URL automatically after publication.
 
 ## Working tree traps
 
-**Never check out a branch in a served directory.** When the web server serves the working tree, `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref directly with `git push origin dev-0.7:main`. Neither touches a single file.
+**Never check out a branch in a served directory.** When the web server serves the working tree, `git checkout <branch>` replaces the running application, and an older branch's code meets the newer `vendor/` and fails on every request. To move a branch pointer, use `git branch -f main <branch>`, or push a ref directly with `git push origin <branch>:main`. Neither touches a single file.
 
-**A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has and leaves behind every file the branch dropped. After restoring this way, remove what does not belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single leftover Fat-Free class is enough to stop Symfony building its container.
+**A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has and leaves behind every file the branch dropped. After restoring this way, remove what does not belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single leftover file under `src/` is enough to stop Symfony building its container.
 
 **`core.fileMode` is false in this repository.** Git therefore ignores the executable bit, and a file that is executable on disk can be stored as `100644`. A later checkout writes it without the bit and `bin/console` answers `Permission denied`. Fix the stored mode, not just the file:
 
@@ -444,7 +347,7 @@ GEOIP_DATABASE=/home/<site-user>/storage/geoip/GeoLite2-City.mmdb
 
 The LMS must continue to work when the MMDB file is absent; location simply remains unavailable. Private/local IPs should be presented as local/private rather than treated as geolocation errors.
 
-For automatic database updates, install/configure MaxMind `geoipupdate` at the server level. This is operational tooling, not an LMS runtime dependency. A free MaxMind account downloads the databases; put `GeoLite2-ASN.mmdb` in the same folder as the City (or Country) database for network names. The service builds the locator with no path, so it reads `GEOIP_DATABASE` itself (until 2026-10-26 it never did, and every location said "GeoIP unavailable").
+For automatic database updates, install/configure MaxMind `geoipupdate` at the server level. This is operational tooling, not an LMS runtime dependency. A free MaxMind account downloads the databases; put `GeoLite2-ASN.mmdb` in the same folder as the City (or Country) database for network names. The locator reads `GEOIP_DATABASE` itself.
 
 ## Sign-up check
 
@@ -518,4 +421,6 @@ Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE
 
 The business hosting the site is the Site Owner, not a company: there is no System Company. Its trading name, legal name, legal form (company or sole proprietor), registration number, tax number, address, telephone, email address, website, Information Officer, memberships, accreditation and EFT bank details come from `SITE_OWNER_*` in `.env` (with `APP_ADMIN_EMAIL` and `APP_DOMAIN`), and Administration → Settings → Site Owner overrides each (`app_options` `site_owner.<field>`; a value equal to `.env` removes the override; Reset removes all). Every change is in the Activity log (`site_owner.updated`) with each changed field's old and new value. The legal pages, invoices, receipts, credit notes and certificates name it; a document keeps the details it was issued with. Nobody belongs to the Site Owner, not even ADMIN; a course no company owns is the Site Owner's, and its provider name is the Site Owner's trading name.
 
-Settings is one area: site mode, the Site Owner, platform identity, outgoing mail, each group of commerce settings and maintenance, each in its own accordion with its own save. Saving one section does not submit another's fields, and saving settings never changes anyone's company membership.
+Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Settings → Site Owner) before a live site gives customers EFT instructions; a demo site shows fake details instead ("Demo site or live site", above). The simulated card (Omnipay's Dummy driver) works only on a demo site. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No card processor's credentials are included in the code.
+
+Settings is one area, each part (site mode, the site notification, the Site Owner, who can sign in, payment methods and each group of commerce settings, mailing, maintenance and the rest) in its own accordion with its own save. Saving one section does not submit another's fields, and saving settings never changes anyone's company membership.

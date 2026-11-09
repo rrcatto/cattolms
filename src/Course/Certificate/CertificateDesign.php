@@ -17,6 +17,9 @@ document_template_versions.design beside the template HTML and CSS compiled from
 The wording and small print are in CertificateWording's stored form.
 
 Changelog:
+2026/11/09 SAST
+- The logo choice (logo_choice: the site logo, its own or none, the site logo until another is chosen) and
+  forPrinting(), which the service compiles.
 2026/10/07 SAST
 - Created for certificate designs.
 */
@@ -25,6 +28,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course\Certificate;
 
+use CattoLearning\Configuration\SiteLogo;
 use InvalidArgumentException;
 
 final class CertificateDesign
@@ -46,7 +50,17 @@ final class CertificateDesign
         public readonly string $signaturePosition,
         public readonly ?CertificateImage $signature,
         public readonly string $smallPrint,
+        /** A key of SiteLogo::CHOICES (owner, 2026-11-09): the site logo, the design's own ($logo) or none. */
+        public readonly string $logoChoice = 'site',
     ) {}
+
+    /** The design with the logo it prints as its own: the site logo, its own or none. */
+    public function forPrinting(?CertificateImage $siteLogo): self
+    {
+        $printed = match ($this->logoChoice) { 'site' => $siteLogo, 'own' => $this->logo, default => null };
+        return new self($this->look, $this->background, $this->placement, $this->typeface, $this->colour, $printed, $this->wording,
+            $this->signatureName, $this->signaturePosition, $this->signature, $this->smallPrint, 'own');
+    }
 
     /** A new design on an installed look, as it is installed. */
     public static function starter(string $look, string $signatureName = '', string $signaturePosition = ''): self
@@ -58,18 +72,22 @@ final class CertificateDesign
     /** @param array<string,mixed> $stored */
     public static function fromArray(array $stored): self
     {
+        $logo = CertificateImage::fromArray(is_array($stored['logo'] ?? null) ? $stored['logo'] : null);
+        // A design saved before the choice prints its own logo if it had one, else the site logo.
+        $choice = is_string($stored['logo_choice'] ?? null) && isset(SiteLogo::CHOICES[$stored['logo_choice']]) ? $stored['logo_choice'] : ($logo !== null ? 'own' : 'site');
         return new self(
             (string) ($stored['look'] ?? 'classic'),
             CertificateImage::fromArray(is_array($stored['background'] ?? null) ? $stored['background'] : null),
             (string) ($stored['placement'] ?? 'centre'),
             (string) ($stored['typeface'] ?? 'serif'),
             (string) ($stored['colour'] ?? self::DEFAULT_COLOUR),
-            CertificateImage::fromArray(is_array($stored['logo'] ?? null) ? $stored['logo'] : null),
+            $logo,
             (string) ($stored['wording'] ?? ''),
             (string) ($stored['signature_name'] ?? ''),
             (string) ($stored['signature_position'] ?? ''),
             CertificateImage::fromArray(is_array($stored['signature'] ?? null) ? $stored['signature'] : null),
             (string) ($stored['small_print'] ?? ''),
+            $choice,
         );
     }
 
@@ -83,6 +101,7 @@ final class CertificateDesign
             'typeface' => $this->typeface,
             'colour' => $this->colour,
             'logo' => $this->logo?->toArray(),
+            'logo_choice' => $this->logoChoice,
             'wording' => $this->wording,
             'signature_name' => $this->signatureName,
             'signature_position' => $this->signaturePosition,
@@ -121,6 +140,11 @@ final class CertificateDesign
         }
         if ($this->isCustom() && $this->background === null) {
             $errors[] = 'Upload your background, or choose one of the looks.';
+        }
+        if (!isset(SiteLogo::CHOICES[$this->logoChoice])) {
+            $errors[] = 'Choose which logo the certificate prints.';
+        } elseif ($this->logoChoice === 'own' && $this->logo === null) {
+            $errors[] = 'Upload the certificate\'s own logo, or choose the site logo or no logo.';
         }
         if (!isset(CertificateLooks::PLACEMENTS[$this->placement])) {
             $errors[] = 'Choose where the words go.';

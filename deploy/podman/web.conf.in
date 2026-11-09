@@ -23,6 +23,22 @@ server {
     real_ip_header X-Forwarded-For;
     real_ip_recursive off;
 
+    # Text sent compressed (the SEO brief, 2026-11-09: fast pages): stylesheets, scripts, pages and drawings travel at about
+    # a fifth of their size. The server's own web server passes it on as it is.
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/javascript application/javascript application/json application/ld+json application/xml text/xml image/svg+xml;
+
+    # The static folders (no page lives in them): kept by the browser for 30 days. Their files are versioned by name or by
+    # ?v= when they change, so a change is fetched at once.
+    location ~* ^/(css|js|img|themes|assets)/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=2592000";
+    }
+
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
