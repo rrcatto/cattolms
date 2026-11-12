@@ -98,7 +98,7 @@ if ($action === 'create') {
     if ((int) $state['default_layout_id'] > 0 && $layouts->defaultLayout()['id'] !== (int) $state['default_layout_id']) {
         $layouts->makeDefault((int) $state['default_layout_id'], (int) $state['admin_id']);
     }
-    $db->executeStatement("DELETE FROM audit_log WHERE event_key LIKE 'course_page_layout.%' AND user_id = :u", ['u' => (int) $state['admin_id']]);
+    $db->executeStatement("DELETE FROM cattophp_activity WHERE action LIKE 'course_page_layout.%' AND actor_id = CAST(:u AS TEXT)", ['u' => (int) $state['admin_id']]);
     (new CheckScrub($db))->remove($state['scrub']);
     // The layouts the check made, once its course no longer uses them.
     $db->executeStatement('DELETE FROM course_page_layouts WHERE name LIKE :mark AND NOT is_default', ['mark' => '%' . $state['mark'] . '%']);

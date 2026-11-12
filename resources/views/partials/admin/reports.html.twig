@@ -29,7 +29,7 @@
 
 							<tr>
 								{% for sh in course_report_sort_headers %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: course_report_region, sort_results: course_report_results} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: course_report_region, sort_results: course_report_results} %}
 								{% endfor %}
 							</tr>
 

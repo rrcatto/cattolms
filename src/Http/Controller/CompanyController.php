@@ -78,8 +78,44 @@ final class CompanyController extends BaseController
         private readonly \CattoLearning\Company\CompanyDepartures $departures,
         private readonly \CattoLearning\Course\CourseService $courses,
         private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys,
+        private readonly \CattoLearning\Commerce\Application\BundleCredits $bundleCredits,
     ) {
         parent::__construct($auth, $view, $requests);
+    }
+
+    /**
+     * Gives one bundle credit to one person (owner, 2026-11-11: "each bundle credit they buy can be assigned to 1 person only
+     * - they can never split the bundle up"): every course of the bundle, in one step, or nothing.
+     */
+    #[Route('/company/bundle-credits/assign', name: 'company_bundle_credit_assign', methods: ['POST'])]
+    public function assignBundleCredit(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $companyId = $this->contextCompanyId($user);
+            if ($companyId <= 0) throw new \RuntimeException('Select a company first.');
+            $credit = null;
+            foreach ($this->bundleCredits->forCompany($companyId) as $candidate) {
+                if ((string) $candidate['public_id'] === (string) ($_POST['bundle_credit'] ?? '')) $credit = $candidate;
+            }
+            if ($credit === null) throw new \RuntimeException('Choose one of the company\'s bundle credits.');
+            $personId = (int) ($_POST['bundle_user_id'] ?? 0);
+            if ($personId <= 0) throw new \RuntimeException('Choose the staff member who gets the bundle.');
+            // Someone who already has some of its courses: the page says which, and the Company Administrator may give it
+            // anyway, extending those courses by the bundle's access period (owner, 2026-11-11).
+            $held = $this->bundleCredits->heldCourses($companyId, (int) $credit['id'], $personId);
+            $extend = ($_POST['extend_held'] ?? '') === '1';
+            if ($held !== [] && !$extend) {
+                $this->redirect('/company/credits?give=' . rawurlencode((string) $credit['public_id']) . '&person=' . $personId . '#bundle-credits');
+            }
+            $this->bundleCredits->assign($companyId, (int) $credit['id'], $personId, $user->id, $extend);
+            $name = $this->bundleCredits->personName($personId);
+            $this->flash('success', $held === []
+                ? $name . ' now has every course in ' . $credit['bundle_title'] . ': ' . implode(', ', $credit['course_titles']) . '.'
+                : $name . ' now has every course in ' . $credit['bundle_title'] . ', and their access to ' . implode(', ', array_column($held, 'title')) . ' is extended by ' . $credit['access_label'] . '.');
+            $this->redirect('/company/credits#bundle-credits');
+        }, '/company/credits#bundle-credits');
     }
 
 
@@ -772,6 +808,19 @@ final class CompanyController extends BaseController
             $data['assign_course'] = $this->platformAdministration->describeEntity('courses', $assignCourse) ?? 0;
             $data['assign_lengths'] = $this->platformAdministration->assignLengths($this->contextCompanyId($user), $assignCourse);
             $data['assign_seconds'] = (int) ($_GET['assign_seconds'] ?? 0);
+        }
+        // The company's bundle credits, one credit one person (owner, 2026-11-11), beside its course credits.
+        if ($key === 'credits' && ($companyId = $this->contextCompanyId($user)) > 0) {
+            $data['bundle_credits'] = $this->bundleCredits->forCompany($companyId);
+            $data['bundle_rule'] = \CattoLearning\Commerce\Application\BundleCredits::RULE;
+            // Giving a bundle credit to someone who already has some of its courses: which ones, before giving it anyway.
+            $person = (int) ($_GET['person'] ?? 0);
+            foreach ($data['bundle_credits'] as $candidate) {
+                if ($person > 0 && (string) $candidate['public_id'] === (string) ($_GET['give'] ?? '')) {
+                    $held = $this->bundleCredits->heldCourses($companyId, (int) $candidate['id'], $person);
+                    if ($held !== []) $data['bundle_give'] = ['credit' => $candidate, 'person_id' => $person, 'person_name' => $this->bundleCredits->personName($person), 'held' => array_column($held, 'title')];
+                }
+            }
         }
         $data['company_section'] = $definition;
         $data['company_layout'] = 'section';

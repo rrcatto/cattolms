@@ -11,6 +11,15 @@ Description:
 Handles web requests for admin operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/12 SAST
+- The log archive and the setup checklist are CattoPHP's (CattoPHP Phase 4, steps 1 and 2): Settings > Maintenance's
+  archive setting and the test email's mark on the mail step go through them, in the same words.
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): the Settings section's save.
+2026/11/09 SAST
+- A role's pages are named by its key, /admin/roles/COURSE_EDITOR, not a number (CattoPHP Phase 2, step 5).
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/11/07 SAST
 - A refused role, person, company or credit comes back as it was typed and chosen (keepTyped, typedCredit()).
 - A refused course access grant on a person's page comes back to the courses found, the course chosen and the days typed.
@@ -99,7 +108,7 @@ use CattoLearning\Course\CourseService;
 
 use CattoLearning\Maintenance\MaintenanceService;
 
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Application\AdministrationSectionRegistry;
@@ -145,29 +154,32 @@ final class AdminController extends BaseController
         private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
         private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
         private readonly \CattoLearning\Commerce\Settings\PaymentMethods $paymentMethods,
-        private readonly \CattoLearning\Identity\IdentitySettings $identitySettings,
-        private readonly \CattoLearning\Setup\SetupChecklist $setup,
+        private readonly \CattoPHP\Identity\IdentitySettings $identitySettings,
+        private readonly \CattoPHP\Setup\SetupChecklist $setup,
         private readonly \CattoLearning\Identity\IdentityVerificationService $identity,
         private readonly \CattoLearning\Maintenance\ScheduledJobStatus $scheduledJobs,
         private readonly \CattoLearning\Application\ProfilePictures $pictures,
         private readonly \CattoLearning\Application\CompanyLogos $logos,
         private readonly \CattoLearning\Auth\SignInRestriction $signIn,
         private readonly \CattoLearning\Infrastructure\Persistence\AuditRepository $auditLog,
-        private readonly \CattoLearning\Auth\Signup\SignupCountries $signupCountries,
-        private readonly \CattoLearning\Auth\Signup\SignupLists $signupLists,
-        private readonly \CattoLearning\Auth\Signup\NetworkLookup $network,
+        private readonly \CattoPHP\Signup\SignupCountries $signupCountries,
+        private readonly \CattoPHP\Network\ReputationLists $signupLists,
+        private readonly \CattoPHP\Network\GeoIpNetworkLookup $network,
         private readonly \CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signupAttempts,
         private readonly \CattoLearning\Auth\Signup\SignInHistory $signInHistory,
         private readonly \CattoLearning\Company\CompanyDepartures $departures,
         private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
         private readonly \CattoLearning\Application\CompanyOverview $companyOverview,
         private readonly SeedDatabaseService $seedDatabase,
-        private readonly \CattoLearning\Maintenance\LogArchive $logArchive,
+        private readonly \CattoPHP\Scheduler\LogArchive $logArchive,
+        private readonly \CattoPHP\Settings\Settings $cattoSettings,
         private readonly \CattoLearning\Course\CataloguePositions $cataloguePositions,
         private readonly \CattoLearning\Course\CourseQuickEdit $courseQuickEdit,
         private readonly \CattoLearning\SiteAnalytics\SiteLogRepository $siteLog,
         private readonly \CattoLearning\Application\SignInSecurityAdministration $signInSecurity,
-        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys
+        private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys,
+        private readonly \CattoLearning\Commerce\Settings\CardPaymentSettings $cardPayments,
+        private readonly \CattoLearning\Bundle\BundlePositions $bundlePositions
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -354,13 +366,13 @@ final class AdminController extends BaseController
         return $this->renderAdministrationSection('roles');
     }
 
-    #[Route('/admin/roles/{id}', name: 'admin_role', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    #[Route('/admin/roles/{key}', name: 'admin_role', requirements: ['key' => '[A-Z][A-Z0-9_]{1,39}'], methods: ['GET'])]
     public function role(): Response
     {
         $this->requirePermission('SYSTEM.ROLE.VIEW');
-        $roleId = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($roleId): Response {
-            $role = $this->roleAdministration->role($roleId);
+        $roleKey = (string) $this->param('key');
+        return $this->handle(function () use ($roleKey): Response {
+            $role = $this->roleAdministration->role($roleKey);
             return $this->render('admin-role-edit', [
                 'title' => 'Role · ' . (string) $role['role_name'],
                 'page_kicker' => 'Administration · Roles & ACL',
@@ -376,47 +388,47 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
         return $this->handle(function () use ($user): void {
-            $roleId = $this->roleAdministration->create($_POST, $user->id);
+            $roleKey = $this->roleAdministration->create($_POST, $user->id);
             $this->flash('success', 'The role was created. Assign its permissions before using it.');
-            $this->redirect('/admin/roles/' . $roleId);
+            $this->redirect('/admin/roles/' . $roleKey);
         }, '/admin/roles', keepTyped: true);
     }
 
-    #[Route('/admin/roles/{id}', name: 'admin_update_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/roles/{key}', name: 'admin_update_role', requirements: ['key' => '[A-Z][A-Z0-9_]{1,39}'], methods: ['POST'])]
     public function updateRole(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $roleId): void {
-            $this->roleAdministration->update($roleId, $_POST, $user->id);
+        $roleKey = (string) $this->param('key');
+        return $this->handle(function () use ($user, $roleKey): void {
+            $roleKey = $this->roleAdministration->update($roleKey, $_POST, $user->id);
             $this->flash('success', 'The role details were saved.');
-            $this->redirect('/admin/roles/' . $roleId);
-        }, '/admin/roles/' . $roleId);
+            $this->redirect('/admin/roles/' . $roleKey);
+        }, '/admin/roles/' . $roleKey);
     }
 
-    #[Route('/admin/roles/{id}/permissions', name: 'admin_save_role_permissions', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/roles/{key}/permissions', name: 'admin_save_role_permissions', requirements: ['key' => '[A-Z][A-Z0-9_]{1,39}'], methods: ['POST'])]
     public function saveRolePermissions(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->param('id'));
+        $roleKey = (string) $this->param('key');
         $permissions = array_values(array_filter((array) ($_POST['permissions'] ?? []), 'is_string'));
-        return $this->handle(function () use ($user, $roleId, $permissions): void {
-            $this->roleAdministration->savePermissions($roleId, $permissions, $user->id);
+        return $this->handle(function () use ($user, $roleKey, $permissions): void {
+            $this->roleAdministration->savePermissions($roleKey, $permissions, $user->id);
             $this->flash('success', 'The role permissions were saved.');
-            $this->redirect('/admin/roles/' . $roleId);
-        }, '/admin/roles/' . $roleId);
+            $this->redirect('/admin/roles/' . $roleKey);
+        }, '/admin/roles/' . $roleKey);
     }
 
-    #[Route('/admin/roles/{id}/delete', name: 'admin_delete_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/admin/roles/{key}/delete', name: 'admin_delete_role', requirements: ['key' => '[A-Z][A-Z0-9_]{1,39}'], methods: ['POST'])]
     public function deleteRole(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->param('id'));
-        return $this->handle(function () use ($user, $roleId): void {
-            $this->roleAdministration->delete($roleId, $user->id);
+        $roleKey = (string) $this->param('key');
+        return $this->handle(function () use ($user, $roleKey): void {
+            $this->roleAdministration->delete($roleKey, $user->id);
             $this->flash('success', 'The role was deleted.');
             $this->redirect('/admin/roles');
         }, '/admin/roles');
@@ -515,7 +527,7 @@ final class AdminController extends BaseController
             'person_company_logo' => ($logo = ($data['company'] ?? null) !== null ? $this->logos->state((int) $data['company']['id']) : null) === null ? '' : CompanyAddress::admin($data['company'], '/logo?v=' . $logo['version']),
             'profile_image_url' => $picture === null ? '' : PersonAddress::admin($reference, '/profile-image?v=' . $picture['version']),
             'profile_image_drawn' => $picture !== null && $picture['drawn'],
-            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
+            'account_reference_label' => \CattoPHP\Foundation\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
@@ -546,7 +558,7 @@ final class AdminController extends BaseController
             'identity_history' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.VIEW') ? $this->identity->history($target) : [],
             'can_manage_identity' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.MANAGE'),
             'can_manage_enrolments' => $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE'),
-            'identity_console' => \CattoLearning\Identity\IdentityVerificationService::CONSOLE,
+            'identity_console' => \CattoPHP\Identity\IdentityVerification::CONSOLE,
             // Their Telegram account and their two-step sign-in, with Reset two-step (owner, 2026-11-05).
             'person_sign_in' => $this->signInSecurity->personView($target),
         ]);
@@ -963,7 +975,7 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
-        $this->themes->resyncRegistry($user->id);
+        $this->themes->resyncRegistry(self::themeActor($user->id));
         $this->flash('success', 'The theme registry was rebuilt from the filesystem.');
         $this->redirect('/admin/themes');
     }
@@ -973,10 +985,10 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
-        $theme = trim((string) ($_POST['theme'] ?? ThemeManager::DEFAULT_SLUG));
+        $theme = trim((string) ($_POST['theme'] ?? \CattoLearning\View\ProjectTheme::DEFAULT_SLUG));
         // A refusal is a message on the Themes page, never an error page (2026-10-26 audit).
         return $this->handle(function () use ($theme, $user): void {
-            $this->themes->activate($theme, $user->id);
+            $this->themes->activate($theme, self::themeActor($user->id));
             $this->flash('success', 'The selected theme is now active.');
             $this->redirect('/admin/themes');
         }, '/admin/themes');
@@ -989,7 +1001,7 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $slug = (string) $this->param('slug');
         return $this->handle(function () use ($slug, $user): void {
-            $this->themes->delete($slug, $user->id);
+            $this->themes->delete($slug, self::themeActor($user->id));
             $this->flash('success', 'The theme was uninstalled.');
             $this->redirect('/admin/themes');
         }, '/admin/themes');
@@ -1011,10 +1023,16 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $token = (string) ($_POST['token'] ?? '');
         return $this->handle(function () use ($user, $token): void {
-            $key = $this->themes->importStaged($token, $user->id);
+            $key = $this->themes->importStaged($token, self::themeActor($user->id));
             $this->flash('success', 'Theme ' . $key . ' was installed successfully.');
             $this->redirect('/admin/themes');
         }, '/admin/themes');
+    }
+
+    /** The person acting on a theme, as CattoPHP's activity log names an account: by its number. */
+    private static function themeActor(int $userId): \CattoPHP\Activity\Actor
+    {
+        return new \CattoPHP\Activity\Actor((string) $userId, (string) $userId);
     }
 
     #[Route('/admin/settings', name: 'admin_save_settings', methods: ['POST'])]
@@ -1067,6 +1085,19 @@ final class AdminController extends BaseController
     }
 
     /** Settings > Site mode (owner, 2026-11-03): what a demo site's pages, emails and checkouts say. */
+    /** Settings > Footer social media (owner, 2026-11-09): the site's own profiles, linked from the footer's marks. */
+    #[Route('/admin/settings/footer-social', name: 'admin_save_footer_social', methods: ['POST'])]
+    public function saveFooterSocial(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveFooterSocial($this->request()->request->all('social'), $user->id);
+            $this->flash('success', 'The footer social media links are saved.');
+            $this->redirect('/admin/settings?section=footer-social#settings-footer-social');
+        }, '/admin/settings?section=footer-social#settings-footer-social');
+    }
+
     #[Route('/admin/settings/site-notification', name: 'admin_save_site_notification', methods: ['POST'])]
     public function saveSiteNotification(): Response
     {
@@ -1207,7 +1238,7 @@ final class AdminController extends BaseController
     {
         if ($attempt === null) return null;
         $row = SignupAttemptsController::row($attempt);
-        $row['hold_words'] = array_map([\CattoLearning\Auth\Signup\SignupRisk::class, 'holdWords'], (array) $attempt['hold_reasons']);
+        $row['hold_words'] = array_map([\CattoPHP\Signup\SignupRisk::class, 'holdWords'], (array) $attempt['hold_reasons']);
 
         return $row;
     }
@@ -1234,10 +1265,10 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         return $this->handle(function () use ($user): void {
-            $saved = $this->signupCountries->save((string) ($_POST['allowed_countries'] ?? ''), (string) ($_POST['blocked_countries'] ?? ''), $user->id);
+            $saved = $this->signupCountries->save((string) ($_POST['allowed_countries'] ?? ''), (string) ($_POST['blocked_countries'] ?? ''), $user->id > 0 ? new \CattoPHP\Activity\Actor((string) $user->id, (string) $user->id) : null);
             $this->auditLog->record($user->id, 'settings.signup_countries_saved', $saved);
-            $this->flash('success', 'Allowed countries: ' . \CattoLearning\Auth\Signup\SignupCountries::names($saved['allowed'], 'every country')
-                . '. Blocked countries: ' . \CattoLearning\Auth\Signup\SignupCountries::names($saved['blocked']) . '.');
+            $this->flash('success', 'Allowed countries: ' . \CattoPHP\Signup\SignupCountries::names($saved['allowed'], 'every country')
+                . '. Blocked countries: ' . \CattoPHP\Signup\SignupCountries::names($saved['blocked']) . '.');
             $this->redirect('/admin/settings?section=signup-checks#settings-signup-checks');
         }, '/admin/settings?section=signup-checks#settings-signup-checks');
     }
@@ -1249,9 +1280,9 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         return $this->handle(function () use ($user): void {
-            $keep = $this->logArchive->saveKeep((string) ($_POST['keep'] ?? ''), $user->id);
+            $keep = $this->saveLogArchiveKeep((string) ($_POST['keep'] ?? ''), $user->id);
             $this->auditLog->record($user->id, 'settings.log_archives_saved', ['keep' => $keep]);
-            $this->flash('success', 'Log archives are now kept for ' . \CattoLearning\Support\Duration::parse($keep)->words() . '.');
+            $this->flash('success', 'Log archives are now kept for ' . \CattoPHP\Foundation\Duration::parse($keep)->words() . '.');
             $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
         }, '/admin/settings?section=maintenance#settings-maintenance');
     }
@@ -1273,15 +1304,79 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=course-positions#settings-course-positions');
     }
 
+    /**
+     * Renumber the catalogue (owner, 2026-11-12: "a renumber ... button which will redo the numbering from 100 with
+     * increments of 100", keeping "all the numbers within their band"): every course back in its prefix's band, in the
+     * catalogue's present order. From Administration > Courses (back=courses) or Settings > Course positions.
+     */
+    #[Route('/admin/settings/course-positions/renumber', name: 'admin_renumber_course_positions', methods: ['POST'])]
+    public function renumberCoursePositions(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $back = ($_POST['back'] ?? '') === 'courses' ? '/admin/courses' : '/admin/settings?section=course-positions#settings-course-positions';
+        return $this->handle(function () use ($user, $back): void {
+            $result = $this->cataloguePositions->renumber();
+            $this->auditLog->record($user->id, 'course.catalogue_renumbered', $result);
+            $this->flash($result['unbanded'] === [] && $result['crowded'] === [] ? 'success' : 'info', \CattoLearning\Support\PositionBands::outcome($result, 'course'));
+            $this->redirect($back);
+        }, $back);
+    }
+
+    /**
+     * Settings > Bundle positions (owner, 2026-11-12): each bundle code prefix and where its band starts; a bundle arriving
+     * with no position takes the next free number in its band.
+     */
+    #[Route('/admin/settings/bundle-positions', name: 'admin_save_bundle_positions', methods: ['POST'])]
+    public function saveBundlePositions(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $ranges = $this->bundlePositions->save((array) ($_POST['prefix'] ?? []), (array) ($_POST['start'] ?? []), $user->id);
+            $this->auditLog->record($user->id, 'settings.bundle_positions_saved', ['ranges' => $ranges]);
+            $this->flash('success', $ranges === [] ? 'No bands are set: a new bundle goes to the end of the list until it is given a position.' : 'Bundle positions saved: ' . $this->bundlePositions->view()['summary']);
+            $this->redirect('/admin/settings?section=bundle-positions#settings-bundle-positions');
+        }, '/admin/settings?section=bundle-positions#settings-bundle-positions');
+    }
+
+    /** Renumber the bundles (owner, 2026-11-12), from Administration > Bundles (back=bundles) or Settings > Bundle positions. */
+    #[Route('/admin/settings/bundle-positions/renumber', name: 'admin_renumber_bundle_positions', methods: ['POST'])]
+    public function renumberBundlePositions(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('BUNDLE.MANAGE');
+        $back = ($_POST['back'] ?? '') === 'bundles' ? '/admin/bundles' : '/admin/settings?section=bundle-positions#settings-bundle-positions';
+        return $this->handle(function () use ($user, $back): void {
+            $result = $this->bundlePositions->renumber($user->id);
+            $this->flash($result['unbanded'] === [] && $result['crowded'] === [] ? 'success' : 'info', \CattoLearning\Support\PositionBands::outcome($result, 'bundle'));
+            $this->redirect($back);
+        }, $back);
+    }
+
+    /**
+     * Saves how long log archives are kept, which then overrides .env: a length of time of at least a day, refused in the
+     * words Settings > Maintenance always used.
+     */
+    private function saveLogArchiveKeep(string $text, int $actorId): string
+    {
+        $text = trim($text);
+        if (!\CattoPHP\Foundation\Duration::isValid($text)) throw new \InvalidArgumentException(\CattoPHP\Foundation\Duration::HOW);
+        if (\CattoPHP\Foundation\Duration::parse($text)->lengthInSeconds() < 86400) throw new \InvalidArgumentException('Keep the log archives for at least a day (1d).');
+        $this->cattoSettings->set(\CattoPHP\Scheduler\LogArchive::KEEP, $text, new \CattoPHP\Activity\Actor((string) $actorId, (string) $actorId));
+
+        return $text;
+    }
+
     /** Removes the saved keep period: log archives follow LOG_ARCHIVES_KEPT_FOR in .env again. */
     #[Route('/admin/settings/log-archives/reset', name: 'admin_reset_log_archives', methods: ['POST'])]
     public function resetLogArchives(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        $this->logArchive->resetKeep();
+        $this->cattoSettings->reset(\CattoPHP\Scheduler\LogArchive::KEEP);
         $this->auditLog->record($user->id, 'platform.setting_reset', ['setting' => 'log_archives', 'source' => '.env']);
-        $this->flash('success', 'Log archives are kept as LOG_ARCHIVES_KEPT_FOR in .env says: ' . \CattoLearning\Support\Duration::parse($this->logArchive->keep())->words() . '.');
+        $this->flash('success', 'Log archives are kept as LOG_ARCHIVES_KEPT_FOR in .env says: ' . $this->logArchive->keep()->words() . '.');
         $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
     }
 
@@ -1305,7 +1400,7 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         $done = $this->signupLists->update(true);
         $this->auditLog->record($user->id, 'settings.signup_lists_fetched', $done);
-        $labels = array_map(static fn(string $name, string $what): string => \CattoLearning\Auth\Signup\SignupLists::LISTS[$name]['label'] . ': ' . $what, array_keys($done), $done);
+        $labels = array_map(static fn(string $name, string $what): string => \CattoPHP\Network\ReputationLists::LISTS[$name]['label'] . ': ' . $what, array_keys($done), $done);
         $this->flash('success', 'Lists fetched. ' . implode('. ', $labels) . '.');
         $this->redirect('/admin/settings?section=signup-checks#settings-signup-checks');
     }
@@ -1403,7 +1498,7 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->mailer->sendTestMessage($user->primaryEmail);
             // A test email that went marks the setup wizard's mail step (owner, 2026-10-20).
-            if ($user->hasPermission('SYSTEM.SETTING.MANAGE')) $this->setup->mark('mail', true, $user->id);
+            if ($user->hasPermission('SYSTEM.SETTING.MANAGE')) $this->setup->markDone('mail', new \CattoPHP\Activity\Actor((string) $user->id, (string) $user->id));
             $this->flash('success', 'A test email was sent to ' . $user->primaryEmail . '.');
             $this->redirect('/admin/settings?section=mail#settings-mail');
         }, '/admin/settings?section=mail#settings-mail');
@@ -1444,8 +1539,8 @@ final class AdminController extends BaseController
             $checks = $this->signupAttempts->forUsers(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $data['people']));
             foreach ($data['people'] as $index => $row) {
                 $check = $checks[(int) ($row['id'] ?? 0)] ?? null;
-                $data['people'][$index]['risk'] = $check === null ? null : ['label' => \CattoLearning\Auth\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'],
-                    'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band']), 'href' => '/admin/people/signup-attempts/' . $check['id']];
+                $data['people'][$index]['risk'] = $check === null ? null : ['label' => \CattoPHP\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'],
+                    'tone' => \CattoPHP\Signup\RiskAssessment::tone($check['band']), 'href' => '/admin/people/signup-attempts/' . $check['id']];
             }
         }
         // A course's row or card edited in place (owner, 2026-11-01): the pencil for whoever edits courses, the list's own
@@ -1550,28 +1645,34 @@ final class AdminController extends BaseController
             $environment = $this->signupCountries->environmentLists();
             $data['signup_checks'] = [
                 'allowed' => implode(', ', $this->signupCountries->allowed()), 'blocked' => implode(', ', $this->signupCountries->blocked()),
-                'allowed_names' => \CattoLearning\Auth\Signup\SignupCountries::names($this->signupCountries->allowed(), 'every country'),
-                'blocked_names' => \CattoLearning\Auth\Signup\SignupCountries::names($this->signupCountries->blocked()),
+                'allowed_names' => \CattoPHP\Signup\SignupCountries::names($this->signupCountries->allowed(), 'every country'),
+                'blocked_names' => \CattoPHP\Signup\SignupCountries::names($this->signupCountries->blocked()),
                 'blocked_count' => count($this->signupCountries->blocked()),
                 'source' => $this->signupCountries->source(),
-                'environment' => \CattoLearning\Auth\Signup\SignupCountries::names($environment['allowed'], 'every country') . ' allowed, ' . \CattoLearning\Auth\Signup\SignupCountries::names($environment['blocked']) . ' blocked',
+                'environment' => \CattoPHP\Signup\SignupCountries::names($environment['allowed'], 'every country') . ' allowed, ' . \CattoPHP\Signup\SignupCountries::names($environment['blocked']) . ' blocked',
                 'lists' => array_values(array_map(static fn(array $list): array => $list + ['fetched' => $list['fetched_at'] === null ? 'not fetched yet' : date('j M Y, H:i', $list['fetched_at'])], $this->signupLists->status())),
             ] + $this->network->available();
             $data['maintenance'] = $this->maintenance->pending();
             // The application log and its archives (owner, 2026-10-27): where they are, how big, how long kept.
             $logs = $this->logArchive->status();
-            $logs['others'] = array_map(static fn(array $log): array => $log + ['size' => \CattoLearning\Maintenance\LogArchive::size($log['bytes'])], $logs['others']);
-            $data['log_archive'] = $logs + ['log_size' => \CattoLearning\Maintenance\LogArchive::size($logs['log_bytes']),
-                'archive_size' => \CattoLearning\Maintenance\LogArchive::size($logs['archive_bytes']), 'keep' => $this->logArchive->keep(),
-                'keep_words' => \CattoLearning\Support\Duration::parse($this->logArchive->keep())->words(), 'source' => $this->logArchive->source(),
-                'environment' => $this->logArchive->environmentKeep(), 'how' => \CattoLearning\Support\Duration::HOW];
-            // The course position ranges (owner, 2026-11-01).
+            $logs['others'] = array_map(static fn(array $log): array => $log + ['size' => \CattoPHP\Scheduler\LogArchive::size($log['bytes'])], $logs['others']);
+            $environment = $this->cattoSettings->envValue(\CattoPHP\Scheduler\LogArchive::KEEP);
+            $data['log_archive'] = $logs + ['log_size' => \CattoPHP\Scheduler\LogArchive::size($logs['log_bytes']),
+                'archive_size' => \CattoPHP\Scheduler\LogArchive::size($logs['archive_bytes']), 'keep' => $this->logArchive->keep()->text,
+                'keep_words' => $this->logArchive->keep()->words(), 'source' => $this->cattoSettings->isOverridden(\CattoPHP\Scheduler\LogArchive::KEEP) ? 'database' : 'environment',
+                'environment' => \CattoPHP\Foundation\Duration::isValid($environment) ? $environment : \CattoPHP\Scheduler\LogArchive::DEFAULT_KEEP, 'how' => \CattoPHP\Foundation\Duration::HOW];
+            // The course position ranges (owner, 2026-11-01) and the bundles' (owner, 2026-11-12).
             $data['course_positions'] = $this->cataloguePositions->view();
+            $data['bundle_positions'] = $this->bundlePositions->view();
             // Each scheduled job's last run, the payment methods and identity verification (owner, 2026-10-19).
             $data['scheduled_jobs'] = $this->scheduledJobs->jobs();
             $data['payment_methods'] = $this->paymentMethods->settingsView();
+            // Card payments through Stitch (owner, 2026-11-11): its keys over .env, and its return address and webhook.
+            $data['card_payments'] = $this->cardPayments->view();
+            $data['card_payments_note'] = $_SESSION['card_payments_note'] ?? null;
+            unset($_SESSION['card_payments_note']);
             $data['identity_settings'] = ['available' => $this->identitySettings->available(),
-                'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl(),
+                'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => $this->identitySettings->webhookUrl(),
                 'key_kind' => $this->identitySettings->keyKind(), 'sandbox_on_live' => $this->identitySettings->sandboxKeyOnLiveSite(), 'demo_site' => $this->identitySettings->demoSite()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
             $data['owner_messages_note'] = $_SESSION['owner_messages_note'] ?? null;
@@ -1650,7 +1751,7 @@ final class AdminController extends BaseController
         // platform administrator. Without this flag the section lists every course on the
         // platform to a course editor who administers only their own.
         if ($key === 'courses') {
-            return ['view_all_courses' => $user->hasPermission('PLATFORM.DASHBOARD.VIEW')];
+            return ['view_all_courses' => $user->hasPermission('PLATFORM.DASHBOARD.VIEW'), 'renumber_courses' => $user->hasPermission('SYSTEM.SETTING.MANAGE')];
         }
         // Two sections since v0.6, and each needs its own flag. Missing this, the requests section
         // built with an empty capability set and rendered an empty screen with no error anywhere.

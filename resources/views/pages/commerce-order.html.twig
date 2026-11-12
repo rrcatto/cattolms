@@ -3,7 +3,7 @@
     {% set ph_kicker = 'My Orders' %}{% set ph_title = 'Order ' ~ order_number(order.id) %}
     {# A question about this order opens the contact form with the order chosen (owner, 2026-10-20). #}
     {% set ph_actions %}{{ ui('action.link', {label: 'Ask about this order', variant: 'secondary', href: '/contact?reason=order&' ~ order_query(order.id), icon: 'action-ask'}) }}{% endset %}
-    {% include '@platform/partials/page-head.html.twig' %}
+    {% include '@CattoPHP/page/head.html.twig' %}
     <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
@@ -15,6 +15,10 @@
                 {# The bundle as it was bought: its title, price and courses from the order, not the bundle now. #}
                 <p>{{ ui('feedback.badge', {label: 'Bundle', tone: 'info', size: 'small'}) }} <strong>{{ item.bundle_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.price_label }}</p>
                 <p class="help">Includes: {{ item.courses|map(c => c.title)|join(', ') }}</p>
+            {% elseif item.fulfilment_type|default('') == 'bundle_credit' %}
+                {# A company's bundle credits (owner, 2026-11-11): each one whole bundle for one person. #}
+                <p>{{ ui('feedback.badge', {label: 'Bundle credits', tone: 'info', size: 'small'}) }} <strong>{{ item.bundle_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} bundle {{ item.quantity == 1 ? 'credit' : 'credits' }} · {{ item.price_label|default(item.line_label|default('')) }}</p>
+                <p class="help">Includes: {{ item.courses|map(c => c.title)|join(', ') }}. {{ item.quantity == 1 ? 'This credit is for one person, who gets every course in the bundle.' : 'Each credit is for one person, who gets every course in the bundle.' }}</p>
             {% else %}
                 <p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>
             {% endif %}
@@ -68,7 +72,15 @@
 {% endblock %}
 {% endembed %}
             {% endif %}
-            {% if change_method or payment_method != 'eft' %}
+            {% if card_checkout|default(null) and not change_method %}
+                {# A card payment waiting on Stitch's page (owner, 2026-11-11): the buyer goes back to it to pay. #}
+                <p>Your card payment is waiting on Stitch's secure page. Your courses start as soon as Stitch confirms it.</p>
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.link', {label: 'Pay by card on Stitch\'s page', variant: 'primary', size: 'normal', href: card_checkout, icon: 'action-pay'}) }}{{ ui('action.link', {label: 'Change payment method', variant: 'secondary', size: 'normal', href: my_order_url(order.id, '?payment=change'), icon: 'action-edit'}) }}
+{% endblock %}
+{% endembed %}
+            {% elseif change_method or payment_method != 'eft' %}
                 <form action="{{ my_order_url(order.id, '/pay') }}" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payment_key" value="{{ payment_key }}">
                     {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method} %}

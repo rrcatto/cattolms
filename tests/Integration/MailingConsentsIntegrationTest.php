@@ -66,11 +66,11 @@ final class MailingConsentsIntegrationTest extends TestCase
         self::assertTrue($mailing->isSubscribed($person, 'news'));
         self::assertTrue($mailing->isSubscribed($person, 'course', $course));
         $courseList = (int) $lists->listId('course', $course, false);
-        self::assertSame('checkout', $this->db->fetchOne('SELECT source FROM mailing_subscriptions WHERE list_id = :l AND user_id = :u', ['l' => $courseList, 'u' => $person]), 'The same yes again changes nothing.');
+        self::assertSame('checkout', $this->db->fetchOne('SELECT source FROM cattophp_mailing_subscriptions WHERE list_id = :l AND account = CAST(:u AS TEXT)', ['l' => $courseList, 'u' => $person]), 'The same yes again changes nothing.');
 
         $mailing->unsubscribe($person, 'course', $course, 'preferences');
         self::assertFalse($mailing->isSubscribed($person, 'course', $course));
-        self::assertSame([['subscribed', 'checkout'], ['unsubscribed', 'preferences']], array_map(static fn(array $r): array => [$r['status'], $r['source']], $this->db->fetchAllAssociative('SELECT status, source FROM mailing_subscription_events WHERE list_id = :l AND user_id = :u ORDER BY id', ['l' => $courseList, 'u' => $person])), 'Every change is history.');
+        self::assertSame([['subscribed', 'checkout'], ['unsubscribed', 'preferences']], array_map(static fn(array $r): array => [$r['status'], $r['source']], $this->db->fetchAllAssociative('SELECT status, source FROM cattophp_mailing_subscription_events WHERE list_id = :l AND account = CAST(:u AS TEXT) ORDER BY id', ['l' => $courseList, 'u' => $person])), 'Every change is history.');
 
         $preferences = $mailing->preferences($person);
         self::assertTrue($preferences['news']);

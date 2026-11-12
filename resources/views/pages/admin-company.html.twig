@@ -2,7 +2,7 @@
 	A company's page in Administration, as the owner approved its mockup (2026-10-27: "the mockup is approved, build it.
 	just remember to retain the identity band of the logged in user"; the request: "that page should be an overview of all
 	the pertinent info about that company on one page ... Make the UI a delight for a human being to use"). The head with
-	its logo and badges, then the reader's identity band (partials/page-head draws both); what waits for an administrator
+	its logo and badges, then the reader's identity band (CattoPHP's page head draws both); what waits for an administrator
 	about it; its figures, each opening its part; its people and the courses it provides, each a table or a grid of
 	cards; its staff's learning, its credits and its orders; and beside them its details and administrators, wallet,
 	billing details, logo, recent activity and Disable. Application\CompanyOverview gathers it.
@@ -19,7 +19,7 @@
 		{% if can_select_company and co.status == 'active' %}<form action="/company/context" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="company_id" value="{{ co.id }}">{{ ui('action.button', {label: 'Manage in the Company workspace', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-switch'}) }}</form>{% endif %}
 		{% if can_manage_companies %}{{ ui('action.link', {label: 'Edit details', variant: 'secondary', size: 'normal', href: co_base ~ '?edit=1#company-details', icon: 'action-edit'}) }}{% endif %}
 	{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	{# What waits for an administrator about this company, as the dashboard's Needs your attention lists it. #}
 	{% if company_attention %}
@@ -54,7 +54,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'people'})} %}{% block surface_body %}
 			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', summary: cp.all == 0 ? 'Nobody belongs to ' ~ co.name ~ ' yet. A person whose address is at ' ~ cp.domain ~ ' becomes its staff.' : (cp.all == 1 ? '1 person' : cp.all ~ ' people') ~ ' at ' ~ cp.domain ~ ': ' ~ (company_admins|length == 1 ? '1 Company Administrator' : company_admins|length ~ ' Company Administrators') ~ '.'})} %}{% block section_actions %}{% if can_manage_people %}{{ ui('action.button', {label: 'Add a person', variant: 'primary', size: 'small', type: 'button', modal: 'company-add-person', icon: 'action-add'}) }}{% endif %}{% endblock %}{% endembed %}
 			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'company_people', pagination: cp.pagination, search: {ds_name: 'company_people', ds_label: 'Search its people', ds_value: cp.search, ds_action: co_base ~ '#people'}})} %}
-			{% block toolbar %}{% if cp.all > 0 %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: cp.view_switch} %}</div>{% endif %}{% endblock %}
+			{% block toolbar %}{% if cp.all > 0 %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: cp.view_switch} %}</div>{% endif %}{% endblock %}
 			{% block results %}
 				{% if cp.people %}
 					{% if cp.view == 'grid' %}
@@ -73,7 +73,7 @@
 					{% endblock %}{% endembed %}
 					{% else %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Role in the company'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Courses'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Last signed in'}} %}</tr>{% endblock %}
+					{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Person'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Role in the company'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Courses'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Last signed in'}} %}</tr>{% endblock %}
 					{% block body %}{% for person in cp.people %}<tr>
 						<td class="cell-text">{{ ui('data.person', {name: person.name, href: person_url(person)}) }}</td>
 						<td>{{ ui('feedback.badge', {label: person.role, tone: person.role_tone}) }}</td>
@@ -95,12 +95,12 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'provided'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Courses it provides', summary: (cc.figures.total == 1 ? '1 course' : cc.figures.total ~ ' courses') ~ ': ' ~ cc.figures.published ~ ' published, ' ~ cc.figures.draft ~ ' draft' ~ (cc.figures.retired > 0 ? ', ' ~ cc.figures.retired ~ ' retired' : '') ~ '. ' ~ (cc.figures.learners == 1 ? '1 learner is' : cc.figures.learners ~ ' learners are') ~ ' on them.'}) }}
 			<div id="company_courses-view">
-			<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: cc.view_switch} %}</div>
+			<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: cc.view_switch} %}</div>
 			{% if cc.view == 'grid' %}
 			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 4, label: 'Courses'})} %}{% block body %}
 				{% for course in cc.courses %}
 				{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: course_admin_url(course), picture: 'wide'})} %}
-{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
+{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|authored }}{% endif %}{% endblock %}
 {% block details %}
 					{% if course.code %}<p class="cl-ui-card-line"><code class="cl-course-code">{{ course.code }}</code></p>{% endif %}
 					{% if course.price %}<p class="cl-ui-card-line"><strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %}</p>{% endif %}
@@ -113,7 +113,7 @@
 			{% endblock %}{% endembed %}
 			{% else %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Learners'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Learners'}} %}</tr>{% endblock %}
 			{% block body %}{% for course in cc.courses %}<tr>
 				<td class="cell-text"><a href="{{ course_admin_url(course) }}">{{ course.title }}</a></td>
 				<td>{{ course.code }}</td>
@@ -133,7 +133,7 @@
 			{{ ui('layout.section-head', {heading: 'Its staff\'s learning', summary: 'The courses its people are on, how far they are and how they did.'}) }}
 			{% if company_learning %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Not started'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'In progress'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Completed'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Average result'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Not started'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'In progress'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Completed'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Average result'}} %}</tr>{% endblock %}
 			{% block body %}{% for row in company_learning %}<tr>
 				<td class="cell-text"><a href="{{ course_admin_url(row) }}">{{ row.title }}</a></td>
 				<td>{{ row.on }}</td><td>{{ row.not_started }}</td><td>{{ row.in_progress }}</td><td>{{ row.completed }}</td><td>{{ row.average }}</td>
@@ -150,7 +150,7 @@
 			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course credits', summary: company_credits.places.held == 0 ? 'It holds no places on courses for its staff.' : 'Places on courses it holds for its staff: ' ~ company_credits.places.left ~ ' of ' ~ company_credits.places.held ~ ' left.'})} %}{% block section_actions %}{% if can_manage_credits %}{{ ui('action.button', {label: 'Give credits', variant: 'secondary', size: 'small', type: 'button', modal: 'company-give-credits', icon: 'action-grant'}) }}{% endif %}{% if can_select_company and co.status == 'active' and company_credits.places.left > 0 %}<form action="/company/context" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="company_id" value="{{ co.id }}"><input type="hidden" name="next" value="/company/credits">{{ ui('action.button', {label: 'Assign places', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-switch'}) }}</form>{% endif %}{% endblock %}{% endembed %}
 			{% if company_credits.credits %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Places'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Length'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'From'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: ''}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Places'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Length'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'From'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: ''}} %}</tr>{% endblock %}
 			{% block body %}{% for credit in company_credits.credits %}<tr>
 				<td class="cell-text"><a href="{{ course_admin_url(credit) }}">{{ credit.course_title }}</a></td>
 				<td>{{ ui('feedback.progress', {value: credit.held > 0 ? (100 * credit.used / credit.held)|round : 0, label: credit.left ~ ' of ' ~ credit.held ~ ' left', show_value: false}) }}<span class="small">{{ credit.left }} of {{ credit.held }} left</span></td>
@@ -187,7 +187,7 @@
 			{{ ui('layout.section-head', {heading: 'Orders', summary: cs.total == 0 ? 'It has placed no orders.' : (cs.total == 1 ? '1 order' : cs.total ~ ' orders') ~ ': ' ~ cs.paid ~ ' paid' ~ (cs.due_minor > 0 ? ', ' ~ cs.due ~ ' waiting for payment' : '') ~ '.'}) }}
 			{% if cs.orders %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Order'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Placed'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'What'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Amount'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Status'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Order'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Placed'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'What'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Amount'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Status'}} %}</tr>{% endblock %}
 			{% block body %}{% for order in cs.orders %}<tr>
 				<td><a href="{{ order_url(order.id) }}">{{ order.number }}</a></td>
 				<td>{{ order.placed }}</td>

@@ -23,7 +23,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\ThemeRegistryRepository;
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 use CattoLearning\Infrastructure\Persistence\Database;
 
 $container = CliBootstrap::boot()['container'];

@@ -9,7 +9,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'Subscribers' %}
 	{% set ph_lead = 'Everyone on at least one list, with how they get updates. Nobody is here unless they said yes.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
 	{% set sb_icons = {
 		all: '<svg ' ~ a ~ '><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.5c2.6.2 4.4 2 5 5"/></svg>',
@@ -30,7 +30,7 @@
 		</form>
 		{% set sb_return = subscribers_return %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'subscribers', pagination: subscribers_pagination, search: {ds_name: 'subscribers', ds_label: 'Search names, emails and account references', ds_value: subscribers_search, ds_action: '/mailing/subscribers', ds_hidden: how == 'all' ? {} : {how: how}}})} %}
-		{% block toolbar %}{% if subscribers_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: subscribers_view_switch} %}</div>{% endif %}{% endblock %}
+		{% block toolbar %}{% if subscribers_pagination %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: subscribers_view_switch} %}</div>{% endif %}{% endblock %}
 		{% block results %}
 			{% if subscribers and subscribers_view == 'grid' %}
 			{% embed ui_template('data.card-grid') with {props: ui_props('data.card-grid', {columns: 5, label: 'Subscribers'})} %}{% block body %}
@@ -52,7 +52,7 @@
 			{% endblock %}{% endembed %}
 			{% elseif subscribers %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Subscribers'})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Name'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Lists'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'How'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Joined'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Last opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: ''}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Name'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Email'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Lists'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'How'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Joined'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Last opened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: ''}} %}</tr>{% endblock %}
 			{% block body %}{% for row in subscribers %}<tr>
 				<td class="cell-text">{{ ui('data.person', {name: row.name, href: person_to('subscriber', row)}) }}</td>
 				<td class="cell-text">{{ row.email }}{% if row.never_emailed %} {{ ui('feedback.badge', {label: 'Never emailed', tone: 'danger'}) }}{% endif %}</td>

@@ -66,9 +66,11 @@ final class CatalogueRecordAddressesIntegrationTest extends TestCase
             ['GET', '/admin/certificates/designs', 'admin_certificate_designs'],
             ['POST', '/account/certificates/CL-2026-3F9A2C1B7D4E/visibility', 'account_certificate_visibility'],
             ['POST', '/account/certificates/CL-2026-3F9A2C1B7D4E/address', 'account_certificate_address'],
-            ['GET', '/admin/messages/MSG-000043', 'admin_contact_message'],
-            ['POST', '/admin/messages/MSG-000043/answered', 'admin_contact_message_answered'],
-            ['POST', '/admin/messages/MSG-000043/unanswered', 'admin_contact_message_unanswered'],
+            ['GET', '/inbox/MSG-000043', 'inbox_conversation'],
+            ['POST', '/inbox/MSG-000043/act', 'inbox_conversation_act'],
+            ['POST', '/inbox/MSG-000043/reply', 'inbox_reply'],
+            ['GET', '/inbox/spam', 'inbox_spam'],
+            ['GET', '/inbox/settings', 'inbox_settings'],
         ];
         foreach ($reached as [$method, $path, $route]) {
             self::assertSame($route, $this->match($method, $path), $method . ' ' . $path);
@@ -78,7 +80,7 @@ final class CatalogueRecordAddressesIntegrationTest extends TestCase
             ['GET', '/admin/promotions/12'], ['GET', '/admin/promotions/2026'], ['GET', '/admin/promotions/summer25'], ['POST', '/admin/promotions/12/status'],
             ['GET', '/admin/certificates/12'], ['GET', '/admin/certificates/12/certificate.pdf'], ['POST', '/admin/certificates/12/revoke'], ['GET', '/admin/certificates/cl-2026-3f9a2c1b7d4e'],
             ['POST', '/account/certificates/12/visibility'], ['POST', '/account/certificates/12/address'],
-            ['GET', '/admin/messages/43'], ['GET', '/admin/messages/msg-000043'], ['POST', '/admin/messages/43/answered'],
+            ['GET', '/inbox/43'], ['GET', '/inbox/msg-000043'], ['POST', '/inbox/43/act'], ['GET', '/admin/messages/MSG-000043'],
         ];
         foreach ($nothing as [$method, $path]) {
             self::assertNull($this->match($method, $path), $method . ' ' . $path . ' is not an address: a row id names nothing.');
@@ -105,7 +107,7 @@ final class CatalogueRecordAddressesIntegrationTest extends TestCase
             foreach (['keytest_2026', (string) $promotion, 'KEYTEST-2026'] as $miss) self::assertNull($keys->promotion($miss), $miss);
             self::assertSame('KEYTEST_2026', $keys->keyOf('promotion', $promotion));
 
-            $message = (int) $db->fetchOne("INSERT INTO contact_messages (reference, reason, sender_name, sender_email, message) VALUES ('MSG-987654321', 'other', 'Key Test', 'key@example.test', 'Hello.') RETURNING id");
+            $message = (int) $db->fetchOne("INSERT INTO cattophp_inbox_conversations (reference, reason, sender_name, sender_email, message) VALUES ('MSG-987654321', 'other', 'Key Test', 'key@example.test', 'Hello.') RETURNING id");
             self::assertSame($message, $keys->message('MSG-987654321'));
             foreach (['msg-987654321', 'MSG-0987654321', (string) $message, 'MSG-98765432'] as $miss) self::assertNull($keys->message($miss), $miss);
 

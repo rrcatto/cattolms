@@ -8,9 +8,9 @@
 	{% set ph_kicker = 'Courses' %}
 	{% set ph_title = 'Import & Export Catalogue' %}
 	{% set ph_lead = 'Move the whole catalogue between sites in one file: the categories and tags, and every course with its content, code, cover, tags and prices.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{# Stimulus, for the export's tick buttons and count (catalogue_export_controller.js). #}
-	{% if can_export %}{{ importmap() }}{% endif %}
+	{% if can_export %}{{ importmap('app', {nonce: csp_nonce()}) }}{% endif %}
 	{% if can_export %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -31,11 +31,11 @@
 				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every course on this site, in catalogue order: tick the ones to export'})} %}
 {% block header %}
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Export'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Code'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 38, label: 'Course'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Category'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Export'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Code'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 38, label: 'Course'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Category'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
 					</tr>
 {% endblock %}
 {% block body %}

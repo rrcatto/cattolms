@@ -9,7 +9,7 @@ use CattoLearning\Course\Catwalk\SlideLayouts;
 use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Address\CourseItemAddress;
 use CattoLearning\Support\Address\CoursePartAddress;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use InvalidArgumentException;
@@ -79,6 +79,12 @@ final class CourseItemService
         private readonly ResourceLibraryService $resources,
         private readonly CourseStructureArrangement $arrangement
     ) {
+    }
+
+    /** 'short' when the item is placed in a short course (its presentation takes a short course's sizes), else 'full'. */
+    public function itemCourseType(int $id): string
+    {
+        return $this->items->itemCourseType($id);
     }
 
     /**
@@ -417,7 +423,8 @@ final class CourseItemService
     public function createAndPlace(int $courseId, array $input, int $userId): array
     {
         return $this->transactions->run(function () use ($courseId, $input, $userId): array {
-            $itemId = $this->create($input, $userId);
+            // Made for a course, a presentation takes that course's sizes and buttons (a short course, specification 4.13, 15).
+            $itemId = $this->create(['course_type' => $this->items->courseType($courseId)] + $input, $userId);
             $node = $this->addExisting($courseId, $itemId, $input, $userId);
             if (trim((string) ($input['name'] ?? '')) === '') { $this->nameFromPlacements($courseId, [$itemId]); }
             return ['item' => $itemId, 'node' => $node];
@@ -528,7 +535,11 @@ final class CourseItemService
             }
             $this->validateReferences((string) $row['item_key'], [], $errors);
         }
-        if ($graded > 0 && $finals !== 1) { $errors[] = 'An assessed course must contain exactly one final Assessment placement.'; }
+        // A short course has no final: its one graded assessment makes the whole mark (Course Specification 4.13, section 15.5).
+        if (($course['course_type'] ?? 'full') === 'short') {
+            if ($finals > 0) { $errors[] = 'A short course has no final assessment: its one assessment makes the whole mark.'; }
+            if ($graded === 0) { $errors[] = 'A short course needs its assessment, which makes the whole mark.'; }
+        } elseif ($graded > 0 && $finals !== 1) { $errors[] = 'An assessed course must contain exactly one final Assessment placement.'; }
         if ($finals > 1) { $errors[] = 'A course may contain only one final Assessment placement.'; }
         return ['errors' => array_values(array_unique($errors)), 'warnings' => array_values(array_unique($warnings))];
     }
@@ -576,8 +587,12 @@ final class CourseItemService
         $sectionModules = array_filter($rows, static fn(array $row): bool => (string) $row['node_type'] === 'section' && !empty($row['numbered'])) !== [];
         // Numbered from 1, or from 0 when the course's first module sets it up (owner, 2026-10-29).
         $sectionNumber = $this->items->firstModuleNumber($courseId) - 1; $moduleOf = [];
+        // A short course's one module shows under its title alone (owner, 2026-11-11, "Title alone"): it keeps its number,
+        // and so its parts' names and addresses, but label_number, which every "Module N:" label reads, is empty.
+        $short = $this->items->courseType($courseId) === 'short';
         foreach ($rows as &$row) {
             $row['section_number'] = (string) $row['node_type'] === 'section' && !empty($row['numbered']) ? ++$sectionNumber : null;
+            $row['label_number'] = $short ? null : $row['section_number'];
             // The module a row sits in, for the outline's part labels: its own number for a module section.
             $row['module_of'] = $moduleOf[$row['parent_node_id'] === null ? 0 : (int) $row['parent_node_id']] ?? null;
             $moduleOf[(int) $row['id']] = $row['section_number'] ?? $row['module_of'];
@@ -759,9 +774,10 @@ final class CourseItemService
             // its slides are then added and edited on its own page (owner, 2026-10-30).
             if (($deck['slides'] ?? []) === []) {
                 $deck['slides'] = [['layout' => 'title', 'title' => 'Welcome', 'heading' => mb_substr($title, 0, 200)]];
-                if (($deck['kind'] ?? '') === 'trailer') { $deck['slides'][] = ['layout' => 'cta', 'title' => 'Start the course', 'heading' => 'Ready to start?', 'text' => 'Get the course, or preview it first.', 'actions' => ['enrol', 'preview']]; }
+                $short = ($input['course_type'] ?? 'full') === 'short';
+                if (($deck['kind'] ?? '') === 'trailer') { $deck['slides'][] = ['layout' => 'cta', 'title' => 'Start the course', 'heading' => 'Ready to start?', 'text' => $short ? 'Get the course and start today.' : 'Get the course, or preview it first.', 'actions' => $short ? ['enrol'] : ['enrol', 'preview']]; }
             }
-            $config = SlideDeck::validate($deck);
+            $config = SlideDeck::validate($deck, ($input['course_type'] ?? null) === 'short' ? 'short' : ($currentId > 0 ? $this->items->itemCourseType($currentId) : 'full'));
         } elseif ($type === 'flashcards') {
             $config = ['cards' => FlashCards::validate(array_key_exists('cards', $input) || array_key_exists('cards_paste', $input) ? self::cardsInput($input) : ($config['cards'] ?? []))];
         } elseif ($type === 'practical') {

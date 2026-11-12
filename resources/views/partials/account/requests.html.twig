@@ -15,10 +15,10 @@
 {% block header %}
 
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 58, label: 'Course'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Requested', wide: true}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Status'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 58, label: 'Course'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Requested', wide: true}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Status'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 						</tr>
 
 {% endblock %}

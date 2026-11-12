@@ -55,6 +55,16 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
 const flash = async (page) => clean(await page.locator('[data-flash-message] > div').first().innerText());
 const submit = async (page, locator) => Promise.all([page.waitForNavigation(), locator.click()]);
 const totals = async (page) => {
+    // The checkout review's summary (owner, 2026-11-11, the approved mockup): its lines without VAT, then To pay now, read
+    // as an order's Subtotal, promotion and Total so one expectation fits the review and the order.
+    const summary = page.locator('[data-order-summary] .cl-ui-key-value-list');
+    if (await summary.count() > 0) {
+        const labels = await summary.locator('dt').allInnerTexts();
+        const values = await summary.locator('dd').allInnerTexts();
+        const rows = labels.map((label, i) => [clean(label), clean(values[i])]).filter(([label]) => label !== 'VAT');
+        const total = clean(await page.locator('[data-to-pay] strong').innerText());
+        return rows.length > 1 ? [['Subtotal', rows[0][1]], ...rows.slice(1), ['Total', total]] : [['Total', total]];
+    }
     const list = page.locator('.cl-ui-key-value-list').last();
     const labels = await list.locator('dt').allInnerTexts();
     const values = await list.locator('dd').allInnerTexts();

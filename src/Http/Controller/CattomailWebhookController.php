@@ -13,6 +13,9 @@ is read: no secret saved yet is 503 (cattomail tries again later), a wrong or st
 event 400. A good event is kept once and processed at once, and answered 200, a repeat too.
 
 Changelog:
+2026/11/12 SAST
+- CattoPHP answers it (CattoMailWebhook: the size, the signature, the event kept once and worked through; CattoPHP
+  Phase 4, step 9).
 2026/10/26 SAST
 - Created.
 */
@@ -22,10 +25,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Mailing\CattomailSignature;
-use CattoLearning\Mailing\CattomailWebhook;
-use CattoLearning\Mailing\MailingSettings;
 use CattoLearning\View\ThemeRenderer;
+use CattoPHP\Mailing\CattoMail\CattoMailWebhook;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,7 +34,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class CattomailWebhookController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly MailingSettings $settings, private readonly CattomailWebhook $webhook)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CattoMailWebhook $webhook)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -42,16 +43,8 @@ final class CattomailWebhookController extends BaseController
     public function receive(): Response
     {
         $request = $this->request();
-        $body = (string) $request->getContent();
-        if (strlen($body) > 1048576) return new JsonResponse(['error' => 'too large'], 413);
-        $secrets = [$this->settings->value('cattomail_secret'), $this->settings->value('cattomail_secret_previous')];
-        if (array_filter($secrets) === []) return new JsonResponse(['error' => 'not configured'], 503);
-        if (!CattomailSignature::valid((string) $request->headers->get('Smarthost-Signature', ''), $body, $secrets, time())) return new JsonResponse(['error' => 'bad signature'], 401);
-        $event = json_decode($body, true);
-        if (!is_array($event) || !is_string($event['id'] ?? null) || $event['id'] === '' || !is_string($event['type'] ?? null)) return new JsonResponse(['error' => 'not an event'], 400);
-        $this->webhook->receive(mb_substr($event['id'], 0, 100), mb_substr($event['type'], 0, 60), $body);
-        $this->webhook->process(20);
+        [$status, $answer] = $this->webhook->answer((string) $request->headers->get(CattoMailWebhook::SIGNATURE_HEADER, ''), (string) $request->getContent());
 
-        return new JsonResponse(['ok' => true], 200);
+        return new JsonResponse($answer, $status);
     }
 }

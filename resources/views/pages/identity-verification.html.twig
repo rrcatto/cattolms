@@ -6,7 +6,7 @@
 	{% set ph_kicker = 'Account' %}
 	{% set ph_title = 'Identity verification' %}
 	{% set ph_lead = 'Your certificates and transcripts carry your name exactly as it appears on your identity document.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'identity-status'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Your identity', heading_level: 2}) }}

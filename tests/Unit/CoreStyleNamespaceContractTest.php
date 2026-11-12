@@ -118,8 +118,9 @@ final class CoreStyleNamespaceContractTest extends TestCase
     private static function styledClasses(): array
     {
         $stylesheets = [
+            self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css',
             self::root() . '/public_html/css/catto-platform.css',
-            self::root() . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/public/css/theme.css',
+            self::root() . '/themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG . '/public/css/theme.css',
         ];
         $styled = [];
         foreach ($stylesheets as $stylesheet) {

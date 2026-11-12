@@ -62,7 +62,7 @@ use CattoLearning\Course\Certificate\CertificateSharing;
 use CattoLearning\Course\Certificate\CertificateWording;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Document\DocumentAssetRepository;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Http\Controller\CertificateController;
 use CattoLearning\Http\Controller\CertificateDesignController;
@@ -171,7 +171,7 @@ final class CertificateIntegrationTest extends TestCase
             self::assertNull($transcript['document_data']['result.module_average'], 'No module assessments.');
             self::assertEquals([['title' => 'QA assessment', 'kind' => 'Final assessment', 'mark' => '0.00']], $transcript['document_data']['assessments']);
             self::assertSame('TR-' . substr((string) $certificate['certificate_number'], 3), (string) $transcript['transcript_number']);
-            $audit = $this->db->fetchAssociative("SELECT metadata FROM audit_log WHERE event_key = 'certificate.issued' AND metadata->>'enrolment_id' = :id", ['id' => (string) $enrolmentId]);
+            $audit = $this->db->fetchAssociative("SELECT details AS metadata FROM cattophp_activity WHERE action = 'certificate.issued' AND details->>'enrolment_id' = :id", ['id' => (string) $enrolmentId]);
             self::assertNotFalse($audit);
             self::assertSame((int) $legalSeal['published_version_id'], (int) json_decode((string) $audit['metadata'], true)['template_version_id']);
         }
@@ -334,7 +334,7 @@ final class CertificateIntegrationTest extends TestCase
 
         // ADMIN revokes the certificate, with a reason: both pages say so and neither has a PDF.
         IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateAwards::class)->revoke((int) $certificate['id'], $this->adminId, 'Issued in error.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'certificate.revoked' AND metadata->>'certificate_id' = :id", ['id' => (string) $certificate['id']]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'certificate.revoked' AND details->>'certificate_id' = :id", ['id' => (string) $certificate['id']]));
         $revoked = InProcessPage::run(null, CertificateController::class, 'show', $id);
         self::assertStringContainsString('This certificate was revoked', $revoked['body']);
         self::assertStringContainsString('Issued in error.', $revoked['body']);
@@ -401,7 +401,7 @@ final class CertificateIntegrationTest extends TestCase
 
         // Every change is the learner's and is in the Activity log, without the address.
         foreach (['transcript.made_public', 'transcript.address_changed'] as $event) {
-            $logged = $this->db->fetchAssociative("SELECT user_id, metadata::text AS metadata FROM audit_log WHERE event_key = :event AND metadata->>'certificate_id' = :id", ['event' => $event, 'id' => (string) $certificateId]);
+            $logged = $this->db->fetchAssociative("SELECT account_person(actor_id) AS user_id, details::text AS metadata FROM cattophp_activity WHERE action = :event AND details->>'certificate_id' = :id", ['event' => $event, 'id' => (string) $certificateId]);
             self::assertNotFalse($logged, $event);
             self::assertSame($learnerId, (int) $logged['user_id']);
             foreach ([$old, $oldTranscript, $new] as $code) self::assertStringNotContainsString($code, (string) $logged['metadata']);
@@ -518,8 +518,10 @@ final class CertificateIntegrationTest extends TestCase
         foreach (['Classic', 'Modern', 'Minimal', 'Legal Seal', 'Gold Frame', 'Professional CPD', 'Default for new courses', 'New courses start with', 'Used by', 'Last edited'] as $text) {
             self::assertStringContainsString($text, $list['body']);
         }
+        // The page's own content, not the menus above it (the Inbox menu has Drafts, 2026-11-11).
+        $main = (string) strstr($list['body'], 'id="cl-main"') ?: $list['body'];
         foreach (['Published', 'Draft', 'Archived', '>Status<', 'Version '] as $gone) {
-            self::assertStringNotContainsString($gone, $list['body'], 'No engine internals on the list: ' . $gone);
+            self::assertStringNotContainsString($gone, $main, 'No engine internals on the list: ' . $gone);
         }
         $editor = InProcessPage::run($this->admin, CertificateDesignController::class, 'create');
         foreach (['name="look"', 'Upload your own background', 'data-certificate-editor="wording"', 'Insert field', 'name="signature_name"', 'data-certificate-editor="small-print"', 'certificate-preview', '/admin/certificates/looks/classic/preview.pdf'] as $text) {
@@ -570,14 +572,14 @@ final class CertificateIntegrationTest extends TestCase
         self::assertSame($gold['id'], (int) $this->db->fetchOne('SELECT certificate_design_id FROM courses WHERE id = :id', ['id' => $courseId]));
         self::assertSame($gold['id'], $this->designs->defaultId());
         self::assertFalse($this->designs->nameTaken('CPD for conveyancers'), 'Its name is free again.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'certificate.design_deleted' AND metadata->>'design_id' = :id", ['id' => (string) $id]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'certificate.design_deleted' AND details->>'design_id' = :id", ['id' => (string) $id]));
     }
 
     public function testAnUploadedBackgroundBecomesTheDesignsLook(): void
     {
         $container = IntegrationContainer::get();
         $service = new CertificateDesignService($this->designs, new CertificateDesignCompiler(), $container->get(DocumentAssetRepository::class), $container->get(DocumentTemplateRenderer::class),
-            $container->get(DocumentPdfRenderer::class), $container->get(TransactionManager::class), $container->get(AuditRepository::class), static fn(string $path): bool => is_file($path));
+            $container->get(PdfRenderer::class), $container->get(TransactionManager::class), $container->get(AuditRepository::class), static fn(string $path): bool => is_file($path));
         $file = (string) tempnam(sys_get_temp_dir(), 'canva');
         $image = imagecreatetruecolor(3508, 2480);
         imagefill($image, 0, 0, (int) imagecolorallocate($image, 250, 246, 234));
@@ -601,7 +603,7 @@ final class CertificateIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $service = new CertificateDesignService($this->designs, new CertificateDesignCompiler(), $container->get(DocumentAssetRepository::class), $container->get(DocumentTemplateRenderer::class),
-            $container->get(DocumentPdfRenderer::class), $container->get(TransactionManager::class), $container->get(AuditRepository::class), static fn(string $path): bool => is_file($path));
+            $container->get(PdfRenderer::class), $container->get(TransactionManager::class), $container->get(AuditRepository::class), static fn(string $path): bool => is_file($path));
         // A nearly square signature on white paper with wide margins: before 2026-10-08 every look
         // refused it as words that do not fit.
         $file = (string) tempnam(sys_get_temp_dir(), 'signature');

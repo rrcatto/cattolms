@@ -6,7 +6,7 @@
 {% set cq = course_edit %}
 {% set cq_form = 'course-quick-' ~ course.id %}
 {% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, picture: 'wide'})} %}
-{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
+{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|authored }}{% endif %}{% endblock %}
 {% block title %}Editing <code class="cl-course-code">{{ course.code }}</code>{% endblock %}
 {% block details %}
 	<span id="{{ course_anchor(course) }}" class="cl-course-anchor"></span>

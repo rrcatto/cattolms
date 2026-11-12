@@ -13,6 +13,8 @@ key (SecretCipher), one account per number by its keyed fingerprint (3A: "That I
 in instead."), and shown masked (780615 **** ***). The date of birth comes from it (2A).
 
 Changelog:
+2026/11/09 SAST
+- The secret cipher from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/27 SAST
 - Created.
 */
@@ -21,7 +23,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Auth;
 
-use CattoLearning\Configuration\SecretCipher;
+use CattoPHP\Security\SecretCipher;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use DateTimeImmutable;
 use InvalidArgumentException;

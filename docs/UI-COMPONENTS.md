@@ -1,6 +1,6 @@
 # Platform UI component guide
 
-**LMS:** 1.1.3 · **Updated:** 2026-11-09 · **Registry:** 39 components in `src/View/Ui/PlatformUi.php`
+**LMS:** 1.2.0 · **Updated:** 2026-11-12 · **Registry:** CattoPHP's `CattoPHP\Ui\Components` (34 components) and cattolms's catalogue components (5)
 
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 
@@ -10,7 +10,7 @@ Keep this guide to the components and rules as they are now, and under 150,000 c
 
 ## Ownership and API
 
-`src/View/Ui/PlatformUi.php` is the sole allowlist of logical names, template paths, property names and defaults. `PlatformUiExtension` exposes three Twig functions:
+The registry is CattoPHP's (`CattoPHP\Ui\Components`, since CattoPHP Phase 3): the sole allowlist of logical names, template paths, property names and defaults. Its components' templates are CattoPHP's, at `@CattoPHP/ui/` (`vendor/rrcatto/cattophp/templates/ui/`); cattolms adds its own catalogue components through `View\Ui\CatalogueComponents` (a `CattoPHP\Ui\ComponentSet`, templates in `resources/views/ui/catalogue/`) and its slide drawings as feature cards through `View\Ui\SlideDrawing` (a `CattoPHP\Ui\DrawingCheck`). A change to one of CattoPHP's components is made in CattoPHP. CattoPHP's `UiExtension` exposes the Twig functions:
 
 ```twig
 {{ ui('feedback.badge', {label: 'Active', tone: 'success'}) }}
@@ -31,7 +31,7 @@ Theme ownership checks cover canonical components, course cards, pagination, com
 
 ## Component inventory
 
-Paths are relative to `resources/views/ui/`. Slots in this table are the only variable markup areas.
+Paths are relative to CattoPHP's `templates/ui/`, the catalogue's to `resources/views/ui/`. Slots in this table are the only variable markup areas.
 
 | Logical name | Canonical template | Slots |
 |---|---|---|
@@ -75,7 +75,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 | `catalogue.tag-browser` | `catalogue/tag-browser.html.twig` | `surface_body` |
 | `catalogue.tag-chip` | `catalogue/tag-chip.html.twig` | — |
 
-The page head's picture is not a component: `partials/page-head.html.twig` takes `ph_hero` (captured SVG markup) and puts the kicker, title, lead and the page's actions over it (`.cl-picture-head`, as on `/help`, `/faq`, `/courses`, the tag browser, `/contact`, `/terms`, `/refunds` and `/privacy`; a course page's header uses the same `.cl-picture-head` with its cover). Every one is the same size: full width at 32:15, square on a phone. Pictures live in `partials/artwork/`.
+The page head's picture is not a component: CattoPHP's `@CattoPHP/page/head.html.twig` takes `ph_hero` (captured SVG markup) and puts the kicker, title, lead and the page's actions over it (`.cl-picture-head`, as on `/help`, `/faq`, `/courses`, the tag browser, `/contact`, `/terms`, `/refunds` and `/privacy`; a course page's header uses the same `.cl-picture-head` with its cover). Every one is the same size: full width at 32:15, square on a phone. Pictures live in `partials/artwork/`.
 
 ## Semantic contracts
 
@@ -126,8 +126,8 @@ Uses of the components and shared partials, each made through them rather than w
 - **A legal document.** `partials/legal-document-head.html.twig` opens `/terms`, `/refunds` and `/privacy` with the last-updated date from `LegalDocuments` (no version), the document's opening sentence, the other two documents and its PDF; each numbered section below is a closed `overlay.accordion-section` with that id, an icon and "Section N" as its eyebrow, from `partials/legal/*-sections.html.twig`, which the PDF shares, so the sections' titles are the contents.
 - **Head metadata.** `partials/head-meta.html.twig` is included by every theme's head and draws the view model's `meta`: the description, and where a page sets them its canonical address, robots rule, Open Graph tags (with a share picture's type, size and words), X's `twitter:card`, the home page's verification codes and, through `partials/structured-data.html.twig`, its structured data, one JSON-LD script per item (`Search\PageMetadata`, owner 2026-11-06; UX rule 8.9). A page passes them as `page_meta`; nothing in a template queries for them.
 - **Ordered lists with actions.** The bundle editor's course list uses Move up / Move down / Remove buttons as ordinary forms (`cl-bundle-courses`), the same pattern as course price variants; it is not a second drag-and-drop tree.
-- **An icon for a category or tag.** `partials/admin/icon-choice.html.twig` is its own card after the details card: the current icon, the shared search control (`ds_name: 'icon'`, `ds_help`), which reloads the page's own address with `icon_q` and swaps `#icon-results` into `#icon-region` as one types, the icon library's icons that fit the name (or those the search finds) as `form.picture-choice` cards named `library_icon`, an upload of one's own and Save icon, posted to `/admin/courses/categories/{slug}/icon` or `/admin/courses/tags/{slug}/icon`. `View\Artwork\IconLibrary` holds the library (Lucide, `resources/icons/lucide.json`). The shared search control takes an optional `ds_help` for its help line.
-- **A sortable table.** Administration → Courses in the catalogue's order: each row `tr[data-course-code]`, with its address in `data-course-url`, carries its number (`[data-position]`) and a hidden `.cl-row-handle`, which `assets/controllers/course_order_controller.js` shows; it moves rows while dragging or with the keys and saves each move, and the ⋯ menu's forms move a course without JavaScript.
+- **An icon for a category or tag.** `partials/admin/icon-choice.html.twig` is its own card after the details card: the current icon, the shared search control (`ds_name: 'icon'`, `ds_help`), which reloads the page's own address with `icon_q` and swaps `#icon-results` into `#icon-region` as one types, the icon library's icons that fit the name (or those the search finds) as `form.picture-choice` cards named `library_icon`, an upload of one's own and Save icon, posted to `/admin/courses/categories/{slug}/icon` or `/admin/courses/tags/{slug}/icon`. CattoPHP's `Ui\IconLibrary` holds the library (Lucide, CattoPHP's `resources/icons/lucide.json`), and `View\Artwork\CourseIcons` gives it the subjects courses are filed under. The shared search control takes an optional `ds_help` for its help line.
+- **A sortable table.** Administration → Courses and Administration → Bundles in the catalogue's order: each row `tr[data-order-code]`, with the address its move is sent to in `data-order-url` and its title in `data-order-title`, carries its number (`[data-position]`) and a hidden `.cl-row-handle`, which `assets/controllers/list_order_controller.js` shows; it moves rows while dragging or with the keys and saves each move, and the ⋯ menu's forms move a course or a bundle without JavaScript.
 
 ## A course's addresses
 
@@ -141,7 +141,7 @@ A GET form changes the page in place with `{% include '@platform/partials/in-pla
 
 Every button and button-styled link carries an icon before its label that says what it does (owner, 2026-10-21: "add an svg icon to the left of the Button title", table rows included). Every `ui('action.button')` and `ui('action.link')` call names its `icon`, every Actions menu (`action.row` with `menu` or `narrow_menu`) names its trigger's, and every section registry action (`actions()`) names one; `ActionIconContractTest` fails a call without one. `action.button`'s tick or arrow when no icon is named is only a safety net. The only button without an icon is a pagination page number, which is its own label. A label never repeats its icon (UX rule 3.3), so the reader's paging reads Previous and Next, not "← Previous" and "Next →". The reader's Download link, drawn by `CourseItemRenderer`, carries `action-download` the same way.
 
-One meaning has one symbol everywhere. The symbols are in `public_html/img/nav-icons.svg`, drawn from Lucide (ISC, `resources/icons/lucide.json`, 1.70.0 since 2026-11-07); add a symbol there, named by its meaning, only for a meaning not listed here.
+One meaning has one symbol everywhere. The symbols are in `public_html/img/nav-icons.svg`, drawn from Lucide (ISC, CattoPHP's icon library `CattoPHP\Ui\IconLibrary`, 1.70.0 since 2026-11-07); add a symbol there, named by its meaning, only for a meaning not listed here.
 
 | Meaning (examples) | Symbol |
 | --- | --- |
@@ -277,7 +277,7 @@ The assessment and diagnostic editors include `partials/question-editor.html.twi
 
 Links reject button-only properties such as `disabled`, `form`, `name`, `value`, `close_modal` and `stimulus_action`. Buttons reject `href`, `new_window`, `rel`, `navigation_key` and `close_disclosure`. A Cancel link in a form opened in place inside a `<details>` (Course Content's Edit section and Placement settings) takes `close_disclosure: true`: with JavaScript it puts the form back as it was and closes the disclosure without a page load (`platform-overrides.js`), and without JavaScript it follows its `href`, which should lead back to the same place on the page. Unknown-property exceptions name the component and offending properties. Common htmx and modal-open hooks remain.
 
-`UiOwnershipAudit` runs in unit tests and `tools/validate-ui-contracts.php`. It examines JavaScript markup literals and class-producing operations in `public_html/js` and `assets/controllers`, plus canonical theme geometry and malformed Stimulus attributes. Comments and selector-only references do not count as generated UI. There are no file exemptions. Notice headings use `cl-ui-notice-heading`; inline emphasis in notice prose must stay inline.
+CattoPHP's `Ui\Contract\SourceAudit` runs in unit tests and `tools/validate-ui-contracts.php`. It examines JavaScript markup literals and class-producing operations in `public_html/js` and `assets/controllers`, plus canonical theme geometry and malformed Stimulus attributes. Comments and selector-only references do not count as generated UI. There are no file exemptions. Notice headings use `cl-ui-notice-heading`; inline emphasis in notice prose must stay inline.
 
 ## Canonical page construction
 
@@ -300,8 +300,8 @@ The registry has 39 components; canonical shell partials do not introduce a para
 | Concern | Core source |
 | --- | --- |
 | Navigation model rendering | `resources/views/partials/navigation.html.twig` |
-| Page context and full identity placement | `resources/views/partials/page-head.html.twig` |
-| Full identity | `resources/views/partials/account/identity-head.html.twig` |
+| Page context and full identity placement | CattoPHP's `@CattoPHP/page/head.html.twig` |
+| Full identity | CattoPHP's `@CattoPHP/page/identity.html.twig` |
 | Compact header identity | `resources/views/partials/account/identity-compact.html.twig` |
 | Flash messages | `resources/views/partials/flash-messages.html.twig` |
 | Standard footer | `resources/views/partials/site-footer.html.twig` |

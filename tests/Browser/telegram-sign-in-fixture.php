@@ -9,7 +9,7 @@ Version: 1.1.0
 
 Description:
 Signing in with Telegram and two-step sign-in, the browser check's fixture (owner, 2026-11-05). `create` makes an ADMIN and a
-learner, each with a session, keeps what the site has saved of Messages to you, the two-step policy, points the
+learner, each with a session, keeps what the site has saved of Connect to Telegram bot, the two-step policy, points the
 site at the stand-in (telegram-sign-in-standin.php) before anything else and starts it, so no message ever goes to the real
 Telegram, and turns sign-in by Telegram on with the stand-in's key. `writes <chat> <username> <text>` is someone writing to
 the bot; `sent` prints what the site sent; `connect <user id> <chat> <username>` connects a person's Telegram directly; `reset-two-step <user id>`;
@@ -27,9 +27,10 @@ use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Auth\TwoStepPolicy;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\OwnerMessages\OwnerMessageSettings;
-use CattoLearning\OwnerMessages\TelegramAccountRepository;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Telegram\TelegramAccounts;
+use CattoPHP\Telegram\TelegramBot;
+use CattoPHP\Telegram\TelegramState;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
@@ -40,19 +41,23 @@ const TELEGRAM_SIGN_IN_PORT = 18091;
 const TELEGRAM_SIGN_IN_KEY = '123456789:stand-in-key-for-checks-only';
 $container = CliBootstrap::boot()['container'];
 $db = $container->get(Database::class);
-$options = $container->get(OptionRepository::class);
+// CattoPHP's Telegram values (since 2026-11-12): the bot's connection, Telegram's address and the reader's place.
+$options = new TelegramState($db->connection());
 $statePath = '/tmp/catto-telegram-sign-in-state.json';
 $standIn = '/tmp/telegram-sign-in-standin.json';
 $action = $argv[1] ?? '';
 $read = static fn(): array => json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
-$kept = [OwnerMessageSettings::OPTION, OwnerMessageSettings::ADDRESS_OPTION, OwnerMessageSettings::INBOX_OPTION, TwoStepPolicy::OPTION];
+$kept = [TelegramState::BOT, TelegramState::ADDRESS, TelegramState::INBOX];
+// The two-step policy is a CattoPHP setting: its own row is kept and put back.
+$policyRow = static fn() => $db->fetchAssociative('SELECT name, value, secret, updated_at, updated_by FROM cattophp_settings WHERE name = :n', ['n' => TwoStepPolicy::ENV]) ?: null;
 
 if ($action === 'create') {
     if (is_file($statePath)) { throw new RuntimeException('Clean up the previous Telegram sign-in fixture first.'); }
     $before = [];
-    foreach ($kept as $name) $before[$name] = $options->find($name);
+    foreach ($kept as $name) $before[$name] = $options->get($name);
+    $beforePolicy = $policyRow();
     // The stand-in's address first, so nothing that follows can reach the real Telegram.
-    $options->set(OwnerMessageSettings::ADDRESS_OPTION, 'http://127.0.0.1:' . TELEGRAM_SIGN_IN_PORT);
+    $options->set(TelegramState::ADDRESS, 'http://127.0.0.1:' . TELEGRAM_SIGN_IN_PORT);
     $fixture = new DevelopmentFixture($db);
     $admin = $fixture->person('ADMIN');
     // One learner for each browser, so neither meets the other's sign-in limits.
@@ -64,17 +69,17 @@ if ($action === 'create') {
         $learners[$browser]['token'] = Token::generate();
         $sessions->create($learner['id'], Token::hash($learners[$browser]['token']), 7200, '', 'Telegram sign-in browser', $learner['email']);
     }
-    $settings = $container->get(OwnerMessageSettings::class);
-    $options->delete(OwnerMessageSettings::OPTION);
-    $options->delete(OwnerMessageSettings::INBOX_OPTION);
-    $settings->setKey(TELEGRAM_SIGN_IN_KEY, 'catto_check_bot', $admin['id']);
-    $settings->setSignIn(true, $admin['id']);
-    $options->set(TwoStepPolicy::OPTION, TwoStepPolicy::CHOICE);
+    $settings = $container->get(TelegramBot::class);
+    $options->remove(TelegramState::BOT);
+    $options->remove(TelegramState::INBOX);
+    $settings->setKey(TELEGRAM_SIGN_IN_KEY, 'catto_check_bot', new Actor((string) $admin['id'], (string) $admin['id']));
+    $settings->setSignIn(true, new Actor((string) $admin['id'], (string) $admin['id']));
+    $container->get(TwoStepPolicy::class)->save(TwoStepPolicy::CHOICE);
     @unlink($standIn);
     $pid = (int) shell_exec('php -S 127.0.0.1:' . TELEGRAM_SIGN_IN_PORT . ' ' . escapeshellarg(__DIR__ . '/telegram-sign-in-standin.php') . ' > /dev/null 2>&1 & echo $!');
     usleep(500000);
-    $state = ['admin' => $admin, 'learners' => $learners, 'admin_token' => $adminToken, 'pid' => $pid, 'before' => $before,
-        'messages_before' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages'), 'last_message' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM telegram_messages'),
+    $state = ['admin' => $admin, 'learners' => $learners, 'admin_token' => $adminToken, 'pid' => $pid, 'before' => $before, 'before_policy' => $beforePolicy,
+        'messages_before' => (int) $db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages'), 'last_message' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM cattophp_telegram_messages'),
         'scrub' => $fixture->seeds()];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
@@ -94,26 +99,31 @@ if ($action === 'create') {
     echo json_encode($data['sent']), "\n";
 } elseif ($action === 'connect') {
     $who = (int) ($argv[2] ?? 0);
-    $container->get(TelegramAccountRepository::class)->connect($who, (string) ($argv[3] ?? ''), (string) ($argv[4] ?? ''));
+    $container->get(TelegramAccounts::class)->connect((string) $who, (string) ($argv[3] ?? ''), (string) ($argv[4] ?? ''));
 } elseif ($action === 'reset-two-step') {
     $container->get(\CattoLearning\Auth\TwoStep\TwoStep::class)->reset((int) ($argv[2] ?? 0), null);
 } elseif ($action === 'policy') {
-    $options->set(TwoStepPolicy::OPTION, strtoupper((string) ($argv[2] ?? 'CHOICE')));
+    $container->get(TwoStepPolicy::class)->save(strtoupper((string) ($argv[2] ?? 'CHOICE')));
 } elseif ($action === 'counts') {
-    echo json_encode(['messages' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages'), 'owner_waiting' => (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NULL AND chat_id IS NULL'),
-        'address' => $options->find(OwnerMessageSettings::ADDRESS_OPTION)]), "\n";
+    echo json_encode(['messages' => (int) $db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages'), 'owner_waiting' => (int) $db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages WHERE sent_at IS NULL AND chat_id IS NULL'),
+        'address' => $options->get(TelegramState::ADDRESS)]), "\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) { exit(0); }
     $state = $read();
     if ((int) ($state['pid'] ?? 0) > 0) { @shell_exec('kill ' . (int) $state['pid'] . ' 2>/dev/null'); }
-    $db->executeStatement('DELETE FROM telegram_messages WHERE id > :before', ['before' => (int) $state['last_message']]);
+    $db->executeStatement('DELETE FROM cattophp_telegram_messages WHERE id > :before', ['before' => (int) $state['last_message']]);
     foreach ($state['before'] as $name => $value) {
-        if ($value === null) { $options->delete($name); } else { $options->set($name, $value); }
+        if ($value === null) { $options->remove($name); } else { $options->set($name, $value); }
+    }
+    $db->executeStatement('DELETE FROM cattophp_settings WHERE name = :n', ['n' => TwoStepPolicy::ENV]);
+    if (is_array($state['before_policy'] ?? null)) {
+        $db->executeStatement('INSERT INTO cattophp_settings (name, value, secret, updated_at, updated_by) VALUES (:name, :value, FALSE, :updated_at, :updated_by)',
+            ['name' => $state['before_policy']['name'], 'value' => $state['before_policy']['value'], 'updated_at' => $state['before_policy']['updated_at'], 'updated_by' => $state['before_policy']['updated_by']]);
     }
     (new CheckScrub($db))->remove($state['scrub']);
     foreach ([$standIn, $standIn . '.lock'] as $file) @unlink($file);
     unlink($statePath);
-    $after = (int) $db->fetchOne('SELECT COUNT(*) FROM telegram_messages');
+    $after = (int) $db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages');
     echo json_encode(['messages_before' => (int) $state['messages_before'], 'messages_after' => $after]), "\n";
 } else {
     fwrite(STDERR, "Usage: php tests/Browser/telegram-sign-in-fixture.php create|writes <chat> <username> <text>|sent|connect <user id> <chat> <username>|reset-two-step <user id>|policy <value>|counts|cleanup\n");

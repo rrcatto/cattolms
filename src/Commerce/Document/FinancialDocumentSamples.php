@@ -32,7 +32,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use InvalidArgumentException;
 
 final class FinancialDocumentSamples
@@ -100,7 +100,7 @@ final class FinancialDocumentSamples
         $snapshot = self::person('Lerato Dlamini', 'Dlamini & Associates', '4000000001', ['line_1' => '12 Kéré Street', 'line_2' => 'Suite 4', 'locality' => 'Brooklyn',
             'city' => 'Pretoria', 'region' => 'Gauteng', 'postal_code' => '0181', 'country_code' => 'ZA'], 'lerato@example.test', null, 'CL2026090300412') + [
             'items' => [$course('Fire Safety for Workplace Supervisors', 129000, 12900, 365), $bundle, $course('Hazard Identification & Risk Assessment', 179000, 17900, 180)],
-            'subtotal_minor' => 487000, 'discount_minor' => 48700, 'total_minor' => 438300, 'currency' => 'ZAR',
+            'subtotal_minor' => 487000, 'discount_minor' => 48700, 'total_minor' => 438300, 'currency' => 'ZAR', 'payment_method' => 'eft',
             'promotion' => ['code' => 'SPRING10', 'label' => '10% off', 'discount_minor' => 48700],
         ];
         $refund = $snapshot;
@@ -129,7 +129,7 @@ final class FinancialDocumentSamples
             'city' => 'Kempton Park', 'region' => 'Gauteng', 'postal_code' => '1600', 'country_code' => 'ZA'], 'sipho.mokoena@example.test', 'Sipho Mokoena', 'CL2026082100187') + [
             'company_id' => 1, 'company_name' => 'Mokoena Logistics',
             'items' => [$credits('Forklift Operator Safety', 10, 85000, 365), $credits('First Aid Level 1', 4, 120000, 365)],
-            'total_minor' => 1330000, 'currency' => 'ZAR',
+            'total_minor' => 1330000, 'currency' => 'ZAR', 'payment_method' => 'dummy',
         ];
         $refund = $snapshot;
         $refund['items'] = [['course_title' => 'Forklift Operator Safety', 'access_period_seconds' => 365 * 86400, 'quantity' => 3, 'line_total_minor' => 255000, 'currency' => 'ZAR']];

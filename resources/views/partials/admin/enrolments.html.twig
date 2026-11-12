@@ -11,7 +11,7 @@
 
 							<tr>
 								{% for sh in enrolments_sort_headers %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: enrolments_region, sort_results: enrolments_results} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: enrolments_region, sort_results: enrolments_results} %}
 								{% endfor %}
 							</tr>
 

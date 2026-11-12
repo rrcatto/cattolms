@@ -58,6 +58,9 @@ final class CompanyCreditController extends BaseController
         return $this->render('company-credit-buy', [
             'title'=>'Buy company credits','active_nav'=>'company',
             'offers'=>$this->purchases->offers($companyId,$search),
+            // Bundles as bundle credits, one credit one person (owner, 2026-11-11), with the rule said where they are bought.
+            'bundle_offers'=>$this->purchases->bundleOffers(),'bundle_rule'=>\CattoLearning\Commerce\Application\BundleCredits::RULE,
+            'chosen_bundle'=>(int)$this->request()->query->get('bundle', 0),
             'search'=>$search,'basket'=>$basket,'basket_error'=>$basketError,
         ]);
     }
@@ -69,6 +72,27 @@ final class CompanyCreditController extends BaseController
         return $this->handle(function() use($actor): void {
             $this->purchases->add($actor,$this->companyId($actor),(int)($_POST['variant_id'] ?? 0),(int)($_POST['quantity'] ?? 0));
             $this->flash('success','Credits added to the company purchase.');
+            $this->redirect('/company/credits/buy');
+        },'/company/credits/buy');
+    }
+
+    #[Route('/company/credits/buy/add-bundle', name: 'company_credit_buy_add_bundle', methods: ['POST'])]
+    public function addBundle(): Response
+    {
+        $this->requireCsrf(); $actor=$this->requirePermission('COMPANY.CREDIT.MANAGE');
+        return $this->handle(function() use($actor): void {
+            $this->purchases->addBundle($actor,$this->companyId($actor),(int)($_POST['bundle_offer_id'] ?? 0),(int)($_POST['quantity'] ?? 0));
+            $this->flash('success','Bundle credits added to the company purchase. ' . \CattoLearning\Commerce\Application\BundleCredits::RULE);
+            $this->redirect('/company/credits/buy');
+        },'/company/credits/buy');
+    }
+
+    #[Route('/company/credits/buy/remove-bundle', name: 'company_credit_buy_remove_bundle', methods: ['POST'])]
+    public function removeBundle(): Response
+    {
+        $this->requireCsrf(); $actor=$this->requirePermission('COMPANY.CREDIT.MANAGE');
+        return $this->handle(function() use($actor): void {
+            $this->purchases->removeBundle($actor,$this->companyId($actor),(int)($_POST['bundle_offer_id'] ?? 0));
             $this->redirect('/company/credits/buy');
         },'/company/credits/buy');
     }
@@ -106,7 +130,8 @@ final class CompanyCreditController extends BaseController
                 'billing'=>$this->purchases->billingForm($actor,$companyId),'billing_fields'=>BillingDetails::formFields(false),
                 'wallet_balance_minor'=>$balance,'wallet_balance_label'=>Money::ofMinorUnits($balance,'ZAR')->format(),
                 'payment_due'=>$this->settings->paymentDue()->words(),'refund_window'=>$this->settings->refundWindow()->words(),
-                'payment_options'=>$this->paymentMethods->checkoutOptions()]);
+                'payment_options'=>$this->paymentMethods->checkoutOptions(),
+                'bundle_rule'=>\CattoLearning\Commerce\Application\BundleCredits::RULE,'bundle_accept'=>\CattoLearning\Commerce\Application\BundleCredits::ACCEPT]);
         },'/company/credits/buy');
     }
 
@@ -118,7 +143,8 @@ final class CompanyCreditController extends BaseController
             $id=$this->purchases->place($actor,$this->companyId($actor),(string)($_POST['purchase_key'] ?? ''),
                 (string)($_POST['quote'] ?? ''),BillingDetails::forCompany($_POST),
                 (string)($_POST['payment_method'] ?? ''),(string)($_POST['method_token'] ?? ''),
-                ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes',($_POST['use_wallet'] ?? '') === 'yes');
+                ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes',($_POST['use_wallet'] ?? '') === 'yes',
+                ($_POST['accept_bundle_use'] ?? '') === 'yes');
             $this->maintenance->deliverInvoices(1);
             $this->maintenance->deliverCompanyCourseNotices(2);
             $this->redirect(OrderAddress::buyer($id));

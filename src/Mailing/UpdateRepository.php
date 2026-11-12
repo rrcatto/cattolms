@@ -15,6 +15,12 @@ it, of its tags, and of the list it was written for or posted to), each with the
 reached whom; each person's choice of how they hear; and each course's lowest price last seen.
 
 Changelog:
+2026/11/12 SAST
+- The lists and who follows them are CattoPHP's (CattoPHP Phase 4, step 9, part 2): the reads go over its tables, a
+  list's subject and a person as text.
+2026/11/09 SAST
+- The activity log is CattoPHP's (CattoPHP Phase 2, step 4): cattophp_activity, its person the actor (account_person()
+  turns the actor back into a person's number), action, details and happened_at for event_key, metadata and created_at.
 2026/10/28 SAST
 - Created.
 */
@@ -31,10 +37,10 @@ final class UpdateRepository
         u.status_note, u.created_at, u.updated_at, c.title AS course_title, c.code AS course_code, c.slug AS course_slug,
         CASE l.kind WHEN 'news' THEN 'News and Updates' WHEN 'own' THEN l.name ELSE COALESCE(lc.name, lco.title, lt.name, '') END AS list_name";
     private const JOINS = "LEFT JOIN courses c ON c.id = u.course_id
-        LEFT JOIN mailing_lists l ON l.id = u.list_id
-        LEFT JOIN course_categories lc ON l.kind = 'category' AND lc.id = l.subject_id
-        LEFT JOIN courses lco ON l.kind = 'course' AND lco.id = l.subject_id
-        LEFT JOIN tags lt ON l.kind = 'tag' AND lt.id = l.subject_id";
+        LEFT JOIN cattophp_mailing_lists l ON l.id = u.list_id
+        LEFT JOIN course_categories lc ON l.kind = 'category' AND l.subject = CAST(lc.id AS TEXT)
+        LEFT JOIN courses lco ON l.kind = 'course' AND l.subject = CAST(lco.id AS TEXT)
+        LEFT JOIN tags lt ON l.kind = 'tag' AND l.subject = CAST(lt.id AS TEXT)";
 
     public function __construct(private readonly Database $db)
     {
@@ -128,23 +134,23 @@ final class UpdateRepository
                  UNION ALL
                  SELECT chain.update_id, parent.id, parent.parent_id FROM chain JOIN course_categories parent ON parent.id = chain.parent_id
              ), lists AS (
-                 SELECT p.id AS update_id, l.id AS list_id, 0 AS sort FROM picked p JOIN mailing_lists l ON l.kind = 'course' AND l.subject_id = p.course_id
-                 UNION SELECT chain.update_id, l.id, 1 FROM chain JOIN mailing_lists l ON l.kind = 'category' AND l.subject_id = chain.category_id
-                 UNION SELECT p.id, l.id, 2 FROM picked p JOIN course_tags ct ON ct.course_id = p.course_id JOIN mailing_lists l ON l.kind = 'tag' AND l.subject_id = ct.tag_id
+                 SELECT p.id AS update_id, l.id AS list_id, 0 AS sort FROM picked p JOIN cattophp_mailing_lists l ON l.kind = 'course' AND l.subject = CAST(p.course_id AS TEXT)
+                 UNION SELECT chain.update_id, l.id, 1 FROM chain JOIN cattophp_mailing_lists l ON l.kind = 'category' AND l.subject = CAST(chain.category_id AS TEXT)
+                 UNION SELECT p.id, l.id, 2 FROM picked p JOIN course_tags ct ON ct.course_id = p.course_id JOIN cattophp_mailing_lists l ON l.kind = 'tag' AND l.subject = CAST(ct.tag_id AS TEXT)
                  UNION SELECT p.id, p.list_id, 3 FROM picked p WHERE p.list_id IS NOT NULL
              )
-             SELECT lists.update_id, s.user_id, e.email, COALESCE(u.first_name, '') AS first_name, l.id AS list_id, l.kind AS list_kind, s.changed_at AS followed_at,
+             SELECT lists.update_id, CAST(s.account AS BIGINT) AS user_id, e.email, COALESCE(u.first_name, '') AS first_name, l.id AS list_id, l.kind AS list_kind, s.changed_at AS followed_at,
                     CASE l.kind WHEN 'news' THEN 'News and Updates' WHEN 'own' THEN l.name ELSE COALESCE(cat.name, co.title, t.name, '') END AS list_name
              FROM lists
-             JOIN mailing_lists l ON l.id = lists.list_id AND l.closed_at IS NULL
-             JOIN mailing_subscriptions s ON s.list_id = l.id AND s.status = 'subscribed'
-             JOIN users u ON u.id = s.user_id AND u.status = 'active'
+             JOIN cattophp_mailing_lists l ON l.id = lists.list_id AND l.closed_at IS NULL
+             JOIN cattophp_mailing_subscriptions s ON s.list_id = l.id AND s.status = 'subscribed'
+             JOIN users u ON CAST(u.id AS TEXT) = s.account AND u.status = 'active'
              JOIN user_emails e ON e.user_id = u.id AND e.is_primary
-             LEFT JOIN course_categories cat ON l.kind = 'category' AND cat.id = l.subject_id
-             LEFT JOIN courses co ON l.kind = 'course' AND co.id = l.subject_id
-             LEFT JOIN tags t ON l.kind = 'tag' AND t.id = l.subject_id
-             WHERE NOT EXISTS (SELECT 1 FROM mailing_suppressions x WHERE x.email = LOWER(e.email))
-             ORDER BY s.user_id, lists.update_id, lists.sort, l.id",
+             LEFT JOIN course_categories cat ON l.kind = 'category' AND l.subject = CAST(cat.id AS TEXT)
+             LEFT JOIN courses co ON l.kind = 'course' AND l.subject = CAST(co.id AS TEXT)
+             LEFT JOIN tags t ON l.kind = 'tag' AND l.subject = CAST(t.id AS TEXT)
+             WHERE NOT EXISTS (SELECT 1 FROM cattophp_mailing_suppressions x WHERE x.email = LOWER(e.email))
+             ORDER BY CAST(s.account AS BIGINT), lists.update_id, lists.sort, l.id",
             ['ids' => '{' . implode(',', array_map('intval', $updateIds)) . '}']
         );
 
@@ -306,7 +312,7 @@ final class UpdateRepository
         $counts = ['instant' => 0, 'daily' => 0, 'weekly' => 0, 'monthly' => 0];
         foreach ($this->db->fetchAllAssociative(
             "SELECT CASE WHEN p.delivery = 'instant' THEN 'instant' ELSE COALESCE(p.frequency, 'weekly') END AS choice, COUNT(*) AS people
-             FROM (SELECT DISTINCT s.user_id FROM mailing_subscriptions s JOIN users u ON u.id = s.user_id AND u.status = 'active' WHERE s.status = 'subscribed') f
+             FROM (SELECT DISTINCT CAST(s.account AS BIGINT) AS user_id FROM cattophp_mailing_subscriptions s JOIN users u ON CAST(u.id AS TEXT) = s.account AND u.status = 'active' WHERE s.status = 'subscribed') f
              LEFT JOIN mailing_preferences p ON p.user_id = f.user_id GROUP BY 1"
         ) as $row) $counts[(string) $row['choice']] = (int) $row['people'];
 
@@ -329,8 +335,8 @@ final class UpdateRepository
     /** @return array{price:int,was:?int,currency:string,period:int}|null a published course's lowest active price */
     public function lowestPrice(int $courseId): ?array
     {
-        $row = $this->db->fetchAssociative("SELECT v.price_minor_units, v.was_price_minor_units, v.currency_code, v.access_period_seconds FROM course_price_variants v
-            JOIN courses c ON c.id = v.course_id AND c.status = 'published' WHERE v.course_id = :c AND v.is_active ORDER BY v.price_minor_units, v.position LIMIT 1", ['c' => $courseId]);
+        $row = $this->db->fetchAssociative("SELECT v.price_minor_units, v.was_price_minor_units, v.currency_code, v.access_period_seconds FROM course_prices_on_sale v
+            JOIN courses c ON c.id = v.course_id AND c.status = 'published' WHERE v.course_id = :c ORDER BY v.price_minor_units, v.position LIMIT 1", ['c' => $courseId]);
 
         return $row === false ? null : ['price' => (int) $row['price_minor_units'], 'was' => $row['was_price_minor_units'] === null ? null : (int) $row['was_price_minor_units'],
             'currency' => (string) $row['currency_code'], 'period' => (int) $row['access_period_seconds']];
@@ -348,14 +354,14 @@ final class UpdateRepository
     public function activitySince(int $afterId, int $limit): array
     {
         return array_map(static fn(array $r): array => ['id' => (int) $r['id'], 'event_key' => (string) $r['event_key'], 'metadata' => (array) (json_decode((string) $r['metadata'], true) ?: [])],
-            $this->db->fetchAllAssociative("SELECT id, event_key, metadata FROM audit_log WHERE id > :after AND event_key IN ('course.status_changed', 'course_item.placed', 'course_section.created',
+            $this->db->fetchAllAssociative("SELECT id, action AS event_key, details AS metadata FROM cattophp_activity WHERE id > :after AND action IN ('course.status_changed', 'course_item.placed', 'course_section.created',
                 'course.pricing_created', 'course.pricing_updated', 'course.pricing_deleted', 'course.pricing_default_changed', 'landing_page.published', 'promotion.created', 'promotion.updated')
                 ORDER BY id LIMIT :limit", ['after' => $afterId, 'limit' => $limit]));
     }
 
     public function lastActivityId(): int
     {
-        return (int) $this->db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM audit_log');
+        return (int) $this->db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM cattophp_activity');
     }
 
     /**

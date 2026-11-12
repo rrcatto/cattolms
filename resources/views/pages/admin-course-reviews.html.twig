@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_kicker = 'Administration' %}{% set ph_title = 'Course Reviews' %}{% set ph_lead = 'Learner ratings and reviews wait here until they are approved. Only approved reviews are published or counted in a course rating; an edited review keeps its approved version published until the edit is approved.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_kicker = 'Administration' %}{% set ph_title = 'Course Reviews' %}{% set ph_lead = 'Learner ratings and reviews wait here until they are approved. Only approved reviews are published or counted in a course rating; an edited review keeps its approved version published until the edit is approved.' %}{% include '@CattoPHP/page/head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Reviews', eyebrow: 'Course Reviews', summary: 'Reviews wait here until they are approved. Filter them by status, course and rating.'}) }}

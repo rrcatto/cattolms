@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = '/admin/reports/popularity' %}{% set ph_back_label = 'Course popularity' %}{% set ph_kicker = 'Course popularity' %}{% set ph_title = course.title %}{% set ph_lead = 'Rank ' ~ course.rank ~ ' with ' ~ course.score|number_format(1) ~ ' of 100 points, calculated ' ~ course.calculated_at|date('j M Y H:i') ~ ' for ' ~ course.window_start|date('j M Y') ~ ' to ' ~ course.window_end|date('j M Y') ~ '.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = '/admin/reports/popularity' %}{% set ph_back_label = 'Course popularity' %}{% set ph_kicker = 'Course popularity' %}{% set ph_title = course.title %}{% set ph_lead = 'Rank ' ~ course.rank ~ ' with ' ~ course.score|number_format(1) ~ ' of 100 points, calculated ' ~ course.calculated_at|date('j M Y H:i') ~ ' for ' ~ course.window_start|date('j M Y') ~ ' to ' ~ course.window_end|date('j M Y') ~ '.' %}{% include '@CattoPHP/page/head.html.twig' %}
 {% set p = run.parameters %}
 {% set w = p.weights %}
 <section class="cl-page-section">

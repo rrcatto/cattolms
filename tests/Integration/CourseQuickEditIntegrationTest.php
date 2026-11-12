@@ -147,7 +147,9 @@ final class CourseQuickEditIntegrationTest extends TestCase
         $form = $this->send('GET', '/admin/courses/' . $this->code . '/row?mode=edit&view=list');
         self::assertSame(200, $form->getStatusCode());
         $html = (string) $form->getContent();
-        self::assertStringStartsWith('<tr id="course-' . $this->code . '" class="cl-course-quick"', trim((string) preg_replace('/^\s*(<!--.*?-->\s*)*/s', '', $html)));
+        $row = trim((string) preg_replace('/^\s*(<!--.*?-->\s*)*/s', '', $html));
+        self::assertStringStartsWith('<tr id="course-' . $this->code . '" data-order-code="' . $this->code . '"', $row, 'The row alone, still in the list\'s drag order.');
+        self::assertMatchesRegularExpression('/^<tr [^>]*class="cl-course-quick"/', $row);
         self::assertStringNotContainsString('<html', $html, 'Only the row is sent.');
         foreach (['name="catalogue_position"', 'name="code"', 'name="title"', 'name="price"', 'name="was_price"', 'name="access_period_value"', 'name="category_id"', 'form="course-quick-' . $this->course . '"'] as $part) {
             self::assertStringContainsString($part, $html);

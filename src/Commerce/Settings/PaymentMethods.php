@@ -10,8 +10,8 @@ Version: 0.9.6
 Description:
 The payment methods a site offers (owner, 2026-10-19): Administration > Settings > Payment methods has
 one tick box per method, EFT and card (Stitch) for now, so more can be added later. A method can be
-ticked only when it is configured: card needs its keys in .env (STITCH_CLIENT_ID, STITCH_CLIENT_SECRET)
-and the Stitch connection, which is not built yet, so it cannot be ticked. The simulated card exists
+ticked only when it is configured: card needs Stitch's client ID and secret (Settings > Card payments
+(Stitch), over .env), and a live site Stitch's live ID (StitchPaymentGateway::problem()). The simulated card exists
 only on a demo site and is never offered on a live site, whatever is saved. Checkout offers only the
 ticked methods that work; the wallet is not one of them, it is always available to spend. Every change
 goes to the Activity log (settings.payment_methods_changed) with the old and new methods.
@@ -20,6 +20,9 @@ No payment method may ever collect card details on this site: card payment is al
 provider's own page. Checkout and receipts name the method and its provider (label(), receiptLabel()).
 
 Changelog:
+2026/11/11 SAST
+- Card payments through Stitch are built (StitchPaymentGateway, rrcatto/omnipay-stitch-express): card can be ticked once Stitch's
+  client ID and secret are set, which Settings > Card payments (Stitch) saves over .env.
 2026/10/19 SAST
 - Created.
 */
@@ -31,7 +34,6 @@ namespace CattoLearning\Commerce\Settings;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\Support\Env;
 use InvalidArgumentException;
 
 final class PaymentMethods
@@ -47,13 +49,11 @@ final class PaymentMethods
     /** What a site offers before anyone saves the setting: EFT, and the simulated card on a demo site. */
     private const DEFAULT = [self::EFT, self::SIMULATED];
 
-    /** The .env keys card payments need. */
-    public const CARD_KEYS = ['STITCH_CLIENT_ID', 'STITCH_CLIENT_SECRET'];
-
     public function __construct(
         private readonly SiteMode $site,
         private readonly ?OptionRepository $options = null,
         private readonly ?AuditRepository $audit = null,
+        private readonly ?\CattoLearning\Commerce\Infrastructure\Payment\StitchPaymentGateway $stitch = null,
     ) {}
 
     /** @return list<string> every method, in the order Settings and checkout show them */
@@ -166,17 +166,13 @@ final class PaymentMethods
         };
     }
 
+    /**
+     * Why card payments through Stitch cannot be offered: the client ID or secret not set (at Settings > Card payments
+     * (Stitch), over .env), or Stitch's test ID on a live site (owner, 2026-11-11).
+     */
     private function cardProblem(): ?string
     {
-        $missing = array_values(array_filter(self::CARD_KEYS, static fn(string $key): bool => trim(Env::string($key)) === ''));
-        if ($missing !== []) return 'Add ' . implode(' and ', $missing) . ' to .env first.';
-        if (!$this->cardConnected()) return 'Card payments through Stitch are not connected yet.';
-        return null;
-    }
-
-    /** Whether card payments through Stitch are built. Until they are, card cannot be ticked. */
-    private function cardConnected(): bool
-    {
-        return class_exists('CattoLearning\\Commerce\\Infrastructure\\Payment\\StitchPaymentGateway');
+        if ($this->stitch === null) return 'Card payments through Stitch are not set up in this installation.';
+        return $this->stitch->problem();
     }
 }

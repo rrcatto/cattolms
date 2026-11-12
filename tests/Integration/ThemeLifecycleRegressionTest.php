@@ -26,12 +26,17 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\ThemeRegistryRepository;
 use CattoLearning\Tests\Support\DevelopmentFixture;
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Activity\DbalActivityStore;
+use Symfony\Component\Clock\NativeClock;
+use CattoPHP\Theme\ThemeManager;
+use CattoLearning\View\OptionThemeChoice;
+use CattoLearning\View\ProjectTheme;
 use PHPUnit\Framework\TestCase;
 use ZipArchive;
 
@@ -58,28 +63,21 @@ final class ThemeLifecycleRegressionTest extends TestCase
         try {
             mkdir($instanceRoot, 0775, true);
             mkdir($publicRoot, 0775, true);
-            $manager = new ThemeManager(
-                dirname(__DIR__, 2),
-                $instanceRoot,
-                $publicRoot,
-                $container->get(OptionRepository::class),
-                $container->get(AuditRepository::class),
-                $container->get(ThemeRegistryRepository::class)
-            );
+            $manager = $this->manager($container, $instanceRoot, $publicRoot);
 
             $this->writeThemeZip($packageA, $name, $slug, '1.0.0', 'body{outline:1px solid red}');
             $staged = $manager->stageImport($packageA);
-            $key = $manager->importStaged((string) $staged['token'], $actorId);
+            $key = $manager->importStaged((string) $staged['token'], self::actor($actorId));
             self::assertSame($slug . '-v1.0.0', $key);
             self::assertFileExists($instanceRoot . '/themes/' . $key . '/public/css/theme.css');
             self::assertStringContainsString('red', (string) file_get_contents($instanceRoot . '/themes/' . $key . '/public/css/theme.css'));
 
-            $manager->delete($key, $actorId);
+            $manager->delete($key, self::actor($actorId));
             self::assertDirectoryDoesNotExist($instanceRoot . '/themes/' . $key);
 
             $this->writeThemeZip($packageB, $name, $slug, '1.0.0', 'body{outline:2px solid green}');
             $staged = $manager->stageImport($packageB);
-            $reinstalledKey = $manager->importStaged((string) $staged['token'], $actorId);
+            $reinstalledKey = $manager->importStaged((string) $staged['token'], self::actor($actorId));
             self::assertSame($key, $reinstalledKey);
             self::assertStringContainsString('green', (string) file_get_contents($instanceRoot . '/themes/' . $key . '/public/css/theme.css'));
 
@@ -110,14 +108,7 @@ final class ThemeLifecycleRegressionTest extends TestCase
         try {
             mkdir($instanceRoot . '/storage/tmp/theme-imports', 0775, true);
             chmod($instanceRoot . '/storage/tmp/theme-imports', 0555);
-            $manager = new ThemeManager(
-                dirname(__DIR__, 2),
-                $instanceRoot,
-                $instanceRoot,
-                $container->get(OptionRepository::class),
-                $container->get(AuditRepository::class),
-                $container->get(ThemeRegistryRepository::class)
-            );
+            $manager = $this->manager($container, $instanceRoot, $instanceRoot);
             $this->writeThemeZip($package, 'QA Unwritable ' . $suffix, 'qa-unwritable-' . $suffix, '1.0.0', 'body{color:red}');
             ob_start();
             try {
@@ -163,21 +154,14 @@ final class ThemeLifecycleRegressionTest extends TestCase
         try {
             mkdir($instanceRoot, 0775, true);
             mkdir($publicRoot, 0775, true);
-            $manager = new ThemeManager(
-                dirname(__DIR__, 2),
-                $instanceRoot,
-                $publicRoot,
-                $options,
-                $container->get(AuditRepository::class),
-                $container->get(ThemeRegistryRepository::class)
-            );
+            $manager = $this->manager($container, $instanceRoot, $publicRoot);
 
             $this->writeThemeZip($parentZip, $parentName, $parentSlug, '1.0.0', 'body{background:#111}');
             $parentInspection = $manager->stageImport($parentZip);
             self::assertSame('install', $parentInspection['install_action']);
             self::assertFalse((bool) $parentInspection['summary']['child']);
-            $parentKey = $manager->importStaged((string) $parentInspection['token'], $actorId);
-            $manager->activate($parentKey, $actorId);
+            $parentKey = $manager->importStaged((string) $parentInspection['token'], self::actor($actorId));
+            $manager->activate($parentKey, self::actor($actorId));
             self::assertSame($parentKey, $manager->activeTheme());
             self::assertFileExists($publicRoot . '/themes/' . $parentKey . '/css/theme.css');
 
@@ -193,8 +177,8 @@ final class ThemeLifecycleRegressionTest extends TestCase
             $childInspection = $manager->stageImport($childZip);
             self::assertTrue((bool) $childInspection['summary']['child']);
             self::assertSame($parentName, $childInspection['summary']['parent_name']);
-            $childKey = $manager->importStaged((string) $childInspection['token'], $actorId);
-            $manager->activate($childKey, $actorId);
+            $childKey = $manager->importStaged((string) $childInspection['token'], self::actor($actorId));
+            $manager->activate($childKey, self::actor($actorId));
             self::assertSame($childKey, $manager->activeTheme());
 
             $registry = $container->get(ThemeRegistryRepository::class)->byInstallKey();
@@ -202,13 +186,13 @@ final class ThemeLifecycleRegressionTest extends TestCase
             self::assertArrayHasKey($childKey, $registry);
             self::assertSame((int) $registry[$parentKey]['id'], (int) $registry[$childKey]['parent_theme_id']);
 
-            $manager->activate($parentKey, $actorId);
-            $manager->delete($childKey, $actorId);
+            $manager->activate($parentKey, self::actor($actorId));
+            $manager->delete($childKey, self::actor($actorId));
             self::assertDirectoryDoesNotExist($instanceRoot . '/themes/' . $childKey);
             self::assertDirectoryDoesNotExist($publicRoot . '/themes/' . $childKey);
 
             $options->set('active_theme', $originalActive, $actorId);
-            $manager->delete($parentKey, $actorId);
+            $manager->delete($parentKey, self::actor($actorId));
             self::assertDirectoryDoesNotExist($instanceRoot . '/themes/' . $parentKey);
 
             $this->writeBrokenThemeZip($brokenZip, 'QA Broken ' . $suffix, 'qa-broken-' . $suffix);
@@ -252,11 +236,11 @@ final class ThemeLifecycleRegressionTest extends TestCase
         try {
             mkdir($instanceRoot, 0775, true);
             mkdir($publicRoot, 0775, true);
-            $manager = new ThemeManager(dirname(__DIR__, 2), $instanceRoot, $publicRoot, $options, $container->get(AuditRepository::class), $container->get(ThemeRegistryRepository::class));
+            $manager = $this->manager($container, $instanceRoot, $publicRoot);
             $this->writeThemeZip($parentZip, $parentName, 'qa-gone-parent-' . $suffix, '1.0.0', 'body{background:#222}');
-            $parentKey = $manager->importStaged((string) $manager->stageImport($parentZip)['token'], $actorId);
+            $parentKey = $manager->importStaged((string) $manager->stageImport($parentZip)['token'], self::actor($actorId));
             $this->writeThemeZip($childZip, 'QA Orphan ' . $suffix, 'qa-orphan-' . $suffix, '1.0.0', '.qa-orphan{color:red}', ['name' => $parentName, 'version' => '1.0.0'], false);
-            $childKey = $manager->importStaged((string) $manager->stageImport($childZip)['token'], $actorId);
+            $childKey = $manager->importStaged((string) $manager->stageImport($childZip)['token'], self::actor($actorId));
 
             // The parent leaves without its child, as a theme taken out of the code does.
             $this->removeDirectory($instanceRoot . '/themes/' . $parentKey);
@@ -265,11 +249,11 @@ final class ThemeLifecycleRegressionTest extends TestCase
             self::assertSame('', $listed[$childKey]['parent_key'], 'Its parent is missing.');
             self::assertDirectoryExists($publicRoot . '/themes/' . $childKey);
 
-            $manager->delete($childKey, $actorId);
+            $manager->delete($childKey, self::actor($actorId));
             self::assertDirectoryDoesNotExist($instanceRoot . '/themes/' . $childKey);
             self::assertDirectoryDoesNotExist($publicRoot . '/themes/' . $childKey);
             self::assertArrayNotHasKey($childKey, array_column($manager->themes(), null, 'key'));
-            $row = $container->get(Database::class)->fetchAssociative("SELECT user_id FROM audit_log WHERE event_key = 'theme.uninstalled' AND metadata->>'key' = :key ORDER BY id DESC LIMIT 1", ['key' => $childKey]);
+            $row = $container->get(Database::class)->fetchAssociative("SELECT account_person(actor_id) AS user_id FROM cattophp_activity WHERE action = 'theme.uninstalled' AND details->>'key' = :key ORDER BY id DESC LIMIT 1", ['key' => $childKey]);
             self::assertIsArray($row, 'The uninstall is in the audit log.');
             self::assertSame($actorId, (int) $row['user_id']);
         } finally {
@@ -280,6 +264,27 @@ final class ThemeLifecycleRegressionTest extends TestCase
             $this->removeDirectory($instanceRoot);
             $this->removeDirectory($publicRoot);
         }
+    }
+
+    /** CattoPHP's theme manager with cattolms's own terms, over throwaway folders. */
+    private function manager(\Psr\Container\ContainerInterface $container, string $instanceRoot, string $publicRoot): ThemeManager
+    {
+        return new ThemeManager(
+            dirname(__DIR__, 2) . '/themes',
+            $instanceRoot . '/themes',
+            $instanceRoot . '/storage/tmp/theme-imports',
+            $publicRoot,
+            ProjectTheme::DEFAULT_SLUG,
+            new OptionThemeChoice($container->get(OptionRepository::class)),
+            new ActivityLog(new DbalActivityStore($container->get('doctrine.dbal.default_connection')), new NativeClock()),
+            $container->get(ThemeRegistryRepository::class),
+            ProjectTheme::validator(),
+        );
+    }
+
+    private static function actor(int $userId): Actor
+    {
+        return new Actor((string) $userId, (string) $userId);
     }
 
     /** @param array{name:string,version:string}|null $parent */

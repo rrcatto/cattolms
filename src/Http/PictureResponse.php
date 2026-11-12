@@ -17,7 +17,7 @@ Changelog:
 2026/10/26 SAST
 - Created with the drawn avatars.
 2026/11/06 SAST
-- A public picture (a course's or bundle's share picture, Search\SharePictures) may be cached by anyone.
+- A public picture (a course's or bundle's share picture, CattoPHP\Search\SharePictures) may be cached by anyone.
 2026/11/07 SAST
 - The session's "no-store" headers are taken off: sent beside the picture's own, they kept every picture from being
   cached at all (found with the course covers on a bundle's card).

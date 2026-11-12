@@ -150,7 +150,7 @@ final class BillingProfileIntegrationTest extends TestCase
         self::assertSame('Billing Co (Pty) Ltd', $this->billing->forCompany($companyId)?->name);
         self::assertSame('Admin Personally', $this->billing->forUser($adminId)?->name, 'The two profiles are independent.');
         self::assertNull($this->billing->forCompany($companyId)?->organisationName, 'A company has no separate organisation name.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key='company.billing_updated' AND metadata->>'company_id'=:c", ['c' => (string) $companyId]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action='company.billing_updated' AND details->>'company_id'=:c", ['c' => (string) $companyId]));
 
         try {
             $this->billing->saveForCompany($learner, $companyId, BillingFixture::company('Learner Takeover'));
@@ -228,8 +228,10 @@ final class BillingProfileIntegrationTest extends TestCase
         $this->db->executeStatement('DELETE FROM companies WHERE id=:id', ['id' => $companyId]);
         self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM company_billing_profiles WHERE company_id=:id', ['id' => $companyId]), 'A company’s profile goes with it.');
 
-        $grants = $this->db->fetchFirstColumn("SELECT r.role_key FROM role_permissions rp JOIN roles r ON r.id=rp.role_id JOIN permissions p ON p.id=rp.permission_id WHERE p.permission_key='COMPANY.BILLING.MANAGE' ORDER BY 1");
-        self::assertSame(['ADMIN', 'COMPANY_ADMIN'], $grants, 'COMPANY.BILLING.MANAGE belongs to company administrators, not learners.');
+        // The Administrator holds every permission without a row; of the other roles only the company's administrator holds it.
+        $grants = $this->db->fetchFirstColumn("SELECT role_key FROM cattophp_role_permissions WHERE permission = 'COMPANY.BILLING.MANAGE' ORDER BY 1");
+        self::assertSame(['COMPANY_ADMIN'], $grants, 'COMPANY.BILLING.MANAGE belongs to company administrators, not learners.');
+        self::assertTrue(IntegrationContainer::get()->get(\CattoPHP\Access\Roles::class)->get('ADMIN')->isAdministrator());
     }
 
     /** @param array<string,mixed> $params */
@@ -287,6 +289,6 @@ final class BillingProfileIntegrationTest extends TestCase
 
     private function auditCount(string $event, int $userId): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM audit_log WHERE event_key=:e AND user_id=:u', ['e' => $event, 'u' => $userId]);
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_activity WHERE action=:e AND actor_id = CAST(:u AS TEXT)', ['e' => $event, 'u' => $userId]);
     }
 }

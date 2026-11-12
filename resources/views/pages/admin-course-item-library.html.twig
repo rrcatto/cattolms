@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_kicker = 'Administration' %}{% set ph_title = 'Course Item Library' %}{% set ph_lead = 'Edit Course Items, which can be shared by several courses, and see where each is placed. Items without placements remain available under Not currently in use.' %}{% set ph_actions %}{{ ui('action.link', {label: 'Create item', variant: 'primary', href: '/admin/course-items/new', icon: 'action-add'}) }}{% endset %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_kicker = 'Administration' %}{% set ph_title = 'Course Item Library' %}{% set ph_lead = 'Edit Course Items, which can be shared by several courses, and see where each is placed. Items without placements remain available under Not currently in use.' %}{% set ph_actions %}{{ ui('action.link', {label: 'Create item', variant: 'primary', href: '/admin/course-items/new', icon: 'action-add'}) }}{% endset %}{% include '@CattoPHP/page/head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Find a course item', eyebrow: 'Course Item Library', summary: 'Search by title or key, or show one type.'}) }}

@@ -71,7 +71,7 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
             $newcomer = (int) $db->fetchOne('SELECT user_id FROM user_emails WHERE email = :email', ['email' => $email]);
             $fixture->rememberUser($newcomer);
             self::assertTrue($consents->isSubscribed($newcomer, 'course', $course['id']), 'Following once the account is made.');
-            self::assertSame('follow_button', $db->fetchOne("SELECT s.source FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id WHERE l.kind = 'course' AND l.subject_id = :c AND s.user_id = :u", ['c' => $course['id'], 'u' => $newcomer]));
+            self::assertSame('follow_button', $db->fetchOne("SELECT s.source FROM cattophp_mailing_subscriptions s JOIN cattophp_mailing_lists l ON l.id = s.list_id WHERE l.kind = 'course' AND l.subject = CAST(:c AS TEXT) AND s.account = CAST(:u AS TEXT)", ['c' => $course['id'], 'u' => $newcomer]));
             unset($_COOKIE['catto_learning_session']);
 
             // Signing in: the follow travels in the sign-in link.
@@ -97,7 +97,7 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
         } finally {
             if ($savedAddress === null) unset($_SERVER['REMOTE_ADDR']); else $_SERVER['REMOTE_ADDR'] = $savedAddress;
             unset($_COOKIE['catto_learning_session']);
-            $db->executeStatement("DELETE FROM mailing_lists WHERE kind = 'course' AND subject_id IN (:a, :b)", ['a' => $course['id'], 'b' => $draft['id']]);
+            $db->executeStatement("DELETE FROM cattophp_mailing_lists WHERE kind = 'course' AND subject IN (CAST(:a AS TEXT), CAST(:b AS TEXT))", ['a' => $course['id'], 'b' => $draft['id']]);
             $fixture->cleanup();
         }
     }
@@ -140,11 +140,11 @@ final class FollowBeforeSignInIntegrationTest extends TestCase
             if ($savedAddress === null) unset($_SERVER['REMOTE_ADDR']); else $_SERVER['REMOTE_ADDR'] = $savedAddress;
             unset($_COOKIE['catto_learning_session']);
             foreach ($made as $kind => $record) {
-                $db->executeStatement('DELETE FROM mailing_lists WHERE kind = :kind AND subject_id = :id', ['kind' => $kind, 'id' => $record['id']]);
+                $db->executeStatement('DELETE FROM cattophp_mailing_lists WHERE kind = :kind AND subject = CAST(:id AS TEXT)', ['kind' => $kind, 'id' => $record['id']]);
             }
             if (isset($made['category'])) $courses->deleteCategory((int) $made['category']['id'], null, $person['id']);
             if (isset($made['tag'])) $courses->deleteTag((int) $made['tag']['id'], $person['id']);
-            $db->executeStatement("DELETE FROM audit_log WHERE user_id = :id AND event_key LIKE 'course%'", ['id' => $person['id']]);
+            $db->executeStatement("DELETE FROM cattophp_activity WHERE actor_id = CAST(:id AS TEXT) AND action LIKE 'course%'", ['id' => $person['id']]);
             $fixture->cleanup();
         }
     }

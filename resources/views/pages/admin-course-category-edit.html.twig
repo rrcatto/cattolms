@@ -1,13 +1,13 @@
 {% extends layout %}
 {% block page_body %}
 	{# Stimulus, for the search previews (search_preview_controller.js). #}
-	{{ importmap() }}
+	{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set ph_back_href = tree_href %}
 	{% set ph_back_label = 'Course categories' %}
 	{% set ph_kicker = 'Course metadata' %}
 	{% set ph_title = category.name %}
 	{% set ph_lead = (category.course_count)~' course'~(category.course_count==1 ? '' : 's')~' currently use this category.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}

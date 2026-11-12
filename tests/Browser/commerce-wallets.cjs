@@ -98,8 +98,8 @@ async function buyWithWalletAndEft(page, fixture) {
     await page.locator('#payment-method').selectOption('eft');
     await submit(page, page.getByRole('button', {name: 'Review my order'}));
     const review = await text(page);
-    assert.match(review, new RegExp(`Paid from your wallet ${rand(20000)}`), 'the review shows the wallet part');
-    assert.match(review, new RegExp(`To pay ${rand(10000)}`), 'and what is left to pay');
+    assert.match(review, new RegExp(`Paid from your wallet −${rand(20000)}`), 'the review shows the wallet part');
+    assert.match(review, new RegExp(`To pay now ${rand(10000)}`), 'and what is left to pay');
     const place = page.getByRole('button', {name: 'Place my order'});
     await page.locator('input[name=accept_terms]').check();
     await place.click();
@@ -399,6 +399,8 @@ async function buyWithWalletAndEft(page, fixture) {
         for (const key of themes) {
             for (const width of widths) {
                 for (const [token, pages] of [[sample?.learner.token, learnerPages], [fixture.admin_token, adminPages]]) {
+                    // Without the sample order an earlier step failed: that failure is reported, not a crash here.
+                    if (!token) continue;
                     const {ctx, page} = await open(chromium, token, {width});
                     for (const route of pages) {
                         await check(`${key} ${width} ${route}`, async () => {

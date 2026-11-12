@@ -68,7 +68,7 @@ final class CanonicalCatalogueImportIntegrationTest extends TestCase
         $this->package = IntegrationContainer::get()->get(CataloguePackage::class);
         $this->courses = IntegrationContainer::get()->get(CourseRepository::class);
         $this->service = IntegrationContainer::get()->get(CourseService::class);
-        $roles = new RoleRepository($this->db);
+        $roles = IntegrationContainer::get()->get(RoleRepository::class);
         $this->admin = $roles->firstUserWithRole('ADMIN') ?? (function () use ($roles): int {
             $id = $this->fixture->createUser('Canonical import administrator');
             $roles->assign($id, 'ADMIN');
@@ -312,6 +312,27 @@ final class CanonicalCatalogueImportIntegrationTest extends TestCase
         $this->package->apply($kept['key'], ['keep_bundles' => [$code => ['price']]], $this->admin);
         $last = $records->findByCode($code);
         self::assertSame(['Canonical bundle ' . $this->suffix, 130000], [$last['title'], (int) $last['price_minor_units']]);
+    }
+
+    /** A bundle with one course comes in as the site keeps one: a draft may have it, only publishing needs two. */
+    public function testABundleWithOneCourseComesInAsADraftAndSaysWhy(): void
+    {
+        [$a, , , $catalogue, $courses] = $this->pairOnTheSite();
+        $code = 'BDL-O' . $this->tail;
+        $catalogue['bundles'] = [$this->bundleEntry($code, [$a])];
+        $zip = $this->zip($catalogue, $courses, []);
+        $plan = $this->package->plan($this->package->stageFile($zip, 'catalogue.zip', $this->admin));
+        self::assertSame('new', $plan['bundles'][0]['action'] ?? null, 'Reviewed as a new bundle, not refused.');
+        $report = $this->package->apply($plan['key'], ['prices' => true, 'publish' => true], $this->admin);
+        self::assertSame('imported', $report['bundles'][0]['outcome'] ?? null);
+        self::assertContains('Left as a draft: a published bundle needs at least two courses', $report['bundles'][0]['details'] ?? []);
+        $bundle = IntegrationContainer::get()->get(BundleRepository::class)->findByCode($code);
+        self::assertSame('draft', $bundle['status'] ?? null);
+
+        // Exported as the draft it is, it comes back with nothing to change.
+        $catalogue['bundles'] = [['status' => 'draft'] + $this->bundleEntry($code, [$a])];
+        $again = $this->package->plan($this->package->stageFile($this->zip($catalogue, $courses, []), 'catalogue.zip', $this->admin));
+        self::assertSame('unchanged', $again['bundles'][0]['action'] ?? null, implode(' | ', $again['bundles'][0]['changes'] ?? []));
     }
 
     public function testTheReviewOffersEachDifferenceAsTwoFeatureCardsAndTheFormDoesWhatWasChosen(): void

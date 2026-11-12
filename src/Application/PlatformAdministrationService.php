@@ -11,6 +11,12 @@ Description:
 Implements Catto Learning business and application logic for platform administration operations.
 
 Changelog:
+2026/11/12 SAST
+- Connect to Telegram bot acts through CattoPHP's TelegramSetup (CattoPHP Phase 4, step 4), the same words and ticks.
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): its Settings section, saved with what it was before in the activity log.
+2026/11/09 SAST
+- The platform name is saved in CattoPHP's settings (CattoPHP Phase 2, step 3).
 2026/11/09 SAST
 - The Site Owner's view carries the site logo's address, for its upload on Settings > Site Owner.
 - The Settings view carries the sections' order (SettingsOrder).
@@ -140,9 +146,10 @@ use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
-use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
+use CattoPHP\Ui\Pager;
+use CattoLearning\Http\Controller\CourseController;
 use CattoLearning\Support\PersonName;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Money;
@@ -470,11 +477,10 @@ final class PlatformAdministrationService
         private readonly RoleRepository $roles,
         private readonly CompanyRepository $companies,
         private readonly CourseRepository $courses,
-        private readonly OptionRepository $options,
         private readonly RuntimeSettings $settings,
         private readonly AuditRepository $audit,
         private readonly MailerInterface $mailer,
-        private readonly GeoIpLocator $geoIp,
+        private readonly \CattoPHP\Network\GeoIp $geoIp,
         private readonly EntityLookupRepository $lookups,
         private readonly AuthSessionRepository $sessions,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
@@ -482,12 +488,13 @@ final class PlatformAdministrationService
         private readonly ?\CattoLearning\Company\CompanyService $companyRule = null,
         private readonly ?\CattoLearning\Auth\IdNumbers $idNumbers = null,
         private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSetup $ownerMessages = null,
+        private readonly ?\CattoPHP\Telegram\TelegramSetup $ownerMessages = null,
         private readonly ?\CattoLearning\Search\SearchEnginesAdministration $searchEngines = null,
         private readonly ?\CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys = null,
         private readonly ?\CattoLearning\Configuration\SiteLogo $siteLogo = null,
         private readonly ?\CattoLearning\Configuration\SettingsOrder $settingsOrder = null,
-        private readonly ?\CattoLearning\Configuration\SitePicture $sitePicture = null
+        private readonly ?\CattoLearning\Configuration\SitePicture $sitePicture = null,
+        private readonly ?\CattoLearning\Configuration\FooterSocial $footerSocial = null
     ) {
     }
 
@@ -1070,59 +1077,10 @@ final class PlatformAdministrationService
         ?string $sizeParam = null,
         ?array $sizes = null
     ): array {
-        $pageParam ??= $dataset . '_page';
-        $sizeParam ??= $dataset . '_page_size';
-
-        $filters = array_filter(
-            $filters,
-            static fn(mixed $value): bool => $value !== '' && $value !== 0 && $value !== null
-        );
-
-        $href = fn(int $page): string => self::pageHref($base, $filters, $pageParam, $sizeParam, $page, $pagination->pageSize);
-
-        $pages = [];
-        foreach ($pagination->window() as $item) {
-            $pages[] = $item + ['href' => $item['is_gap'] ? '' : $href($item['page'])];
-        }
-        // A list's own sizes when it has them (a grid's whole rows, ListView), else the catalogue's one size or the tables'.
-        $sizes ??= $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES;
-
-        return $pagination->toArray() + [
-            'prefix' => $dataset,
-            'page_param' => $pageParam,
-            'size_param' => $sizeParam,
-            'base' => $base,
-            'label' => $label,
-            'page_sizes' => $sizes,
-            // The rows drop-down stays wherever another size would page the list differently, a list that fits on one
-            // page included (owner, 2026-10-21: after choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way
-            // to change the rows per page back down"; Companies, 40-odd rows at 50, never showed it at all).
-            'has_sizes' => count($sizes) > 1 && $pagination->total > min($sizes),
-            'filters' => $filters,
-            'query' => $filters === [] ? '' : http_build_query($filters) . '&',
-            'region' => $dataset . '-region',
-            'results' => $dataset . '-results',
-            'pages' => $pages,
-            'first_href' => $href($pagination->firstPage),
-            'previous_href' => $href(max(1, $pagination->page - 1)),
-            'next_href' => $href(min($pagination->totalPages, $pagination->page + 1)),
-            'last_href' => $href($pagination->lastPage),
-        ];
+        // CattoPHP's pager (CattoPHP Phase 3, step 4), with the catalogue's one page size of 24 offering no other.
+        return Pager::payload($pagination, $dataset, $base, $label, $filters, $pageParam, $sizeParam, $sizes ?? ($pagination->pageSize === CourseController::CATALOGUE_PAGE ? [CourseController::CATALOGUE_PAGE] : null));
     }
 
-    /**
-     * One page's URL: the list's own route, its current filters, its page and its page size.
-     *
-     * The page size travels on every link because it is dataset state like any other. Leaving it
-     * off meant a reader who chose 250 rows dropped back to the dataset default the moment they
-     * moved off page 1, which reads as the setting not having been applied.
-     *
-     * @param array<string,mixed> $filters
-     */
-    private static function pageHref(string $base, array $filters, string $pageParam, string $sizeParam, int $page, int $pageSize): string
-    {
-        return $base . '?' . http_build_query($filters + [$pageParam => $page, $sizeParam => $pageSize]);
-    }
 
     /**
      * Fetches one bounded preview page for a consolidated workspace section.
@@ -1264,6 +1222,17 @@ final class PlatformAdministrationService
             : self::withPrices(self::trimTimestamps($this->courses->manageableCourses($actorUserId, $limit, $offset, $search, $sort)));
     }
 
+    /** The code of the course just before this one in the whole catalogue order, or '' for the first. */
+    private function courseBeforeInCatalogue(string $code): string
+    {
+        $previous = '';
+        foreach ($this->courses->catalogueExportRows() as $row) {
+            if ($row['code'] === $code) return $previous;
+            $previous = $row['code'];
+        }
+        return '';
+    }
+
     /**
      * Each course's price as it is sold now (owner, 2026-10-20: "I need to know what I'm charging"): its
      * active default price, the was price it is marked down from and its access period; no price when
@@ -1275,12 +1244,14 @@ final class PlatformAdministrationService
     private static function withPrices(array $courses): array
     {
         foreach ($courses as &$course) {
-            $minor = $course['default_price_minor_units'] ?? null;
-            $currency = (string) ($course['default_currency_code'] ?? Money::platformCurrency());
+            // What it is sold at today (owner, 2026-11-11: dated prices): blank when no price is on sale.
+            $minor = $course['current_price_minor_units'] ?? null;
+            $currency = (string) ($course['current_currency_code'] ?? Money::platformCurrency());
             $course['price'] = $minor === null ? null : [
                 'price_label' => (int) $minor === 0 ? 'Free' : Money::strictMinorUnits((int) $minor, $currency)->format(),
-                'period_label' => AccessPeriod::label((int) $course['default_price_access_period_seconds']),
-            ] + WasPrice::labels((int) $minor, $course['default_was_price_minor_units'] ?? null, $currency);
+                'period_label' => AccessPeriod::label((int) $course['current_price_access_period_seconds']),
+            ] + WasPrice::labels((int) $minor, $course['current_was_price_minor_units'] ?? null, $currency);
+            $course['not_on_sale'] = $minor === null && (string) ($course['status'] ?? '') === 'published';
         }
         unset($course);
         return $courses;
@@ -1373,16 +1344,20 @@ final class PlatformAdministrationService
                 $sort = $this->sortFor('courses', $activityFilters, array_keys(CourseRepository::ADMIN_COURSE_SORTS), 'position', SortOrder::ASCENDING);
                 $searchFilter = self::withSearch($scope, 'courses', $search);
                 $pagination = $this->paginationFor('courses', $activityFilters, $this->adminCoursesTotal($actorUserId, $viewAll, $search));
-                // Courses are dragged into place only in that order, unsearched, by someone who sees every course: the
-                // whole order is then on screen a page at a time, and the course before this page anchors its first row.
-                $arrange = $viewAll && $search === '' && $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING;
+                // Courses are dragged into place in that order by someone who sees every course, searched or not (owner,
+                // 2026-11-11: "searching for courses throws away the ability to drag and drop the courses"). A course dropped
+                // goes straight after the row above it in the whole catalogue, and one dropped first on the page straight
+                // after the course before the page's first row there: among the courses a search shows, just before them.
+                $arrange = $viewAll && $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING;
+                $page = $this->adminCoursePage($actorUserId, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort);
                 return [
-                    'courses' => $this->adminCoursePage($actorUserId, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort),
+                    'courses' => $page,
                     'courses_search' => $search,
                     'courses_can_arrange' => $arrange,
+                    // Renumber, beside the drag (owner, 2026-11-12), for whoever may change Settings' bands.
+                    'courses_can_renumber' => $arrange && !empty($capabilities['renumber_courses']),
                     // By its code, which the drag sends as the course its first row goes after.
-                    'courses_before_page' => $arrange && $pagination->offset > 0
-                        ? (string) ($this->adminCoursePage($actorUserId, $viewAll, 1, $pagination->offset - 1, '', $sort)[0]['code'] ?? '') : '',
+                    'courses_before_page' => $arrange && $page !== [] ? $this->courseBeforeInCatalogue((string) $page[0]['code']) : '',
                 ]
                     + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'), self::listSizes('courses', $activityFilters))
                     + self::viewData('courses', $activityFilters, '/admin/courses', $searchFilter + $sort->toPrefixedArray('courses'))
@@ -1641,6 +1616,8 @@ final class PlatformAdministrationService
                     'platform_name_source' => $this->settings->platformNameSource(),
                     'mail_settings' => $this->settings->mailAdminView(),
                     'site_notification' => $this->siteNotification?->settingsView(),
+                    // Settings > Footer social media (owner, 2026-11-09). Not footer_social: that is the footer's own marks on every page.
+                    'social_profiles' => $this->footerSocial?->settingsView(),
                     'owner_messages' => $this->ownerMessages?->view(),
                     // Settings > Search engines and AI (owner, 2026-11-06).
                     'search_engines' => $this->searchEngines?->view(),
@@ -2800,11 +2777,8 @@ final class PlatformAdministrationService
         // A blank name is refused, not skipped while the page says saved; and the .env name itself is no override, so a
         // later .env change still shows (2026-10-26 audit: saving unchanged made one).
         if ($platformName === '') throw new InvalidArgumentException('Enter the platform name.');
-        if ($platformName === Env::string('APP_NAME', 'Catto Learning')) {
-            if ($this->settings->platformNameSource() === 'database') $this->settings->resetPlatformName();
-        } else {
-            $this->options->set('platform_name', $platformName, $actorUserId);
-        }
+        // CattoPHP's settings keep it, and a name equal to what .env gives is no override.
+        $this->settings->savePlatformName($platformName, $actorUserId);
         $this->audit->record($actorUserId, 'platform.settings_updated');
     }
 
@@ -2863,6 +2837,21 @@ final class PlatformAdministrationService
         });
     }
 
+    /**
+     * Settings > Footer social media (owner, 2026-11-09): the site's own profiles, all kept or none.
+     *
+     * @param array<array-key,mixed> $input platform => the address typed
+     */
+    public function saveFooterSocial(array $input, int $actorUserId): void
+    {
+        $profiles = $this->footerSocial ?? throw new InvalidArgumentException('The footer social media cannot be changed here.');
+        $this->transactions->run(function () use ($profiles, $input, $actorUserId): void {
+            $before = $profiles->saved();
+            $profiles->save($input, $actorUserId);
+            if ($before !== $profiles->saved()) $this->audit->record($actorUserId, 'platform.footer_social_changed', ['old' => $before, 'new' => $profiles->saved()]);
+        });
+    }
+
     /** @param array<string,mixed> $input */
     public function saveSiteNotification(array $input, int $actorUserId): void
     {
@@ -2880,28 +2869,29 @@ final class PlatformAdministrationService
      */
     public function connectOwnerTelegram(array $input, int $actorUserId): bool
     {
-        $setup = $this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.');
-        $done = $setup->connect($input, $actorUserId);
+        $setup = $this->ownerMessages ?? throw new InvalidArgumentException('The Telegram bot cannot be connected here.');
+        $done = $setup->connect($input, new \CattoPHP\Activity\Actor((string) $actorUserId, (string) $actorUserId));
         $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['key_changed' => $done['key_changed'], 'connected' => $done['connected']]);
 
         return $done['connected'];
     }
 
-    /** The ticks of Messages to you; $signIn, when given, is Login via Telegram (owner, 2026-11-05), and $onOrder New Order (owner, 2026-11-06). */
+    /** The ticks of Connect to Telegram bot; $signIn, when given, is Login via Telegram (owner, 2026-11-05), and $onOrder New Order (owner, 2026-11-06). */
     public function saveOwnerMessageChoices(bool $onRegister, bool $onSale, int $actorUserId, ?bool $signIn = null, ?bool $onOrder = null): void
     {
-        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->saveChoices($onRegister, $onSale, $actorUserId, $signIn, $onOrder);
+        ($this->ownerMessages ?? throw new InvalidArgumentException('The Telegram bot cannot be connected here.'))
+            ->saveChoices(['on_register' => $onRegister, 'on_sale' => $onSale] + ($onOrder === null ? [] : ['on_order' => $onOrder]), $signIn, new \CattoPHP\Activity\Actor((string) $actorUserId, (string) $actorUserId));
         $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['on_register' => $onRegister, 'on_sale' => $onSale] + ($onOrder === null ? [] : ['on_order' => $onOrder]) + ($signIn === null ? [] : ['telegram_sign_in' => $signIn]));
     }
 
     public function sendOwnerTestMessage(): void
     {
-        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->sendTest();
+        ($this->ownerMessages ?? throw new InvalidArgumentException('The Telegram bot cannot be connected here.'))->sendTest();
     }
 
     public function disconnectOwnerMessages(int $actorUserId): void
     {
-        ($this->ownerMessages ?? throw new InvalidArgumentException('Messages to you cannot be changed here.'))->disconnect($actorUserId);
+        ($this->ownerMessages ?? throw new InvalidArgumentException('The Telegram bot cannot be connected here.'))->disconnect(new \CattoPHP\Activity\Actor((string) $actorUserId, (string) $actorUserId));
         $this->audit->record($actorUserId, 'platform.owner_messages_changed', ['disconnected' => true]);
     }
 
@@ -3043,7 +3033,7 @@ final class PlatformAdministrationService
     public function requestCourse(int $userId, int $courseId, int $accessPeriodSeconds, string $note): int
     {
         $allowedPeriod = false;
-        foreach ($this->courses->priceVariants($courseId, true) as $variant) {
+        foreach ($this->courses->priceVariantsOnSale($courseId) as $variant) {
             if ((int) ($variant['access_period_seconds'] ?? 0) === $accessPeriodSeconds) {
                 $allowedPeriod = true;
                 break;
@@ -3092,7 +3082,7 @@ final class PlatformAdministrationService
         $allowed = array_flip($this->normalAssignableRoleKeys());
         return array_values(array_filter(
             $this->roles->all(),
-            static fn(array $role): bool => isset($allowed[(string) ($role['role_key'] ?? '')])
+            static fn(array $role): bool => isset($allowed[$role['role_key']])
         ));
     }
 
@@ -3340,7 +3330,7 @@ final class PlatformAdministrationService
             $row['source_label'] = str_starts_with($key, 'mcp.') ? 'MCP' : (str_starts_with($key, 'api.') ? 'API' : 'Web');
             $ipAddress = trim((string) ($row['ip_address'] ?? ''));
             $row['ip_address'] = $ipAddress;
-            $row['geo_location'] = $ipAddress !== '' ? $this->geoIp->locate($ipAddress) : '—';
+            $row['geo_location'] = $ipAddress !== '' ? $this->geoIp->place($ipAddress) : '—';
             $row['related_links'] = $this->activityRelatedLinks($metadata);
         }
         unset($row);

@@ -28,7 +28,7 @@ declare(strict_types=1);
 namespace CattoLearning\Course\Certificate;
 
 use CattoLearning\Course\CourseItemRepository;
-use CattoLearning\Identity\IdentityVerificationRepository;
+use CattoPHP\Identity\IdentityChecks;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use InvalidArgumentException;
 use Throwable;
@@ -42,7 +42,7 @@ final class CertificateAwards
         private readonly CertificateRepository $certificates,
         private readonly CertificateIssuer $issuer,
         private readonly CourseItemRepository $items,
-        private readonly IdentityVerificationRepository $identities,
+        private readonly IdentityChecks $identities,
         private readonly AuditRepository $audit,
     ) {}
 
@@ -64,7 +64,7 @@ final class CertificateAwards
      */
     public function afterGradedAttempt(int $enrolmentId, int $userId): void
     {
-        if (!$this->earned($enrolmentId) || $this->identities->approved($userId) === null) return;
+        if (!$this->earned($enrolmentId) || $this->identities->approved((string) $userId) === null) return;
         $this->issuer->issue($enrolmentId);
     }
 
@@ -77,7 +77,7 @@ final class CertificateAwards
      */
     public function issueWaiting(int $userId): int
     {
-        if ($this->identities->approved($userId) === null) return 0;
+        if ($this->identities->approved((string) $userId) === null) return 0;
         $issued = 0;
         foreach ($this->certificates->earnedWithoutCertificate($userId) as $enrolmentId) {
             if (!$this->earned($enrolmentId)) continue;
@@ -101,7 +101,7 @@ final class CertificateAwards
     {
         $certificate = $this->certificates->forEnrolment($enrolmentId);
         if ($certificate !== null) return ['state' => 'issued', 'certificate' => $certificate, 'message' => null];
-        if ($this->earned($enrolmentId) && $this->identities->approved($userId) === null) {
+        if ($this->earned($enrolmentId) && $this->identities->approved((string) $userId) === null) {
             return ['state' => 'waiting', 'certificate' => null, 'message' => self::VERIFY_TO_RECEIVE];
         }
         return ['state' => 'none', 'certificate' => null, 'message' => null];

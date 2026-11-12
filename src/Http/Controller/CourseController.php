@@ -20,7 +20,7 @@ use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Support\Slug;
 
 
@@ -33,6 +33,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /** Coordinates course HTTP operations; catalogue data stays in services and repositories. */
 final class CourseController extends BaseController
 {
+    /** The public catalogue's one page size: 24 cards, whole rows of four, three and two. */
+    public const CATALOGUE_PAGE = 24;
+
     public function __construct(
         AuthService $auth,
         ThemeRenderer $view,
@@ -80,7 +83,7 @@ final class CourseController extends BaseController
         // subcategories, and a keyword searches the same scope (owner, 2026-10-19).
         $filter = new CatalogueFilter($category === null ? null : (int) $category['id'], [], $search);
         $base = $category === null ? '/courses' : '/courses/category/' . (string) $category['slug'];
-        $pagination = Pagination::catalogue($this->request()->query->get('page'), $this->courses->catalogueCount($filter));
+        $pagination = Pagination::within($this->request()->query->get('page'), self::CATALOGUE_PAGE, $this->courses->catalogueCount($filter), [self::CATALOGUE_PAGE]);
         $courses = $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset);
         $navigation = $this->courses->categoryNavigation($category);
         $scope = $category === null ? '' : (string) $category['name'] . ($navigation['subcategories'] === [] ? '' : ' and all its subcategories');

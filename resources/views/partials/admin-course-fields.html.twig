@@ -44,6 +44,16 @@
 
 {% endblock %}
 {% endembed %}
+	{% if course.course_type|default('full') == 'short' %}
+	{# A short course's time is in minutes, 60 to 120 (Course Specification 4.13, section 15.1; owner, 2026-11-11). #}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Study time in minutes', help: 'A short course: what a buyer is told it takes, 60 to 120 minutes. Empty adds up its parts.', span: 'quarter', for: 'study-minutes'})} %}
+{% block control %}
+
+		<input class="cl-input" id="study-minutes" type="number" min="0" name="study_minutes" value="{{ course.study_minutes is defined ? course.study_minutes : (course.estimated_minutes|default(0) ?: '') }}" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+	{% else %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Study time in hours', help: 'What a buyer is told the whole course takes. Empty adds up its parts.', span: 'quarter', for: 'study-hours'})} %}
 {% block control %}
 
@@ -51,6 +61,7 @@
 
 {% endblock %}
 {% endembed %}
+	{% endif %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Default access period in days', span: 'third', for: 'access-days', required: true})} %}
 {% block control %}
 

@@ -111,7 +111,7 @@ final class CompanyWorkspaceContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html.twig');
-        $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents($root . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents($root . '/public_html/css/catto-platform.css'));
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
         // Add company is the Companies section's own action (its registry), drawn in the page head or
         // the section's card head; it opens the shared dialog.

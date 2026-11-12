@@ -104,7 +104,7 @@ A bounded example dataset.
 {% block results %}
 {% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Static sample records'})} %}
 {% block header %}
-<tr>{% for column in [{label: 'Name', width: 60, sortable: false}, {label: 'State', width: 40, sortable: false}] %}{% include '@platform/partials/sortable-header.html.twig' with {sh: column} %}{% endfor %}</tr>
+<tr>{% for column in [{label: 'Name', width: 60, sortable: false}, {label: 'State', width: 40, sortable: false}] %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: column} %}{% endfor %}</tr>
 {% endblock %}
 {% block body %}
 {% for record in 26..50 %}<tr><td>Example record {{ record }}</td><td>{{ ui('feedback.badge', {label: 'Active', tone: 'success'}) }}</td></tr>{% endfor %}
@@ -209,6 +209,6 @@ Example list item without actions.
 {% for tone in ['neutral','info','success','warning','danger','permanent'] %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: tone, variant: 'compact', section_spacing: true})} %}{% block surface_body %}{{ tone|capitalize }} surface{% endblock %}{% endembed %}
 {% endfor %}
-{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: 'Compact empty table'})} %}{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {label: 'Example', sortable: false, width: 100}} %}</tr>{% endblock %}{% block empty %}{{ ui('feedback.empty', {summary: 'No sample rows'}) }}{% endblock %}{% endembed %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: 'Compact empty table'})} %}{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {label: 'Example', sortable: false, width: 100}} %}</tr>{% endblock %}{% block empty %}{{ ui('feedback.empty', {summary: 'No sample rows'}) }}{% endblock %}{% endembed %}
 {% endblock %}
 {% endembed %}

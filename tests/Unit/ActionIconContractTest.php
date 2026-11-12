@@ -33,51 +33,21 @@ namespace CattoLearning\Tests\Unit;
 use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Application\CompanySectionRegistry;
+use CattoPHP\Ui\Contract\TemplateContract;
 use PHPUnit\Framework\TestCase;
 
 final class ActionIconContractTest extends TestCase
 {
-    /**
-     * Calls that may draw no icon, by template and label, each with its reason. Nothing else may.
-     *
-     * @var array<string,string>
-     */
-    private const WITHOUT_ICON = [
-        'partials/pagination.html.twig (pg_item.page)' => 'A page number is its own label; an icon beside every number would double the bar the owner asked to keep short.',
-    ];
-
+    /** Every button and button-link in cattolms's templates names an icon (CattoPHP checks its own templates likewise). */
     public function testEveryButtonAndButtonLinkNamesAnIcon(): void
     {
-        $missing = [];
-        $seen = [];
-        foreach (self::actionCalls() as [$file, $props]) {
-            $keys = self::topLevel($props);
-            if (isset($keys['icon']) || isset($keys['icon_only'])) {
-                continue;
-            }
-            $key = $file . ' ' . ($keys['label'] ?? '');
-            $seen[$key] = true;
-            if (!array_key_exists($key, self::WITHOUT_ICON)) {
-                $missing[] = $key;
-            }
-        }
-        self::assertSame([], $missing, 'These buttons draw no icon of their own; name one that fits the action (docs/UI-COMPONENTS.md, "Action icons").');
-        self::assertSame([], array_values(array_diff(array_keys(self::WITHOUT_ICON), array_keys($seen))), 'An exception no longer needed is removed from the list.');
+        self::assertSame([], TemplateContract::withoutIcon(self::templates()), 'These buttons draw no icon of their own; name one that fits the action (docs/UI-COMPONENTS.md, "Action icons").');
     }
 
     public function testEveryIconNamedOnAnActionIsInTheSprite(): void
     {
-        $sprite = self::sprite();
-        $named = [];
-        foreach (self::actionCalls() as [$file, $props]) {
-            $keys = self::topLevel($props);
-            if (isset($keys['icon'])) {
-                preg_match_all("/'((?:action|nav|page|figure)-[a-z0-9-]+)'/", $keys['icon'], $literals);
-                foreach ($literals[1] as $name) {
-                    $named[$name][] = $file;
-                }
-            }
-        }
+        // Actions and Actions menus in cattolms's templates and CattoPHP's, all drawn from this site's sprite.
+        $named = TemplateContract::namedIcons(self::templates() + TemplateContract::cattophpTemplates());
         // Icons handed to an action as data: the move lists' entries and the page head's own.
         foreach (self::templates() as $file => $source) {
             preg_match_all("/\\{direction: '[a-z]+', label: '[^']+', icon: '([a-z][a-z0-9-]*)'/", $source, $moves);
@@ -90,28 +60,16 @@ final class ActionIconContractTest extends TestCase
             }
         }
         self::assertGreaterThan(50, count($named));
-        foreach ($named as $name => $files) {
-            self::assertStringContainsString('<symbol id="' . $name . '"', $sprite, $name . ' (' . implode(', ', array_unique($files)) . ') has no symbol in the platform sprite.');
-        }
+        self::assertSame([], TemplateContract::missingSymbols($named, self::sprite()), 'These icons have no symbol in the platform sprite.');
     }
 
     /** An Actions menu's trigger is a button too: it names the icon it shows beside its label. */
     public function testEveryActionsMenuNamesItsTriggerIcon(): void
     {
-        $sprite = self::sprite();
-        foreach (self::templates() as $file => $source) {
-            preg_match_all("/ui_props\\('action\\.row', (\\{[^{}]*\\})\\)/", $source, $rows);
-            foreach ($rows[1] as $props) {
-                if (!str_contains($props, 'menu: true')) {
-                    continue;
-                }
-                self::assertSame(1, preg_match("/icon: '([a-z][a-z0-9-]*)'/", $props, $icon), $file . ': an Actions menu names its icon (' . $props . ').');
-                self::assertStringContainsString('<symbol id="' . $icon[1] . '"', $sprite);
-            }
-        }
+        self::assertSame([], TemplateContract::menusWithoutIcon(self::templates()));
     }
 
-    /** A section's own actions are drawn by partials/section-actions.html.twig with the icon each one names. */
+    /** A section's own actions are drawn by CattoPHP's page/section-actions.html.twig with the icon each one names. */
     public function testEverySectionActionNamesAnIcon(): void
     {
         $sprite = self::sprite();
@@ -123,7 +81,7 @@ final class ActionIconContractTest extends TestCase
                 }
             }
         }
-        $partial = (string) file_get_contents(self::views() . '/partials/section-actions.html.twig');
+        $partial = (string) file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/templates/page/section-actions.html.twig');
         self::assertSame(2, substr_count($partial, 'icon: action.icon'));
     }
 
@@ -138,94 +96,10 @@ final class ActionIconContractTest extends TestCase
     /** UX rule 3.3: a label never repeats its icon, so no label starts with a typed arrow or plus the icon now draws. */
     public function testNoLabelStartsWithATypedGlyph(): void
     {
-        foreach (self::actionCalls() as [$file, $props]) {
-            $label = self::topLevel($props)['label'] ?? '';
+        foreach (TemplateContract::actions(self::templates()) as [$file, $props]) {
+            $label = TemplateContract::properties($props)['label'] ?? '';
             self::assertDoesNotMatchRegularExpression("/^'(←|→|↺|↻|＋|\\+ |✓|×)/u", $label, $file . ': ' . $label);
         }
-    }
-
-    /** @return list<array{0:string,1:string}> each `ui('action.button')` and `ui('action.link')` call's template and property hash */
-    private static function actionCalls(): array
-    {
-        $calls = [];
-        foreach (self::templates() as $file => $source) {
-            $offset = 0;
-            while (preg_match("/ui\\('action\\.(?:button|link)'\\s*,\\s*/", $source, $match, PREG_OFFSET_CAPTURE, $offset) === 1) {
-                $start = $match[0][1] + strlen($match[0][0]);
-                self::assertSame('{', $source[$start] ?? '', $file . ': an action takes a literal property hash.');
-                $end = self::closing($source, $start);
-                $calls[] = [$file, substr($source, $start, $end - $start + 1)];
-                $offset = $end;
-            }
-        }
-        return $calls;
-    }
-
-    /** The index of the bracket closing the one at $start, skipping quoted strings. */
-    private static function closing(string $source, int $start): int
-    {
-        $depth = 0;
-        $quote = '';
-        for ($i = $start, $length = strlen($source); $i < $length; $i++) {
-            $character = $source[$i];
-            if ($quote !== '') {
-                if ($character === '\\') {
-                    $i++;
-                } elseif ($character === $quote) {
-                    $quote = '';
-                }
-            } elseif ($character === "'" || $character === '"') {
-                $quote = $character;
-            } elseif (str_contains('([{', $character)) {
-                $depth++;
-            } elseif (str_contains(')]}', $character) && --$depth === 0) {
-                return $i;
-            }
-        }
-        self::fail('Unbalanced brackets from offset ' . $start . '.');
-    }
-
-    /**
-     * The hash's own keys and their value expressions, not those of hashes nested inside it.
-     *
-     * @return array<string,string>
-     */
-    private static function topLevel(string $hash): array
-    {
-        $values = [];
-        $depth = 0;
-        $quote = '';
-        $key = '';
-        $from = 0;
-        for ($i = 0, $length = strlen($hash); $i < $length; $i++) {
-            $character = $hash[$i];
-            if ($quote !== '') {
-                if ($character === '\\') {
-                    $i++;
-                } elseif ($character === $quote) {
-                    $quote = '';
-                }
-                continue;
-            }
-            if ($character === "'" || $character === '"') {
-                $quote = $character;
-                continue;
-            }
-            if ($depth === 1 && ($character === ',' || $character === '}') && $key !== '') {
-                $values[$key] = trim(substr($hash, $from, $i - $from));
-                $key = '';
-            }
-            if (str_contains('([{', $character)) {
-                $depth++;
-            } elseif (str_contains(')]}', $character)) {
-                $depth--;
-            }
-            if ($depth === 1 && ($character === '{' || $character === ',') && preg_match('/\G\s*([a-z_]+)\s*:/', $hash, $name, 0, $i + 1) === 1) {
-                $key = $name[1];
-                $from = $i + 1 + strlen($name[0]);
-            }
-        }
-        return $values;
     }
 
     /** @return array<string,string> Core's templates by path under resources/views */

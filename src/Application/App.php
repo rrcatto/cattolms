@@ -11,6 +11,11 @@ Description:
 Provides application-layer coordination for app, connecting Catto Learning domain services, persistence and HTTP workflows.
 
 Changelog:
+2026/11/12 SAST
+- The lockout gate is CattoPHP's (CattoPHP Phase 4, step 3), asked here as before: before the session, with the Never
+  lock out list Settings saved or .env says.
+2026/11/09 SAST
+- Run mode from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/11/04 SAST
 - The lockout check before the session starts (site analytics, owner 2026-11-04).
 2026/10/24 SAST
@@ -75,7 +80,7 @@ use CattoLearning\Plugin\PluginContext;
 use CattoLearning\Plugin\PluginManager;
 use CattoLearning\View\ThemeRenderer;
 use CattoLearning\Kernel;
-use CattoLearning\Configuration\RunMode;
+use CattoPHP\Runtime\RunMode;
 use CattoLearning\Support\Env;
 use Dotenv\Dotenv;
 use RuntimeException;
@@ -115,9 +120,14 @@ final class App
         ini_set('error_log', $logRoot . '/application.log');
         self::logRequest();
 
-        $database = new DbalDatabase(ConnectionFactory::create());
-        // A locked-out visitor gets the bare refusal and nothing else, with no session started (owner, 2026-11-04).
-        \CattoLearning\SiteAnalytics\LockoutGate::checkCurrentRequest($database);
+        $connection = ConnectionFactory::create();
+        $database = new DbalDatabase($connection);
+        // A locked-out visitor gets the bare refusal and nothing else, with no session started (owner, 2026-11-04; the gate is
+        // CattoPHP's since 2026-11-12, CattoPHP Phase 4 step 3).
+        $gate = \CattoPHP\Protection\LockoutGate::beforeTheContainer($connection, Env::string('SITE_NEVER_LOCK_OUT'),
+            \CattoPHP\Network\GeoIpNetworkLookup::at(Env::string('GEOIP_DATABASE'), $instanceRoot . '/storage/signup-lists'), new \CattoPHP\Protection\PathMask(\CattoLearning\SiteAnalytics\SiteAnalyticsWords::SECRET_PATHS));
+        $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+        if ($gate->refuses(\CattoLearning\Support\ClientFingerprint::ipAddress(), $path, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'), (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))) \CattoPHP\Protection\LockoutGate::refuse();
         self::startSession($database);
 
         // Symfony owns every route, the container and the error page. Fat-Free is gone.
@@ -158,7 +168,7 @@ final class App
     private static function handleWithSymfony(string $instanceRoot): void
     {
         // How the program runs: APP_ENV alone, debugging following it (Configuration\RunMode, owner 2026-10-24).
-        $kernel = new Kernel(RunMode::environment(), RunMode::debug(), $instanceRoot);
+        $kernel = new Kernel(RunMode::environment(Env::string('APP_ENV')), RunMode::debug(Env::string('APP_ENV')), $instanceRoot);
         $kernel->boot();
 
         $request = Request::createFromGlobals();

@@ -1,13 +1,13 @@
 {% extends layout %}
 {% block page_body %}
 {# The Page layout tab's controllers (page_layout_choice and page_layout, owner 2026-10-30 and 2026-11-01). #}
-{% if active_tab in ['page-layout', 'search'] %}{{ importmap() }}{% endif %}
+{% if active_tab in ['page-layout', 'search'] %}{{ importmap('app', {nonce: csp_nonce()}) }}{% endif %}
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
 	{% set ph_kicker = course.status|capitalize ~ ' · approval ' ~ course.publication_approval_status %}
 	{% set ph_title = course.title %}
 	{% set ph_lead = '/'~(course.slug) %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		<nav aria-label="Course tools">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
@@ -69,7 +69,7 @@
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover picture (an SVG file, optional)', for: 'course-cover', full_width: true, help: 'Shown on the course\'s catalogue card, course page and landing page. Draw it on a canvas of 640 by 360, with viewBox="0 0 640 360" and preserveAspectRatio="xMidYMid slice" on its svg tag, so that it fills each of them. Leave it empty to keep the current picture.'})} %}
 {% block control %}
-						{% if course.cover_svg|default('') %}<span class="cl-course-cover-preview" aria-hidden="true">{{ course.cover_svg|raw }}</span>{% endif %}
+						{% if course.cover_svg|default('') %}<span class="cl-course-cover-preview" aria-hidden="true">{{ course.cover_svg|authored }}</span>{% endif %}
 						<input class="cl-input" type="file" id="course-cover" name="cover" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
@@ -143,17 +143,18 @@
 			{% endif %}
 
 			{% if active_tab == 'pricing' %}
-				{{ ui('layout.section-head', {heading: 'Pricing & access periods', heading_level: 2, summary: 'The access periods customers can buy. The active default is the catalogue price.'}) }}
+				{{ ui('layout.section-head', {heading: 'Pricing & access periods', heading_level: 2, summary: 'The access periods customers can buy, each on sale between its dates if it has any. The default is the catalogue price; a price that overrides the default takes its place while it is on sale. A published course with no price on sale stays published, but cannot be bought.'}) }}
+				{% set has_default = course.price_variants|filter(p => p.is_default and p.is_active)|length > 0 %}
 				{% if course.price_variants %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Order'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Period'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Price'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Label'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Actions'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Order'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Period'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Price'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Label'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Actions'}} %}
 						</tr>
 {% endblock %}
 {% block body %}
@@ -178,8 +179,16 @@
 										<input class="cl-input" form="{{ price_form }}" name="was_price" value="{{ price.was_price_input }}" inputmode="decimal" placeholder="Was price" aria-label="Was price (optional)">
 										<input class="cl-input text-uppercase" form="{{ price_form }}" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required aria-label="Currency">
 									</td>
-									<td><input class="cl-input" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
-									<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}</td>
+									<td>
+										<input class="cl-input" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label">
+										<label class="cl-price-date">On sale from <input class="cl-input" form="{{ price_form }}" type="datetime-local" name="starts_at" value="{{ price.starts_at }}"></label>
+										<label class="cl-price-date">On sale until <input class="cl-input" form="{{ price_form }}" type="datetime-local" name="ends_at" value="{{ price.ends_at }}"></label>
+									</td>
+									<td>
+										{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}
+										{% set can_override = has_default and not price.is_default %}
+										{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override default price', help: can_override ? '' : (price.is_default ? 'This is the default price.' : 'There is no default price yet.')})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="overrides_default" value="1" {{ price.overrides_default ? 'checked' : '' }} {{ can_override ? '' : 'disabled' }}>{% endblock %}{% endembed %}
+									</td>
 									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
@@ -191,10 +200,11 @@
 								{% else %}
 									<td>{{ price.access_period_label }}</td>
 									<td>{% include '@platform/partials/price.html.twig' with {price: price} %}</td>
-									<td>{{ price.label }}</td>
+									<td>{{ price.label }}{% if price.dates_label %}<br><span class="small">{{ price.dates_label }}</span>{% endif %}</td>
 									<td>
 										{% if price.is_default %}{{ ui('feedback.badge', {label: 'Default', tone: 'info', size: 'small'}) }}{% endif %}
-										{{ ui('feedback.badge', {label: (price.is_active ? 'Active' : 'Inactive'), tone: price.is_active ? 'success' : 'neutral', size: 'small'}) }}
+										{% if price.overrides_default %}{{ ui('feedback.badge', {label: 'Overrides the default', tone: 'info', size: 'small'}) }}{% endif %}
+										{{ ui('feedback.badge', {label: price.sale_label, tone: price.sale_tone, size: 'small'}) }}
 									</td>
 									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, icon: 'action-more'})} %}
@@ -213,7 +223,7 @@
 {% endblock %}
 {% endembed %}
 				{% else %}
-					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and exactly one active default price before it can be published.'}) }}
+					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and a default price before it can be published. A published course with no price on sale stays published, but cannot be bought.'}) }}
 				{% endif %}
 				{# A refused price option comes back as it was typed and ticked (2026-11-07). #}
 				{% set typed = typed_for(course_admin_url(course, '/pricing')) %}
@@ -231,18 +241,26 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', for: 'new-price-amount', span: 'quarter', required: true})} %}
 {% block control %}<input class="cl-input" id="new-price-amount" name="price" value="{{ typed.price|default('') }}" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (optional)', for: 'new-price-was', span: 'quarter', help: 'A higher price shown struck through beside the price, so the course is seen to be marked down. Only the price is charged. Leave it empty when the course is not marked down.'})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (optional)', for: 'new-price-was', span: 'quarter'})} %}
 {% block control %}<input class="cl-input" id="new-price-was" name="was_price" value="{{ typed.was_price|default('') }}" placeholder="7500.00" inputmode="decimal" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'quarter', required: true})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'third', required: true})} %}
 {% block control %}<input class="cl-input text-uppercase" id="new-price-currency" name="currency_code" value="{{ typed.currency_code|default('ZAR') }}" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label'})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label', span: 'two-thirds'})} %}
 {% block control %}<input class="cl-input" id="new-price-label" name="label" value="{{ typed.label|default('') }}" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-						<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'This price option', size: 'small', selected: typed is empty ? ['is_active'] : ['is_active', 'is_default']|filter(tick => attribute(typed, tick) is defined), items: [
-							{value: 'is_active', label: 'Active', icon: lucide('circle-check'), note: 'Buyers can choose it. Untick it to keep it off sale.'},
+						{# On sale from and until, each a date and time (owner, 2026-11-12: "I want to specify the times too"), side by side under Currency and Label. #}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale from (optional)', for: 'new-price-starts', help: 'Empty: from now.'})} %}
+{% block control %}<input class="cl-input" id="new-price-starts" type="datetime-local" name="starts_at" value="{{ typed.starts_at|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale until (optional)', for: 'new-price-ends', help: 'No longer sold from this moment. Empty: until you change it.'})} %}
+{% block control %}<input class="cl-input" id="new-price-ends" type="datetime-local" name="ends_at" value="{{ typed.ends_at|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						<div class="cl-ui-field--full">{{ ui('form.picture-choice', {multiple: true, legend: 'This price option', size: 'small', selected: typed is empty ? ['is_active'] : ['is_active', 'is_default', 'overrides_default']|filter(tick => attribute(typed, tick) is defined), items: [
+							{value: 'is_active', label: 'Active', icon: lucide('circle-check'), note: 'Buyers can choose it between its dates. Untick it to keep it off sale.'},
 							{value: 'is_default', label: 'Make this the default catalogue price', icon: lucide('star'), note: 'The price on the course\'s card. Leave it unticked and the current default stays.'},
+							{value: 'overrides_default', label: 'Override default price', icon: lucide('tag'), note: has_default ? 'While it is on sale, buyers get it instead of the default price, shown with the default struck through. Give it dates for a promotion.' : 'There is no default price to override yet.', disabled: not has_default},
 						]}) }}</div>
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Add price option', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}
@@ -261,10 +279,10 @@
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '')})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Position', wide: true}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Title'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Type'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Placement', wide: true}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Position', wide: true}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Title'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Type'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Placement', wide: true}} %}
 						</tr>
 {% endblock %}
 {% block body %}
@@ -344,12 +362,12 @@
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Label'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'From %'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'To %'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Passing'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Remove'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Label'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'From %'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'To %'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Passing'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Remove'}} %}
 						</tr>
 {% endblock %}
 {% block body %}
@@ -435,9 +453,9 @@
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact'})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'When'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 53, label: 'Change'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'By', wide: true}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'When'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 53, label: 'Change'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'By', wide: true}} %}
 						</tr>
 {% endblock %}
 {% block body %}

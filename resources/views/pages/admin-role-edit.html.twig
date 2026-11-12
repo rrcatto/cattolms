@@ -5,7 +5,7 @@
 	{% set ph_kicker = 'Platform administration' %}
 	{% set ph_title = role_acl.role_name %}
 	{% set ph_lead = role_acl.role_description %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
 {% block body %}
@@ -16,7 +16,7 @@
 				<h2>
 					Role details
 				</h2>
-				<form action="/admin/roles/{{ role_acl.id }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+				<form action="/admin/roles/{{ role_acl.role_key }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
 					<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -48,7 +48,7 @@
 {% endblock %}
 {% endembed %}</form>
 				{% if can_manage_roles and not role_acl.is_builtin_role and role_acl.user_count==0 %}
-					<form class="section" action="/admin/roles/{{ role_acl.id }}/delete" method="post">
+					<form class="section" action="/admin/roles/{{ role_acl.role_key }}/delete" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						{{ ui('action.button', {label: 'Delete role', variant: 'danger', size: 'normal', confirm: 'Delete this role?', icon: 'action-remove'}) }}
 					</form>
@@ -89,7 +89,7 @@
 
 {% endblock %}
 {% endembed %}
-		<form action="/admin/roles/{{ role_acl.id }}/permissions" method="post" class="section">
+		<form action="/admin/roles/{{ role_acl.role_key }}/permissions" method="post" class="section">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Permissions', summary: 'Check the capabilities this role should receive, then save once. Normal and SEED_* roles share these business permission keys; data visibility is enforced separately.'})} %}
 
@@ -103,10 +103,10 @@
 {% block header %}
 
 										<tr>
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 7, label: 'Assign'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Permission'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 27, label: 'Internal key', wide: true}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Description', wide: true}} %}
+											{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 7, label: 'Assign'}} %}
+											{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Permission'}} %}
+											{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 27, label: 'Internal key', wide: true}} %}
+											{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Description', wide: true}} %}
 										</tr>
 
 {% endblock %}

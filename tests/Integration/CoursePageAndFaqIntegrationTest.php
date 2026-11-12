@@ -48,7 +48,7 @@ final class CoursePageAndFaqIntegrationTest extends TestCase
         self::assertStringContainsString('<div class="cl-picture-head-art" aria-hidden="true">' . self::COVER . '</div>', $html, 'The cover picture, large, at the top.');
         self::assertMatchesRegularExpression('#<div class="cl-picture-head-text">.*<h1 class="cl-display-4 fw-bold">\s*Course page course\s*</h1>#s', $html, 'The title sits over the picture.');
         self::assertSame(1, substr_count($html, '<h1'), 'One title.');
-        self::assertMatchesRegularExpression('#<dt>Access starts</dt><dd>Immediately</dd>#', $html);
+        self::assertMatchesRegularExpression('#<dt>Access starts</dt><dd>Immediately</dd>#', self::tight($html));
         self::assertStringNotContainsString('When you start', $html);
         self::assertStringNotContainsString('id="reviews"', $html, 'No Reviews section while the course has no review.');
         self::assertStringNotContainsString('No reviews yet', $html);
@@ -64,10 +64,10 @@ final class CoursePageAndFaqIntegrationTest extends TestCase
         $questions = substr_count($html, '<details class="cl-ui-accordion-section"');
         self::assertGreaterThanOrEqual(10, $questions);
         self::assertSame(0, preg_match('#<details class="cl-ui-accordion-section"[^>]*\bopen\b#', $html), 'Every answer starts closed.');
-        self::assertSame($questions, substr_count($html, '<summary class="cl-ui-accordion-summary cl-ui-accordion-summary--labelled"><span class="cl-ui-accordion-icon" aria-hidden="true"><svg'), 'Each question opens with its icon.');
+        self::assertSame($questions, substr_count(self::tight($html), '<summary class="cl-ui-accordion-summary cl-ui-accordion-summary--labelled"><span class="cl-ui-accordion-icon" aria-hidden="true"><svg'), 'Each question opens with its icon.');
         self::assertSame($questions, substr_count($html, '<span class="cl-ui-accordion-eyebrow">'), 'Each question has its category above it.');
         self::assertStringContainsString('id="grading"', $html);
-        self::assertStringContainsString('<span class="cl-ui-accordion-eyebrow">Grading</span><span class="cl-ui-accordion-title">How is my result worked out?</span>', $html);
+        self::assertStringContainsString('<span class="cl-ui-accordion-eyebrow">Grading</span><span class="cl-ui-accordion-title">How is my result worked out?</span>', self::tight($html));
         foreach (['75% and above', 'Below 50%', 'Do I need to pass to get a certificate?', 'Immediately.'] as $answer) self::assertStringContainsString($answer, $html);
         self::assertStringContainsString('href="/faq"', InProcessPage::run(null, HelpController::class, 'index')['body'], 'Help links to the FAQ.');
     }
@@ -93,12 +93,20 @@ final class CoursePageAndFaqIntegrationTest extends TestCase
         foreach ($pages as $name => [$html, $picture]) {
             $source = (string) file_get_contents($artwork . $picture . '.html.twig');
             $svg = trim(substr($source, (int) strpos($source, '<svg')));
-            self::assertMatchesRegularExpression('#<section class="cl-page-head  cl-page-head--picture">\s*<div class="cl-page-head-inner">\s*<div class="cl-picture-head"><div class="cl-picture-head-art" aria-hidden="true">#', $html, $name);
-            self::assertStringContainsString($svg, $html, $name . ' shows its own picture.');
+            self::assertMatchesRegularExpression('#<section class="cl-page-head  cl-page-head--picture">\s*<div class="cl-page-head-inner">\s*<div class="cl-picture-head">\s*<div class="cl-picture-head-art" aria-hidden="true">#', $html, $name);
+            // Whitespace between a drawing's tags is never drawn, and the served page's layout changes it (CattoPHP's HtmlLayout).
+            $tight = static fn (string $markup): string => (string) preg_replace(['/>\s+</', '/\s+/'], ['><', ' '], $markup);
+            self::assertStringContainsString($tight($svg), $tight($html), $name . ' shows its own picture.');
             self::assertMatchesRegularExpression('#<div class="cl-page-head-content cl-picture-head-text">.*?<h1 #s', $html, $name . ': the title sits over it.');
             self::assertSame(1, substr_count($html, '<h1'), $name);
         }
         self::assertStringContainsString("partials/artwork/tags-hero.html.twig", (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/course-tags.html.twig'), 'The tag browser has its own picture.');
         self::assertCount(8, array_unique(array_map(static fn(string $f): string => (string) md5_file($f), glob($artwork . '*-hero.html.twig') ?: [])), 'Eight different pictures.');
+    }
+
+    /** The page without the whitespace between its tags, which the served page's layout lays out and no browser draws. */
+    private static function tight(string $html): string
+    {
+        return (string) preg_replace('/>\s+</', '><', $html);
     }
 }

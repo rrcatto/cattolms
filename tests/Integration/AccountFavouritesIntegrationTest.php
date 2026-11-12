@@ -109,7 +109,7 @@ final class AccountFavouritesIntegrationTest extends TestCase
         $bundles = IntegrationContainer::get()->get(BundleService::class);
         self::assertTrue($bundles->setFavourite($this->learner, $this->bundles['open']['id'], true));
         self::assertFalse($bundles->setFavourite($this->learner, $this->bundles['open']['id'], true), 'A repeated star changes nothing.');
-        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM audit_log WHERE user_id = :u AND event_key = :a', ['u' => $this->learner, 'a' => 'bundle.favourited']), 'Recorded once.');
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_activity WHERE actor_id = CAST(:u AS TEXT) AND action = :a', ['u' => $this->learner, 'a' => 'bundle.favourited']), 'Recorded once.');
         try {
             $bundles->setFavourite($this->learner, $this->bundles['draft']['id'], true);
             self::fail('A draft bundle is not in the catalogue, so it cannot be starred.');

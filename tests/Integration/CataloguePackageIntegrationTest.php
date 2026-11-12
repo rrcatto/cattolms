@@ -62,7 +62,7 @@ final class CataloguePackageIntegrationTest extends TestCase
         $this->fixture = new DevelopmentFixture($this->db);
         $this->package = IntegrationContainer::get()->get(CataloguePackage::class);
         $this->courses = IntegrationContainer::get()->get(CourseRepository::class);
-        $roles = new RoleRepository($this->db);
+        $roles = IntegrationContainer::get()->get(RoleRepository::class);
         $this->admin = $roles->firstUserWithRole('ADMIN') ?? (function () use ($roles): int {
             $id = $this->fixture->createUser('Catalogue package administrator');
             $roles->assign($id, 'ADMIN');

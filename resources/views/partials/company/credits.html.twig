@@ -2,7 +2,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Credit pools', eyebrow: 'Credits', summary: 'Course and access-period credit pools.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Credit pools', eyebrow: 'Credits', summary: 'Course and access-period credit pools.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'credits', pagination: credits_pagination, search: {ds_name: 'credits', ds_label: 'Search credits', ds_value: credits_search, ds_action: '/company/credits'}})} %}
 {% block results %}
@@ -22,7 +22,7 @@
 
 							<tr>
 								{% for sh in credits_sort_headers %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: credits_region, sort_results: credits_results} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: credits_region, sort_results: credits_results} %}
 								{% endfor %}
 							</tr>
 
@@ -72,3 +72,39 @@
 
 {% endblock %}
 {% endembed %}
+{# Bundle credits (owner, 2026-11-11): one credit is one whole bundle for one person, never split between people. #}
+{% if bundle_credits|default([]) %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'bundle-credits'})} %}
+{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Bundle credits', eyebrow: 'Credits', summary: bundle_rule}) }}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bundle credits'})} %}
+{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Bundle'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Access'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Held'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Given'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Left'}} %}</tr>{% endblock %}
+{% block body %}{% for credit in bundle_credits %}<tr data-bundle-credit="{{ credit.public_id }}"><td class="cell-text"><strong>{{ credit.bundle_title }}</strong><br><span class="small">Includes {{ credit.course_titles|join(', ', ' and ') }}</span></td><td>{{ credit.access_label }}</td><td>{{ credit.held }}</td><td>{{ credit.given }}</td><td>{{ credit.left }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% set bundles_left = bundle_credits|filter(c => c.left > 0) %}
+		{# The person already has some of its courses (owner, 2026-11-11): which ones, and giving it anyway extends them. #}
+		{% if bundle_give|default(null) and can_manage_company_enrolments|default(false) %}
+		<div id="bundle-give-anyway">
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: bundle_give.person_name ~ ' already has ' ~ bundle_give.held|join(', ', ' and ') ~ '.'})} %}{% block body %}If you give them the {{ bundle_give.credit.bundle_title }} bundle anyway, they get the courses they do not have yet, and their access to {{ bundle_give.held|join(', ', ' and ') }} is extended by {{ bundle_give.credit.access_label }}. One bundle credit is used for them.{% endblock %}{% endembed %}
+			<form action="/company/bundle-credits/assign" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="bundle_credit" value="{{ bundle_give.credit.public_id }}"><input type="hidden" name="bundle_user_id" value="{{ bundle_give.person_id }}"><input type="hidden" name="extend_held" value="1">
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Give it anyway', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', size: 'normal', href: '/company/credits#bundle-credits', icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
+			</form>
+		</div>
+		{% endif %}
+		{% if can_manage_company_enrolments|default(false) and bundles_left %}
+		<h3 class="h5">Give a bundle credit</h3>
+		<form action="/company/bundle-credits/assign" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bundle credit', full_width: false, for: 'bundle-credit', required: true})} %}{% block control %}<select id="bundle-credit" name="bundle_credit" required {{ ui_field_attrs(props) }}>{% for credit in bundles_left %}<option value="{{ credit.public_id }}">{{ credit.bundle_title }}, {{ credit.access_label }} ({{ credit.left }} left)</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'bundle_user_id', lk_type: 'people', lk_label: 'The one person who gets the bundle', lk_selected: 0, lk_required: 1, lk_empty: 'Nobody selected'} %}
+{% endblock %}
+{% endembed %}
+			<p class="cl-bundle-credit-rule">They get every course in the bundle, with its access period. One bundle credit is used for them, and it cannot be shared with anyone else.</p>
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Give the bundle', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}{% endembed %}
+		</form>
+		{% endif %}
+{% endblock %}
+{% endembed %}
+{% endif %}

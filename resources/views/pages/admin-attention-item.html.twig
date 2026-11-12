@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
     {% set ph_kicker = 'Transactions that need attention' %}{% set ph_title = item.title %}{% set ph_lead = item.summary %}
-    {% include '@platform/partials/page-head.html.twig' %}
+    {% include '@CattoPHP/page/head.html.twig' %}
     <section class="cl-page-section">
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
             {{ ui('layout.section-head', {heading: 'What happened', eyebrow: item.order_label, summary: item.open ? 'Still open.' : 'Resolved: it no longer appears on the dashboard.'}) }}

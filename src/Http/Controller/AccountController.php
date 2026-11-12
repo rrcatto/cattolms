@@ -508,7 +508,7 @@ final class AccountController extends BaseController
             'account_courses' => $courses,
             // The courses still running or waiting to start, each a card with its timing (owner, 2026-10-17).
             'account_current_courses' => $current,
-            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
+            'account_reference_label' => \CattoPHP\Foundation\AccountReference::format((string) ($profile['account_reference'] ?? '')),
             'account_stats' => [
                 'current_courses' => count($current),
                 'completed_courses' => count($completed),
@@ -703,7 +703,7 @@ final class AccountController extends BaseController
             'profile_image_drawn' => $picture !== null && $picture['drawn'],
             'profile_avatar_chosen' => $picture !== null && $picture['chosen'],
             'profile_image_size' => ProfileImage::SIZE,
-            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
+            'account_reference_label' => \CattoPHP\Foundation\AccountReference::format((string) ($profile['account_reference'] ?? '')),
             // Certificates carry the verified name (owner, 2026-10-19); the profile says where the account stands.
             'identity_verification' => $this->identity->state($userId),
         ];

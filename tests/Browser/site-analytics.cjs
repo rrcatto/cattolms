@@ -117,7 +117,7 @@ async function signedIn(browser, options = {}) {
   check(await page.evaluate(() => window.scrollY) === scrolled, 'choosing a card does not move the page');
   check(await page.locator('.cl-main').count() === 1 && await page.locator('#site-log-kinds input[value="missing"]').isChecked(), 'the page holds one main area, with the card chosen');
   await page.waitForTimeout(1200);
-  check(sql(`SELECT is_page FROM site_requests WHERE path LIKE '/admin/site-analytics/log%' ORDER BY id DESC LIMIT 1`).trim() === 't', 'a page changed in place still counts as a page');
+  check(sql(`SELECT is_page FROM cattophp_site_requests WHERE path LIKE '/admin/site-analytics/log%' ORDER BY id DESC LIMIT 1`).trim() === 't', 'a page changed in place still counts as a page');
   check(await page.locator('form:has(#site-log-period) input[name="kind"]').inputValue() === 'missing', 'the filters follow the card');
   check(await page.locator('tr[data-site-request]').count() > 0 && (await text(page)).includes('404 Not found') && !(await text(page)).includes('200 Shown'), 'Not found lists only what was not found');
   await page.goto(`${base}/admin/site-analytics/log?kind=missing&sitelog_q=198.51.100.23`, {waitUntil: 'load'});
@@ -134,7 +134,9 @@ async function signedIn(browser, options = {}) {
   await inPlace(page, () => page.locator('#site-log-kinds input[value="missing"]').check({force: true}), 'kind=missing', 'a third card');
   await page.goBack();
   await page.waitForFunction(() => location.search.includes('kind=bot'), null, {timeout: 8000}).catch(() => {});
-  await page.waitForTimeout(400);
+  // The address changes at once; the list comes back when the page has asked for it again, which a busy server takes
+  // longer over, so the card is waited for as the address is.
+  await page.waitForFunction(() => document.querySelector('#site-log-kinds input[value="bot"]')?.checked === true, null, {timeout: 8000}).catch(() => {});
   check(page.url().includes('kind=bot') && await page.locator('#site-log-kinds input[value="bot"]').isChecked(), 'Back returns to the list before');
   await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
   await page.selectOption('#site-log-country', 'NL');
@@ -155,7 +157,7 @@ async function signedIn(browser, options = {}) {
   check(await page.locator('#site-log-kinds label').first().innerText() !== allBefore, 'the card counts it');
 
   // A refresh is not a visit, and claiming to be one hides nobody.
-  const logged = (path) => Number(sql(`SELECT count(*) FROM site_requests WHERE path LIKE '${path}%'`).trim());
+  const logged = (path) => Number(sql(`SELECT count(*) FROM cattophp_site_requests WHERE path LIKE '${path}%'`).trim());
   await page.waitForTimeout(1500);
   const refreshesBefore = logged('/admin/site-analytics/log');
   await refresh(page); await refresh(page); await refresh(page);
@@ -170,7 +172,7 @@ async function signedIn(browser, options = {}) {
   await context.request.get(`${base}${forgedPage}`, {headers: {'X-Live-Refresh': '1', 'HX-Request': 'true'}});
   await page.waitForTimeout(800);
   check(logged('/help') > 0, 'a signed-in reader claiming one on an ordinary page is still in the Site Log');
-  sql(`DELETE FROM site_requests WHERE path LIKE '/live-check-%' OR path LIKE '/live-forged-%'`);
+  sql(`DELETE FROM cattophp_site_requests WHERE path LIKE '/live-check-%' OR path LIKE '/live-forged-%'`);
 
   // What is typed survives a refresh, and it waits while the reader is busy.
   await page.goto(`${base}/admin/site-analytics/log`, {waitUntil: 'load'});
@@ -245,11 +247,11 @@ async function signedIn(browser, options = {}) {
   await go(page, () => page.locator('form.cl-lock-form button[type=submit]').click());
   main = await text(page);
   check(main.includes('locked out') && main.includes('Lift this lockout'), 'Lock out works and offers Lift');
-  check(sql("SELECT COUNT(*) FROM site_lockouts WHERE label = '203.0.113.14' AND lifted_at IS NULL AND NOT automatic") === '1', 'the lockout is by hand and in force');
+  check(sql("SELECT COUNT(*) FROM cattophp_site_lockouts WHERE label = '203.0.113.14' AND lifted_at IS NULL AND NOT automatic") === '1', 'the lockout is by hand and in force');
   await page.goto(`${base}/admin/site-analytics/lockouts?show=you`, {waitUntil: 'load'});
   check((await text(page)).includes('203.0.113.14'), 'Lockouts lists it under By you');
   await go(page, () => page.locator(`tr:has-text("203.0.113.14") button[type=submit]`).click());
-  check(sql("SELECT COUNT(*) FROM site_lockouts WHERE label = '203.0.113.14' AND lifted_at IS NULL") === '0', 'Lift ends it');
+  check(sql("SELECT COUNT(*) FROM cattophp_site_lockouts WHERE label = '203.0.113.14' AND lifted_at IS NULL") === '0', 'Lift ends it');
   // Add a lockout: a range, a wrong entry refused in words.
   await page.goto(`${base}/admin/site-analytics/lockouts`, {waitUntil: 'load'});
   await page.fill('#add-target', 'not an address');
@@ -273,7 +275,7 @@ async function signedIn(browser, options = {}) {
   await page.goto(`${base}/admin/site-analytics/flagged`, {waitUntil: 'load'});
   await go(page, () => page.locator('tr:has-text("192.0.2.61") button[type=submit]:visible').first().click());
   check(page.url().includes('show=fine') && (await text(page)).includes('192.0.2.61'), 'Not a problem moves it to its card');
-  check(sql("SELECT COUNT(*) FROM site_lockouts WHERE label = '192.0.2.61' AND lifted_at IS NULL") === '0', 'Not a problem ends the time-out');
+  check(sql("SELECT COUNT(*) FROM cattophp_site_lockouts WHERE label = '192.0.2.61' AND lifted_at IS NULL") === '0', 'Not a problem ends the time-out');
 
   // Site protection: a wrong length refused, a change saved, Reset.
   await page.goto(`${base}/admin/site-analytics/protection`, {waitUntil: 'load'});
@@ -358,7 +360,7 @@ async function signedIn(browser, options = {}) {
     await ownPage.goto(`${base}/admin/site-analytics/address/${seen[1]}`, {waitUntil: 'load'});
     check((await text(ownPage)).includes('You are using this address now, so you cannot lock it out.'), 'the address in use cannot be locked out from its page');
     await own.close();
-    const id = sql(`INSERT INTO site_lockouts (kind, network, label, which, why) VALUES ('address', '${seen[1]}', '${seen[1]}', 'lockout', 'The browser check of the refusal') RETURNING id`).split('\n')[0];
+    const id = sql(`INSERT INTO cattophp_site_lockouts (kind, network, label, which, why) VALUES ('address', '${seen[1]}', '${seen[1]}', 'lockout', 'The browser check of the refusal') RETURNING id`).split('\n')[0];
     try {
       const refused = await browser.newContext({ignoreHTTPSErrors: true});
       const answer = await refused.request.get(`${base}/courses`, {maxRedirects: 0});
@@ -369,16 +371,16 @@ async function signedIn(browser, options = {}) {
       const hook = await refused.request.post(`${base}/webhooks/didit`, {data: '{}', headers: {'content-type': 'application/json'}, failOnStatusCode: false});
       check(hook.status() !== 403, `a webhook is never refused (${hook.status()})`);
       await refused.close();
-      check(Number(sql(`SELECT refused FROM site_lockouts WHERE id = ${id}`)) >= 1, 'the refusal is counted');
+      check(Number(sql(`SELECT refused FROM cattophp_site_lockouts WHERE id = ${id}`)) >= 1, 'the refusal is counted');
     } finally {
-      sql(`UPDATE site_lockouts SET lifted_at = NOW() WHERE id = ${id}`);
+      sql(`UPDATE cattophp_site_lockouts SET lifted_at = NOW() WHERE id = ${id}`);
     }
     const after = await browser.newContext({ignoreHTTPSErrors: true});
     const back = await after.request.get(`${base}/courses`);
     check(back.status() === 200, 'lifted, the site answers again');
     await after.close();
-    sql(`DELETE FROM site_requests WHERE refused AND address = '${seen[1]}'`);
-    sql(`DELETE FROM site_lockouts WHERE id = ${id}`);
+    sql(`DELETE FROM cattophp_site_requests WHERE refused AND address = '${seen[1]}'`);
+    sql(`DELETE FROM cattophp_site_lockouts WHERE id = ${id}`);
   }
 
   await browser.close();

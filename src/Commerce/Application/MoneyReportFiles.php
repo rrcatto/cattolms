@@ -9,7 +9,7 @@ Version: 1.1.0
 
 Description:
 A month's money report as files (owner, 2026-11-06, the approved mockup): the PDF, A4, drawn by the shared PDF engine
-(DocumentPdfRenderer::renderPage) from partials/admin/money-report-pdf.html.twig, and the Excel file,
+(PdfRenderer::renderPage) from partials/admin/money-report-pdf.html.twig, and the Excel file,
 money-report-YYYY-MM.xlsx, written by OpenSpout (MIT) with the sheets Summary, Money in, Sales, Orders, Refunds and Wallet.
 Both are drawn from the one report MoneyReports makes, so they carry the page's numbers.
 
@@ -29,7 +29,7 @@ namespace CattoLearning\Commerce\Application;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Configuration\SiteOwner;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\View\ThemeRenderer;
 use DateTimeImmutable;
 use OpenSpout\Common\Entity\Cell;
@@ -51,7 +51,7 @@ final class MoneyReportFiles
     public const AMOUNT_FORMAT = '"R" #,##0.00;-"R" #,##0.00';
 
     public function __construct(
-        private readonly DocumentPdfRenderer $pdfs,
+        private readonly PdfRenderer $pdfs,
         private readonly ThemeRenderer $view,
         private readonly SiteOwner $owner,
         private readonly SiteMode $site,

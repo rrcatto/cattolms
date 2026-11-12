@@ -54,9 +54,9 @@ final class BundledThemeContractTest extends TestCase
         // Saharan Sunset alone since 2026-11-07 (owner: the other themes "on ice until further notice"), and it is the
         // default, so it can never stop being part of the codebase.
         self::assertArrayHasKey(
-            \CattoLearning\View\ThemeManager::DEFAULT_SLUG,
+            \CattoLearning\View\ProjectTheme::DEFAULT_SLUG,
             $themes,
-            'The default theme, ' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . ', must be bundled: a site falls back to it.'
+            'The default theme, ' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG . ', must be bundled: a site falls back to it.'
         );
 
         foreach ($themes as $slug => $manifest) {

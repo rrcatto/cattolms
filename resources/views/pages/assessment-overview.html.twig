@@ -3,7 +3,7 @@
 <span class="cl-kicker">{{ assessment.assessment_role == 'final' ? 'Final assessment' : (assessment.assessment_type == 'diagnostic' ? 'Course diagnostic' : 'Assessment') }}</span>
 <h1>{{ assessment.title }}</h1>
 <h2 class="h4">Before you begin</h2>
-{{ assessment.instructions_html|raw }}
+{{ assessment.instructions_html|authored }}
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 {% block body %}
 {{ ui('data.stat-card', {label: 'Question pool', value: assessment.question_pool_count}) }}

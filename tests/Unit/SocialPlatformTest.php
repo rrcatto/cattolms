@@ -21,6 +21,8 @@ asserts both halves.
 Architectural boundary: unit. It exercises a value object and touches nothing else.
 
 Changelog:
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): the footer's marks are the site's own profiles once any is set.
 2026/10/17 SAST
 - Every platform names an https home page, and the footer's six marks link to an address on their own platform.
 2026/09/10 02:25 SAST
@@ -119,9 +121,21 @@ final class SocialPlatformTest extends TestCase
         }
         // The footer's marks link to these until settings give a profile address, so each must be an
         // address on its own platform.
-        foreach (['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'] as $key) {
+        foreach (SocialPlatform::FOOTER as $key) {
             self::assertSame(SocialPlatform::home($key), SocialPlatform::normalise($key, SocialPlatform::home($key)), $key);
         }
         self::assertSame('', SocialPlatform::home('myspace'));
+    }
+
+    public function testTheFooterShowsTheSitesOwnProfilesOrElseEveryPlatformsHomePage(): void
+    {
+        $none = SocialPlatform::footerMarks([]);
+        self::assertSame(['facebook', 'whatsapp', 'telegram', 'x', 'linkedin', 'instagram', 'youtube'], array_column($none, 'key'), 'with none set, all seven, Telegram after WhatsApp');
+        self::assertSame('https://www.facebook.com/', $none[0]['href'], "each to the platform's home page");
+        self::assertSame([], SocialPlatform::profiles([]), 'and none is the site\'s own');
+
+        $own = SocialPlatform::footerMarks(['youtube' => 'https://www.youtube.com/@example', 'telegram' => 'https://t.me/example', 'facebook' => ' https://www.facebook.com/example ', 'x' => '', 'github' => 'https://github.com/example']);
+        self::assertSame([['key' => 'facebook', 'label' => 'Facebook', 'href' => 'https://www.facebook.com/example'], ['key' => 'telegram', 'label' => 'Telegram', 'href' => 'https://t.me/example'], ['key' => 'youtube', 'label' => 'YouTube', 'href' => 'https://www.youtube.com/@example']], $own, "only the site's own, in the footer's order, nothing the footer has no mark for");
+        self::assertSame(['https://www.facebook.com/example', 'https://www.youtube.com/@example'], SocialPlatform::profiles(['youtube' => 'https://www.youtube.com/@example', 'facebook' => 'https://www.facebook.com/example']));
     }
 }

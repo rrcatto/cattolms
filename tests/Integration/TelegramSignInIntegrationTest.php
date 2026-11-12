@@ -32,10 +32,13 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Auth\{AclService, AuthService, IdNumbers, LoginLinkNotUsableException, SignInRestriction, TwoStepPolicy};
 use CattoLearning\Auth\TwoStep\{PendingSignIn, TwoStep, TwoStepRepository};
-use CattoLearning\Configuration\{SecretCipher, SiteMode};
+use CattoLearning\Configuration\SiteMode;
+use CattoPHP\Security\SecretCipher;
 use CattoLearning\Event\EventDispatcher;
-use CattoLearning\Infrastructure\Persistence\{AuditRepository, AuthSessionRepository, Database, LoginTokenRepository, OptionRepository, RoleRepository, TransactionManager, UserProfileRepository, UserRepository};
-use CattoLearning\OwnerMessages\{OwnerMessageJob, OwnerMessageRepository, OwnerMessages, OwnerMessageSettings, OwnerMessageSetup, TelegramAccountRepository, TelegramClient, TelegramConnections, TelegramInbox, TelegramMessenger};
+use CattoLearning\Infrastructure\Persistence\{AuditRepository, AuthSessionRepository, Database, LoginTokenRepository, RoleRepository, TransactionManager, UserProfileRepository, UserRepository};
+use CattoLearning\OwnerMessages\{OwnerMessages, TelegramRepository, TelegramSignInAccounts};
+use CattoPHP\Activity\Actor;
+use CattoPHP\Telegram\{OwnerMessageSender, TelegramAccounts, TelegramBot, TelegramClient, TelegramConnections, TelegramInbox, TelegramLog, TelegramMessenger, TelegramSetup, TelegramState, TelegramWords};
 use CattoLearning\Tests\Support\{DevelopmentFixture, FakeMailer, IntegrationContainer, TelegramStandIn};
 use CattoLearning\Support\Env;
 use PHPUnit\Framework\TestCase;
@@ -47,12 +50,11 @@ final class TelegramSignInIntegrationTest extends TestCase
     private Database $db;
     private DevelopmentFixture $fixture;
     private MockClock $clock;
-    private OptionRepository $options;
-    private OwnerMessageSettings $settings;
-    private OwnerMessageRepository $messages;
+    private TelegramBot $settings;
+    private TelegramLog $messages;
     private TelegramStandIn $telegram;
     private TelegramMessenger $messenger;
-    private TelegramAccountRepository $accounts;
+    private TelegramAccounts $accounts;
     private TelegramConnections $connections;
     private TelegramInbox $inbox;
     private SignInRestriction $restriction;
@@ -71,26 +73,26 @@ final class TelegramSignInIntegrationTest extends TestCase
         $container = IntegrationContainer::get();
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable());
-        $this->options = $container->get(OptionRepository::class);
         // No message can reach the real Telegram, even through the container: its address is nowhere.
-        $this->options->set(OwnerMessageSettings::ADDRESS_OPTION, 'http://127.0.0.1:9');
-        $this->options->delete(OwnerMessageSettings::INBOX_OPTION);
-        $this->settings = $container->get(OwnerMessageSettings::class);
-        $this->messages = $container->get(OwnerMessageRepository::class);
+        $state = new TelegramState($this->connection());
+        $state->set(TelegramState::ADDRESS, 'http://127.0.0.1:9');
+        $state->remove(TelegramState::INBOX);
+        $this->settings = $container->get(TelegramBot::class);
+        $this->messages = $container->get(TelegramLog::class);
         $this->admin = $this->fixture->createUser('Telegram administrator');
         $this->settings->forget();
-        $this->settings->setKey(TelegramStandIn::KEY, TelegramStandIn::BOT, $this->admin);
-        $this->settings->setSignIn(true, $this->admin);
+        $this->settings->setKey(TelegramStandIn::KEY, TelegramStandIn::BOT, $this->actor());
+        $this->settings->setSignIn(true, $this->actor());
         $this->telegram = new TelegramStandIn();
         $client = new TelegramClient($this->telegram->client());
         $this->messenger = new TelegramMessenger($this->settings, $this->messages, $client);
-        $this->accounts = $container->get(TelegramAccountRepository::class);
-        $this->connections = new TelegramConnections($container->get(LoginTokenRepository::class), $this->accounts, $this->settings, $this->messenger, $this->owner(),
-            new TransactionManager($this->db), $container->get(AuditRepository::class), $container->get(SecretCipher::class), $this->clock);
-        $this->inbox = new TelegramInbox($this->settings, $this->options, $client, $this->accounts, $this->connections, $this->messages, $this->clock);
-        $this->restriction = new SignInRestriction($this->options);
+        $this->accounts = $container->get(TelegramAccounts::class);
+        $this->connections = new TelegramConnections(new \CattoPHP\Links\DbalLinkStore($this->connection()), $this->accounts, $this->settings, $this->messenger, $this->words(),
+            $this->connection(), $container->get(SecretCipher::class), $this->clock);
+        $this->inbox = new TelegramInbox($this->settings, $state, $client, $this->accounts, $this->connections, $this->messages, $this->clock);
+        $this->restriction = IntegrationContainer::get()->get(SignInRestriction::class);
         $this->restriction->reset();
-        $this->options->delete(TwoStepPolicy::OPTION);
+        IntegrationContainer::get()->get(TwoStepPolicy::class)->reset();
     }
 
     protected function tearDown(): void
@@ -108,7 +110,7 @@ final class TelegramSignInIntegrationTest extends TestCase
         }
         $this->messenger->deliverHeld();
         self::assertSame([], $this->telegram->sent, 'Nothing was sent.');
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM auth_login_tokens WHERE purpose = 'telegram_login' AND created_at >= :since", ['since' => $this->started]));
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_links WHERE purpose = 'telegram_login' AND created_at >= :since", ['since' => $this->started]));
     }
 
     public function testAConnectedAccountGetsOneMessageAndItsCodeAndLinkAreKeptNowhere(): void
@@ -125,7 +127,7 @@ final class TelegramSignInIntegrationTest extends TestCase
         self::assertStringStartsWith('Sign in to ', $first['text']);
         self::assertStringContainsString('It lasts 10 minutes and works once.', $first['text']);
 
-        $logged = $this->db->fetchAssociative("SELECT kind, body, chat_id, to_user_id, to_username, sent_at FROM telegram_messages WHERE kind = 'sign_in' AND to_user_id = :user", ['user' => $thandi['id']]);
+        $logged = $this->db->fetchAssociative("SELECT kind, body, chat_id, to_account, to_username, sent_at FROM cattophp_telegram_messages WHERE kind = 'sign_in' AND to_account = :user", ['user' => (string) $thandi['id']]);
         self::assertNotFalse($logged);
         self::assertSame(['sign_in', 'Sign-in code and link for ' . OwnerMessages::domain() . ' (not kept)', '5551001', 'Thandi_M'], [$logged['kind'], $logged['body'], $logged['chat_id'], $logged['to_username']]);
         self::assertNotNull($logged['sent_at']);
@@ -165,7 +167,7 @@ final class TelegramSignInIntegrationTest extends TestCase
         self::assertSame(1, $this->sessions($thandi['id']));
         $this->assertRefused(fn() => $auth->consumeTelegramCode($row, $code), AuthService::TELEGRAM_CODE_WRONG, 'The link used the code up.');
         $this->assertRefused(fn() => $auth->consumeLogin($token), AuthService::LINK_INVALID, 'And itself: an expired or used link says what the email link says.');
-        $login = $this->db->fetchOne("SELECT metadata->>'via' FROM audit_log WHERE event_key = 'auth.login' AND user_id = :user ORDER BY id DESC LIMIT 1", ['user' => $thandi['id']]);
+        $login = $this->db->fetchOne("SELECT details->>'via' FROM cattophp_activity WHERE action = 'auth.login' AND actor_id = CAST(:user AS TEXT) ORDER BY id DESC LIMIT 1", ['user' => $thandi['id']]);
         self::assertSame('telegram_link', $login, 'The activity log says how they came in.');
     }
 
@@ -269,25 +271,25 @@ final class TelegramSignInIntegrationTest extends TestCase
     {
         $thandi = $this->person('Thandi Mokoena');
         $sipho = $this->person('Sipho Dlamini');
-        $this->connections->start($thandi['id'], $thandi['email']);
-        $link = $this->connections->view($thandi['id'])['link'];
+        $this->connections->start((string) $thandi['id'], $thandi['email']);
+        $link = $this->connections->view((string) $thandi['id'])['link'];
         self::assertStringStartsWith('https://t.me/' . TelegramStandIn::BOT . '?start=', $link);
-        self::assertSame('waiting', $this->connections->view($thandi['id'])['state']);
+        self::assertSame('waiting', $this->connections->view((string) $thandi['id'])['state']);
         $this->telegram->writes(777001, 'Thandi_M', '/start ' . substr($link, strpos($link, '=') + 1));
         self::assertSame(1, $this->inbox->read());
-        $view = $this->connections->view($thandi['id']);
+        $view = $this->connections->view((string) $thandi['id']);
         self::assertSame(['on', 'Thandi_M'], [$view['state'], $view['username']]);
         self::assertSame(['Your Telegram account is now connected to ' . OwnerMessages::domain()], $this->telegram->textsTo('777001'));
         self::assertSame('Connected', $this->kindOf('connected', (int) $thandi['id']));
 
-        $this->connections->start($sipho['id'], $sipho['email']);
-        $link = $this->connections->view($sipho['id'])['link'];
+        $this->connections->start((string) $sipho['id'], $sipho['email']);
+        $link = $this->connections->view((string) $sipho['id'])['link'];
         $this->telegram->writes(777001, 'Thandi_M', '/start ' . substr($link, strpos($link, '=') + 1));
         $this->inbox->read();
-        $view = $this->connections->view($sipho['id']);
+        $view = $this->connections->view((string) $sipho['id']);
         self::assertSame(['off', TelegramConnections::TAKEN], [$view['state'], $view['note']['words'] ?? '']);
         self::assertStringContainsString('already connected to another account', $this->telegram->textsTo('777001')[1] ?? '');
-        self::assertSame((int) $thandi['id'], $this->accounts->forChat('777001')['user_id'] ?? null, 'It stays Thandi\'s.');
+        self::assertSame((string) $thandi['id'], $this->accounts->forChat('777001')['account'] ?? null, 'It stays Thandi\'s.');
 
         // A used or expired link is answered, and connects nobody.
         $this->telegram->writes(777002, 'someone_else', '/start ' . substr($link, strpos($link, '=') + 1));
@@ -305,7 +307,7 @@ final class TelegramSignInIntegrationTest extends TestCase
         self::assertSame(3, $this->inbox->read());
         self::assertStringStartsWith('This bot sends sign-in messages for ' . OwnerMessages::domain(), $this->telegram->textsTo('888001')[0] ?? '');
         self::assertSame([], $this->telegram->textsTo('888002'), 'Anything else is left alone.');
-        self::assertSame('thandi_new', $this->accounts->forUser($thandi['id'])['username'], 'Her new username.');
+        self::assertSame('thandi_new', $this->accounts->forAccount((string) $thandi['id'])['username'], 'Her new username.');
         self::assertNull($this->auth()->requestTelegramLogin('thandi_m'), 'The old one names nobody now.');
         self::assertSame(0, $this->inbox->read(), 'Read once: what was read is confirmed.');
         self::assertSame('Bot reply', $this->kindOf('connected', null));
@@ -315,8 +317,8 @@ final class TelegramSignInIntegrationTest extends TestCase
     {
         // Telegram keeps unread messages for a day: switching sign-in on must not answer a Start pressed hours before.
         $thandi = $this->person('Thandi Mokoena');
-        $this->connections->start($thandi['id'], $thandi['email']);
-        $link = $this->connections->view($thandi['id'])['link'];
+        $this->connections->start((string) $thandi['id'], $thandi['email']);
+        $link = $this->connections->view((string) $thandi['id'])['link'];
         $old = $this->clock->now()->getTimestamp() - TelegramInbox::ANSWERS_FOR - 60;
         $this->telegram->writes(888003, 'early_riser', '/start', $old);
         $this->telegram->writes(777003, 'Thandi_M', '/start ' . substr($link, strpos($link, '=') + 1), $old);
@@ -329,13 +331,13 @@ final class TelegramSignInIntegrationTest extends TestCase
     public function testNothingIsReadOrSentWhileSignInByTelegramIsOff(): void
     {
         $this->person('Thandi Mokoena', 'thandi_m', '5551001');
-        $this->settings->setSignIn(false, $this->admin);
+        $this->settings->setSignIn(false, $this->actor());
         $this->telegram->writes(888001, 'a_stranger', '/start');
         self::assertSame(0, $this->inbox->read());
         self::assertSame(0, $this->telegram->getUpdatesCalls, 'Telegram is not even asked.');
         self::assertNull($this->auth()->requestTelegramLogin('thandi_m'));
         self::assertFalse($this->auth()->telegramSignInOffered());
-        $this->settings->setSignIn(true, $this->admin);
+        $this->settings->setSignIn(true, $this->actor());
         $this->settings->forget();
         self::assertFalse($this->auth()->telegramSignInOffered(), 'Ticked, with no key: not offered.');
     }
@@ -347,35 +349,49 @@ final class TelegramSignInIntegrationTest extends TestCase
         // Telegram forgets an update when it is next asked from past it, as the job does a minute later.
         self::assertSame(0, $this->inbox->read());
         self::assertSame([], $this->telegram->updates, 'Used up: Telegram no longer has it.');
-        $setup = new OwnerMessageSetup($this->settings, $this->messages, $this->owner(), new TelegramClient($this->telegram->client()), $this->inbox);
-        self::assertTrue($setup->connect(['key' => '', 'username' => '@your_username'], $this->admin)['connected'], 'Found among the chats seen lately.');
+        $setup = new TelegramSetup($this->settings, $this->messages, $this->words(), new TelegramClient($this->telegram->client()), $this->inbox, OwnerMessages::CHOICES);
+        self::assertTrue($setup->connect(['key' => '', 'username' => '@your_username'], $this->actor())['connected'], 'Found among the chats seen lately.');
         self::assertSame('4242', $this->settings->saved()['chat_id']);
-        $without = new OwnerMessageSetup($this->settings, $this->messages, $this->owner(), new TelegramClient($this->telegram->client()));
-        $this->settings->setUsername('someone_new', $this->admin);
-        self::assertFalse($without->connect(['key' => '', 'username' => 'your_username'], $this->admin)['connected'], 'Without the record it would not be: the check guards something.');
+        $without = new TelegramSetup($this->settings, $this->messages, $this->words(), new TelegramClient($this->telegram->client()), null, OwnerMessages::CHOICES);
+        $this->settings->setUsername('someone_new', $this->actor());
+        self::assertFalse($without->connect(['key' => '', 'username' => 'your_username'], $this->actor())['connected'], 'Without the record it would not be: the check guards something.');
     }
 
     public function testTheOwnersJobLeavesAPersonsMessagesAloneAndTheLogSaysWhoEachWentTo(): void
     {
-        $this->settings->setUsername('your_username', $this->admin);
-        $this->settings->setChat('4242', $this->admin);
+        $this->settings->setUsername('your_username', $this->actor());
+        $this->settings->setChat('4242', $this->actor());
         $blocked = $this->person('Lerato Nkosi', 'lerato_n', '5553001');
         $this->telegram->blocked[] = '5553001';
         $auth = $this->auth();
         $auth->requestTelegramLogin('lerato_n');
         self::assertSame(0, $this->messenger->deliverHeld());
-        $row = $this->db->fetchAssociative("SELECT sent_at, last_error, to_username, to_user_id FROM telegram_messages WHERE to_user_id = :user", ['user' => $blocked['id']]);
+        $row = $this->db->fetchAssociative("SELECT sent_at, last_error, to_username, to_account FROM cattophp_telegram_messages WHERE to_account = :user", ['user' => (string) $blocked['id']]);
         self::assertSame([null, TelegramMessenger::BLOCKED, 'lerato_n'], [$row['sent_at'], $row['last_error'], $row['to_username']]);
         self::assertSame(['waiting' => 0, 'last_error' => null], array_intersect_key($this->messages->status(), ['waiting' => 1, 'last_error' => 1]), 'Settings never says the owner is not getting through.');
         $this->messages->record('order:check-' . $this->fixture->suffix(), 'sale', 'Sale: a check');
-        $job = new OwnerMessageJob($this->messages, $this->settings, new TelegramClient($this->telegram->client()), $this->clock, $this->inbox);
+        $job = new OwnerMessageSender($this->messages, $this->settings, new TelegramClient($this->telegram->client()), $this->clock, $this->inbox);
         self::assertStringStartsWith('Sent 1 message.', $job->run(), 'Only the owner\'s own, once.');
         self::assertSame(['Sale: a check'], $this->telegram->textsTo('4242'));
         self::assertSame([], $this->telegram->textsTo('5553001'), 'Nothing sent twice, nor at all, to someone who blocked the bot.');
-        $sale = $this->db->fetchAssociative("SELECT chat_id, to_username FROM telegram_messages WHERE body = 'Sale: a check'");
+        $sale = $this->db->fetchAssociative("SELECT chat_id, to_username FROM cattophp_telegram_messages WHERE body = 'Sale: a check'");
         self::assertSame([null, 'your_username'], [$sale['chat_id'], $sale['to_username']], 'The owner\'s own, with their username when it went.');
-        $page = $this->messages->logPage('sign_in', 25, 0);
+        $page = IntegrationContainer::get()->get(TelegramRepository::class)->logPage('sign_in', 25, 0);
         self::assertSame('Lerato', $page[0]['first_name'] ?? $page[0]['display_name'] ?? null, 'The log names the person.');
+    }
+
+    /** CattoPHP holds a person as text, which no link follows: the triggers do what the old tables' links did (2026-11-12). */
+    public function testADeletedPersonsTelegramAccountGoesAndTheLogsStopNamingThem(): void
+    {
+        $person = $this->person('Naledi Khumalo', 'naledi_k', '5558001');
+        $account = (string) $person['id'];
+        $this->messenger->send('test', '5558001', $account, 'naledi_k', 'Test');
+        $this->db->executeStatement("INSERT INTO cattophp_site_requests (address, subject, account_id, visitor, agent_kind, method, path, status) VALUES ('198.51.100.77', '198.51.100.77', :account, 'signed_in', 'browser', 'GET', '/', 200)", ['account' => $account]);
+        self::assertTrue(IntegrationContainer::get()->get(UserRepository::class)->deleteUnlessKept($person['id']));
+        self::assertNull($this->accounts->forAccount($account), 'The Telegram account went with the person.');
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages WHERE to_account = :account', ['account' => $account]), 'The Telegram log no longer names them.');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_telegram_messages WHERE chat_id = '5558001' AND to_account IS NULL"), 'The message itself stays.');
+        self::assertSame([null], $this->db->fetchFirstColumn("SELECT account_id FROM cattophp_site_requests WHERE address = '198.51.100.77'"), 'The Site Log keeps the request, without the person.');
     }
 
     // Helpers.
@@ -387,27 +403,45 @@ final class TelegramSignInIntegrationTest extends TestCase
         $id = $this->fixture->createUser($name, $email);
         [$first, $last] = explode(' ', $name, 2);
         $this->db->executeStatement('UPDATE users SET first_name = :first, last_name = :last WHERE id = :id', ['first' => $first, 'last' => $last, 'id' => $id]);
-        if ($username !== null || $chat !== null) $this->accounts->connect($id, $chat ?? (string) random_int(100000, 999999), $username);
+        if ($username !== null || $chat !== null) $this->accounts->connect((string) $id, $chat ?? (string) random_int(100000, 999999), $username);
 
         return ['id' => $id, 'email' => $email];
     }
 
     private function owner(): OwnerMessages
     {
-        return new OwnerMessages($this->settings, IntegrationContainer::get()->get(OwnerMessageRepository::class), SiteMode::fixed('live'));
+        return new OwnerMessages($this->settings, $this->messages, $this->words(), new \CattoLearning\OwnerMessages\TelegramRepository($this->db));
+    }
+
+    private function words(): TelegramWords
+    {
+        return new TelegramWords(new \CattoPHP\Runtime\SiteMode(null, 'live'), new \CattoPHP\Installation\Installation(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)));
+    }
+
+    private function actor(): Actor
+    {
+        return new Actor((string) $this->admin, (string) $this->admin);
+    }
+
+    private function connection(): \Doctrine\DBAL\Connection
+    {
+        $db = $this->db;
+        self::assertInstanceOf(\CattoLearning\Infrastructure\Persistence\DbalDatabase::class, $db);
+
+        return $db->connection();
     }
 
     private function auth(): AuthService
     {
         $container = IntegrationContainer::get();
         $cipher = $container->get(SecretCipher::class);
-        $twoStep = new TwoStep($container->get(TwoStepRepository::class), $cipher, new TransactionManager($this->db), $container->get(AuditRepository::class), $this->clock);
+        $twoStep = \CattoLearning\Tests\Support\TwoStepFixture::twoStep($this->clock);
 
         return new AuthService(new TransactionManager($this->db), $container->get(UserRepository::class), $container->get(RoleRepository::class), $container->get(AclService::class),
             $container->get(LoginTokenRepository::class), $container->get(AuthSessionRepository::class), $container->get(AuditRepository::class), new FakeMailer(), $container->get(EventDispatcher::class),
             $container->get(UserProfileRepository::class), null, SiteMode::fixed('live'), $this->restriction, idNumbers: $container->get(IdNumbers::class), ownerMessages: $this->owner(),
-            twoStep: $twoStep, twoStepPolicy: new TwoStepPolicy($this->options), pending: new PendingSignIn($cipher, $this->clock),
-            telegramAccounts: $this->accounts, telegram: $this->messenger, telegramSettings: $this->settings);
+            twoStep: $twoStep, twoStepPolicy: IntegrationContainer::get()->get(TwoStepPolicy::class), pending: new PendingSignIn($cipher, $this->clock),
+            telegramAccounts: new TelegramSignInAccounts($this->accounts, new \CattoLearning\OwnerMessages\TelegramRepository($this->db)), telegram: $this->messenger, telegramSettings: $this->settings);
     }
 
     /** @return array{0:string,1:string} the code and the link's token in the latest message to a chat */
@@ -424,26 +458,26 @@ final class TelegramSignInIntegrationTest extends TestCase
 
     private function assertKeptNowhere(string $code, string $token): void
     {
-        $kept = (string) $this->db->fetchOne("SELECT string_agg(body || ' ' || COALESCE(last_error, ''), ' | ') FROM telegram_messages");
+        $kept = (string) $this->db->fetchOne("SELECT string_agg(body || ' ' || COALESCE(last_error, ''), ' | ') FROM cattophp_telegram_messages");
         self::assertStringNotContainsString($token, $kept, 'No link in the Telegram log.');
         self::assertDoesNotMatchRegularExpression('/(?<!\d)' . $code . '(?!\d)/', $kept, 'No code in the Telegram log.');
-        $audit = (string) $this->db->fetchOne('SELECT string_agg(CAST(metadata AS TEXT), \' \') FROM audit_log WHERE created_at >= :since', ['since' => $this->started]);
+        $audit = (string) $this->db->fetchOne('SELECT string_agg(CAST(details AS TEXT), \' \') FROM cattophp_activity WHERE happened_at >= :since', ['since' => $this->started]);
         self::assertStringNotContainsString($token, $audit, 'No link in the activity log.');
         self::assertStringNotContainsString($code, $audit, 'No code in the activity log.');
-        $tokens = (string) $this->db->fetchOne("SELECT string_agg(CAST(context AS TEXT) || token_hash, ' ') FROM auth_login_tokens WHERE purpose = 'telegram_login' AND created_at >= :since", ['since' => $this->started]);
+        $tokens = (string) $this->db->fetchOne("SELECT string_agg(CAST(context AS TEXT) || token_hash, ' ') FROM cattophp_links WHERE purpose = 'telegram_login' AND created_at >= :since", ['since' => $this->started]);
         self::assertStringNotContainsString($token, $tokens, 'The link is kept only as a hash.');
         self::assertDoesNotMatchRegularExpression('/"' . $code . '"|:' . $code . '\b/', $tokens, 'The code is kept only as a keyed hash.');
     }
 
     private function sessions(int $userId): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM auth_sessions WHERE user_id = :user', ['user' => $userId]);
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_sessions WHERE account_id = CAST(:user AS TEXT)', ['user' => $userId]);
     }
 
     /** What the log calls the latest message of a kind to a person (or to nobody on this site). */
     private function kindOf(string $kind, ?int $userId): string
     {
-        $reference = (string) $this->db->fetchOne('SELECT reference FROM telegram_messages WHERE kind = :kind AND ' . ($userId === null ? 'to_user_id IS NULL' : 'to_user_id = ' . $userId) . ' ORDER BY id DESC LIMIT 1', ['kind' => $kind]);
+        $reference = (string) $this->db->fetchOne('SELECT reference FROM cattophp_telegram_messages WHERE kind = :kind AND ' . ($userId === null ? 'to_account IS NULL' : "to_account = '" . $userId . "'") . ' ORDER BY id DESC LIMIT 1', ['kind' => $kind]);
 
         return str_starts_with($reference, 'connected:') ? 'Connected' : ($reference === '' ? '' : 'Bot reply');
     }

@@ -1,13 +1,13 @@
 {% extends layout %}
 {% block page_body %}
-{# Courses drag into the catalogue's order with a Stimulus controller (course_order, owner 2026-10-20). #}
-{% if admin_section.key in ['ui_components', 'courses'] %}{{ importmap() }}{% endif %}
+{# Courses drag into the catalogue's order with a Stimulus controller (list_order, owner 2026-10-20 and 2026-11-12). #}
+{% if admin_section.key in ['ui_components', 'courses'] %}{{ importmap('app', {nonce: csp_nonce()}) }}{% endif %}
 	{% set ph_kicker = 'Administration' %}
 	{% set ph_title = admin_section.label %}
 	{% set ph_lead = admin_section.description %}
 	{# The section's own actions belong to the page here, so they sit in the page head. #}
-	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: admin_section.actions|default([])} %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% set ph_actions %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: admin_section.actions|default([])} %}{% endset %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section" data-admin-section="{{ admin_section.key }}">
 		{{ admin_section.content|raw }}
 	</section>

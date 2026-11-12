@@ -10,6 +10,10 @@ Description:
 Coordinates Administration role CRUD and ACL mappings. Business capabilities are shared across normal and SEED_* roles; SYSTEM.* permissions remain ADMIN-only.
 
 Changelog:
+2026/11/09 SAST
+- Roles are named by their key, not a number (CattoPHP Phase 2, step 5); CattoPHP's roles keep them and record every change in the
+  activity log (made, changed with the name, description and permissions before and after, renamed, deleted), in place
+  of this service's own entries.
 2026/08/20 04:20 SAST
 - Removed duplicated data-universe permission filtering; normal and SEED_* roles now share one business capability catalogue.
 - Kept role-family labelling and normal/SEED assignment separation while sharing one business permission catalogue.
@@ -22,7 +26,6 @@ namespace CattoLearning\Application;
 use CattoLearning\Auth\AclService;
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use RuntimeException;
 
@@ -33,7 +36,6 @@ final class RoleAdministrationService
         private readonly RoleRepository $roles,
         private readonly PermissionCatalog $catalog,
         private readonly AclService $acl,
-        private readonly AuditRepository $audit
     ) {
     }
 
@@ -54,16 +56,14 @@ final class RoleAdministrationService
     }
 
     /** @return array<string,mixed> */
-    public function role(int $roleId): array
+    public function role(string $roleKey): array
     {
-        $role = $this->roles->findById($roleId);
+        $role = $this->roles->findByKey($roleKey);
         if ($role === null) {
             throw new RuntimeException('The role does not exist.');
         }
         $roleKey = (string) $role['role_key'];
-        $role['permission_keys'] = $roleKey === RoleCatalog::ADMIN
-            ? $this->catalog->keys()
-            : $this->roles->permissionKeysForRole($roleId);
+        $role['permission_keys'] = $this->roles->permissionKeysForRole($roleKey);
         $role['permission_groups'] = $this->catalog->groupedForRole($roleKey);
         $role['is_admin_role'] = $roleKey === RoleCatalog::ADMIN;
         $role['is_builtin_role'] = RoleCatalog::isBuiltIn($roleKey);
@@ -71,67 +71,49 @@ final class RoleAdministrationService
         return $role;
     }
 
-    /** @param array<string,mixed> $input */
-    public function create(array $input, int $actorUserId): int
+    /**
+     * @param array<string,mixed> $input
+     * @return string the new role's key
+     */
+    public function create(array $input, int $actorUserId): string
     {
         $key = $this->normaliseCustomKey((string) ($input['role_key'] ?? ''));
         $name = $this->normaliseName((string) ($input['role_name'] ?? ''));
         $description = trim((string) ($input['role_description'] ?? ''));
-        $roleId = $this->roles->createRole($key, $name, $description);
+        $this->roles->createRole($key, $name, $description, $actorUserId);
         $this->acl->invalidateAll($actorUserId);
-        $this->audit->record($actorUserId, 'acl.role_created', [
-            'role_id' => $roleId,
-            'role_family' => $this->roleFamily($key),
-            'changes' => [
-                ['field' => 'role_key', 'before' => null, 'after' => $key],
-                ['field' => 'role_name', 'before' => null, 'after' => $name],
-                ['field' => 'role_description', 'before' => null, 'after' => $description],
-            ],
-        ]);
-        return $roleId;
+        return $key;
     }
 
-    /** @param array<string,mixed> $input */
-    public function update(int $roleId, array $input, int $actorUserId): void
+    /**
+     * @param array<string,mixed> $input
+     * @return string the role's key, which a custom role may have changed
+     */
+    public function update(string $roleKey, array $input, int $actorUserId): string
     {
-        $current = $this->role($roleId);
-        $isAdmin = (bool) $current['is_admin_role'];
-        $isBuiltIn = (bool) $current['is_builtin_role'];
+        $current = $this->role($roleKey);
         $currentKey = (string) $current['role_key'];
-
-        $key = $isBuiltIn
+        // The Administrator's name and description are fixed: it holds every permission, now and later.
+        if ((bool) $current['is_admin_role']) {
+            return $currentKey;
+        }
+        $key = (bool) $current['is_builtin_role']
             ? $currentKey
-            : $this->normaliseCustomKey((string) ($input['role_key'] ?? $currentKey));
-        
-        if ($isAdmin) {
-            $name = 'Administrator';
-            $description = 'System Administrator';
-        } else {
-            $name = $this->normaliseName((string) ($input['role_name'] ?? $current['role_name']));
-            $description = trim((string) ($input['role_description'] ?? $current['role_description'] ?? ''));
+            : $this->normaliseCustomKey((string) ($input['role_key'] ?? $currentKey), $currentKey);
+        $name = $this->normaliseName((string) ($input['role_name'] ?? $current['role_name']));
+        $description = trim((string) ($input['role_description'] ?? $current['role_description'] ?? ''));
+        if ($key === $currentKey && $name === (string) $current['role_name'] && $description === (string) ($current['role_description'] ?? '')) {
+            return $currentKey;
         }
-
-        $changes = $this->changes($current, [
-            'role_key' => $key,
-            'role_name' => $name,
-            'role_description' => $description,
-        ]);
-        if ($changes === []) {
-            return;
-        }
-        $this->roles->updateRole($roleId, $key, $name, $description);
+        $this->roles->updateRole($currentKey, $key, $name, $description, $actorUserId);
         $this->acl->invalidateAll($actorUserId);
-        $this->audit->record($actorUserId, 'acl.role_updated', [
-            'role_id' => $roleId,
-            'role_family' => $this->roleFamily($key),
-            'changes' => $changes,
-        ]);
+        return $key;
     }
 
     /** @param list<string> $permissionKeys */
-    public function savePermissions(int $roleId, array $permissionKeys, int $actorUserId): void
+    public function savePermissions(string $roleKey, array $permissionKeys, int $actorUserId): void
     {
-        $role = $this->role($roleId);
+        $role = $this->role($roleKey);
         if ((bool) $role['is_admin_role']) {
             throw new RuntimeException('ADMIN always has every permission and its ACL cannot be reduced.');
         }
@@ -146,58 +128,40 @@ final class RoleAdministrationService
             static fn(string $key): bool => isset($allowed[$key])
         )));
         sort($new);
-        $old = $this->roles->permissionKeysForRole($roleId);
+        $old = $this->roles->permissionKeysForRole($roleKey);
         sort($old);
         if ($old === $new) {
             return;
         }
 
-        $this->roles->replaceRolePermissions($roleId, $new);
+        $this->roles->replaceRolePermissions($roleKey, $new, $actorUserId);
         $this->acl->invalidateAll($actorUserId);
-        $added = array_values(array_diff($new, $old));
-        $removed = array_values(array_diff($old, $new));
-        $changes = [];
-        foreach ($added as $key) {
-            $changes[] = ['permission' => $key, 'before' => false, 'after' => true];
-        }
-        foreach ($removed as $key) {
-            $changes[] = ['permission' => $key, 'before' => true, 'after' => false];
-        }
-        $this->audit->record($actorUserId, 'acl.role_permissions_updated', [
-            'role_id' => $roleId,
-            'role_key' => $roleKey,
-            'role_family' => $this->roleFamily($roleKey),
-            'changes' => $changes,
-        ]);
     }
 
-    public function delete(int $roleId, int $actorUserId): void
+    public function delete(string $roleKey, int $actorUserId): void
     {
-        $role = $this->role($roleId);
+        $role = $this->role($roleKey);
         if ((bool) $role['is_builtin_role']) {
             throw new RuntimeException('Built-in roles cannot be deleted.');
         }
         if ((int) ($role['user_count'] ?? 0) > 0) {
             throw new RuntimeException('Remove this role from all users before deleting it.');
         }
-        $this->roles->deleteRole($roleId);
+        $this->roles->deleteRole((string) $role['role_key'], $actorUserId);
         $this->acl->invalidateAll($actorUserId);
-        $this->audit->record($actorUserId, 'acl.role_deleted', [
-            'role_id' => $roleId,
-            'role_key' => (string) $role['role_key'],
-            'role_family' => (string) $role['role_family'],
-            'changes' => [['field' => 'deleted', 'before' => false, 'after' => true]],
-        ]);
     }
 
-    private function normaliseCustomKey(string $key): string
+    private function normaliseCustomKey(string $key, ?string $current = null): string
     {
         $key = strtoupper(trim($key));
-        if (preg_match('/^[A-Z][A-Z0-9_]{1,63}$/', $key) !== 1) {
-            throw new RuntimeException('Custom role keys must use uppercase snake notation. Prefix SEED_ only for seed-only roles.');
+        if (preg_match('/^[A-Z][A-Z0-9_]{1,39}$/', $key) !== 1) {
+            throw new RuntimeException('Custom role keys use uppercase snake notation, at most 40 characters. Prefix SEED_ only for seed-only roles.');
         }
         if (RoleCatalog::isBuiltIn($key)) {
             throw new RuntimeException('That role key is reserved for a permanent built-in role.');
+        }
+        if ($key !== $current && $this->roles->findByKey($key) !== null) {
+            throw new RuntimeException('Another role already has that key.');
         }
         return $key;
     }
@@ -205,8 +169,8 @@ final class RoleAdministrationService
     private function normaliseName(string $name): string
     {
         $name = trim($name);
-        if ($name === '' || mb_strlen($name) > 120) {
-            throw new RuntimeException('Role name is required and may not exceed 120 characters.');
+        if ($name === '' || mb_strlen($name) > 80) {
+            throw new RuntimeException('Role name is required and may not exceed 80 characters.');
         }
         if (preg_match('/^[A-Z][A-Za-z0-9]*$/', $name) !== 1) {
             throw new RuntimeException('Role names must use CamelCase without spaces or punctuation.');
@@ -217,22 +181,5 @@ final class RoleAdministrationService
     private function roleFamily(string $roleKey): string
     {
         return $roleKey === RoleCatalog::ADMIN ? 'Administrator' : 'Normal';
-    }
-
-    /**
-     * @param array<string,mixed> $before
-     * @param array<string,string> $after
-     * @return list<array{field:string,before:mixed,after:mixed}>
-     */
-    private function changes(array $before, array $after): array
-    {
-        $changes = [];
-        foreach ($after as $field => $value) {
-            $old = (string) ($before[$field] ?? '');
-            if ($old !== $value) {
-                $changes[] = ['field' => $field, 'before' => $old, 'after' => $value];
-            }
-        }
-        return $changes;
     }
 }

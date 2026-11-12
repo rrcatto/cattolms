@@ -14,6 +14,9 @@ they are on, when they first joined one and when they last opened an email; and 
 with its opening and clicks, and the history of every answer they gave.
 
 Changelog:
+2026/11/12 SAST
+- The lists, answers, history and addresses never emailed are CattoPHP's (CattoPHP Phase 4, step 9, part 2): the reads go
+  over its tables, a list's subject and a person as text.
 2026/10/28 SAST
 - Created.
 */
@@ -30,8 +33,8 @@ final class SubscriberRepository
     public const CHOICES = ['all' => 'Everyone', 'instant' => 'As they happen', 'daily' => 'Daily digest', 'weekly' => 'Weekly digest', 'monthly' => 'Monthly digest'];
 
     private const LIST_NAME = "CASE l.kind WHEN 'news' THEN 'News and Updates' WHEN 'own' THEN l.name ELSE COALESCE(cat.name, co.title, t.name, '') END";
-    private const LIST_JOINS = "LEFT JOIN course_categories cat ON l.kind = 'category' AND cat.id = l.subject_id
-        LEFT JOIN courses co ON l.kind = 'course' AND co.id = l.subject_id LEFT JOIN tags t ON l.kind = 'tag' AND t.id = l.subject_id";
+    private const LIST_JOINS = "LEFT JOIN course_categories cat ON l.kind = 'category' AND l.subject = CAST(cat.id AS TEXT)
+        LEFT JOIN courses co ON l.kind = 'course' AND l.subject = CAST(co.id AS TEXT) LEFT JOIN tags t ON l.kind = 'tag' AND l.subject = CAST(t.id AS TEXT)";
 
     public function __construct(private readonly Database $db)
     {
@@ -46,9 +49,9 @@ final class SubscriberRepository
             "SELECT u.id AS user_id, u.account_reference, e.email,
                     COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, e.email) AS name,
                     f.lists, f.joined, p.delivery, COALESCE(p.frequency, 'weekly') AS frequency,
-                    (SELECT MAX(d.last_opened_at) FROM mailing_deliveries d WHERE d.user_id = u.id) AS last_opened,
-                    EXISTS (SELECT 1 FROM mailing_suppressions x WHERE x.email = LOWER(e.email)) AS never_emailed
-             FROM (SELECT s.user_id, COUNT(*) AS lists, MIN(s.changed_at) AS joined FROM mailing_subscriptions s WHERE s.status = 'subscribed' GROUP BY s.user_id) f
+                    (SELECT MAX(d.last_opened_at) FROM cattophp_mailing_copies d WHERE d.account = CAST(u.id AS TEXT)) AS last_opened,
+                    EXISTS (SELECT 1 FROM cattophp_mailing_suppressions x WHERE x.email = LOWER(e.email)) AS never_emailed
+             FROM (SELECT CAST(s.account AS BIGINT) AS user_id, COUNT(*) AS lists, MIN(s.changed_at) AS joined FROM cattophp_mailing_subscriptions s WHERE s.status = 'subscribed' GROUP BY s.account) f
              JOIN users u ON u.id = f.user_id JOIN user_emails e ON e.user_id = u.id AND e.is_primary
              LEFT JOIN mailing_preferences p ON p.user_id = u.id
              WHERE " . $where . " ORDER BY f.joined DESC, u.id DESC LIMIT :limit OFFSET :offset",
@@ -61,7 +64,7 @@ final class SubscriberRepository
         [$where, $params] = $this->where($search, $choice);
 
         return (int) $this->db->fetchOne(
-            "SELECT COUNT(*) FROM (SELECT s.user_id FROM mailing_subscriptions s WHERE s.status = 'subscribed' GROUP BY s.user_id) f
+            "SELECT COUNT(*) FROM (SELECT CAST(s.account AS BIGINT) AS user_id FROM cattophp_mailing_subscriptions s WHERE s.status = 'subscribed' GROUP BY s.account) f
              JOIN users u ON u.id = f.user_id JOIN user_emails e ON e.user_id = u.id AND e.is_primary LEFT JOIN mailing_preferences p ON p.user_id = u.id
              WHERE " . $where,
             $params
@@ -76,7 +79,7 @@ final class SubscriberRepository
                     COUNT(*) FILTER (WHERE COALESCE(p.delivery, 'combined') <> 'instant' AND p.frequency = 'daily') AS daily,
                     COUNT(*) FILTER (WHERE COALESCE(p.delivery, 'combined') <> 'instant' AND COALESCE(p.frequency, 'weekly') = 'weekly') AS weekly,
                     COUNT(*) FILTER (WHERE COALESCE(p.delivery, 'combined') <> 'instant' AND p.frequency = 'monthly') AS monthly
-             FROM (SELECT DISTINCT s.user_id FROM mailing_subscriptions s WHERE s.status = 'subscribed') f LEFT JOIN mailing_preferences p ON p.user_id = f.user_id"
+             FROM (SELECT DISTINCT CAST(s.account AS BIGINT) AS user_id FROM cattophp_mailing_subscriptions s WHERE s.status = 'subscribed') f LEFT JOIN mailing_preferences p ON p.user_id = f.user_id"
         );
 
         return array_map('intval', $row === false ? array_fill_keys(array_keys(self::CHOICES), 0) : $row);
@@ -88,7 +91,7 @@ final class SubscriberRepository
         $row = $this->db->fetchAssociative(
             "SELECT u.id AS user_id, u.account_reference, u.status, e.email, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, e.email) AS name,
                     p.delivery, COALESCE(p.frequency, 'weekly') AS frequency, p.last_digest_at,
-                    EXISTS (SELECT 1 FROM mailing_suppressions x WHERE x.email = LOWER(e.email)) AS never_emailed
+                    EXISTS (SELECT 1 FROM cattophp_mailing_suppressions x WHERE x.email = LOWER(e.email)) AS never_emailed
              FROM users u JOIN user_emails e ON e.user_id = u.id AND e.is_primary LEFT JOIN mailing_preferences p ON p.user_id = u.id WHERE u.id = :u",
             ['u' => $userId]
         );
@@ -100,8 +103,8 @@ final class SubscriberRepository
     public function lists(int $userId): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT l.id, l.kind, ' . self::LIST_NAME . " AS name, s.source, s.changed_at FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id " . self::LIST_JOINS . "
-             WHERE s.user_id = :u AND s.status = 'subscribed' ORDER BY s.changed_at DESC",
+            'SELECT l.id, l.kind, ' . self::LIST_NAME . " AS name, s.source, s.changed_at FROM cattophp_mailing_subscriptions s JOIN cattophp_mailing_lists l ON l.id = s.list_id " . self::LIST_JOINS . "
+             WHERE s.account = CAST(:u AS TEXT) AND s.status = 'subscribed' ORDER BY s.changed_at DESC",
             ['u' => $userId]
         );
     }
@@ -112,7 +115,7 @@ final class SubscriberRepository
         return $this->db->fetchAllAssociative(
             "SELECT d.id, d.token, d.campaign_id, d.status, d.handed_at, d.created_at, d.open_count, d.first_opened_at, d.click_count, d.first_clicked_at,
                     COALESCE(NULLIF(d.content->>'subject', ''), NULLIF(c.subject, ''), c.name) AS subject, c.kind
-             FROM mailing_deliveries d JOIN mailing_campaigns c ON c.id = d.campaign_id WHERE d.user_id = :u ORDER BY d.id DESC LIMIT :limit",
+             FROM cattophp_mailing_copies d JOIN cattophp_mailing_campaigns c ON c.id = d.campaign_id WHERE d.account = CAST(:u AS TEXT) ORDER BY d.id DESC LIMIT :limit",
             ['u' => $userId, 'limit' => $limit]
         );
     }
@@ -121,8 +124,8 @@ final class SubscriberRepository
     public function history(int $userId, int $limit): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT ev.status, ev.source, ev.created_at, l.kind, ' . self::LIST_NAME . " AS name FROM mailing_subscription_events ev JOIN mailing_lists l ON l.id = ev.list_id " . self::LIST_JOINS . "
-             WHERE ev.user_id = :u ORDER BY ev.created_at DESC, ev.id DESC LIMIT :limit",
+            'SELECT ev.status, ev.source, ev.created_at, l.kind, ' . self::LIST_NAME . " AS name FROM cattophp_mailing_subscription_events ev JOIN cattophp_mailing_lists l ON l.id = ev.list_id " . self::LIST_JOINS . "
+             WHERE ev.account = CAST(:u AS TEXT) ORDER BY ev.created_at DESC, ev.id DESC LIMIT :limit",
             ['u' => $userId, 'limit' => $limit]
         );
     }

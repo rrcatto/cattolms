@@ -24,7 +24,7 @@ use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\IntegrationContainer;

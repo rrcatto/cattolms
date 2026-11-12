@@ -74,7 +74,7 @@ final class CompanyLogosIntegrationTest extends TestCase
         $picture = $this->logos->picture($this->company);
         self::assertFalse($picture['drawn']);
         self::assertStringContainsString('#123456', $picture['bytes']);
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'company.logo_changed' AND user_id = :id", ['id' => $this->admin]), 'Logged.');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'company.logo_changed' AND actor_id = CAST(:id AS TEXT)", ['id' => $this->admin]), 'Logged.');
 
         $this->logos->remove($this->company, $this->admin);
         self::assertTrue($this->logos->picture($this->company)['drawn']);

@@ -10,6 +10,10 @@ Description:
 Persists roles, user-role assignments and role-permission mappings. Normal and SEED_* roles share one business permission catalogue; SYSTEM.* remains restricted to ADMIN.
 
 Changelog:
+2026/11/09 SAST
+- Kept by CattoPHP's roles (CattoPHP Phase 2, step 5): a person is an account (their number as text), a role is named by its key,
+  the Administrator holds every permission without a row, and every change is in CattoPHP's activity log. The rules of
+  this platform stay here: the learner's baseline role, built-in roles fixed, a role family's permissions.
 2026/08/20 04:20 SAST
 - Removed duplicated data-universe permission coupling while retaining normal/SEED role-family assignment safety.
 - Restored normal built-in role keys while retaining SEED_* test-role counterparts.
@@ -22,14 +26,18 @@ namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
+use CattoPHP\Access\Role;
+use CattoPHP\Access\Roles;
+use CattoPHP\Activity\Actor;
 use RuntimeException;
-use Throwable;
 
-/** Database boundary for role membership and ACL assignment. */
+/** Role membership and ACL assignment, kept by CattoPHP's roles. */
 final class RoleRepository
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly Roles $access,
+        private readonly PermissionCatalog $catalog,
     ) {
     }
 
@@ -43,48 +51,29 @@ final class RoleRepository
         if ($role === RoleCatalog::ADMIN) {
             $this->ensureAdminRole();
         }
-        $roleRow = $this->roleByKey($role);
-        if ($roleRow === null) {
+        if (!isset($this->access->all()[$role])) {
             throw new RuntimeException('Unknown role: ' . $role);
         }
-
-        $current = $this->roles($userId);
-        $candidate = array_values(array_unique([...$current, $role]));
-
         $baseline = RoleCatalog::baselineForRole($role);
-        if ($role !== $baseline && !in_array($baseline, $candidate, true)) {
-            $baselineRow = $this->roleByKey($baseline);
-            if ($baselineRow === null) {
+        if ($role !== $baseline && !in_array($baseline, $this->roles($userId), true)) {
+            if (!isset($this->access->all()[$baseline])) {
                 throw new RuntimeException('Required baseline role is missing: ' . $baseline);
             }
-            $this->insertUserRole($userId, (int) $baselineRow['id']);
+            $this->access->grant((string) $userId, $baseline);
         }
-        $this->insertUserRole($userId, (int) $roleRow['id']);
+        $this->access->grant((string) $userId, $role);
     }
 
     /** @return list<string> */
     public function roles(int $userId): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT r.role_key FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=:user_id ORDER BY r.role_key',
-            ['user_id' => $userId]
-        );
-        return array_map(static fn(array $row): string => (string) $row['role_key'], $rows);
+        return $this->access->rolesOf((string) $userId);
     }
 
     /** @return list<string> */
     public function permissionsForUser(int $userId): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT DISTINCT p.permission_key
-             FROM user_roles ur
-             JOIN role_permissions rp ON rp.role_id=ur.role_id
-             JOIN permissions p ON p.id=rp.permission_id
-             WHERE ur.user_id=:user_id
-             ORDER BY p.permission_key',
-            ['user_id' => $userId]
-        );
-        return array_map(static fn(array $row): string => (string) $row['permission_key'], $rows);
+        return $this->access->permissionsOf((string) $userId);
     }
 
     public function bootstrapAdministrator(int $userId, string $email, string $configuredAdminEmail): bool
@@ -97,174 +86,141 @@ final class RoleRepository
         return true;
     }
 
-    /** Recreates the protected ADMIN row when only that row has been lost. */
-    public function ensureAdminRole(): int
+    /** Recreates the protected ADMIN role when only it has been lost: CattoPHP's schema makes it, holding every permission. */
+    public function ensureAdminRole(): void
     {
-        $rows = $this->db->fetchAllAssociative(
-            "INSERT INTO roles (role_key,role_name,role_description)
-             VALUES ('ADMIN','Administrator','System Administrator')
-             ON CONFLICT (role_key) DO UPDATE SET role_name=EXCLUDED.role_name, role_description=EXCLUDED.role_description
-             RETURNING id"
+        $made = $this->db->executeStatement(
+            "INSERT INTO cattophp_roles (key, name, description, created_at, updated_at)
+             VALUES ('ADMIN', 'Administrator', 'Holds every permission, now and as new ones are added.', NOW(), NOW())
+             ON CONFLICT (key) DO NOTHING"
         );
-        return (int) ($rows[0]['id'] ?? 0);
+        if ($made > 0) {
+            $this->access->refresh();
+        }
     }
 
     public function revoke(int $userId, string $role): void
     {
         $role = strtoupper(trim($role));
-        if (in_array($role, [RoleCatalog::STUDENT, RoleCatalog::STUDENT], true)) {
+        if ($role === RoleCatalog::STUDENT) {
             throw new RuntimeException('The baseline learner role cannot be removed directly.');
         }
-        $row = $this->roleByKey($role);
-        if ($row === null) {
+        if (!isset($this->access->all()[$role])) {
             throw new RuntimeException('Unknown role: ' . $role);
         }
-        $this->db->executeStatement(
-            'DELETE FROM user_roles WHERE user_id=:user_id AND role_id=:role_id',
-            ['user_id' => $userId, 'role_id' => (int) $row['id']]
-        );
+        $this->access->revoke((string) $userId, $role);
     }
 
     /** The earliest account holding the role, or null when none does. */
     public function firstUserWithRole(string $role): ?int
     {
-        $id = $this->db->fetchOne('SELECT ur.user_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.role_key = :role ORDER BY ur.user_id LIMIT 1', ['role' => $role]);
+        $id = $this->db->fetchOne('SELECT MIN(account_person(account_id)) FROM cattophp_account_roles WHERE role_key = :role', ['role' => strtoupper(trim($role))]);
         return $id === false || $id === null ? null : (int) $id;
     }
 
     public function countUsersWithRole(string $role): int
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT COUNT(*)::int AS total FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE r.role_key=:role',
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(*) FROM cattophp_account_roles WHERE role_key = :role AND account_person(account_id) IS NOT NULL',
             ['role' => strtoupper(trim($role))]
         );
-        return (int) ($rows[0]['total'] ?? 0);
     }
 
     public function countActiveUsersWithRole(string $role): int
     {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT COUNT(*)::int AS total
-             FROM user_roles ur JOIN roles r ON r.id=ur.role_id JOIN users u ON u.id=ur.user_id
-             WHERE r.role_key=:role AND u.status='active'",
+        return (int) $this->db->fetchOne(
+            "SELECT COUNT(*) FROM cattophp_account_roles ar JOIN users u ON u.id = account_person(ar.account_id)
+             WHERE ar.role_key = :role AND u.status = 'active'",
             ['role' => strtoupper(trim($role))]
         );
-        return (int) ($rows[0]['total'] ?? 0);
     }
 
-    /** @return list<array<string,mixed>> */
+    /** @return list<array{role_key:string,role_name:string,role_description:string}> the Administrator, the built-in roles, seed roles, then the rest by name */
     public function all(): array
     {
-        return $this->db->fetchAllAssociative(
-            "SELECT id,role_key,role_name,role_description FROM roles
-             ORDER BY CASE
-               WHEN role_key='ADMIN' THEN 0
-               WHEN role_key IN ('STUDENT','COMPANY_ADMIN','COURSE_EDITOR','COURSE_OWNER') THEN 1
-               WHEN role_key LIKE 'SEED\\_%' ESCAPE '\\' THEN 2
-               ELSE 3 END, role_name"
-        );
+        $roles = array_map(static fn(Role $role): array => ['role_key' => $role->key, 'role_name' => $role->name, 'role_description' => $role->description],
+            array_values($this->access->all()));
+        usort($roles, static fn(array $a, array $b): int => [self::rank($a['role_key']), $a['role_name']] <=> [self::rank($b['role_key']), $b['role_name']]);
+        return $roles;
     }
 
     /** @return list<array<string,mixed>> */
     public function allWithPermissionCounts(): array
     {
-        return $this->db->fetchAllAssociative(
-            "SELECT r.id,r.role_key,r.role_name,r.role_description,
-                    COUNT(DISTINCT ur.user_id)::int AS user_count,
-                    COUNT(DISTINCT rp.permission_id)::int AS permission_count
-             FROM roles r
-             LEFT JOIN user_roles ur ON ur.role_id=r.id
-             LEFT JOIN role_permissions rp ON rp.role_id=r.id
-             GROUP BY r.id
-             ORDER BY CASE
-               WHEN r.role_key='ADMIN' THEN 0
-               WHEN r.role_key IN ('STUDENT','COMPANY_ADMIN','COURSE_EDITOR','COURSE_OWNER') THEN 1
-               WHEN r.role_key LIKE 'SEED\\_%' ESCAPE '\\' THEN 2
-               ELSE 3 END,r.role_name"
-        );
-    }
-
-    /** @return array<string,mixed>|null */
-    public function findById(int $roleId): ?array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT r.id,r.role_key,r.role_name,r.role_description,
-                    COUNT(DISTINCT ur.user_id)::int AS user_count
-             FROM roles r LEFT JOIN user_roles ur ON ur.role_id=r.id
-             WHERE r.id=:id GROUP BY r.id LIMIT 1",
-            ['id' => $roleId]
-        );
-        return $rows[0] ?? null;
+        $holders = [];
+        foreach ($this->db->fetchAllAssociative('SELECT role_key, COUNT(*)::int AS total FROM cattophp_account_roles GROUP BY role_key') as $row) {
+            $holders[(string) $row['role_key']] = (int) $row['total'];
+        }
+        return array_map(fn(array $role): array => $role + [
+            'user_count' => $holders[$role['role_key']] ?? 0,
+            'permission_count' => count($this->permissionKeysForRole($role['role_key'])),
+        ], $this->all());
     }
 
     /** @return array<string,mixed>|null */
     public function findByKey(string $roleKey): ?array
     {
-        return $this->roleByKey(strtoupper(trim($roleKey)));
+        $roleKey = strtoupper(trim($roleKey));
+        foreach ($this->all() as $role) {
+            if ($role['role_key'] === $roleKey) {
+                return $role + ['user_count' => (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_account_roles WHERE role_key = :role', ['role' => $roleKey])];
+            }
+        }
+        return null;
     }
 
-    public function createRole(string $key, string $name, string $description): int
+    public function createRole(string $key, string $name, string $description, ?int $actorUserId = null): void
     {
-        if (preg_match('/^[A-Z][A-Z0-9_]{1,63}$/', $key) !== 1 || RoleCatalog::isBuiltIn($key)) {
-            throw new RuntimeException('Custom role keys must use uppercase snake notation and must not reuse a built-in key.');
+        if (preg_match('/^[A-Z][A-Z0-9_]{1,39}$/', $key) !== 1 || RoleCatalog::isBuiltIn($key)) {
+            throw new RuntimeException('Custom role keys must use uppercase snake notation, at most 40 characters, and must not reuse a built-in key.');
         }
-        try {
-            $rows = $this->db->fetchAllAssociative(
-                'INSERT INTO roles (role_key,role_name,role_description) VALUES (:key,:name,:description) RETURNING id',
-                ['key' => $key, 'name' => $name, 'description' => $description]
-            );
-        } catch (Throwable $e) {
-            throw new RuntimeException('Unable to create the role. The role key may already exist.', 0, $e);
+        if (isset($this->access->all()[$key])) {
+            throw new RuntimeException('Unable to create the role. The role key already exists.');
         }
-        return (int) ($rows[0]['id'] ?? 0);
+        $this->access->save($key, $name, $description, [], self::actor($actorUserId));
     }
 
-    public function updateRole(int $roleId, string $key, string $name, string $description): void
+    /** Changes a role's details; a custom role's key may change too, its permissions and holders going with it. */
+    public function updateRole(string $currentKey, string $key, string $name, string $description, ?int $actorUserId = null): void
     {
-        $current = $this->findById($roleId);
-        if ($current === null) {
-            throw new RuntimeException('The role does not exist.');
-        }
-        $currentKey = (string) $current['role_key'];
+        $current = $this->access->all()[$currentKey] ?? throw new RuntimeException('The role does not exist.');
         if (RoleCatalog::isBuiltIn($currentKey) && $key !== $currentKey) {
             throw new RuntimeException('Built-in role keys cannot be changed.');
         }
-                $this->db->executeStatement(
-            'UPDATE roles SET role_key=:key,role_name=:name,role_description=:description WHERE id=:id',
-            ['key' => $key, 'name' => $name, 'description' => $description, 'id' => $roleId]
-        );
+        if ($key !== $currentKey) {
+            $this->access->rename($currentKey, $key, self::actor($actorUserId));
+        }
+        if ($name !== $current->name || $description !== $current->description) {
+            $this->access->save($key, $name, $description, $current->permissions, self::actor($actorUserId));
+        }
     }
 
-    public function deleteRole(int $roleId): void
+    public function deleteRole(string $roleKey, ?int $actorUserId = null): void
     {
-        $role = $this->findById($roleId);
-        if ($role === null) {
+        if (!isset($this->access->all()[$roleKey])) {
             return;
         }
-        if (RoleCatalog::isBuiltIn((string) $role['role_key'])) {
+        if (RoleCatalog::isBuiltIn($roleKey)) {
             throw new RuntimeException('Built-in roles cannot be deleted.');
         }
-        $this->db->executeStatement('DELETE FROM roles WHERE id=:id', ['id' => $roleId]);
+        $this->access->delete($roleKey, self::actor($actorUserId));
     }
 
-    /** @return list<string> */
-    public function permissionKeysForRole(int $roleId): array
+    /** @return list<string> the role's permissions; the Administrator's are every one */
+    public function permissionKeysForRole(string $roleKey): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT p.permission_key FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE rp.role_id=:role_id ORDER BY p.permission_key',
-            ['role_id' => $roleId]
-        );
-        return array_map(static fn(array $row): string => (string) $row['permission_key'], $rows);
+        if ($roleKey === RoleCatalog::ADMIN) {
+            return $this->catalog->keys();
+        }
+        $permissions = $this->access->all()[$roleKey]->permissions ?? [];
+        sort($permissions);
+        return $permissions;
     }
 
     /** @param list<string> $permissionKeys */
-    public function replaceRolePermissions(int $roleId, array $permissionKeys): void
+    public function replaceRolePermissions(string $roleKey, array $permissionKeys, ?int $actorUserId = null): void
     {
-        $role = $this->findById($roleId);
-        if ($role === null) {
-            throw new RuntimeException('The role does not exist.');
-        }
-        $roleKey = (string) $role['role_key'];
+        $role = $this->access->all()[$roleKey] ?? throw new RuntimeException('The role does not exist.');
         if ($roleKey === RoleCatalog::ADMIN) {
             throw new RuntimeException('ADMIN permissions are immutable.');
         }
@@ -273,23 +229,7 @@ final class RoleRepository
                 throw new RuntimeException('That permission is not assignable to the selected role family: ' . $key);
             }
         }
-
-        $this->db->beginTransaction();
-        try {
-            $this->db->executeStatement('DELETE FROM role_permissions WHERE role_id=:role_id', ['role_id' => $roleId]);
-            foreach ($permissionKeys as $key) {
-                $this->db->executeStatement(
-                    'INSERT INTO role_permissions (role_id,permission_id)
-                     SELECT :role_id,p.id FROM permissions p WHERE p.permission_key=:permission_key
-                     ON CONFLICT (role_id,permission_id) DO NOTHING',
-                    ['role_id' => $roleId, 'permission_key' => $key]
-                );
-            }
-            $this->db->commit();
-        } catch (Throwable $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+        $this->access->save($roleKey, $role->name, $role->description, $permissionKeys, self::actor($actorUserId));
     }
 
     /** @param list<string> $roles */
@@ -309,8 +249,7 @@ final class RoleRepository
             $roles[] = RoleCatalog::STUDENT;
         }
 
-        $current = $this->roles($userId);
-        foreach ($current as $role) {
+        foreach ($this->roles($userId) as $role) {
             if (!in_array($role, $roles, true) && $role !== RoleCatalog::STUDENT) {
                 $this->revoke($userId, $role);
             }
@@ -318,25 +257,21 @@ final class RoleRepository
         foreach ($roles as $role) {
             $this->assign($userId, $role);
         }
-
     }
 
-    /** @return array<string,mixed>|null */
-    private function roleByKey(string $role): ?array
+    /** Where a role is listed: the Administrator, the built-in roles, seed roles, then the rest. */
+    private static function rank(string $key): int
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT id,role_key,role_name,role_description FROM roles WHERE role_key=:role LIMIT 1',
-            ['role' => $role]
-        );
-        return $rows[0] ?? null;
+        return match (true) {
+            $key === RoleCatalog::ADMIN => 0,
+            RoleCatalog::isBuiltIn($key) => 1,
+            str_starts_with($key, 'SEED_') => 2,
+            default => 3,
+        };
     }
 
-    private function insertUserRole(int $userId, int $roleId): void
+    private static function actor(?int $userId): ?Actor
     {
-        $this->db->executeStatement(
-            'INSERT INTO user_roles (user_id,role_id,created_at)
-             VALUES (:user_id,:role_id,NOW()) ON CONFLICT (user_id,role_id) DO NOTHING',
-            ['user_id' => $userId, 'role_id' => $roleId]
-        );
+        return $userId !== null && $userId > 0 ? new Actor((string) $userId, (string) $userId) : null;
     }
 }

@@ -24,7 +24,7 @@ namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use PHPUnit\Framework\TestCase;
 
 final class ListViewTest extends TestCase

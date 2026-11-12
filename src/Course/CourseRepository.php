@@ -93,7 +93,7 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Support\Env;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
 use CattoLearning\View\Artwork\ArtworkGenerator;
@@ -162,8 +162,8 @@ final class CourseRepository
         // Its code (owner, 2026-10-23).
         'code' => 'c.code',
         'title' => 'c.title',
-        // What the course is sold at now (owner, 2026-10-20): its active default price.
-        'price' => '(SELECT spv.price_minor_units FROM course_price_variants spv WHERE spv.course_id = c.id AND spv.is_active = TRUE AND spv.is_default = TRUE)',
+        // What the course is sold at now (owner, 2026-10-20): its default price on sale today (2026-11-11: dated prices).
+        'price' => '(SELECT spv.price_minor_units FROM course_prices_on_sale spv WHERE spv.course_id = c.id AND spv.is_default = TRUE)',
         'category' => '(SELECT scc.name FROM course_categories scc WHERE scc.id = c.category_id)',
         'status' => 'c.status',
         'editors' => '(SELECT COUNT(*) FROM course_editors sed WHERE sed.course_id = c.id)',
@@ -181,7 +181,7 @@ final class CourseRepository
      * where it is shown.
      */
     private const CATALOGUE_DETAIL = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
-                    c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
+                    c.estimated_minutes, c.course_type, c.default_access_period_seconds, c.certificate_enabled,
                     c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
                     NULL::text AS cover_media_public_id,
                     -- The cover picture in the card's header (owner, 2026-10-20), on catalogue pages only.
@@ -190,12 +190,12 @@ final class CourseRepository
                     (SELECT COUNT(*)::int FROM assessment_questions aq
                        JOIN course_item_placements cip ON cip.course_item_id = aq.course_item_id
                       WHERE cip.course_id = c.id) AS question_count,
-                    (SELECT cpv.id FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
-                    (SELECT cpv.price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
-                    (SELECT cpv.was_price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_was_price_minor_units,
-                    (SELECT cpv.currency_code FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
-                    (SELECT cpv.access_period_seconds FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_access_period_seconds,
-                    (SELECT COUNT(*)::int FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE) AS active_price_variant_count
+                    (SELECT cpv.id FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
+                    (SELECT cpv.price_minor_units FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
+                    (SELECT cpv.was_price_minor_units FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id AND cpv.is_default=TRUE LIMIT 1) AS default_was_price_minor_units,
+                    (SELECT cpv.currency_code FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
+                    (SELECT cpv.access_period_seconds FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id AND cpv.is_default=TRUE LIMIT 1) AS default_price_access_period_seconds,
+                    (SELECT COUNT(*)::int FROM course_prices_on_sale cpv WHERE cpv.course_id=c.id) AS active_price_variant_count
              FROM page
              JOIN courses c ON c.id = page.id
              LEFT JOIN course_categories cc ON cc.id = c.category_id";
@@ -385,7 +385,7 @@ final class CourseRepository
             . '' . $match;
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level, c.status,
-                    c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
+                    c.estimated_minutes, c.course_type, c.default_access_period_seconds, c.certificate_enabled,
                     c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
                     c.owner_company_id, oc.name AS owner_company_name,
                     (c.owner_company_id = :company_id) AS is_company_owned,
@@ -616,7 +616,7 @@ final class CourseRepository
 
     private static function courseAdministrationDetail(): string
     {
-        return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position, c.cover_svg,
+        return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position, c.cover_svg, c.course_type, c.estimated_minutes,
                     c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id, c.category_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,
@@ -631,11 +631,15 @@ final class CourseRepository
                     dpv.price_minor_units AS default_price_minor_units, dpv.was_price_minor_units AS default_was_price_minor_units,
                     dpv.currency_code AS default_currency_code, dpv.access_period_seconds AS default_price_access_period_seconds,
                     /* Its default price and how many price options it has: a row edits the default price only while it is the one (owner, 2026-11-01). */
-                    dpv.id AS default_price_id, (SELECT COUNT(*)::int FROM course_price_variants pv WHERE pv.course_id=c.id) AS price_option_count
+                    dpv.id AS default_price_id, (SELECT COUNT(*)::int FROM course_price_variants pv WHERE pv.course_id=c.id) AS price_option_count,
+                    /* What it is sold at today (owner, 2026-11-11: dated prices); nothing when no price is on sale. */
+                    cur.price_minor_units AS current_price_minor_units, cur.was_price_minor_units AS current_was_price_minor_units,
+                    cur.currency_code AS current_currency_code, cur.access_period_seconds AS current_price_access_period_seconds
              FROM page
              JOIN courses c ON c.id=page.id
              LEFT JOIN course_categories cc ON cc.id=c.category_id
              LEFT JOIN course_price_variants dpv ON dpv.course_id=c.id AND dpv.is_active=TRUE AND dpv.is_default=TRUE
+             LEFT JOIN course_prices_on_sale cur ON cur.course_id=c.id AND cur.is_default=TRUE
              LEFT JOIN companies oc ON oc.id=c.owner_company_id
              LEFT JOIN users ou ON ou.id=c.owner_user_id
              LEFT JOIN user_emails oue ON oue.user_id=ou.id AND oue.is_primary=TRUE";
@@ -1515,6 +1519,23 @@ final class CourseRepository
     }
 
     /**
+     * Every course with its code and position in the catalogue's order, locked, for Renumber (CataloguePositions).
+     *
+     * @return list<array{id:int,code:string,position:?int}>
+     */
+    public function catalogueRenumberRows(): array
+    {
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'position' => $row['catalogue_position'] === null ? null : (int) $row['catalogue_position']],
+            $this->db->fetchAllAssociative('SELECT id, code, catalogue_position FROM courses ORDER BY ' . str_replace('c.', '', self::ADMIN_COURSE_ORDER) . ' FOR UPDATE'));
+    }
+
+    /** A course's place in the catalogue, renumbered: its date of change is left alone, since the course itself did not change. */
+    public function placeInCatalogue(int $courseId, int $position): void
+    {
+        $this->db->executeStatement('UPDATE courses SET catalogue_position = :position WHERE id = :id', ['position' => $position, 'id' => $courseId]);
+    }
+
+    /**
      * Puts an uncategorised course in a category (the catalogue file, owner 2026-10-20). A course that already has
      * one keeps it: false then.
      */
@@ -1791,6 +1812,20 @@ final class CourseRepository
         return array_map(fn(array $row): array => $this->normaliseRow($row), $rows);
     }
 
+    /**
+     * The course's prices a buyer can choose today (owner, 2026-11-11): active, inside their dates, an overriding price in the
+     * default's place (the view course_prices_on_sale).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function priceVariantsOnSale(int $courseId): array
+    {
+        return array_map(fn(array $row): array => $this->normaliseRow($row), $this->db->fetchAllAssociative(
+            'SELECT * FROM course_prices_on_sale WHERE course_id = :course_id ORDER BY position, id',
+            ['course_id' => $courseId]
+        ));
+    }
+
     /** @return array<string,mixed>|null */
     public function priceVariant(int $courseId, int $variantId): ?array
     {
@@ -1808,9 +1843,9 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_price_variants
                  (public_id,course_id,access_period_seconds,price_minor_units,was_price_minor_units,currency_code,
-                  label,position,is_active,is_default,created_by_user_id,updated_by_user_id,created_at,updated_at)
+                  label,position,is_active,is_default,starts_at,ends_at,overrides_default,created_by_user_id,updated_by_user_id,created_at,updated_at)
              VALUES (:public_id,:course_id,:access_period_seconds,:price_minor_units,:was_price_minor_units,:currency_code,
-                     :label,:position,:is_active,:is_default,:created_by,:updated_by,:created_at,:updated_at)
+                     :label,:position,:is_active,:is_default,:starts_at,:ends_at,:overrides_default,:created_by,:updated_by,:created_at,:updated_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
@@ -1823,6 +1858,9 @@ final class CourseRepository
                 'position' => (int) $data['position'],
                 'is_active' => (bool) $data['is_active'],
                 'is_default' => (bool) $data['is_default'],
+                'starts_at' => $data['starts_at'] ?? null,
+                'ends_at' => $data['ends_at'] ?? null,
+                'overrides_default' => (bool) ($data['overrides_default'] ?? false),
                 'created_by' => $userId,
                 'updated_by' => $userId,
                 'created_at' => gmdate('Y-m-d H:i:sP'),
@@ -1840,6 +1878,7 @@ final class CourseRepository
             'UPDATE course_price_variants
                 SET access_period_seconds=:access_period_seconds,price_minor_units=:price_minor_units,
                     was_price_minor_units=:was_price_minor_units,currency_code=:currency_code,label=:label,is_active=:is_active,is_default=:is_default,
+                    starts_at=:starts_at,ends_at=:ends_at,overrides_default=:overrides_default,
                     updated_by_user_id=:updated_by,updated_at=:updated_at
               WHERE course_id=:course_id AND id=:id',
             [
@@ -1850,6 +1889,9 @@ final class CourseRepository
                 'label' => trim((string) ($data['label'] ?? '')) ?: null,
                 'is_active' => (bool) $data['is_active'],
                 'is_default' => (bool) $data['is_default'],
+                'starts_at' => $data['starts_at'] ?? null,
+                'ends_at' => $data['ends_at'] ?? null,
+                'overrides_default' => (bool) ($data['overrides_default'] ?? false),
                 'updated_by' => $userId,
                 'updated_at' => gmdate('Y-m-d H:i:sP'),
                 'course_id' => $courseId,
@@ -1906,7 +1948,7 @@ final class CourseRepository
             ['course_id' => $courseId, 'user_id' => $userId]
         );
         $this->db->executeStatement(
-            'UPDATE course_price_variants SET is_default=TRUE,is_active=TRUE,updated_by_user_id=:user_id,updated_at=NOW() WHERE course_id=:course_id AND id=:id',
+            'UPDATE course_price_variants SET is_default=TRUE,is_active=TRUE,overrides_default=FALSE,updated_by_user_id=:user_id,updated_at=NOW() WHERE course_id=:course_id AND id=:id',
             ['course_id' => $courseId, 'id' => $variantId, 'user_id' => $userId]
         );
     }
@@ -2076,13 +2118,13 @@ final class CourseRepository
                   certificate_enabled,certificate_accreditation,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
                   publication_approval_status,interchange_schema_version,created_by_user_id,updated_by_user_id,
-                  created_at,updated_at,cover_svg)
+                  created_at,updated_at,cover_svg,course_type)
              VALUES (:public_id,:code,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,
                      :certificate_enabled,:certificate_accreditation,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
                      :publication_approval_status,:interchange_schema_version,:created_by,:updated_by,
-                     :created_at,:updated_at,:cover_svg)
+                     :created_at,:updated_at,:cover_svg,:course_type)
              RETURNING id',
             [
                 'public_id' => $publicId,
@@ -2115,6 +2157,8 @@ final class CourseRepository
                 // Seeded on the public id rather than the title: two courses may share a name, and
                 // a renamed course keeps the cover its learners already recognise.
                 'cover_svg' => $this->artwork->courseCover($publicId, (string) $data['title']),
+                // A full course or a short course (Course Specification 4.13, section 15).
+                'course_type' => ($data['course_type'] ?? 'full') === 'short' ? 'short' : 'full',
             ]
         );
 
@@ -2160,6 +2204,8 @@ final class CourseRepository
             'presentation_css' => 'presentation_css',
             'owner_company_id' => 'owner_company_id',
             'owner_user_id' => 'owner_user_id',
+            // Written by an import, which reads the course's type from its file; the Details form leaves it alone.
+            'course_type' => 'course_type',
         ];
         foreach ($optional as $key => $column) {
             if (array_key_exists($key, $data)) {
@@ -2532,6 +2578,13 @@ final class CourseRepository
                  WHERE enrolment_id=:enrolment_id AND status='assigned'",
                 ['enrolment_id' => $enrolmentId]
             );
+            // A bundle credit is used whole once its person starts any of its courses (owner, 2026-11-11: the bundle
+            // stays together and is given to one person).
+            $this->db->executeStatement(
+                "UPDATE bundle_credit_allocations SET status='consumed', consumed_at=NOW()
+                  WHERE status='assigned' AND id IN (SELECT allocation_id FROM bundle_credit_enrolments WHERE enrolment_id=:enrolment_id)",
+                ['enrolment_id' => $enrolmentId]
+            );
         }
     }
 
@@ -2862,7 +2915,7 @@ final class CourseRepository
         $booleanKeys = [
             'certificate_enabled', 'is_review', 'assessment_required', 'required', 'is_correct', 'is_passing',
             'passed', 'is_public', 'practice_enabled', 'randomise_questions', 'randomise_options',
-            'negative_marking', 'practice_eligible', 'graded_eligible', 'is_preview', 'is_visible', 'is_active', 'is_default',
+            'negative_marking', 'practice_eligible', 'graded_eligible', 'is_preview', 'is_visible', 'is_active', 'is_default', 'overrides_default',
         ];
         foreach ($booleanKeys as $key) {
             if (array_key_exists($key, $row)) {

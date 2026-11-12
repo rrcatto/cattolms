@@ -8,7 +8,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseReviewRepository;
 use CattoLearning\Course\CourseReviewService;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;

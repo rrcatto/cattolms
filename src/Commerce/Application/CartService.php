@@ -59,6 +59,9 @@ final class CartService
             // A marked-down price shows its was price struck through (owner, 2026-10-20); only the price counts.
             $item += WasPrice::labels($money->minorUnits, $item['was_price_minor_units'] ?? null, $money->currency);
             $item['days'] = (int) $item['access_period_seconds'] / 86400;
+            // The checkout review's line: its access in words and its drawn cover (owner, 2026-11-11, the approved Review mockup).
+            $item['access_label'] = AccessPeriod::label((int) $item['access_period_seconds']);
+            $item['cover'] = ($item['cover_version'] ?? null) !== null ? '/courses/' . $item['slug'] . '/cover.svg?v=' . $item['cover_version'] : null;
             $total = $total->plus($money);
         }
         unset($item);
@@ -71,6 +74,7 @@ final class CartService
             $bundle['price_label'] = $money->format();
             $bundle += WasPrice::labels($money->minorUnits, $bundle['was_price_minor_units'] ?? null, $money->currency);
             $bundle['access_label'] = AccessPeriod::label((int) $bundle['access_period_seconds']);
+            $bundle['cover'] = ($bundle['cover_version'] ?? null) !== null && ($bundle['status'] ?? '') === 'published' ? '/bundles/' . $bundle['slug'] . '/cover.svg?v=' . $bundle['cover_version'] : null;
             $bundle['course_count'] = count($bundle['courses']);
             $bundle['course_titles'] = array_map(static fn(array $c): string => (string) $c['title'], $bundle['courses']);
             $bundle['owned_count'] = 0;

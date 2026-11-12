@@ -19,7 +19,7 @@
 		{{ ui('action.link', {label: 'Everything it did', variant: 'secondary', href: log_href, icon: 'action-view-all'}) }}
 		{% if can_manage and flag and not flag.fine %}<form action="/admin/site-analytics/flagged/fine" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="a" value="{{ subject }}">{{ ui('action.button', {label: 'Not a problem', variant: 'secondary', type: 'submit', icon: 'action-done'}) }}</form>{% endif %}
 	{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% if force %}
 	<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: force.what ~ ': ' ~ force.which|lower ~ ' ' ~ force.until_short})} %}{% block body %}<p>{{ force.why }} It sees a plain page saying the site is not available, and nothing more. {{ force.refused }} refused so far.</p>{% if can_manage %}<form action="/admin/site-analytics/lockouts/{{ force.id }}/lift" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return" value="{{ href }}">{{ ui('action.button', {label: 'Lift this lockout', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-lift'}) }}</form>{% endif %}{% endblock %}{% endembed %}</section>
 	{% endif %}
@@ -37,7 +37,7 @@
 				<ul class="mb-0">{% for line in why %}<li>{{ line }}</li>{% endfor %}</ul>
 			{% endblock %}{% endembed %}{% endif %}
 			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'did'})} %}{% block surface_body %}
-				{% include '@platform/partials/live-status.html.twig' with {live_seconds: 30} %}
+				{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 30} %}
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'What it did'})} %}{% block section_actions %}{{ ui('action.link', {label: 'All ' ~ figures.requests|number_format ~ ' in the Site Log', variant: 'secondary', size: 'small', icon: 'action-view-all', href: log_href}) }}{% endblock %}{% endembed %}
 				{% if did %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 				{% block header %}<tr><th>When</th><th>Page</th><th>Answer</th></tr>{% endblock %}

@@ -7,7 +7,7 @@
 <ol class="cl-course-modules" aria-labelledby="{{ list_label_id }}">
 	{% for module in modules_view.modules %}
 		<li>
-			<span class="cl-course-module-number">{{ module.number }}</span>
+			{% if module.number is not null %}<span class="cl-course-module-number">{{ module.number }}</span>{% endif %}
 			<span class="cl-course-module-text">
 				<span class="cl-course-module-title">{{ module.title }}</span>
 				<span class="cl-course-module-time">{{ module.time }}{% if module.preview %} · <a href="/courses/{{ course_slug }}/preview">Free preview</a>{% endif %}</span>

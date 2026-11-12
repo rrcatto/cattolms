@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Support\TreeArrangement;
-use CattoLearning\Support\TreeMoveRefused;
+use CattoPHP\Ui\TreeArrangement;
+use CattoPHP\Ui\TreeMoveRefused;
 use InvalidArgumentException;
 
 /**

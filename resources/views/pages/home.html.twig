@@ -4,7 +4,7 @@
 		Home has a hero rather than a page head, so it includes the identity band directly. It is
 		still the same band in the same place - first thing under the top of the page.
 	#}
-	{% include '@platform/partials/account/identity-head.html.twig' %}
+	{% include '@CattoPHP/page/identity.html.twig' %}
 	<section class="cl-hero">
 		<div class="cl-container py-12 py-lg-6">
 			<div class="row align-items-center min-vh-hero">
@@ -85,7 +85,7 @@
 			and the controller reveals whichever applies: without it there is no rotation to pause.
 		#}
 		{% if popular_groups %}
-			{{ importmap() }}
+			{{ importmap('app', {nonce: csp_nonce()}) }}
 			<section class="cl-popular-courses" id="popular-courses" aria-roledescription="carousel" aria-label="Popular courses"
 			         data-controller="popular-courses" data-popular-courses-interval-value="{{ popular_rotation_seconds }}">
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Popular courses', summary: 'A changing selection of the courses learners are choosing.'})} %}

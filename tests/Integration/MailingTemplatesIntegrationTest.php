@@ -132,7 +132,7 @@ final class MailingTemplatesIntegrationTest extends TestCase
         $templates->makeDefault($standard['id'], 'messages', $this->admin());
         $campaigns = IntegrationContainer::get()->get(CampaignRepository::class);
         $message = $campaigns->create('message', 'Winter sale', $this->admin(), ['subject' => 'Our winter sale']);
-        $this->db->executeStatement('UPDATE mailing_campaigns SET template_id = :t WHERE id = :id', ['t' => $id, 'id' => $message]);
+        $this->db->executeStatement('INSERT INTO mailing_campaign_settings (campaign_id, template_id) VALUES (:id, :t) ON CONFLICT (campaign_id) DO UPDATE SET template_id = EXCLUDED.template_id', ['t' => $id, 'id' => $message]);
         self::assertSame($id, $templates->forCampaign($campaigns->find($message))['id'], 'A message draws in the template it chose.');
         $templates->delete($id, $this->admin());
         self::assertSame($standard['id'], $templates->forCampaign($campaigns->find($message))['id'], 'Its template gone, it draws in the default for messages.');
@@ -172,6 +172,6 @@ final class MailingTemplatesIntegrationTest extends TestCase
 
     private function admin(): int
     {
-        return (int) $this->db->fetchOne("SELECT ur.user_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.role_key = 'ADMIN' ORDER BY ur.user_id LIMIT 1");
+        return (int) $this->db->fetchOne("SELECT MIN(account_person(account_id)) FROM cattophp_account_roles WHERE role_key = 'ADMIN'");
     }
 }

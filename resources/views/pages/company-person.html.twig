@@ -7,7 +7,7 @@
 	{% set ph_kicker = 'Company' %}
 	{% set ph_title = person.name %}
 	{% set ph_lead = (person.account_reference|account_reference) ~ ' · ' ~ person.email %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set back = company_person_url(person) %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
@@ -79,11 +79,11 @@
 			{% if enrolments %}
 				{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 					{% block header %}<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 44, label: 'Course'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access ends', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 44, label: 'Course'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access ends', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 					</tr>{% endblock %}
 					{% block body %}{% for enrolment in enrolments %}<tr>
 						<td><strong>{{ enrolment.course_title }}</strong></td>

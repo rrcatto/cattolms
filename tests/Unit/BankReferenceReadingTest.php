@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Commerce\Application\BankPayments;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use PHPUnit\Framework\TestCase;
 
 /**

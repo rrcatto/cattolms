@@ -62,10 +62,10 @@ final class CategoryTreeContractTest extends TestCase
     {
         $root = RenderHarness::root();
         $page = (string) file_get_contents($root . '/resources/views/pages/admin-course-categories.html.twig');
-        foreach (['{{ importmap() }}', 'data-controller="category-tree"', 'dragstart->category-tree#start', 'drop->category-tree#drop', 'submit->category-tree#menu', 'category-tree#expandAll', 'category-tree#collapseAll', 'id="category-tree-view"', 'method="get"', 'data-category-tree-target="enhanced" hidden', "modal: 'category-create'"] as $contract) {
+        foreach (["{{ importmap('app', {nonce: csp_nonce()}) }}", 'data-controller="category-tree"', 'dragstart->category-tree#start', 'drop->category-tree#drop', 'submit->category-tree#menu', 'category-tree#expandAll', 'category-tree#collapseAll', 'id="category-tree-view"', 'method="get"', 'data-category-tree-target="enhanced" hidden', "modal: 'category-create'"] as $contract) {
             self::assertStringContainsString($contract, $page);
         }
-        self::assertGreaterThan(strpos($page, 'page-head.html.twig'), strpos($page, '{{ importmap() }}'), 'The page head stays the first element of main; scripts come after it.');
+        self::assertGreaterThan(strpos($page, 'page/head.html.twig'), strpos($page, "{{ importmap('app', {nonce: csp_nonce()}) }}"), 'The page head stays the first element of main; scripts come after it.');
         $shared = (string) file_get_contents($root . '/assets/lib/sortable_tree_controller.js');
         $controller = (string) file_get_contents($root . '/assets/controllers/category_tree_controller.js');
         $content = (string) file_get_contents($root . '/assets/controllers/course_content_controller.js');

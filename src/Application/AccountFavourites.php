@@ -31,7 +31,7 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Infrastructure\Persistence\FavouritesRepository;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use InvalidArgumentException;
 
 final class AccountFavourites

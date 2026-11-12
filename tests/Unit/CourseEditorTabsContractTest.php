@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 use CattoLearning\Tests\Support\ComponentHarness;
 use CattoLearning\Tests\Support\RenderHarness;
-use CattoLearning\View\Ui\PlatformUi;
+use CattoLearning\View\Ui\ProjectComponents;
 use PHPUnit\Framework\TestCase;
 
 /** Guards the tabbed course editor: link tabs, the wide form grid and the inline category picker. */
@@ -28,7 +28,7 @@ final class CourseEditorTabsContractTest extends TestCase
     public function testTabItemsAreBounded(): void
     {
         foreach ([[], [['key' => 'a', 'label' => 'A']], [['key' => 'a', 'label' => 'A', 'href' => '/', 'class' => 'x']], [['key' => '', 'label' => 'A', 'href' => '/']]] as $items) {
-            try { (new PlatformUi())->properties('layout.tabs', ['items' => $items, 'aria_label' => 'Tabs']); self::fail('Invalid tab items accepted'); }
+            try { ProjectComponents::registry()->properties('layout.tabs', ['items' => $items, 'aria_label' => 'Tabs']); self::fail('Invalid tab items accepted'); }
             catch (\InvalidArgumentException $exception) { self::assertStringContainsString('ab', $exception->getMessage()); }
         }
     }
@@ -43,13 +43,13 @@ final class CourseEditorTabsContractTest extends TestCase
         $full = ComponentHarness::render('form.field', ['label' => 'Title', 'span' => 'third', 'full_width' => true]);
         self::assertStringContainsString('cl-ui-field--full', $full);
         self::assertStringNotContainsString('cl-ui-field--third', $full);
-        try { (new PlatformUi())->properties('form.field', ['label' => 'Title', 'span' => '7']); self::fail('Invalid span accepted'); }
+        try { ProjectComponents::registry()->properties('form.field', ['label' => 'Title', 'span' => '7']); self::fail('Invalid span accepted'); }
         catch (\InvalidArgumentException $exception) { self::assertStringContainsString('Invalid semantic UI value', $exception->getMessage()); }
     }
 
     public function testWideGridCssGivesEverySpanAColumnCount(): void
     {
-        $css = (string) file_get_contents(RenderHarness::root() . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(RenderHarness::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(RenderHarness::root() . '/public_html/css/catto-platform.css'));
         self::assertStringContainsString('.cl-ui-form-grid[data-columns="wide"]{grid-template-columns:repeat(12,minmax(0,1fr))', $css);
         foreach (['quarter' => 'span 3', 'third' => 'span 4', 'two-thirds' => 'span 8'] as $span => $rule) {
             self::assertStringContainsString('.cl-ui-form-grid[data-columns="wide"]>.cl-ui-field--' . $span . '{grid-column:' . $rule . '}', $css);

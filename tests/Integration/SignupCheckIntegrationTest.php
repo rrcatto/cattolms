@@ -28,13 +28,6 @@ use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Auth\AclService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\SignInRestriction;
-use CattoLearning\Auth\Signup\MailDomainCheck;
-use CattoLearning\Auth\Signup\NetworkFacts;
-use CattoLearning\Auth\Signup\NetworkLookup;
-use CattoLearning\Auth\Signup\SignupChecks;
-use CattoLearning\Auth\Signup\SignupCountries;
-use CattoLearning\Auth\Signup\SignupLists;
-use CattoLearning\Auth\Signup\SignupRisk;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Event\EventDispatcher;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -46,9 +39,17 @@ use CattoLearning\Infrastructure\Persistence\SignupAttemptRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
-use CattoLearning\Support\GeoIpLocator;
+use CattoLearning\Support\Env;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\FakeMailer;
+use CattoPHP\Network\NetworkFacts;
+use CattoPHP\Network\NetworkLookup;
+use CattoPHP\Network\ReputationLists;
+use CattoPHP\Signup\MailDomainCheck;
+use CattoPHP\Signup\SignupAttempts;
+use CattoPHP\Signup\SignupChecks;
+use CattoPHP\Signup\SignupCountries;
+use CattoPHP\Signup\SignupRisk;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
@@ -63,6 +64,21 @@ final class SignupCheckIntegrationTest extends TestCase
     private string $listsRoot;
     private ?string $savedAddress = null;
     private ?string $savedAgent = null;
+
+    /** @var array<string,string|null> who can sign in, as the Settings page had saved it before envOnly() set it aside */
+    private array $savedSignIn = [];
+
+    /** The site's rule for who can sign in as .env gives it: anything the Settings page saved is set aside until tearDown(). */
+    private function envOnly(): SignInRestriction
+    {
+        $settings = $this->container->get(\CattoPHP\Settings\Settings::class);
+        foreach ([SignInRestriction::ENV_SIGNIN, SignInRestriction::ENV_ALLOWED] as $name) {
+            if (!array_key_exists($name, $this->savedSignIn)) $this->savedSignIn[$name] = $settings->isOverridden($name) ? $settings->get($name) : null;
+            $settings->reset($name);
+        }
+
+        return $this->container->get(SignInRestriction::class);
+    }
 
     protected function setUp(): void
     {
@@ -79,8 +95,8 @@ final class SignupCheckIntegrationTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->emails as $email) {
-            $this->db->executeStatement('DELETE FROM signup_attempts WHERE email = :email', ['email' => $email]);
-            $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE email = :email', ['email' => $email]);
+            $this->db->executeStatement('DELETE FROM cattophp_signup_attempts WHERE email = :email', ['email' => $email]);
+            $this->db->executeStatement('DELETE FROM cattophp_links WHERE email = :email', ['email' => $email]);
         }
         $this->fixture->cleanup();
         foreach (glob($this->listsRoot . '/signup-lists/*') ?: [] as $file) @unlink($file);
@@ -89,6 +105,12 @@ final class SignupCheckIntegrationTest extends TestCase
         if ($this->savedAddress === null) unset($_SERVER['REMOTE_ADDR']); else $_SERVER['REMOTE_ADDR'] = $this->savedAddress;
         if ($this->savedAgent === null) unset($_SERVER['HTTP_USER_AGENT']); else $_SERVER['HTTP_USER_AGENT'] = $this->savedAgent;
         unset($_COOKIE['catto_learning_session']);
+        // Who can sign in, as the Settings page had saved it, put back exactly.
+        $settings = $this->container->get(\CattoPHP\Settings\Settings::class);
+        foreach ($this->savedSignIn as $name => $value) {
+            if ($value !== null) $settings->set($name, $value);
+        }
+        $this->savedSignIn = [];
     }
 
     /**
@@ -97,17 +119,17 @@ final class SignupCheckIntegrationTest extends TestCase
      */
     public function testALiveSiteLetsSomeoneAbroadInAndHoldsABlockedCountryWithoutSayingWhy(): void
     {
-        $home = $this->register('live', new NetworkFacts('41.0.0.1', true, 'ZA', 36994, 'Vodacom'), 'home');
+        $home = $this->register('live', new NetworkFacts('ZA', 36994, 'Vodacom', 'home', address: '41.0.0.1'), 'home');
         self::assertSame(['active', 'completed', false, 'low'], [$home['status'], $home['attempt']['outcome'], $home['attempt']['held'], $home['attempt']['band']]);
         self::assertSame('', $home['mail']['notice'], 'A live site says nothing about holding.');
         self::assertSame(['ZA', 'Vodacom'], [$home['attempt']['country_code'], $home['attempt']['network_name']]);
 
-        $abroad = $this->register('live', new NetworkFacts('81.2.69.142', true, 'GB', 2856, 'British Telecommunications'), 'abroad');
+        $abroad = $this->register('live', new NetworkFacts('GB', 2856, 'British Telecommunications', 'home', address: '81.2.69.142'), 'abroad');
         self::assertSame(['active', false, 'medium', []], [$abroad['status'], $abroad['attempt']['held'], $abroad['attempt']['band'], $abroad['attempt']['hold_reasons']]);
         self::assertContains('country_not_allowed', array_column($abroad['attempt']['signals'], 'key'), 'Still a warning sign the administrator sees.');
         self::assertSame(['GB', 'ZA'], [$abroad['attempt']['country_code'], $abroad['attempt']['home_country']], 'Where they were, and where they say they live.');
 
-        $blocked = $this->register('live', new NetworkFacts('5.8.18.7', true, 'RU', 12389, 'Rostelecom'), 'blocked');
+        $blocked = $this->register('live', new NetworkFacts('RU', 12389, 'Rostelecom', 'home', address: '5.8.18.7'), 'blocked');
         self::assertSame(['awaiting_approval', 'high', ['country_blocked', 'high_risk']], [$blocked['status'], $blocked['attempt']['band'], $blocked['attempt']['hold_reasons']]);
     }
 
@@ -117,32 +139,32 @@ final class SignupCheckIntegrationTest extends TestCase
         $email = 'throwaway-' . $this->fixture->suffix() . '@mailinator.com';
         $this->emails[] = $email;
         try {
-            $this->auth('live', $mailer, new NetworkFacts('41.0.0.2', true, 'ZA'))->requestRegistration($this->form($email));
+            $this->auth('live', $mailer, new NetworkFacts('ZA', kind: 'home', address: '41.0.0.2'))->requestRegistration($this->form($email));
             self::fail('A throwaway address registered.');
         } catch (RuntimeException $refused) {
             self::assertSame(SignupRisk::REFUSED_DISPOSABLE, $refused->getMessage());
         }
         self::assertSame([], $mailer->messages);
-        self::assertSame('refused', $this->db->fetchOne('SELECT outcome FROM signup_attempts WHERE email = :email', ['email' => $email]), 'Kept, so the administrator sees it.');
+        self::assertSame('refused', $this->db->fetchOne('SELECT outcome FROM cattophp_signup_attempts WHERE email = :email', ['email' => $email]), 'Kept, so the administrator sees it.');
 
         $bot = 'bot-' . $this->fixture->suffix() . '@example.test';
         $this->emails[] = $bot;
-        $this->auth('live', $mailer, new NetworkFacts('41.0.0.3', true, 'ZA'))->requestRegistration($this->form($bot) + [SignupChecks::TRAP_FIELD => 'https://spam.example']);
+        $this->auth('live', $mailer, new NetworkFacts('ZA', kind: 'home', address: '41.0.0.3'))->requestRegistration($this->form($bot) + [SignupChecks::TRAP_FIELD => 'https://spam.example']);
         self::assertSame([], $mailer->messages, 'Nothing sent, and no error to learn from.');
-        self::assertSame(['trapped', 100], array_values($this->db->fetchAssociative('SELECT outcome, score FROM signup_attempts WHERE email = :email', ['email' => $bot]) ?: []));
+        self::assertSame(['trapped', 100], array_values($this->db->fetchAssociative('SELECT outcome, score FROM cattophp_signup_attempts WHERE email = :email', ['email' => $bot]) ?: []));
     }
 
     public function testADemoSiteSaysTheAccountWillBeHeldExceptForAListedAddress(): void
     {
-        $demo = $this->register('demo', new NetworkFacts('41.0.0.4', true, 'ZA'), 'demo');
+        $demo = $this->register('demo', new NetworkFacts('ZA', kind: 'home', address: '41.0.0.4'), 'demo');
         self::assertSame(['awaiting_approval', AuthService::DEMO_HOLD_NOTICE, 'registration_link'], [$demo['status'], $demo['mail']['notice'], $demo['mail']['type']]);
         self::assertStringContainsString('because the site is currently in DEMO mode', AuthService::DEMO_HOLD_NOTICE);
 
         $email = 'listed-' . $this->fixture->suffix() . '@example.test';
-        $restriction = new SignInRestriction(null);
+        $restriction = $this->envOnly();
         $_ENV[SignInRestriction::ENV_ALLOWED] = $email;
         try {
-            $listed = $this->register('demo', new NetworkFacts('41.0.0.5', true, 'ZA'), 'listed', $email, $restriction);
+            $listed = $this->register('demo', new NetworkFacts('ZA', kind: 'home', address: '41.0.0.5'), 'listed', $email, $restriction);
         } finally {
             unset($_ENV[SignInRestriction::ENV_ALLOWED]);
         }
@@ -155,14 +177,14 @@ final class SignupCheckIntegrationTest extends TestCase
         $this->emails[] = $email;
         $_ENV[SignInRestriction::ENV_SIGNIN] = 'ADMIN';
         try {
-            $this->auth('demo', new FakeMailer(), new NetworkFacts('41.0.0.6', true, 'ZA'), new SignInRestriction(null))->requestRegistration($this->form($email));
+            $this->auth('demo', new FakeMailer(), new NetworkFacts('ZA', kind: 'home', address: '41.0.0.6'), $this->envOnly())->requestRegistration($this->form($email));
             self::fail('An uninvited address registered.');
         } catch (RuntimeException $refused) {
             self::assertSame(SignInRestriction::REFUSED, $refused->getMessage());
         } finally {
             unset($_ENV[SignInRestriction::ENV_SIGNIN]);
         }
-        self::assertSame(['refused', SignInRestriction::REFUSED], array_values($this->db->fetchAssociative('SELECT outcome, refusal FROM signup_attempts WHERE email = :email', ['email' => $email]) ?: []));
+        self::assertSame(['refused', SignInRestriction::REFUSED], array_values($this->db->fetchAssociative('SELECT outcome, refusal FROM cattophp_signup_attempts WHERE email = :email', ['email' => $email]) ?: []));
     }
 
     /**
@@ -192,18 +214,18 @@ final class SignupCheckIntegrationTest extends TestCase
     private function form(string $email): array
     {
         return ['account_type' => 'individual', 'first_name' => 'Thandi', 'middle_names' => '', 'last_name' => 'Nkosi', 'email' => $email,
-            'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db()), SignupChecks::STAMP_FIELD => SignupChecks::formStamp(time() - 40)];
+            'country' => 'ZA', 'id_number' => \CattoLearning\Tests\Support\CheckIdNumbers::free(\CattoLearning\Tests\Support\IntegrationContainer::db()), SignupChecks::STAMP_FIELD => $this->container->get(SignupChecks::class)->stamp(time() - 40)];
     }
 
     private function auth(string $mode, FakeMailer $mailer, NetworkFacts $network, ?SignInRestriction $restriction = null): AuthService
     {
-        $_SERVER['REMOTE_ADDR'] = $network->ip;
-        $lists = new SignupLists($this->listsRoot);
+        $_SERVER['REMOTE_ADDR'] = $network->address;
+        $lists = new ReputationLists($this->listsRoot . '/signup-lists');
         $lists->store('disposable', 'domains', "mailinator.com\n");
-        // The real lookup, standing in only for the facts an address gives (every address here is a private one).
-        $lookup = new class($this->container->get(GeoIpLocator::class), $lists) extends NetworkLookup {
+        // Standing in for the facts an address gives (every address here is a private one).
+        $lookup = new class implements NetworkLookup {
             public ?NetworkFacts $given = null;
-            public function facts(string $ip): NetworkFacts { return $this->given ?? parent::facts($ip); }
+            public function facts(string $address): NetworkFacts { return $this->given ?? NetworkFacts::unknown($address); }
         };
         $lookup->given = $network;
         $mail = new class extends MailDomainCheck {
@@ -213,7 +235,7 @@ final class SignupCheckIntegrationTest extends TestCase
             public function allowed(): array { return ['ZA']; }
             public function blocked(): array { return ['RU']; }
         };
-        $checks = new SignupChecks($this->container->get(SignupAttemptRepository::class), $lookup, $lists, $mail, $countries);
+        $checks = new SignupChecks($this->container->get(SignupAttempts::class), $countries, Env::string('APP_KEY'), $lookup, $lists, $mail);
 
         return new AuthService(
             $this->container->get(TransactionManager::class), $this->container->get(UserRepository::class), $this->container->get(RoleRepository::class),

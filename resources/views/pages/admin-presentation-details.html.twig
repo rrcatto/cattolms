@@ -8,11 +8,11 @@
 #}
 {% extends layout %}
 {% block page_body %}
-{{ importmap() }}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set base = course_item_url(item) %}
 	{% set ph_back_href = base %}{% set ph_back_label = 'The presentation: ' ~ item.title %}
 	{% set ph_kicker = item.name %}{% set ph_title = 'Presentation details' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% if notice %}<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: notice.tone})} %}{% block body %}<p>{{ notice.text }}</p>{% endblock %}{% endembed %}</section>{% endif %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-details-form'})} %}{% block surface_body %}
 		<form id="details-form" action="{{ base }}/details" method="post" data-controller="unsaved-changes" data-unsaved-changes-dirty-value="{{ unsaved ? 'true' : 'false' }}" data-unsaved-changes-leave-value=".cl-back-link, #details-close">

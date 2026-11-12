@@ -11,6 +11,9 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/11/12 SAST
+- A course file's course preview (its trailer) is open to visitors from the start: the reader never shows it to a
+  learner, so closed it was seen by nobody (since v1.0.6).
 2026/11/07 SAST
 - The single-course import's canonical rules (CataloguePackage::reviewCourseFile and importCourseFile drive it):
   commitImport() can leave a course's catalogue settings to the review's choices ($withCatalogue); a course replaced
@@ -19,7 +22,7 @@ Changelog:
   imported or none, never one left from an earlier file; a file whose content is a course here is refused with the code
   that updates it. discardImport(), stagedFile() and analyseCourseHtml() serve the review.
 2026/11/01 SAST
-- A course is written as one HTML file (owner, 2026-11-01: one specification document, docs/COURSE-SPECIFICATION.md):
+- A course is written as one HTML file (owner, 2026-11-01: one specification document, docs/COURSE-SPECIFICATION-v<version>.md):
   the zip course package 3.0 is no longer read; an HTML course's presentations and flash cards become parts beneath its
   lessons for the arrangement into modules, and its cover is set. A refused upload is not kept.
 2026/10/30 SAST
@@ -458,6 +461,8 @@ final class CoursePortabilityService
                 'description_html' => $course['description_html'],
                 'level' => $course['level'],
                 'estimated_minutes' => $course['estimated_minutes'],
+                // A full course or a short course (Course Specification 4.13, section 15), so a package carries it.
+                'course_type' => ($course['course_type'] ?? 'full') === 'short' ? 'short' : 'full',
                 'default_access_period_seconds' => (int) $course['default_access_period_seconds'],
                 'first_module_number' => (int) ($course['first_module_number'] ?? 1),
                 'introduction_html' => $course['introduction_html'],
@@ -664,6 +669,8 @@ final class CoursePortabilityService
             'description_html' => $this->courseHtml->preserve((string) ($input['description_html'] ?? '')),
             'level' => mb_substr(trim((string) ($input['level'] ?? '')), 0, 80),
             'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? 0)),
+            // A full course or a short course (Course Specification 4.13, section 15): what the file or package says.
+            'course_type' => ($input['course_type'] ?? 'full') === 'short' ? 'short' : 'full',
             'status' => 'draft',
             'default_access_period_seconds' => max(1, (int) ($input['default_access_period_seconds'] ?? 31536000)),
             'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $input['description_html'] ?? '')),
@@ -827,7 +834,9 @@ final class CoursePortabilityService
         if (is_array($analysis['trailer'] ?? null)) {
             $previewKey = $key('trailer');
             $items[] = ['item_key' => $previewKey, 'item_type' => 'slide_deck', 'title' => (string) $analysis['trailer']['title'], 'description_html' => '', 'content_source' => '', 'type_config' => (array) $analysis['trailer']['type_config'], 'estimated_minutes' => $analysis['trailer']['minutes'] ?? null, 'resource_id' => null];
-            $structure[] = ['item_key' => $previewKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+            // The course preview is for visitors (the reader never shows a learner the trailer), so it is open from the start:
+            // closed, nobody would see it (2026-11-12).
+            $structure[] = ['item_key' => $previewKey, 'assessment_role' => 'content', 'public_preview' => true, 'relative_delay_minutes' => 0];
         }
         foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $index => $assessment) {
             if (!is_array($assessment)) { continue; }

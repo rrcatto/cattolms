@@ -89,7 +89,7 @@ final class CoursePageLayoutIntegrationTest extends TestCase
         $_COOKIE = $this->cookies;
         if ($this->defaultBefore > 0) $this->layouts->makeDefault($this->defaultBefore, $this->admin);
         $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id=:id', ['id' => $this->course]);
-        $this->db->executeStatement("DELETE FROM audit_log WHERE event_key LIKE 'course_page_layout.%' AND user_id = :u", ['u' => $this->admin]);
+        $this->db->executeStatement("DELETE FROM cattophp_activity WHERE action LIKE 'course_page_layout.%' AND actor_id = CAST(:u AS TEXT)", ['u' => $this->admin]);
         $this->fixture->cleanup();
         // The layouts this test made, once no course of its own uses them.
         $this->db->executeStatement('DELETE FROM course_page_layouts WHERE name LIKE :name AND NOT is_default', ['name' => '%' . $this->suffix . '%']);

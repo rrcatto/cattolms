@@ -182,7 +182,7 @@ final class PersonCompanyMembershipIntegrationTest extends TestCase
         $suffix = $fixture->suffix();
         $domain = 'membership-' . $suffix . '.test';
         $admin = $fixture->createUser('Membership Admin', 'membership-admin-' . $suffix . '@example.test');
-        $this->db->executeStatement("INSERT INTO user_roles (user_id, role_id) SELECT :u, id FROM roles WHERE role_key = 'ADMIN'", ['u' => $admin]);
+        $this->db->executeStatement("INSERT INTO cattophp_account_roles (account_id, role_key, granted_at) VALUES (CAST(:u AS TEXT), 'ADMIN', NOW())", ['u' => $admin]);
         $person = $fixture->createUser('Membership Person', 'person@' . $domain);
         $company = $fixture->createCompany($admin, 'Membership Company ' . $suffix, $domain, $personFounds ? $person : null);
         if (!$personFounds) $fixture->addCompanyMember($company, $person);

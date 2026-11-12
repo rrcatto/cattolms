@@ -1,4 +1,4 @@
-/* Messages to the owner's Telegram (owner, 2026-11-05: "yes telegram, paid orders only"), Settings > Messages to you, in Chromium and
+/* Messages to the owner's Telegram (owner, 2026-11-05: "yes telegram, paid orders only"), Settings > Connect to Telegram bot, in Chromium and
    Firefox, at 1440 and 390 pixels wide, against a stand-in of Telegram, so no message goes to the real service:
    - the section is where the order of Settings puts it (straight after Site Owner in the standard order; the owner may arrange
      the sections, 2026-11-09), says how to make a bot, and its ticks are feature cards, both on by default;

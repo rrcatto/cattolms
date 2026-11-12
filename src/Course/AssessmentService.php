@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Course\Certificate\CertificateAwards;
 use CattoLearning\Commerce\Application\AccessService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -114,7 +114,10 @@ final class AssessmentService
         foreach ($responses as &$response) { $response['has_response_seconds'] = $response['response_seconds'] !== null && $response['response_seconds'] !== ''; $response['response_time'] = self::timeTaken((int) $response['response_seconds']); } unset($response);
         $session['responses'] = $responses; $session['counts'] = $this->assessments->sessionCounts((int) $session['id']); $session['elapsed_seconds'] = $this->elapsedSeconds($session); $session['elapsed_label'] = self::timeTaken($session['elapsed_seconds']); $session['is_diagnostic'] = $session['assessment_type'] === 'diagnostic';
         // The final assessment's page says the course's result too (owner-approved mockup, 2026-11-05).
-        $session['course_result'] = ($session['assessment_role'] ?? '') === 'final' && $session['attempt_mode'] === 'graded' ? $this->courses->courseResult((int) $session['enrolment_id']) : null;
+        // A short course's one assessment closes it the same way (Course Specification 4.13, section 15.5).
+        $session['closes_course'] = $this->closesCourse($session);
+        $session['course_result'] = $session['attempt_mode'] === 'graded' && $session['closes_course'] ? $this->courses->courseResult((int) $session['enrolment_id']) : null;
+        $session['short_course'] = $this->itemRecords->courseType((int) $session['course_id']) === 'short';
         if ($session['is_diagnostic']) {
             $passed = (float) ($session['percentage'] ?? 0) + .0001 >= (float) ($session['pass_mark'] ?? 50); $session['diagnostic_passed'] = $passed; $session['diagnostic_message_html'] = $passed ? (string) ($session['result_pass_html'] ?? '') : (string) ($session['result_fail_html'] ?? '');
             // The modules to study again (2026-11-07): a part the learner's start has not yet opened says when it opens;
@@ -180,7 +183,7 @@ final class AssessmentService
         if ($session['attempt_mode'] === 'graded' && empty($session['legacy_attempt_id'])) {
             $responses = []; foreach ($this->assessments->sessionResponses((int) $session['id']) as $response) { if ($response['selected_option_id'] !== null && $response['selected_option_id'] !== '') { $responses[] = ['question_id' => (int) $response['question_id'], 'selected_option_id' => (int) $response['selected_option_id'], 'is_correct' => (bool) $response['is_correct'], 'points_awarded' => (float) $response['points_awarded']]; } }
             $attemptId = $this->assessments->saveAttempt($session, $result, $responses); $this->assessments->attachLegacyAttempt((int) $session['id'], $attemptId);
-            if (($session['assessment_role'] ?? '') === 'final') { $this->completeCourse($session); }
+            if ($this->closesCourse($session)) { $this->completeCourse($session); }
             else { $this->recalculateCompletedCourse((int) $session['enrolment_id'], (int) $session['course_id'], (int) $session['user_id']); }
             if (!(bool) $session['is_preview']) { $this->certificates->afterGradedAttempt((int) $session['enrolment_id'], (int) $session['user_id']); }
         }
@@ -205,24 +208,32 @@ final class AssessmentService
             $value = $this->aggregate($scores, (string) $context['score_policy']);
             if ($context['assessment_role'] === 'final') { $final = $value; } else { $graded[] = $value; }
         }
-        if ($final === null) { return; }
-        ['module' => $module, 'overall' => $overall] = self::courseFigures($graded, $final);
+        // A short course has no final: its assessment makes the whole mark, kept as each of the result's three figures.
+        $short = $this->itemRecords->courseType((int) $session['course_id']) === 'short';
+        if ($final === null && (!$short || $graded === [])) { return; }
+        ['module' => $module, 'overall' => $overall] = self::courseFigures($graded, $short ? null : $final);
         $band = $this->band($overall, $this->courses->gradeBands((int) $session['course_id']));
-        $before = $this->courses->enrolmentByIdForUser((int) $session['enrolment_id'], (int) $session['user_id']); $this->courses->saveCourseResult((int) $session['enrolment_id'], $module, $final, $overall, (string) $band['grade_code'], (bool) $band['is_passing']);
-        if (($before['status'] ?? '') !== 'completed') { $this->audit->record((int) $session['user_id'], 'course.completed', ['course_id' => (int) $session['course_id'], 'enrolment_id' => (int) $session['enrolment_id'], 'completion_method' => 'final_assessment', 'percentage' => $overall, 'grade_code' => $band['grade_code'], 'passed' => $band['is_passing']]); }
+        $before = $this->courses->enrolmentByIdForUser((int) $session['enrolment_id'], (int) $session['user_id']); $this->courses->saveCourseResult((int) $session['enrolment_id'], $module, $short ? $overall : (float) $final, $overall, (string) $band['grade_code'], (bool) $band['is_passing']);
+        if (($before['status'] ?? '') !== 'completed') { $this->audit->record((int) $session['user_id'], 'course.completed', ['course_id' => (int) $session['course_id'], 'enrolment_id' => (int) $session['enrolment_id'], 'completion_method' => $short ? 'short_course_assessment' : 'final_assessment', 'percentage' => $overall, 'grade_code' => $band['grade_code'], 'passed' => $band['is_passing']]); }
     }
 
-    /** A graded attempt on a course already completed recalculates its result from the final's placement. */
+    /** A graded attempt on a course already completed recalculates its result from the placement that closes it. */
     private function recalculateCompletedCourse(int $enrolmentId, int $courseId, int $userId): void
     {
         $enrolment = $this->courses->enrolmentByIdForUser($enrolmentId, $userId);
         if (($enrolment['status'] ?? '') !== 'completed') { return; }
-        foreach ($this->itemRecords->assessmentContexts($courseId, $enrolmentId) as $context) {
-            if ($context['assessment_role'] === 'final') {
-                $this->completeCourse(['course_id' => $courseId, 'structure_node_id' => (int) $context['node_id'], 'enrolment_id' => $enrolmentId, 'user_id' => $userId]);
-                return;
-            }
+        $closing = $this->itemRecords->closingAssessment($courseId, $enrolmentId);
+        if ($closing !== null) {
+            $this->completeCourse(['course_id' => $courseId, 'structure_node_id' => (int) $closing['node_id'], 'enrolment_id' => $enrolmentId, 'user_id' => $userId]);
         }
+    }
+
+    /** @param array<string,mixed> $session */
+    private function closesCourse(array $session): bool
+    {
+        if (($session['assessment_role'] ?? '') === 'final') { return true; }
+        $closing = $this->itemRecords->closingAssessment((int) $session['course_id']);
+        return $closing !== null && $closing['assessment_role'] !== 'final' && (int) $closing['node_id'] === (int) $session['structure_node_id'] && (int) $closing['course_item_id'] === (int) $session['course_item_id'];
     }
 
     /** @return array{0:array<string,mixed>,1:array<string,mixed>} */
@@ -260,15 +271,16 @@ final class AssessmentService
     /** @param array<string,mixed> $session */
     private function elapsedSeconds(array $session): int { $start = strtotime((string) $session['started_at']) ?: time(); $end = strtotime((string) ($session['completed_at'] ?? '')) ?: time(); return max(0, $end - $start); }
     /**
-     * A course's result: half the average of its module assessments, half its final assessment.
+     * A course's result: half the average of its module assessments, half its final assessment; a short course, with no
+     * final (null), its assessment's score alone (Course Specification 4.13, section 15.5).
      *
      * @param list<float> $graded
      * @return array{module:float,overall:float}
      */
-    public static function courseFigures(array $graded, float $final): array
+    public static function courseFigures(array $graded, ?float $final): array
     {
         $module = $graded === [] ? 0.0 : array_sum($graded) / count($graded);
-        return ['module' => $module, 'overall' => round($module * .5 + $final * .5, 2)];
+        return ['module' => $module, 'overall' => $final === null ? round($module, 2) : round($module * .5 + $final * .5, 2)];
     }
 
     /** A length of time a learner took, in words (UX rule 4.7): "42 minutes 10 seconds", "1 second". */

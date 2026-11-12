@@ -11,6 +11,12 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for auth session records.
 
 Changelog:
+2026/11/09 SAST
+- Kept by CattoPHP's sign-ins (CattoPHP Phase 2, step 6e): each by its cookie's hash, with the account, the address it
+  signed in with, where from and the browser. The person's facts are still read with the sign-in in one query, and a
+  company's people's sign-ins ended in one statement; the other calls are CattoPHP's.
+2026/11/09 SAST
+- An administrator is found among CattoPHP's role holders (CattoPHP Phase 2, step 5).
 2026/08/23 04:19 SAST
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
 2026/08/12 23:56 SAST
@@ -28,48 +34,31 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\Uuid;
+use CattoPHP\Sessions\SessionStore;
+use CattoPHP\Sessions\SignInSession;
+use Symfony\Component\Clock\ClockInterface;
 
 final class AuthSessionRepository
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly SessionStore $sessions,
+        private readonly ClockInterface $clock,
     ) {
     }
 
     public function create(int $userId, string $tokenHash, int $ttlSeconds, string $ipHash, string $agent, ?string $authenticatedEmail = null): string
     {
-        $publicId = Uuid::v4();
-        $now = gmdate('Y-m-d H:i:sP');
+        // A session belongs to the identity that signed in.
+        $now = $this->clock->now();
 
-        // A session belongs to the identity that signed in. auth_sessions is seed-aware
-        // precisely so a signed-in seed identity has a session the cleanup can remove.
-        $this->db->executeStatement(
-            'INSERT INTO auth_sessions
-                (public_id, user_id, token_hash, ip_hash, user_agent, authenticated_email,
-                 created_at, last_seen_at, expires_at)
-             VALUES
-                (:public_id, :user_id, :token_hash, :ip_hash, :user_agent, :authenticated_email,
-                 :created_at, :last_seen_at, :expires_at)',
-            [
-                'public_id' => $publicId,
-                'user_id' => $userId,
-                'token_hash' => $tokenHash,
-                'ip_hash' => $ipHash,
-                'user_agent' => $agent,
-                'authenticated_email' => $authenticatedEmail ?? '',
-                'created_at' => $now,
-                'last_seen_at' => $now,
-                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
-            ]
-        );
-
-        return $publicId;
+        return $this->sessions->start($tokenHash, Uuid::v4(), (string) $userId, $authenticatedEmail ?? '', $ipHash, $agent, $now, $now->modify('+' . $ttlSeconds . ' seconds'))->publicId;
     }
 
     /** @return array<string,mixed>|null */
     public function findActive(string $tokenHash): ?array
     {
-        // SQL is justified because the session, user and primary email are joined.
+        // SQL is justified because the session, user and primary email are joined: every request reads them at once.
         //
         // company_suspended is reported rather than filtered on. Whether the company is suspended
         // is a fact about the row; whether that ends this particular session is policy, and policy
@@ -77,22 +66,24 @@ final class AuthSessionRepository
         // Encoding the exemption in this query would bury the one rule that prevents a company
         // suspension from locking an administrator out of their own installation.
         $rows = $this->db->fetchAllAssociative(
-            "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, ue.email AS primary_email,
+            "SELECT s.id, s.public_id, u.id AS user_id, s.token_hash, s.requested_from AS ip_hash, s.user_agent, s.started_at AS created_at, s.last_seen_at,
+                    s.expires_at, s.ended_at AS revoked_at, COALESCE(s.email, '') AS authenticated_email,
+                    u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, ue.email AS primary_email,
                     u.birthdate, (u.id_number_hash IS NOT NULL) AS has_id_number,
                     EXISTS (
-                        SELECT 1 FROM identity_verifications iv
-                        WHERE iv.user_id = u.id AND iv.status = 'approved' AND iv.date_of_birth > CURRENT_DATE - INTERVAL '18 years'
+                        SELECT 1 FROM cattophp_identity_verifications iv
+                        WHERE iv.account = u.id::TEXT AND iv.status = 'approved' AND iv.date_of_birth > CURRENT_DATE - INTERVAL '18 years'
                     ) AS verified_minor,
                     EXISTS (
                         SELECT 1 FROM company_users cu
                         JOIN companies c ON c.id = cu.company_id
                         WHERE cu.user_id = u.id AND cu.status = 'active' AND c.status <> 'active'
                     ) AS company_suspended
-             FROM auth_sessions s
-             JOIN users u ON u.id = s.user_id
+             FROM cattophp_sessions s
+             JOIN users u ON u.id = account_person(s.account_id)
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
              WHERE s.token_hash = :token_hash
-               AND s.revoked_at IS NULL
+               AND s.ended_at IS NULL
                AND s.expires_at > NOW()
                AND u.status = :status
              LIMIT 1",
@@ -104,48 +95,29 @@ final class AuthSessionRepository
 
     public function touch(int $id, int $ttlSeconds): void
     {
-        $this->db->executeStatement(
-            'UPDATE auth_sessions SET last_seen_at = :last_seen_at, expires_at = :expires_at
-              WHERE id = :id',
-            [
-                'last_seen_at' => gmdate('Y-m-d H:i:sP'),
-                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
-                'id' => $id,
-            ]
-        );
+        $now = $this->clock->now();
+        $this->sessions->touch((string) $id, $now, $now->modify('+' . $ttlSeconds . ' seconds'));
     }
 
     /** @return list<array<string,mixed>> */
     public function listForUser(int $userId): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT public_id, user_agent, created_at, last_seen_at, expires_at, revoked_at
-               FROM auth_sessions
-              WHERE user_id = :user_id AND revoked_at IS NULL AND expires_at > :now
-              ORDER BY created_at DESC',
-            ['user_id' => $userId, 'now' => gmdate('Y-m-d H:i:sP')]
-        );
-
         return array_map(
-            static fn(array $row): array => [
-                'public_id' => (string) $row['public_id'],
-                'user_agent' => (string) $row['user_agent'],
-                'created_at' => $row['created_at'],
-                'last_seen_at' => $row['last_seen_at'],
-                'expires_at' => $row['expires_at'],
-                'revoked_at' => $row['revoked_at'],
+            static fn(SignInSession $session): array => [
+                'public_id' => $session->publicId,
+                'user_agent' => (string) $session->userAgent,
+                'created_at' => $session->startedAt->format('Y-m-d H:i:sP'),
+                'last_seen_at' => $session->lastSeenAt->format('Y-m-d H:i:sP'),
+                'expires_at' => $session->expiresAt->format('Y-m-d H:i:sP'),
+                'revoked_at' => $session->endedAt?->format('Y-m-d H:i:sP'),
             ],
-            $rows
+            $this->sessions->activeFor((string) $userId, $this->clock->now())
         );
     }
 
     public function revoke(int $userId, string $publicId): void
     {
-        $this->db->executeStatement(
-            'UPDATE auth_sessions SET revoked_at = :revoked_at
-              WHERE user_id = :user_id AND public_id = :public_id AND revoked_at IS NULL',
-            ['revoked_at' => gmdate('Y-m-d H:i:sP'), 'user_id' => $userId, 'public_id' => $publicId]
-        );
+        $this->sessions->end((string) $userId, $publicId, $this->clock->now());
     }
 
     /**
@@ -154,19 +126,12 @@ final class AuthSessionRepository
      * Disabling an account has to take effect now, not at the next sign-in. `users.status` stops
      * a new magic link being consumed, but it is read only during login: an already-authenticated
      * session would otherwise keep working until it expired, so a disabled learner could carry on
-     * with a course for the rest of the session lifetime.
-     *
-     * Written as one UPDATE rather than a load-and-save loop because it must be atomic with the
-     * status change that accompanies it. The count is returned so the caller can record in the
-     * audit trail what actually happened.
+     * with a course for the rest of the session lifetime. The count is returned so the caller can
+     * record in the audit trail what actually happened.
      */
     public function revokeAllForUser(int $userId): int
     {
-        return $this->db->executeStatement(
-            'UPDATE auth_sessions SET revoked_at = NOW()
-              WHERE user_id = :user_id AND revoked_at IS NULL',
-            ['user_id' => $userId]
-        );
+        return $this->sessions->endAllFor((string) $userId, $this->clock->now());
     }
 
     /**
@@ -184,16 +149,15 @@ final class AuthSessionRepository
     public function revokeCompanyMemberSessions(int $companyId): int
     {
         return $this->db->executeStatement(
-            "UPDATE auth_sessions SET revoked_at = NOW()
-             WHERE revoked_at IS NULL
-               AND user_id IN (
+            "UPDATE cattophp_sessions SET ended_at = NOW()
+             WHERE ended_at IS NULL
+               AND account_person(account_id) IN (
                    SELECT cu.user_id FROM company_users cu
                    WHERE cu.company_id = :company_id AND cu.status = 'active'
                )
                AND NOT EXISTS (
-                   SELECT 1 FROM user_roles ur
-                   JOIN roles r ON r.id = ur.role_id
-                   WHERE ur.user_id = auth_sessions.user_id AND r.role_key = 'ADMIN'
+                   SELECT 1 FROM cattophp_account_roles ar
+                   WHERE ar.account_id = cattophp_sessions.account_id AND ar.role_key = 'ADMIN'
                )",
             ['company_id' => $companyId]
         );
@@ -201,20 +165,12 @@ final class AuthSessionRepository
 
     public function revokeByTokenHash(string $tokenHash): void
     {
-        $this->db->executeStatement(
-            'UPDATE auth_sessions SET revoked_at = :revoked_at
-              WHERE token_hash = :token_hash AND revoked_at IS NULL',
-            ['revoked_at' => gmdate('Y-m-d H:i:sP'), 'token_hash' => $tokenHash]
-        );
+        $this->sessions->endByHash($tokenHash, $this->clock->now());
     }
 
+    /** Removes sign-ins that ran out or were ended over 30 days ago. */
     public function prune(): int
     {
-        // SQL is used because PostgreSQL interval arithmetic is clearer here.
-        return $this->db->executeStatement(
-            "DELETE FROM auth_sessions
-             WHERE expires_at < NOW() - INTERVAL '30 days'
-                OR revoked_at < NOW() - INTERVAL '30 days'"
-        );
+        return $this->sessions->forgetOld($this->clock->now()->modify('-30 days'));
     }
 }

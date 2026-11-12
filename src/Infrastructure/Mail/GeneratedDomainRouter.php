@@ -23,6 +23,8 @@ The rewrite is deliberately narrow. An address that is not recognisably invented
 untouched, because diverting a genuine address would be worse than any bounce.
 
 Changelog:
+2026/11/12 SAST
+- Tells CattoPHP's mail server transport where a made-up address is delivered (CattoPHP\Mailing\RecipientAddresses).
 2026/09/10 02:25 SAST
 - A generated company domain is now the company name and nothing else, and a generated local part drops the run suffix. Owner's instruction: the domain is name.invalid. The old form appended a company index and a sixteen-character run suffix to both halves, which produced hundred-character addresses that no table column could display.
 
@@ -34,7 +36,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Mail;
 
-final class GeneratedDomainRouter
+use CattoPHP\Mailing\RecipientAddresses;
+
+final class GeneratedDomainRouter implements RecipientAddresses
 {
     /**
      * Suffix every invented domain ends with.

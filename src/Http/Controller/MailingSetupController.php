@@ -15,6 +15,8 @@ list's page. Reports shows what was sent in a period and what became of it. Seei
 change PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/28 SAST
 - Created.
 */
@@ -27,7 +29,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Mailing\AutomaticEmails;
 use CattoLearning\Mailing\MailingReports;
 use CattoLearning\Mailing\MailingSettings;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;

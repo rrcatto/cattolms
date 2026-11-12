@@ -41,7 +41,7 @@ use CattoLearning\Http\Controller\MailingController;
 use CattoLearning\Http\Controller\MailingDigestController;
 use CattoLearning\Http\Controller\MailingTemplateController;
 use CattoLearning\Http\Controller\SiteAnalyticsController;
-use CattoLearning\Http\TypedForm;
+use CattoPHP\Http\TypedForm;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Uuid;

@@ -14,6 +14,8 @@ verified email address, which then sets it up again at its next sign-in if the p
 pages; nothing depends on this. It goes in the activity log, by the console.
 
 Change log:
+2026/11/09 SAST
+- Finds the account by CattoPHP's sign-in accounts, an active one by any verified address (CattoPHP Phase 2, step 6b).
 2026/11/05 SAST
 - Created.
 */
@@ -22,6 +24,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Auth\TwoStep;
 
+use CattoLearning\Auth\CattolmsAccounts;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -31,7 +34,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'auth:two-step-reset', description: 'Turn two-step sign-in off for the account with this email address, for a sole administrator who lost their phone and recovery codes.')]
 final class TwoStepResetCommand extends Command
 {
-    public function __construct(private readonly TwoStep $twoStep, private readonly TwoStepRepository $store)
+    public function __construct(private readonly TwoStep $twoStep, private readonly CattolmsAccounts $accounts)
     {
         parent::__construct();
     }
@@ -43,13 +46,13 @@ final class TwoStepResetCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $user = $this->store->userWithEmail((string) $input->getArgument('email'));
-        if ($user === null) {
+        $account = $this->accounts->forEmail((string) $input->getArgument('email'));
+        if ($account === null) {
             $output->writeln('<error>No account has that verified email address.</error>');
 
             return Command::FAILURE;
         }
-        $output->writeln($this->twoStep->reset($user, null)
+        $output->writeln($this->twoStep->reset((int) $account->id, null)
             ? 'Two-step sign-in is off for that account. It is set up again at its next sign-in if the site asks for it.'
             : 'Two-step sign-in was already off for that account.');
 

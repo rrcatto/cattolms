@@ -7,12 +7,12 @@
 {% block page_body %}
 	{% set ph_kicker = 'Sign-up Attempts' %}{% set ph_title = attempt.email %}
 	{% set ph_lead = 'Sent ' ~ attempt.created_at ~ (attempt.name ? ' as ' ~ attempt.name : '') ~ '.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: attempt.risk_label ~ ', ' ~ attempt.score ~ ' points', summary: attempt.signals ? 'What the sign-up check found, and why each counts.' : 'The sign-up check found nothing against it.'}) }}
 		{% if attempt.signals %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 80, label: 'Found'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Points'}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 80, label: 'Found'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Points'}} %}</tr>{% endblock %}
 		{% block body %}{% for signal in attempt.signals %}<tr><td class="cell-text">{{ signal.words }}</td><td>{{ signal.points }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
 		{% endif %}

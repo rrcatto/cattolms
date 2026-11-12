@@ -55,7 +55,9 @@ final class RefundAdministrationService
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
         private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics,
         private readonly AccessService $access, private readonly FinancialDocuments $documents, private readonly WalletService $wallets,
-        private readonly CommerceSettings $settings) {}
+        private readonly CommerceSettings $settings,
+        // A company's bundle credits (owner, 2026-11-11): only those not yet given to anyone are refunded.
+        private readonly ?\CattoLearning\Commerce\Infrastructure\BundleCreditRepository $bundleCredits = null) {}
 
     /**
      * Why the Refund Policy refuses a refund of this order line now; empty when the rule allows it.
@@ -172,7 +174,12 @@ final class RefundAdministrationService
                 if ($quantity<1 || $amountMinor!==0) throw new RuntimeException('Enter an unused credit quantity; its refund value is calculated from the historical order.');
                 $unit=intdiv((int)$item['amount_minor'],(int)$item['quantity']);
                 if ($unit*(int)$item['quantity']!==(int)$item['amount_minor']) throw new RuntimeException('Historical credit price is not divisible by quantity.');
-                if ($this->records->purchasedCredit($itemId)===null) {
+                $bundleCredit=$item['product_type']==='bundle_credit' ? $this->bundleCredits?->creditForItem($itemId,true) : null;
+                if ($item['product_type']==='bundle_credit' && $bundleCredit!==null) {
+                    // A bundle credit given to someone is theirs, whole: only the ones still held and not given come back.
+                    if ($quantity>(int)$bundleCredit['left']) throw new RuntimeException('Only bundle credits not yet given to anyone can be refunded: '.(int)$bundleCredit['left'].' of this line.');
+                    $this->bundleCredits->refundUnits((int)$bundleCredit['id'],$quantity);
+                } elseif ($item['product_type']==='bundle_credit' || $this->records->purchasedCredit($itemId)===null) {
                     $remaining=(int)$item['amount_minor']-$this->records->refundedAmount($orderId,$itemId);
                     if ($quantity*$unit>$remaining) throw new RuntimeException('The refund exceeds this unissued company credit line.');
                 } else {
@@ -197,8 +204,8 @@ final class RefundAdministrationService
             $itemSnapshot=CommerceRepository::decode((string)$item['snapshot']);
             $snapshot=CommerceRepository::decode((string)$order['snapshot']);
             $bundle=$item['product_type']==='bundle';
-            $snapshot['items']=[$bundle
-                ? ['fulfilment_type'=>'bundle','bundle_title'=>$itemSnapshot['bundle_title'],'courses'=>$itemSnapshot['courses'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]
+            $snapshot['items']=[$bundle || $item['product_type']==='bundle_credit'
+                ? ['fulfilment_type'=>$bundle ? 'bundle' : 'bundle_credit','bundle_title'=>$itemSnapshot['bundle_title'],'courses'=>$itemSnapshot['courses'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]
                 : ['course_title'=>$itemSnapshot['course_title'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]];
             // The credit note states what the refunded line was paid; the order's totals are not its own.
             $snapshot['refund_line']=['price_minor'=>(int)$item['amount_minor'],'discount_minor'=>(int)$item['discount_minor'],'paid_minor'=>self::paidAmount($item),'quantity'=>(int)$item['quantity'],'promotion_code'=>$snapshot['promotion']['code'] ?? null];

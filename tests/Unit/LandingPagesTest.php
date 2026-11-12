@@ -14,6 +14,8 @@ parameters kept from an address, and the contracts the templates keep - no copy 
 query from a template, one purchase box shared with the course page and no arbitrary links.
 
 Changelog:
+2026/11/09 SAST
+- The course's cover is marked |authored, served byte for byte by CattoPHP's HtmlLayout; only a Presentation's markup is raw.
 2026/10/09 SAST
 - Created for course marketing landing pages (Phase L).
 */
@@ -148,8 +150,8 @@ final class LandingPagesTest extends TestCase
         foreach (['pages/landing-page.html.twig', 'partials/landing/hero.html.twig', 'partials/landing/section.html.twig', 'partials/landing/paragraphs.html.twig'] as $file) {
             $landing .= (string) file_get_contents($views . '/' . $file);
         }
-        self::assertSame(2, substr_count($landing, '|raw'), 'Only the course’s own generated cover artwork and a Presentation’s markup are drawn raw.');
-        self::assertStringContainsString('landing.course.cover_svg|raw', $landing);
+        self::assertSame(1, substr_count($landing, '|raw'), 'Only a Presentation’s markup is drawn raw.');
+        self::assertStringContainsString('landing.course.cover_svg|authored', $landing, 'the course’s own cover, served as it was uploaded (CattoPHP\'s HtmlLayout)');
         // The Presentation's markup is DeckRenderer's, every word in it escaped (CatWalk, owner 2026-10-28).
         self::assertStringContainsString('section.deck_html|raw', $landing);
         self::assertStringNotContainsString('include \'@platform/partials/landing/section-\' ~', $landing, 'No template path is built from data.');

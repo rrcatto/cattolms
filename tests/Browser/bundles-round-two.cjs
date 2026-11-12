@@ -125,7 +125,7 @@ const coursesMenu = (page) => page.evaluate(() => [...document.querySelectorAll(
             assert.match(clean(await page.locator(`tr#bundle-${now.code} [role=alert]`).innerText()), new RegExp(`${fixture.courses.a.code}.*course`, 'i'));
             assert.equal(await page.locator(`tr#bundle-${now.code} input[name=code]`).inputValue(), fixture.courses.a.code, 'what was typed stays');
             await page.getByRole('link', {name: `Cancel editing ${now.title}`}).click();
-            await page.locator(`tr#bundle-${now.code}:not(:has(input))`).waitFor();
+            await page.locator(`tr#bundle-${now.code}:not(:has(input[name=code]))`).waitFor();
             assert.ok(clean(await page.locator(`tr#bundle-${now.code}`).innerText()).includes(now.code), 'Cancel brings the row back as it is');
             assert.ok(await stillMarked(page), 'cancelled without loading the page again');
             await page.reload();

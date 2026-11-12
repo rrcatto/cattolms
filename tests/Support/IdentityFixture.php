@@ -22,7 +22,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Support;
 
-use CattoLearning\Identity\IdentityVerificationRepository;
+use CattoPHP\Identity\IdentityChecks;
 use CattoLearning\Identity\IdentityVerificationService;
 use CattoLearning\Support\Uuid;
 
@@ -33,7 +33,7 @@ final class IdentityFixture
     {
         $container = IntegrationContainer::get();
         $sessionId = Uuid::v4();
-        $container->get(IdentityVerificationRepository::class)->create($userId, $sessionId);
+        $container->get(IdentityChecks::class)->create((string) $userId, $sessionId);
         $container->get(IdentityVerificationService::class)->apply($sessionId, 'Approved', self::report('Approved', $firstName, $lastName, $dateOfBirth));
         return $sessionId;
     }

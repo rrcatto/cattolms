@@ -10,7 +10,7 @@ Version: 1.0.0
 Description:
 A module's lesson, summary, flash cards and practical work as PDFs to keep (owner, 2026-10-28, decision 6A: "PDF downloads
 available for the html module, summary, flash cards, practical work"). The page is drawn once by the shared PDF engine
-(DocumentPdfRenderer::renderPage) and kept in storage/course-pdfs/ under a name made from everything it shows, so it is
+(PdfRenderer::renderPage) and kept in storage/course-pdfs/ under a name made from everything it shows, so it is
 made again only when the part, its module or its course changes. Which parts print, and what a part prints as, is
 decided here: a lesson as written with its worked examples open, flash cards as a list of questions and answers, and
 practical work with its model answers on their own pages at the end.
@@ -25,7 +25,7 @@ declare(strict_types=1);
 namespace CattoLearning\Course\Parts;
 
 use CattoLearning\Configuration\SiteLogo;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use RuntimeException;
 
 final class CoursePartPdfs
@@ -33,7 +33,7 @@ final class CoursePartPdfs
     /** The parts a learner can download as a PDF. */
     public const PRINTABLE = ['lesson', 'summary', 'review', 'flashcards', 'practical'];
 
-    public function __construct(private readonly DocumentPdfRenderer $pdfs, private readonly string $storageRoot, private readonly ?SiteLogo $siteLogo = null)
+    public function __construct(private readonly PdfRenderer $pdfs, private readonly string $storageRoot, private readonly ?SiteLogo $siteLogo = null)
     {
     }
 
@@ -136,7 +136,7 @@ final class CoursePartPdfs
         $module = '';
         $number = $node['module_of'] ?? null;
         foreach ((array) ($course['structure'] ?? []) as $row) {
-            if ($number !== null && ($row['section_number'] ?? null) === $number) { $module = 'Module ' . $number . ': ' . (string) $row['section_title']; break; }
+            if ($number !== null && ($row['section_number'] ?? null) === $number) { $module = (($row['label_number'] ?? null) !== null ? 'Module ' . $number . ': ' : '') . (string) $row['section_title']; break; }
             if ($number === null && (int) $row['id'] === (int) ($node['parent_node_id'] ?? 0) && (string) $row['node_type'] === 'section') { $module = (string) $row['section_title']; break; }
         }
         $part = \CattoLearning\Course\CourseItemService::PART_LABELS[(string) ($node['part'] ?? '')] ?? (string) ($node['part'] ?? '');

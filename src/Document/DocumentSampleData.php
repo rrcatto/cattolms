@@ -59,6 +59,7 @@ final class DocumentSampleData
                 'course.provider' => 'Example Training Academy',
                 'course.completion_date' => '2026-09-29',
                 'course.accreditation' => 'Legal Practice Council CPD: 2 points',
+                'course.short_course' => null,
                 'result.module_average' => '78.00',
                 'result.final' => '64.00',
                 'result.overall' => '71.00',

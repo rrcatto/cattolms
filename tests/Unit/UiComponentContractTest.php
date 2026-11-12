@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Tests\Support\RenderHarness;
+use CattoLearning\View\Ui\ProjectComponents;
+use CattoPHP\Ui\Contract\TemplateContract;
 use PHPUnit\Framework\TestCase;
 
 /** Enforces canonical structural ownership across core views and all bundled theme templates. */
@@ -28,7 +30,7 @@ final class UiComponentContractTest extends TestCase
         // covered by CourseContentEditorPageTest through the live kernel. Here: the source contract.
         $root = dirname(__DIR__, 2);
         $page = (string) file_get_contents($root . '/resources/views/pages/admin-course-content.html.twig');
-        self::assertGreaterThan(strpos($page, 'page-head.html.twig'), strpos($page, '{{ importmap() }}'), 'Scripts come after the page head.');
+        self::assertGreaterThan(strpos($page, 'page/head.html.twig'), strpos($page, "{{ importmap('app', {nonce: csp_nonce()}) }}"), 'Scripts come after the page head.');
         self::assertStringContainsString('data-controller="course-content"', $page);
         self::assertStringNotContainsString('save-arrangement', $page, 'Moves save at once; there is no staged arrangement.');
         $node = (string) file_get_contents($root . '/resources/views/partials/admin/course-content-node.html.twig');
@@ -59,12 +61,28 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString('&lt;All&gt;', $tree);
     }
 
+    /** @return array<string,string> cattolms's templates and its themes', by path, as written. */
+    private static function ownTemplates(): array
+    {
+        $root = dirname(__DIR__, 2);
+        $templates = [];
+        foreach (['resources/views', 'themes'] as $directory) {
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory, \FilesystemIterator::SKIP_DOTS)) as $file) {
+                if ($file instanceof \SplFileInfo && str_ends_with($file->getFilename(), '.twig')) {
+                    $templates[substr($file->getPathname(), strlen($root) + 1)] = (string) file_get_contents($file->getPathname());
+                }
+            }
+        }
+        return $templates;
+    }
+
     /** @return array<string,string> */
     private static function templates(): array
     {
         $root = dirname(__DIR__, 2);
         $templates = [];
-        foreach (['resources/views', 'themes'] as $directory) {
+        // CattoPHP's component templates too (CattoPHP Phase 3, step 1), where its components are owned.
+        foreach (['resources/views', 'themes', 'vendor/rrcatto/cattophp/templates'] as $directory) {
             $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory));
             foreach ($iterator as $file) {
                 if ($file->isFile() && str_ends_with($file->getFilename(), '.twig')) {
@@ -78,67 +96,23 @@ final class UiComponentContractTest extends TestCase
 
     public function testReusableMarkupHasExactlyOneOwnerIncludingInThemes(): void
     {
-        $owners = [
-            'cl-course-card' => 'partials/course-card',
-            'cl-bundle-card' => 'partials/bundle-card',
-            'cl-ui-surface' => 'ui/layout/surface',
-            'cl-ui-section-grid' => 'ui/layout/section-grid',
-            'cl-ui-section-head' => 'ui/layout/section-head',
-            'cl-ui-toolbar' => 'ui/layout/toolbar',
-            'cl-ui-breadcrumb' => 'ui/layout/breadcrumb',
-            'cl-ui-row-actions' => 'ui/actions/row-actions',
-            'cl-ui-row-menu' => 'ui/actions/row-actions',
-            'cl-ui-action-group' => 'ui/actions/group',
-            'cl-ui-form-grid' => 'ui/forms/form-grid',
-            'cl-ui-field' => 'ui/forms/field',
-            'cl-ui-form-actions' => 'ui/forms/form-actions',
-            'cl-ui-choice' => 'ui/forms/choice-field',
-            'cl-ui-compact-action' => 'ui/forms/compact-action',
-            'cl-ui-table' => 'ui/data/data-table',
-            'cl-ui-stat-card' => 'ui/data/stat-card',
-            'cl-ui-stat-grid' => 'ui/data/stat-grid',
-            'cl-ui-card-grid' => 'ui/data/card-grid',
-            'cl-ui-card' => 'ui/data/card',
-            'cl-ui-list' => 'ui/data/item-list',
-            'cl-ui-list-item' => 'ui/data/list-item',
-            'cl-ui-key-value-list' => 'ui/data/key-value-list',
-            'cl-ui-badge' => 'ui/feedback/badge',
-            'cl-ui-notice' => 'ui/feedback/notice',
-            'cl-ui-empty-state' => 'ui/feedback/empty-state',
-            'cl-ui-progress' => 'ui/feedback/progress',
-            'cl-ui-modal' => 'ui/overlay/modal',
-            'cl-ui-accordion-section' => 'ui/overlay/accordion-section',
-            'cl-ui-icon' => 'ui/helpers/icon',
-            'cl-course-cards' => 'ui/catalogue/course-grid',
-            'cl-bundle-cards' => 'ui/catalogue/bundles',
-            'cl-tag-chip' => 'ui/catalogue/tag-chip',
-            'cl-ui-tree-select' => 'ui/forms/tree-select',
-            'cl-tag-browser' => 'ui/catalogue/tag-browser',
-            'cl-group-nav' => 'ui/layout/tabs',
-            'cl-group-tab' => 'ui/layout/tabs',
-        ];
-        $found = [];
-        foreach (self::templates() as $path => $source) {
-            preg_match_all('/class\s*=\s*["\']([^"\']*)["\']/', $source, $attributes);
-            foreach ($owners as $class => $owner) {
-                foreach ($attributes[1] as $attribute) {
-                    if (preg_match('/(?<![a-z0-9_-])' . preg_quote($class, '/') . '(?![a-z0-9_-])/', $attribute) !== 1) continue;
-                    $expected = 'resources/views/' . $owner . '.html.twig';
-                    self::assertSame($expected, $path, $path . ' duplicates ' . $class . '; compose ' . $expected . ' through PlatformUi instead.');
-                    $found[$class] = true;
-                }
-            }
+        // CattoPHP's components (TemplateContract::OWNERS) and cattolms's own, across cattolms's templates, its themes' and CattoPHP's.
+        $templates = self::ownTemplates() + TemplateContract::cattophpTemplates();
+        self::assertSame([], TemplateContract::duplicates($templates, ProjectComponents::OWNERS));
+        foreach (ProjectComponents::OWNERS as $class => $owner) {
+            self::assertMatchesRegularExpression('/class\\s*=\\s*["\'][^"\']*(?<![a-z0-9_-])' . preg_quote($class, '/') . '(?![a-z0-9_-])/', $templates[$owner], $owner . ' writes ' . $class . ', so the scan reads it.');
+        }
+        foreach ($templates as $path => $source) {
             if (preg_match('/<article\b[^>]*class=["\'][^"\']*cl-ui-surface/', $source) === 1 && str_contains($source, '/courses/')) {
                 self::assertSame('resources/views/partials/course-card.html.twig', $path, $path . ' creates a second course-card implementation.');
             }
         }
-        self::assertCount(count($owners), $found, 'The ownership scan must find every canonical component.');
     }
 
     public function testLogicalNamesAreNamespacedAndHaveNoTemplateAliases(): void
     {
         $templates = [];
-        foreach (\CattoLearning\View\Ui\PlatformUi::COMPONENTS as $name => $definition) {
+        foreach (\CattoLearning\View\Ui\ProjectComponents::registry()->definitions() as $name => $definition) {
             self::assertTrue($name === 'icon' || str_contains($name, '.'), $name . ' is not namespaced.');
             self::assertStringContainsString('/', $definition['template']);
             $templates[] = $definition['template'];
@@ -148,12 +122,11 @@ final class UiComponentContractTest extends TestCase
 
     public function testStructuralSignaturesCannotBeReimplementedUnderAnotherClassName(): void
     {
+        // A table, a window and a progress bar are CattoPHP's components alone (TemplateContract::SIGNATURES, checked with the
+        // ownership scan); the pager is drawn only by the dataset and the catalogue.
         foreach (self::templates() as $path => $source) {
-            if (preg_match('/<table\b/', $source) === 1) self::assertSame('resources/views/ui/data/data-table.html.twig', $path);
-            if (str_contains($source, 'role="dialog"')) self::assertSame('resources/views/ui/overlay/modal.html.twig', $path);
-            if (str_contains($source, 'role="progressbar"')) self::assertSame('resources/views/ui/feedback/progress.html.twig', $path);
-            if (str_contains($source, 'partials/pagination.html.twig')) {
-                self::assertContains($path, ['resources/views/ui/data/dataset-layout.html.twig', 'resources/views/ui/catalogue/catalogue-workspace.html.twig']);
+            if (str_contains($source, 'ui/data/pagination.html.twig')) {
+                self::assertContains($path, ['vendor/rrcatto/cattophp/templates/ui/data/dataset-layout.html.twig', 'resources/views/ui/catalogue/catalogue-workspace.html.twig']);
             }
         }
     }
@@ -167,18 +140,18 @@ final class UiComponentContractTest extends TestCase
             self::assertStringContainsString("ui('catalogue.workspace'", $source, $path);
             // The catalogue's search heads its courses, inside the workspace (owner, 2026-11-09); a tag's page keeps its own.
             if ($page === 'courses') self::assertStringContainsString('search: {value: catalogue_search', $source, $path . ' gives the workspace its search.');
-            else self::assertStringContainsString('partials/dataset-search.html.twig', $source, $path);
+            else self::assertStringContainsString('ui/data/dataset-search.html.twig', $source, $path);
             self::assertDoesNotMatchRegularExpression('/<(article|details|input)\b/', $source, $path . ' must compose canonical controls.');
             self::assertStringNotContainsString('partials/course-card.html.twig', $source, $path . ' must use the canonical course grid.');
-            self::assertStringNotContainsString('partials/pagination.html.twig', $source, $path . ' pagination belongs to the workspace.');
+            self::assertStringNotContainsString('ui/data/pagination.html.twig', $source, $path . ' pagination belongs to the workspace.');
         }
         $workspace = $templates['resources/views/ui/catalogue/catalogue-workspace.html.twig'];
         foreach (['catalogue-workspace', 'catalogue-region', 'catalogue-results'] as $id) {
             self::assertSame(1, substr_count($workspace, 'id="' . $id . '"'));
         }
         // The courses' pagination above and below them, and the bundles' own under theirs (owner, 2026-11-07).
-        self::assertSame(3, substr_count($workspace, 'partials/pagination.html.twig'));
-        self::assertSame(1, substr_count($workspace, 'partials/dataset-search.html.twig'), 'The courses\' search, at the head of their section.');
+        self::assertSame(3, substr_count($workspace, 'ui/data/pagination.html.twig'));
+        self::assertSame(1, substr_count($workspace, 'ui/data/dataset-search.html.twig'), 'The courses\' search, at the head of their section.');
         self::assertStringContainsString('ds_morph_skip: true', $workspace, 'The box is left alone by the morph its answer makes.');
         self::assertStringContainsString("ui('catalogue.bundles'", $workspace);
         self::assertStringContainsString("ui('catalogue.course-grid'", $workspace);
@@ -188,7 +161,7 @@ final class UiComponentContractTest extends TestCase
     public function testNavigationKeepsRealUrlsAndServerAuthoritativePersistentState(): void
     {
         $templates = self::templates();
-        $picker = $templates['resources/views/ui/forms/tree-select.html.twig'];
+        $picker = $templates['vendor/rrcatto/cattophp/templates/ui/forms/tree-select.html.twig'];
         foreach (['popovertarget="{{ props.id }}-options"', ' popover>', 'type="submit"', 'name="{{ props.name }}"', 'value="{{ item.value }}"', 'aria-current="true"', 'autofocus'] as $contract) {
             self::assertStringContainsString($contract, $picker, 'The category picker must keep ' . $contract . ' so it works without JavaScript.');
         }
@@ -242,7 +215,7 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString('data-cl-course-reader="1"', (string) file_get_contents($root . '/resources/views/layout/course-presentation.html.twig'));
         self::assertStringContainsString("document.body.dataset.clCourseReader==='1'", (string) file_get_contents($root . '/public_html/js/platform-overrides.js'));
         self::assertStringContainsString("!in_array(\$family, ['course-player', 'assessment'], true)", (string) file_get_contents($root . '/src/View/ThemeRenderer.php'));
-        self::assertStringContainsString('body[data-cl-course-reader="1"] .cl-palette-switcher', (string) file_get_contents($root . '/public_html/css/catto-platform.css'));
+        self::assertStringContainsString('body[data-cl-course-reader="1"] .cl-palette-switcher', (string) (file_get_contents($root . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents($root . '/public_html/css/catto-platform.css')));
     }
 
     public function testCourseReaderAssessmentLinksBypassTheGenericItemPage(): void
@@ -271,7 +244,7 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString("'Module ' ~ node.assessment_module_number ~ ' '", $source);
         self::assertStringContainsString("node.is_final_assessment|default(false) ? 'Final Assessment'", $source);
         self::assertStringContainsString("node.is_review_study_aid|default(false) ? 'Review Study Aid'", $source);
-        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
         self::assertStringContainsString('.cl-course-outline-introduction.is-current', $css);
         self::assertStringContainsString('.cl-course-outline-title{font-size:.95rem;font-weight:800', $css);
     }
@@ -286,7 +259,7 @@ final class UiComponentContractTest extends TestCase
 
     public function testImportedCourseIntroductionKeepsMastheadAndCardsOnOneWidth(): void
     {
-        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
         self::assertStringContainsString('.cl-course-presentation-intro{padding:clamp(1.4rem,5vw,3.2rem)!important}', $css);
         self::assertStringContainsString('.cl-course-presentation-intro .masthead{margin:0 0 1.5rem!important}', $css);
         self::assertStringContainsString('.cl-course-presentation-intro .course-introduction-copy{max-width:none;margin:0}', $css);
@@ -312,7 +285,7 @@ final class UiComponentContractTest extends TestCase
         $loader = \CattoLearning\View\Twig\TwigFactory::loader(dirname(__DIR__, 2));
         $twig = \CattoLearning\View\Twig\TwigFactory::create($loader, dirname(__DIR__, 2), sys_get_temp_dir() . '/catto-ui-contract-' . getmypid(), true);
         $this->expectException(\InvalidArgumentException::class);
-        (new \CattoLearning\View\Ui\PlatformUi())->render($twig, [], 'feedback.empty', ['heading' => 'Example', 'class' => 'page-local-variant']);
+        \CattoLearning\View\Ui\ProjectComponents::registry()->render($twig, [], 'feedback.empty', ['heading' => 'Example', 'class' => 'page-local-variant']);
     }
 
     public function testSupersededStructuresAndFlatComponentAliasesCannotReturn(): void

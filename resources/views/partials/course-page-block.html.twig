@@ -8,7 +8,7 @@
 {% block surface_body %}
 				<h2 class="h4">About this course</h2>
 				<div class="cl-prose">
-					{{ course.description_html|raw }}
+					{{ course.description_html|authored }}
 				</div>
 {% endblock %}
 {% endembed %}
@@ -24,7 +24,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 				<div class="cl-course-modules-head">
-					<h2 class="h4" id="course-modules">The {{ course_page.modules|length }} {{ course_page.modules|length == 1 ? 'module' : 'modules' }}</h2>
+					<h2 class="h4" id="course-modules">{% if course_page.short|default(false) %}What the short course holds{% else %}The {{ course_page.modules|length }} {{ course_page.modules|length == 1 ? 'module' : 'modules' }}{% endif %}</h2>
 					{% if course_page.total %}<span>{{ course_page.total|capitalize }} in all</span>{% endif %}
 				</div>
 				{% include '@platform/partials/course-module-list.html.twig' with {modules_view: course_page, course_slug: course.slug, list_label_id: 'course-modules'} %}
@@ -51,7 +51,7 @@
 {% block surface_body %}
 				<h2 class="h4">At a glance</h2>
 				{# A bought course opens at once (owner, 2026-10-20: "put 'immediately'"). #}
-				{{ ui('data.key-value-list', {items: (course.category_name ? [{label: 'Category', value: course.category_name}] : [])|merge(course_page.modules ? [{label: 'Modules', value: course_page.modules|length}] : [])|merge(course_page.total ? [{label: 'Study time', value: course_page.total|capitalize}] : [])|merge(course.level ? [{label: 'Level', value: course.level}] : [])|merge([{label: 'Access starts', value: 'Immediately'}])}) }}
+				{{ ui('data.key-value-list', {items: (course.category_name ? [{label: 'Category', value: course.category_name}] : [])|merge(course_page.short|default(false) ? [{label: 'Course', value: 'Short course'}] : (course_page.modules ? [{label: 'Modules', value: course_page.modules|length}] : []))|merge(course_page.total ? [{label: 'Study time', value: course_page.total|capitalize}] : [])|merge(course.level ? [{label: 'Level', value: course.level}] : [])|merge([{label: 'Access starts', value: 'Immediately'}])}) }}
 {% endblock %}
 {% endembed %}
 {% elseif block_id == 'get' %}
@@ -115,6 +115,8 @@
 						{% endif %}
 						{# Following the course, for the updates written about it (mailing, step 1; owner, 2026-10-26). #}
 						{% if follow|default(null) %}{% include '@platform/partials/follow-button.html.twig' with {fb: follow} %}{% endif %}
+						{# Share this course (owner, 2026-11-09: "free organic marketing"), by its canonical address. #}
+						{% include '@platform/partials/share-page.html.twig' with {sh_url: meta.canonical|default('') ?: app.base_url|trim('/', 'right') ~ '/courses/' ~ course.slug, sh_title: course.title, sh_what: 'course', sh_full_width: true} %}
 						{# Reviewing is offered to anyone who has held access to the course, including a learner whose access has expired. #}
 						{% if can_review %}
 							<div class="cl-course-review-action">

@@ -43,9 +43,13 @@
 </table>
 
 <table class="totals">
+{{#if course.short_course}}
+	<tr class="total"><th>Mark (the course's one assessment)</th><td>{{ result.overall }}{{#if result.grade}} ({{ result.grade }}){{/if}}</td></tr>
+{{else}}
 	<tr><th>Module assessments (average, 50% of the grade)</th><td>{{#if result.module_average}}{{ result.module_average }}{{else}}None{{/if}}</td></tr>
 	<tr><th>Final assessment (50% of the grade)</th><td>{{ result.final }}</td></tr>
 	<tr class="total"><th>Overall grade</th><td>{{ result.overall }}{{#if result.grade}} ({{ result.grade }}){{/if}}</td></tr>
+{{/if}}
 </table>
 
 <p class="note">This transcript records the learner's marks. Anyone with its number or link can check it{{#if transcript.verification_url}} at {{ transcript.verification_url }}{{/if}}.</p>

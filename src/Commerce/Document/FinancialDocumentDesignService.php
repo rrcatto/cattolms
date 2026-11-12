@@ -37,12 +37,12 @@ use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Course\Certificate\CertificateImage;
 use CattoLearning\Document\DocumentAssetRepository;
 use CattoLearning\Document\DocumentBusinessData;
-use CattoLearning\Document\DocumentDataException;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\DocumentDataException;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\RenderedDocument;
-use CattoLearning\Document\TemplateValidationException;
+use CattoPHP\Document\RenderedDocument;
+use CattoPHP\Document\TemplateValidationException;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\ImageProcessing;
@@ -60,7 +60,7 @@ final class FinancialDocumentDesignService
         private readonly DocumentBusinessData $business,
         private readonly DocumentAssetRepository $assets,
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly DocumentPdfRenderer $pdf,
+        private readonly PdfRenderer $pdf,
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         ?\Closure $isUploadedFile = null,

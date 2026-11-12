@@ -7,7 +7,7 @@
 	{% set ph_kicker = 'Join a list' %}
 	{% set ph_title = list.name %}
 	{% set ph_lead = list.description ?: 'Join it to get what is sent to it by email.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{% if joined %}
 			{{ ui('layout.section-head', {heading: 'You are on this list', summary: 'You can leave it at any time on My Subscriptions.'}) }}

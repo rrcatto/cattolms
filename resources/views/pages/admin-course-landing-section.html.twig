@@ -6,7 +6,7 @@
 	knows - its outline, prices, rating, reviews and provider - is not written here; the page reads it
 	from the course.
 #}
-{% set ph_back_href = landing_home %}{% set ph_back_label = 'Landing page' %}{% set ph_kicker = 'Landing page · ' ~ course.title %}{% set ph_title = section.label %}{% set ph_lead = section.description %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = landing_home %}{% set ph_back_label = 'Landing page' %}{% set ph_kicker = 'Landing page · ' ~ course.title %}{% set ph_title = section.label %}{% set ph_lead = section.description %}{% include '@CattoPHP/page/head.html.twig' %}
 <section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}

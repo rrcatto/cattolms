@@ -6,9 +6,9 @@
 <h1>{{ course.title }}</h1>
 {% if course.subtitle|default('') %}<p class="course-subtitle">{{ course.subtitle }}</p>{% endif %}
 {% if course.summary|default('') %}<p class="course-summary">{{ course.summary }}</p>{% endif %}
-<div class="meta"><span>{{ course.structure|length }} course items</span>{% if course.estimated_minutes|default(0) %}<span>About {{ (course.estimated_minutes / 60)|round }} hours</span>{% endif %}</div>
+<div class="meta"><span>{{ course.structure|length }} course items</span>{% if course.course_type|default('full') == 'short' %}<span>Short course{% if course.estimated_minutes|default(0) %}, about {{ (course.estimated_minutes / 5)|round * 5 }} minutes{% endif %}</span>{% elseif course.estimated_minutes|default(0) %}<span>About {{ (course.estimated_minutes / 60)|round }} hours</span>{% endif %}</div>
 </header>
-<div class="course-introduction-copy">{{ course.introduction_html|raw }}</div>
+<div class="course-introduction-copy">{{ course.introduction_html|authored }}</div>
 {% if not course.enrolment.started_at %}
 {# Starting begins the access period and cannot be undone, so the learner confirms it first (owner, 2026-10-17). #}
 <form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">

@@ -15,6 +15,9 @@ Reset returns to it, as Who can sign in does (SignInRestriction). Someone the po
 sign-in, before the site gives them a session, and cannot turn it off while the policy names them.
 
 Change log:
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3), under the names .env gives, overriding .env with a Reset;
+  what a site saved is carried over by the upgrade migration 20261109160000_settings_to_cattophp.
 2026/11/05 SAST
 - Created.
 */
@@ -23,13 +26,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Auth;
 
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
+use CattoPHP\Settings\Settings;
 use CattoLearning\Support\Env;
 use InvalidArgumentException;
 
 final class TwoStepPolicy
 {
-    public const OPTION = 'auth.two_step';
     public const ENV = 'AUTH_TWO_STEP';
     public const CHOICE = 'CHOICE';
     public const ADMINS = 'ADMINS';
@@ -42,33 +44,31 @@ final class TwoStepPolicy
         self::EVERYONE => ['label' => 'Everyone must', 'note' => 'Everyone sets it up at their next sign-in. Some learners without a suitable phone could not get in.'],
     ];
 
-    private ?string $value = null;
-
-    public function __construct(private readonly ?OptionRepository $options = null)
+    /** @param Settings|null $settings CattoPHP's settings; null reads .env alone */
+    public function __construct(private readonly ?Settings $settings = null)
     {
     }
 
     /** The policy in force: what Settings saved, else .env, else ADMINS. */
     public function value(): string
     {
-        if ($this->value !== null) return $this->value;
-        $saved = strtoupper(trim((string) ($this->options?->find(self::OPTION) ?? '')));
+        $value = strtoupper(trim($this->settings?->get(self::ENV) ?? Env::string(self::ENV)));
 
-        return $this->value = isset(self::CHOICES[$saved]) ? $saved : $this->environmentValue();
+        return isset(self::CHOICES[$value]) ? $value : self::ADMINS;
     }
 
     /** 'database' (saved in Settings), 'environment' (AUTH_TWO_STEP says one of the three) or 'default' (it does not, so ADMINS). */
     public function source(): string
     {
-        if (isset(self::CHOICES[strtoupper(trim((string) ($this->options?->find(self::OPTION) ?? '')))])) return 'database';
+        if ($this->settings?->isOverridden(self::ENV)) return 'database';
 
-        return self::fromEnvironment() !== null ? 'environment' : 'default';
+        return $this->fromEnvironment() !== null ? 'environment' : 'default';
     }
 
     /** What .env says, which Reset returns to: ADMINS unless AUTH_TWO_STEP says CHOICE or EVERYONE. */
     public function environmentValue(): string
     {
-        return self::fromEnvironment() ?? self::ADMINS;
+        return $this->fromEnvironment() ?? self::ADMINS;
     }
 
     /** Whether someone must use two-step sign-in. */
@@ -85,21 +85,19 @@ final class TwoStepPolicy
     {
         $value = strtoupper(trim($value));
         if (!isset(self::CHOICES[$value])) throw new InvalidArgumentException('Choose who has to use two-step sign-in.');
-        if ($this->options === null) throw new InvalidArgumentException('Settings cannot be saved here.');
-        $this->options->set(self::OPTION, $value);
-        $this->value = $value;
+        if ($this->settings === null) throw new InvalidArgumentException('Settings cannot be saved here.');
+        $this->settings->set(self::ENV, $value);
     }
 
     /** Removes what Settings saved: AUTH_TWO_STEP decides again. */
     public function reset(): void
     {
-        $this->options?->delete(self::OPTION);
-        $this->value = null;
+        $this->settings?->reset(self::ENV);
     }
 
-    private static function fromEnvironment(): ?string
+    private function fromEnvironment(): ?string
     {
-        $value = strtoupper(Env::string(self::ENV));
+        $value = strtoupper($this->settings?->envValue(self::ENV) ?? Env::string(self::ENV));
 
         return isset(self::CHOICES[$value]) ? $value : null;
     }

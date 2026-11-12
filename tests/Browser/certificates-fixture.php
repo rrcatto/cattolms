@@ -35,7 +35,7 @@ declare(strict_types=1);
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
-use CattoLearning\Identity\IdentityVerificationRepository;
+use CattoPHP\Identity\IdentityChecks;
 use CattoLearning\Identity\IdentityVerificationService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -69,7 +69,7 @@ $person = static function (string $role, int $sessions = 1) use ($fixture, $sess
 // Didit's answer for a learner's check: approved, with the name on their identity document.
 $verify = static function (int $userId, string $first, string $last) use ($container): void {
     $sessionId = Uuid::v4();
-    $container->get(IdentityVerificationRepository::class)->create($userId, $sessionId);
+    $container->get(IdentityChecks::class)->create((string) $userId, $sessionId);
     $container->get(IdentityVerificationService::class)->apply($sessionId, 'Approved', ['status' => 'Approved', 'id_verifications' => [[
         'status' => 'Approved', 'document_type' => 'Identity Card', 'document_number' => '9001010000000', 'first_name' => $first, 'last_name' => $last,
         'date_of_birth' => '1990-01-01', 'issuing_state' => 'ZAF', 'issuing_state_name' => 'South Africa', 'warnings' => [],

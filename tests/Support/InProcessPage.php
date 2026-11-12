@@ -44,6 +44,10 @@ final class InProcessPage
         foreach ($attributes as $key => $value) $request->attributes->set($key, $value);
         $stack = new RequestStack();
         $stack->push($request);
+        // The current request for the whole application too, as a real one is: CattoPHP's template functions (a refused
+        // form's typed_for) find it there.
+        $shared = $container->get('request_stack');
+        $shared->push($request);
         [$savedPost, $savedGet] = [$_POST, $_GET];
         $_POST = $post ?? [];
         $_GET = $query;
@@ -66,6 +70,7 @@ final class InProcessPage
         } catch (HttpRedirect $redirect) {
             return ['status' => $redirect->status, 'body' => '', 'location' => $redirect->path, 'headers' => []];
         } finally {
+            $shared->pop();
             [$_POST, $_GET] = [$savedPost, $savedGet];
             $identity->setValue($auth, $previous);
         }

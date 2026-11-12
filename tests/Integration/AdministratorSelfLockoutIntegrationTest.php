@@ -104,6 +104,6 @@ final class AdministratorSelfLockoutIntegrationTest extends TestCase
     /** @return list<string> */
     private function roles(int $userId): array
     {
-        return array_map('strval', $this->db->fetchFirstColumn('SELECT r.role_key FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = :id', ['id' => $userId]));
+        return array_map('strval', $this->db->fetchFirstColumn('SELECT role_key FROM cattophp_account_roles WHERE account_id = CAST(:id AS TEXT)', ['id' => $userId]));
     }
 }

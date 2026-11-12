@@ -6,7 +6,7 @@
 		chosen there. Saving changes every course that uses it, which the head says. The builder's controller and the
 		unsaved-changes controller need Stimulus.
 	#}
-	{{ importmap() }}
+	{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set pl_new = pl_layout.id == 0 %}
 	{% set ph_kicker = 'Course Page Layouts' %}
 	{% set ph_title = pl_new ? 'New layout' : pl_layout.name %}
@@ -17,7 +17,7 @@
 			: (pl_layout.courses > 0 ? 'Used by ' ~ pl_layout.courses ~ ' ' ~ (pl_layout.courses == 1 ? 'course' : 'courses') ~ '. Saving changes ' ~ (pl_layout.courses == 1 ? 'its page' : 'all ' ~ pl_layout.courses ~ ' pages') ~ ' at once.' : 'No course uses this layout yet. Give it to courses on Course Page Layouts or on a course\'s Page layout tab.')) %}
 	{% if pl_layout.is_default %}{% set ph_badges %}{{ ui('feedback.badge', {label: 'Default layout', tone: 'info'}) }}{% endset %}{% endif %}
 	{% set ph_actions %}<span data-page-layout-leave>{{ ui('action.link', {label: 'All layouts', href: '/admin/courses/page-layouts', variant: 'secondary', size: 'normal', icon: 'action-view-list'}) }}</span>{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}

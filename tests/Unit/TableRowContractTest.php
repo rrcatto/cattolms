@@ -10,7 +10,7 @@ Version: 0.6
 Description:
 A table row is one line, it fits, and nothing in it stacks.
 
-Core owns row geometry and clipping. UiOwnershipAudit rejects canonical component layout in
+Core owns row geometry and clipping. CattoPHP's SourceAudit rejects canonical component layout in
 bundled themes. These checks retain defensive core table declarations and reject parallel row
 markup in callers; broad theme element rules still require some cascade protection.
 
@@ -37,7 +37,7 @@ final class TableRowContractTest extends TestCase
 
     private static function css(): string
     {
-        return (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        return (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
     }
 
     /** @return list<string> */
@@ -141,16 +141,16 @@ final class TableRowContractTest extends TestCase
             self::assertStringContainsString($rule, $css, 'Core lost a phone table rule: ' . $rule);
         }
 
-        $header = (string) file_get_contents(self::root() . '/resources/views/partials/sortable-header.html.twig');
+        $header = (string) file_get_contents(self::root() . '/vendor/rrcatto/cattophp/templates/ui/data/sortable-header.html.twig');
         self::assertSame(2, substr_count($header, '{% if sh.wide|default(false) %}data-phone="hide"{% endif %}'), 'Both header forms mark a column a phone hides.');
 
-        $table = (string) file_get_contents(self::root() . '/resources/views/ui/data/data-table.html.twig');
+        $table = (string) file_get_contents(self::root() . '/vendor/rrcatto/cattophp/templates/ui/data/data-table.html.twig');
         self::assertStringContainsString('<div class="cl-ui-table-tip" role="tooltip" hidden></div>', $table);
 
-        $row = (string) file_get_contents(self::root() . '/resources/views/ui/actions/row-actions.html.twig');
+        $row = (string) file_get_contents(self::root() . '/vendor/rrcatto/cattophp/templates/ui/actions/row-actions.html.twig');
         self::assertStringContainsString('<div class="cl-ui-row-actions cl-ui-row-actions--wide">{{ block(\'body\') }}</div><details class="cl-ui-row-menu cl-ui-row-menu--narrow"', $row);
 
-        $script = (string) file_get_contents(self::root() . '/public_html/js/platform-overrides.js');
+        $script = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/js/cattophp.js') . file_get_contents(self::root() . '/public_html/js/platform-overrides.js'));
         self::assertStringContainsString("element.textContent = text;", $script, 'The tooltip is filled with text, never built as markup.');
 
         // Several actions kept in a row become one menu on a phone: Themes and the course price list.
@@ -230,7 +230,7 @@ final class TableRowContractTest extends TestCase
      */
     public function testTruncatedCellsCarryTheirFullTextAsATooltip(): void
     {
-        $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js');
+        $js = (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/js/cattophp.js') . file_get_contents(dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js'));
 
         self::assertStringContainsString('const applyCellTooltips', $js);
         self::assertStringContainsString(".cl-ui-table td, .cl-ui-table th", $js);

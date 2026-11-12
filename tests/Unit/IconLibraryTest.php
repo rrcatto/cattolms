@@ -20,62 +20,21 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\View\Artwork\IconLibrary;
-use CattoLearning\View\Artwork\UploadedSvg;
-use InvalidArgumentException;
+use CattoLearning\View\Artwork\CourseIcons;
+use CattoPHP\Ui\IconLibrary;
 use PHPUnit\Framework\TestCase;
 
 final class IconLibraryTest extends TestCase
 {
-    public function testTheLibraryIsPublishedWithItsLicence(): void
+    /** The library is CattoPHP's, with its own tests there; cattolms gives it the subjects its courses are about. */
+    public function testACategoryOrTagGetsTheIconOfItsSubject(): void
     {
-        $root = dirname(__DIR__, 2) . '/resources/icons/';
-        $library = json_decode((string) file_get_contents($root . 'lucide.json'), true);
-        self::assertSame(['Lucide', 'ISC'], [$library['name'], $library['license']]);
-        self::assertGreaterThan(1500, count($library['icons']));
-        self::assertStringContainsString('ISC License', (string) file_get_contents($root . 'LICENSE-lucide.txt'));
-    }
-
-    public function testEveryIconIsAPictureTheSiteAcceptsInTheThemesColour(): void
-    {
-        $icons = new IconLibrary();
-        $names = array_keys(json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/resources/icons/lucide.json'), true)['icons']);
-        foreach ($names as $name) {
-            $svg = (string) $icons->svg($name);
-            self::assertStringContainsString('stroke="currentColor"', $svg, $name);
-            UploadedSvg::validate($svg, UploadedSvg::ICON_BYTES, 'icon');
-        }
-        self::assertNull($icons->svg('no-such-icon'));
-    }
-
-    public function testASearchFindsIconsByNameThenKeyword(): void
-    {
-        $icons = new IconLibrary();
-        self::assertSame('lock', $icons->search('lock')[0]);
-        self::assertContains('scale', $icons->search('justice'), 'A keyword finds an icon too.');
-        self::assertSame([], $icons->search('zzqxx'));
-        self::assertSame([], $icons->search('   '));
-        self::assertCount(5, $icons->search('chart', 5));
-    }
-
-    public function testANameGetsTheIconThatFitsItBest(): void
-    {
-        $icons = new IconLibrary();
+        $icons = new IconLibrary(CourseIcons::SUBJECTS, CourseIcons::NAME_STOP_WORDS);
         foreach (['Law' => 'scale', 'Linux' => 'terminal', 'Physics' => 'atom', 'Accounting' => 'calculator', 'Small Business' => 'briefcase-business',
-            'Spreadsheets' => 'sheet', 'Cooking' => 'chef-hat', 'Photography' => 'camera', 'Zzqx' => 'folder'] as $name => $icon) {
+            'Spreadsheets' => 'sheet', 'Cooking' => 'chef-hat', 'Photography' => 'camera', 'Paralegal Studies' => 'scale', 'Zzqx' => 'folder'] as $name => $icon) {
             self::assertSame($icon, $icons->bestFor($name, 'folder'), $name);
         }
-        self::assertSame(['value', 'label', 'icon'], array_keys($icons->choices('Law', '')[0]), 'Choices are feature cards.');
-        self::assertSame('lock', $icons->choices('Law', 'lock')[0]['value'], 'A search replaces the suggestions.');
-    }
-
-    public function testOnlyTheLibrarysIconsCanBeChosen(): void
-    {
-        $icons = new IconLibrary();
-        self::assertNull($icons->chosen(''));
-        self::assertNull($icons->chosen(null));
-        self::assertSame($icons->svg('lock'), $icons->chosen('lock'));
-        $this->expectException(InvalidArgumentException::class);
-        $icons->chosen('../../etc/passwd');
+        $configuration = (string) file_get_contents(dirname(__DIR__, 2) . '/config/packages/cattophp.yaml');
+        self::assertStringContainsString('icon_subjects: !php/const CattoLearning\\View\\Artwork\\CourseIcons::SUBJECTS', $configuration, 'The application\'s library has them too.');
     }
 }

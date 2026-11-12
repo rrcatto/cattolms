@@ -11,7 +11,7 @@
 	{% set ph_title = 'Get in touch' %}
 	{% set ph_lead = 'Tell us what your message is about, and we will reply to the email address you give.' %}
 	{% set ph_hero %}{% include '@platform/partials/artwork/contact-hero.html.twig' %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set draft = contact.draft %}
 	{% set signed_in = contact.account is not null %}
 	{#
@@ -54,6 +54,7 @@
 			<p class="cl-contact-faq">Before you write, the <a href="/faq">FAQ</a> may already answer your question.</p>
 			<form action="/contact" method="post" class="contact-form" data-contact-form>
 				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="contact_opened" value="{{ contact_stamp|default('') }}">
 				<div class="cl-honeypot" aria-hidden="true">
 					<label>Website
 					<input type="text" name="website" tabindex="-1" autocomplete="off">
@@ -203,8 +204,7 @@
 {% endblock %}
 {% endembed %}
 			</form>
-			{# Only the chosen reason's fieldset shows and is sent, and a company's name and size only for a company. Without JavaScript everything shows and the server reads only what the choices call for. #}
-			<script>(()=>{const form=document.querySelector('[data-contact-form]');if(!form)return;const sync=()=>{const chosen=form.querySelector('input[name=reason]:checked')?.value;form.querySelectorAll('[data-contact-reason]').forEach((set)=>{const on=set.dataset.contactReason===chosen;set.hidden=!on;set.disabled=!on;});const company=form.querySelector('[data-contact-company]');if(company){const on=form.querySelector('input[name=for_company]:checked')?.value==='yes';company.hidden=!on;company.querySelectorAll('input').forEach((field)=>{field.disabled=!on;});}};form.querySelectorAll('input[name=reason],input[name=for_company]').forEach((card)=>card.addEventListener('change',sync));sync();})();</script>
+			{# Only the chosen reason's fieldset shows and is sent, and a company's name and size only for a company. Without JavaScript everything shows and the server reads only what the choices call for (page-controls.js). #}
 {% endblock %}
 {% endembed %}
 	</section>

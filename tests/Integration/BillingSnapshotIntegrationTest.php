@@ -164,7 +164,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $orderId = $purchases->place($admin, $companyId, $review['purchase_key'], $review['quote'], $a, 'dummy', 'demo_failure', false, true);
         self::assertSame($orderId, $purchases->place($admin, $companyId, $review['purchase_key'], $review['quote'], $b, 'dummy', 'demo_failure', false, true), 'A replayed placement keeps its order and touches nothing.');
         self::assertTrue($a->equals($this->billing->forCompany($companyId) ?? $b), 'Checkout saved the company billing profile, and the replay did not change it.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key='company.billing_updated' AND metadata->>'company_id'=:company", ['company' => (string) $companyId]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action='company.billing_updated' AND details->>'company_id'=:company", ['company' => (string) $companyId]));
         $this->assertBilling($a, $this->orderBilling($orderId));
         $snapshot = CommerceRepository::decode((string) $this->records->order($orderId)['snapshot']);
         self::assertSame([$adminId, $email], [$snapshot['purchaser_user_id'], $snapshot['purchaser_email']], 'The administrator is recorded as the purchaser; the company is billed.');

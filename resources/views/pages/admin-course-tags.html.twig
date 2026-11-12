@@ -5,7 +5,7 @@
 	{% set ph_lead = 'Cross-cutting labels a course may carry as many of as it needs.' %}
 	{# The page's main action belongs to the page, so it sits in the page head. #}
 	{% set ph_actions %}{{ ui('action.button', {label: 'Create tag', variant: 'primary', size: 'normal', type: 'button', modal: 'createTagModal', icon: 'action-add'}) }}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{# The plain section wrapper the other Courses pages use, so the card lands in the same place. #}
 	<section class="cl-page-section">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -21,9 +21,9 @@
 {% block header %}
 
 								<tr>
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 72, label: 'Tag'}} %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses'}} %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Actions'}} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 72, label: 'Tag'}} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses'}} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Actions'}} %}
 								</tr>
 
 {% endblock %}
@@ -32,7 +32,7 @@
 								{% for tag in tags %}
 									<tr>
 										<td title="{{ tag.name }}">
-											{% if tag.icon_svg|default('') %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|raw }}</span> {% endif %}{{ tag.name }}
+											{% if tag.icon_svg|default('') %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|authored }}</span> {% endif %}{{ tag.name }}
 										</td>
 										<td>
 											{{ tag.course_count }}

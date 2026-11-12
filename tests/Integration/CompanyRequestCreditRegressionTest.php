@@ -37,7 +37,7 @@ use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
-use CattoLearning\Support\GeoIpLocator;
+use CattoPHP\Network\GeoIp;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\FakeMailer;
 use PHPUnit\Framework\TestCase;
@@ -138,11 +138,10 @@ final class CompanyRequestCreditRegressionTest extends TestCase
             $container->get(RoleRepository::class),
             $container->get(CompanyRepository::class),
             $container->get(CourseRepository::class),
-            $container->get(OptionRepository::class),
             $container->get(RuntimeSettings::class),
             $container->get(AuditRepository::class),
             $mailer,
-            $container->get(GeoIpLocator::class),
+            $container->get(GeoIp::class),
             $container->get(EntityLookupRepository::class),
             $container->get(AuthSessionRepository::class)
         );

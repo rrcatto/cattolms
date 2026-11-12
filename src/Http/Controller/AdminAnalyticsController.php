@@ -11,7 +11,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\Popularity\CoursePopularityMetrics;
 use CattoLearning\Course\Popularity\CoursePopularityRepository;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\Clock\ClockInterface;

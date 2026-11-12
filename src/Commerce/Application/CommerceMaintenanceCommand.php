@@ -3,8 +3,7 @@
 declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
-use CattoLearning\Maintenance\ScheduledJob;
-use CattoLearning\Maintenance\Scheduler;
+use CattoPHP\Scheduler\Scheduler;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputInterface, InputOption};
@@ -23,7 +22,7 @@ final class CommerceMaintenanceCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         do {
-            $result = $this->scheduler->run([ScheduledJob::Commerce])[ScheduledJob::Commerce->value];
+            $result = $this->scheduler->run(['commerce'])['commerce'];
             if (!$result['ok']) {
                 $output->writeln('<error>Commerce maintenance failed: '.htmlspecialchars($result['summary']).'</error>');
                 if (!$input->getOption('watch')) return Command::FAILURE;

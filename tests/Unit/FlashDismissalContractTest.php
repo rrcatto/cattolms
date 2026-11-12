@@ -81,9 +81,14 @@ final class FlashDismissalContractTest extends TestCase
 
     private function platformScript(): string
     {
-        $file = dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js';
-        self::assertFileExists($file);
+        // CattoPHP's script dismisses messages since CattoPHP Phase 3, step 8; cattolms's own follows it.
+        $files = [dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/js/cattophp.js', dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js'];
+        $script = '';
+        foreach ($files as $file) {
+            self::assertFileExists($file);
+            $script .= (string) file_get_contents($file);
+        }
 
-        return (string) file_get_contents($file);
+        return $script;
     }
 }

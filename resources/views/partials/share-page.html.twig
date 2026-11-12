@@ -1,0 +1,35 @@
+{#
+	Share this page (owner, 2026-11-09: "add a share icon to course and course bundle pages to make it easy for people to
+	share these pages via social media - it's free organic marketing"; then: "one generic share icon (three node graph). The
+	share icon on a mobile device should use the native built-in sharesheet feature. On a Linux or Win PC browser, I'd like a
+	modal window to popup with the 6 options + Telegram. Place Telegram after WhatsApp.").
+	One Share link with the three-node mark. On a phone or tablet (a touch screen whose browser has its own Share) it opens
+	the device's share sheet; anywhere else it opens this window: Facebook, WhatsApp, Telegram, LinkedIn, X, Email and Copy
+	link (page-controls.js). Each platform is a plain link to its own share page, so nothing of theirs loads on the site and
+	nobody is tracked. Each shared address is tagged with where it was shared (utm_medium=share, utm_source facebook, whatsapp,
+	telegram, linkedin, x, email, copied_link or share_sheet), so Site Analytics counts the visitors who arrive through a share
+	(owner, 2026-11-09: "I'd like to see how many visitors arrive through shares - tag them"); the page's own address stays
+	its canonical one. Without JavaScript the window is a part of the page and the link goes to it; Copy link, which needs
+	JavaScript, is left out there. sh_url: the page's address in full; sh_title: what is shared; sh_what: "course" or "bundle";
+	sh_full_width: the link as wide as its card, as the course's Course access card has its buttons.
+#}
+{% set sh_window = 'share-' ~ sh_what %}
+{% set sh_tag = sh_url ~ ('?' in sh_url ? '&' : '?') ~ 'utm_medium=share&utm_campaign=share&utm_source=' %}
+{% set sh_words = sh_title|url_encode %}
+<div class="cl-share-page" data-share data-share-url="{{ sh_url }}" data-share-title="{{ sh_title }}" data-share-copy-url="{{ sh_tag ~ 'copied_link' }}" data-share-sheet-url="{{ sh_tag ~ 'share_sheet' }}">
+	{{ ui('action.link', {label: 'Share this ' ~ sh_what, variant: 'secondary', size: 'normal', full_width: sh_full_width|default(false), href: '#' ~ sh_window, modal: sh_window, icon: 'action-share'}) }}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: sh_window, title: 'Share this ' ~ sh_what})} %}
+	{% block modal_body %}
+		<ul class="cl-share-page-options">
+			<li><a class="cl-share-page-option" href="https://www.facebook.com/sharer/sharer.php?u={{ (sh_tag ~ 'facebook')|url_encode }}" target="_blank" rel="noopener noreferrer"><svg class="cl-share-page-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="{{ platform.icon_sprite }}#social-facebook"></use></svg><span>Facebook</span></a></li>
+			<li><a class="cl-share-page-option" href="https://wa.me/?text={{ (sh_title ~ ' ' ~ sh_tag ~ 'whatsapp')|url_encode }}" target="_blank" rel="noopener noreferrer"><svg class="cl-share-page-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="{{ platform.icon_sprite }}#social-whatsapp"></use></svg><span>WhatsApp</span></a></li>
+			<li><a class="cl-share-page-option" href="https://t.me/share/url?url={{ (sh_tag ~ 'telegram')|url_encode }}&amp;text={{ sh_words }}" target="_blank" rel="noopener noreferrer"><svg class="cl-share-page-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="{{ platform.icon_sprite }}#social-telegram"></use></svg><span>Telegram</span></a></li>
+			<li><a class="cl-share-page-option" href="https://www.linkedin.com/sharing/share-offsite/?url={{ (sh_tag ~ 'linkedin')|url_encode }}" target="_blank" rel="noopener noreferrer"><svg class="cl-share-page-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="{{ platform.icon_sprite }}#social-linkedin"></use></svg><span>LinkedIn</span></a></li>
+			<li><a class="cl-share-page-option" href="https://x.com/intent/post?text={{ sh_words }}&amp;url={{ (sh_tag ~ 'x')|url_encode }}" target="_blank" rel="noopener noreferrer"><svg class="cl-share-page-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="{{ platform.icon_sprite }}#social-x"></use></svg><span>X</span></a></li>
+			<li><a class="cl-share-page-option" href="mailto:?subject={{ sh_words }}&amp;body={{ (sh_title ~ "\n\n" ~ sh_tag ~ 'email')|url_encode }}">{{ ui('icon', {name: 'action-email'}) }}<span>Email</span></a></li>
+			<li data-share-copy-item hidden><button class="cl-share-page-option" type="button" data-share-copy>{{ ui('icon', {name: 'action-copy'}) }}<span>Copy link</span></button></li>
+		</ul>
+		<p class="cl-share-page-done" data-share-done role="status" hidden>The link is copied.</p>
+	{% endblock %}
+	{% endembed %}
+</div>

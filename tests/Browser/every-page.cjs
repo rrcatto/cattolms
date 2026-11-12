@@ -17,7 +17,7 @@ const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-every-page';
 const state = JSON.parse(fs.readFileSync(process.env.CATTO_BROWSER_STATE || '/tmp/catto-section-pages-state.json'));
 const LIMIT = Number(process.env.CATTO_EVERY_PAGE_LIMIT || 600);
 const SKIP = /^\/(learn\/|logout|auth\/|webhooks\/|api\/|mcp)|\/(download|export|delete|remove|reset|revoke|cancel)(\/|$)|\.(pdf|xlsx|csv|xml|txt|json|svg|png|jpe?g|webp|zip)$|^\/sitemap|^\/robots/;
-const {inspect, judge} = require('./page-construction.cjs');
+const {inspect, judge, watchPolicy, flexClasses, flexClaims} = require('./page-construction.cjs');
 const {PAGES, open, within} = require('./pace.cjs');
 // Built another way on purpose: Home and course landing pages are full-width marketing pages, and the course reader and
 // its public preview are Core's reader (UX rule 1.7; the reader is never a theme's page).
@@ -52,6 +52,7 @@ async function crawl(browser, who, cookie, width) {
     const pageFor = async (worker) => {
         if (!contexts[worker]) {
             const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}});
+            await watchPolicy(context);
             if (cookie) await context.addCookies([{name: 'catto_learning_session', value: cookie, url: base, secure: true}]);
             contexts[worker] = {context, page: await context.newPage()};
         }
@@ -84,6 +85,9 @@ async function crawl(browser, who, cookie, width) {
         }
         const links = await page.evaluate(() => [...document.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')));
         const problems = judge(facts, '').map((failure) => failure.replace(/^: /, ''));
+        // The served page's layout put these elements' children on lines of their own on the word that CSS draws them flex or grid.
+        const claims = await page.evaluate(flexClaims, flexClasses);
+        if (claims.length) problems.push('treated by the layout as flex or grid but ' + claims.join(', '));
         results.push({who: `${who} ${width}`, address: landed || address, status: response.status(), problems});
         for (const href of links) {
             if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;

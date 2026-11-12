@@ -57,10 +57,10 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Commerce\Domain\OrderNumber;
 use CattoLearning\Commerce\Infrastructure\MoneyRecordsRepository;
 use CattoLearning\Commerce\Wallet\LedgerKind;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Support\SortOrder;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -422,6 +422,8 @@ final class MoneyRecords
             'refund.approved' => $by . ' approved a refund of ' . $money($p['amount_minor'] ?? 0) . ' on ' . $course . ' as ' . $destination((string) ($p['destination'] ?? ''))
                 . (isset($p['policy_refusal']) ? ', overriding the Refund Policy' : '') . '.',
             'refund.paid_out' => $by . ' recorded paying a refund back by ' . (($p['method'] ?? '') === 'eft' ? 'EFT' : 'card') . (isset($p['reference']) ? ', reference ' . $p['reference'] : '') . '.',
+            'refund.sent_to_card' => ($p['found'] ?? false) ? $by . ' found that Stitch had already refunded ' . $money($p['amount_minor'] ?? 0) . ' to the card (Stitch refund ' . ($p['stitch_refund'] ?? '') . ').' : $by . ' refunded ' . $money($p['amount_minor'] ?? 0) . ' to the card through Stitch (Stitch refund ' . ($p['stitch_refund'] ?? '') . ').',
+            'refund.stitch_failed' => 'Stitch did not refund it to the card: ' . ($p['message'] ?? 'no reason given') . '.',
             'attention.email_sent' => $by . ' emailed ' . $customer . ' about the ' . $kind((string) ($p['kind'] ?? '')) . '.',
             'attention.dismissed' => $by . ' marked the ' . $kind((string) ($p['kind'] ?? '')) . ' as dealt with.',
             'unmatched.recorded' => $by . ' put ' . $money($p['amount_minor'] ?? 0) . ' on the unmatched money list: it arrived' . (isset($p['received_at']) ? ' on ' . self::when((string) $p['received_at']) : '')

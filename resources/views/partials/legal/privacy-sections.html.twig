@@ -49,7 +49,8 @@
 	<li><strong>Your email choices.</strong> Whether you want News and Updates by email, each category, course and tag you follow and each list you join, with when and where you chose (when registering, at checkout, when starting a course, with a Follow button, with a list's join link or on My Subscriptions), and how you would like updates to reach you: as they happen, or in a digest daily, weekly or monthly. You change them at any time under Account › My Subscriptions.</li>
 	<li><strong>News emails.</strong> Each news email we send you, whether it arrived or bounced, and whether you opened it and which of its links you clicked. A news email records its opening with a small picture and its clicks with its own link addresses, and you can unsubscribe with the unsubscribe link at its foot. An address that bounced as not existing, or whose owner marked our news as spam, is never sent news again.</li>
 	<li><strong>Emails you forward.</strong> When you forward one of our emails to a friend, we keep their address, the name and the note you gave, with that email's record, so that it is never sent to them twice. They get it once, we put them on none of our lists, and the email lets them ask us never to email them again.</li>
-	<li><strong>Messages.</strong> A message you send through the contact form: what it is about, your name, email address and message, your account reference and an order number or course if you give them, and the answers the form asks for its reason, such as the day, amount and reference of an EFT payment. It is kept on this site and emailed to us, and we email you its reference.</li>
+	<li><strong>Messages.</strong> A message you send through the contact form: what it is about, your name, email address and message, your account reference and an order number or course if you give them, and the answers the form asks for its reason, such as the day, amount and reference of an EFT payment. It is kept on this site with our replies to you and the answers you send us by email, together as one conversation, and we email you its reference.</li>
+	<li><strong>Spam checks on messages.</strong> To keep unwanted messages out, each message sent through the contact form is given a spam score when it arrives, worked out from the IP address it was sent from, the country and network that address belongs to, your browser's user agent, how long the form was open, your email address and the words of the message. The score and the signs behind it are kept with the message. When we mark a message as spam or as genuine, the words in it are counted to teach the check, and those counts are not linked to you. A message judged to be spam is set aside, and its sender is not told.</li>
 </ul>
 <p>If you belong to a company, your Company Administrator can see your name, email address and role, the courses you are on and your status, progress and dates on them. The company also sees totals for each course with an average result.</p>
 	{% endblock %}{% endembed %}
@@ -117,7 +118,9 @@
 	{label: 'Analytics events', value: '5 years'},
 	{label: 'Site log', value: site_log_kept_for|default('120 days')},
 	{label: 'Flagged addresses and ended lockouts', value: site_flags_kept_for|default('1 year')},
-	{label: 'Contact messages', value: '5 years'},
+	{label: 'Contact messages, with our replies and your answers', value: inbox_kept_for|default('5 years')},
+	{label: 'Messages set aside as spam', value: inbox_spam_kept_for|default('30 days')},
+	{label: 'Messages we deleted', value: inbox_trash_kept_for|default('30 days')},
 	{label: 'Registrations that never became an account', value: '5 years'},
 	{label: 'Records of the news emails sent to you', value: '5 years'},
 	{label: 'Sign-in links', value: '30 minutes'},
@@ -125,7 +128,7 @@
 	{label: 'Records of the messages sent to a messaging account', value: '30 days'},
 	{label: 'Sessions', value: '24 hours'},
 ]}) }}
-<p>Your account details, your ID number and date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day. Your email choices are kept for as long as you have an account, so that we can always show what you agreed to. A connected messaging account is kept until you disconnect it, and two-step sign-in until you turn it off.</p>
+<p>Your account details, your ID number and date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events, contact messages and the records of news emails older than 5 years are deleted automatically every day. Messages set aside as spam, and messages we deleted, are removed for good once they are older than the periods above. Your email choices are kept for as long as you have an account, so that we can always show what you agreed to. A connected messaging account is kept until you disconnect it, and two-step sign-in until you turn it off.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'security', eyebrow: 'Section 9', icon: icons['security'], heading: 'How we protect it'})} %}{% block body %}
 <ul>

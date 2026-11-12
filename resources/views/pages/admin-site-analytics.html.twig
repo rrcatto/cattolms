@@ -7,7 +7,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Site Analytics' %}
 	{% set ph_lead = 'Who is on your site, where they are from and what they are doing.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% if attention or new_countries %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'attention'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Needs your attention', summary: attention_more > 0 ? 'The latest 8 flagged addresses. ' ~ attention_more ~ ' more on Flagged Activity.' : 'Each address the site has flagged and you have not decided, and each sign-in from a new country.'}) }}
@@ -28,9 +28,9 @@
 	{% endblock %}{% endembed %}</section>
 	{% endif %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{% include '@platform/partials/live-status.html.twig' with {live_seconds: 30} %}
-		<form class="cl-money-period" action="/admin/site-analytics" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics'} only %}>
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'site-period'})} %}{% block control %}<select id="site-period" name="period" onchange="if (this.value !== 'dates') this.form.requestSubmit()" {{ ui_field_attrs(props) }}>{% for key, label in period_choices %}<option value="{{ key }}"{{ period.key == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 30} %}
+		<form class="cl-money-period" action="/admin/site-analytics" method="get" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics'} only %}>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'site-period'})} %}{% block control %}<select id="site-period" name="period" data-submit-on-change data-submit-unless="dates" {{ ui_field_attrs(props) }}>{% for key, label in period_choices %}<option value="{{ key }}"{{ period.key == key ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'site-from'})} %}{% block control %}<input type="date" id="site-from" name="from" value="{{ period.fromDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'site-to'})} %}{% block control %}<input type="date" id="site-to" name="to" value="{{ period.toDay }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}
@@ -83,5 +83,18 @@
 			{{ ui('layout.section-head', {heading: 'On the site now', summary: 'Past 5 minutes. Refreshes by itself.'}) }}
 			<div id="site-on-now">{% include '@platform/partials/admin/site-on-now.html.twig' %}</div>
 		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	{# Visitors through shares (owner, 2026-11-09: "I'd like to see how many visitors arrive through shares - tag them"): the
+	   people who arrived through a link from Share this course or bundle, and the pages they arrived at. #}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'site-shares'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Visitors through shares', summary: 'People who arrived through a link someone shared with Share this course or Share this bundle. The link says where it was shared; a link preview drawn by an app is not a visitor.'}) }}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+			{{ ui('data.stat-card', {value: shares.visitors, label: 'Arrived through a share', icon: 'figure-people'}) }}
+			{% for platform in shares.platforms %}{{ ui('data.stat-card', {value: platform.visitors, label: platform.label, icon: 'figure-people'}) }}{% endfor %}
+		{% endblock %}{% endembed %}
+		{% if shares.pages %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr><th>Arrived at</th><th>Shared on</th><th class="text-end">Visitors</th></tr>{% endblock %}
+		{% block body %}{% for row in shares.pages %}<tr><td class="cell-text"><a href="{{ row.href }}">{{ row.name }}</a></td><td class="cell-text">{{ row.shared_on }}</td><td class="text-end">{{ row.visitors }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'Nobody has arrived through a share in this period.'}) }}{% endif %}
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

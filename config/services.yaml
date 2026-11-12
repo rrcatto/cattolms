@@ -61,14 +61,32 @@ services:
     # the PHP-DI container calls statically.
     CattoLearning\Api\:
         resource: '../src/Api/'
-        exclude: '../src/Api/{ApiIdentity.php,ApiScope.php,Security/ApiUser.php,*Exception.php}'
+        exclude: '../src/Api/{ApiScope.php,ApiPerson.php}'
 
     CattoLearning\Auth\:
         resource: '../src/Auth/'
-        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,AdultAge.php,SouthAfricanIdNumber.php,Security/WebUser.php,*Exception.php,Signup/NetworkFacts.php,Signup/SignupFacts.php,Signup/RiskAssessment.php,Signup/SignupRisk.php,TwoStep/Base32.php,TwoStep/OneTimeCode.php,TwoStep/QrPicture.php,TwoStep/RecoveryCodes.php}'
+        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,AdultAge.php,SouthAfricanIdNumber.php,Security/WebUser.php,*Exception.php}'
 
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
+
+    # CattoPHP's secret cipher, in place of cattolms's own since CattoPHP's Phase 2: public, as every service here is, so
+    # the command-line tools and the tests fetch it by name. The same key as CattoPHP's own definition.
+    CattoPHP\Security\SecretCipher:
+        arguments: ['%cattophp.application_key%']
+
+    # CattoPHP's settings (since step 3) and roles (since step 5), public for the tools and the tests.
+    CattoPHP\Settings\Settings: ~
+    CattoPHP\Access\Roles: ~
+
+    # CattoPHP's error page drawn in the theme (step 7a): CattoPHP decides what the page says, this draws it.
+    CattoLearning\Http\ThemedErrorPage: ~
+
+    # CattoPHP's mailer (step 7b), by a name of its own for the tests that build a mailing service by hand: an alias
+    # leaves CattoPHP's own definition, and so its transport, as it is.
+    cattolms.cattophp_mailer:
+        alias: CattoPHP\Mail\Mailer
+        public: true
 
     # The first-party analytics event stream: the recorder and its repository. The event type and
     # source enums are vocabulary, not services.
@@ -80,29 +98,24 @@ services:
     # beside the theme layer rather than in the persistence graph that calls it.
     CattoLearning\View\Artwork\:
         resource: '../src/View/Artwork/'
+        # The subjects courses are about, a list for CattoPHP's icon library, not a service.
+        exclude: '../src/View/Artwork/CourseIcons.php'
 
-    CattoLearning\View\Ui\PlatformUi:
-        arguments:
-            $publicRoot: '%catto.public_root%'
+    # cattolms's own components and the slide drawings its feature cards may show, beside CattoPHP's registry.
+    CattoLearning\View\Ui\CatalogueComponents: ~
+    CattoLearning\View\Ui\SlideDrawing: ~
 
     # The Twig theme layer.
     CattoLearning\View\Twig\:
         resource: '../src/View/Twig/'
 
-    # ThemeTemplates takes the filesystem loader itself rather than the Environment, because
-    # pointing @theme at the theme a request renders in is a loader operation.
-    CattoLearning\View\Twig\ThemeTemplates:
-        arguments:
-            $loader: '@twig.loader.native_filesystem'
-
     # One view model for every page, which is what keeps a single set of navigation and
     # breadcrumb rules rather than one per controller.
     CattoLearning\View\ThemeRenderer: ~
-    CattoLearning\View\ThemeManager:
-        arguments:
-            $codeRoot: '%catto.code_root%'
-            $instanceRoot: '%catto.instance_root%'
-            $publicRoot: '%catto.public_root%'
+
+    # The theme system is CattoPHP's (Phase 3, step 9, config/packages/cattophp.yaml); the chosen theme is kept in the
+    # option it always was, and the theme index in its table.
+    CattoLearning\View\OptionThemeChoice: ~
 
     # Popularity's model and its metric and score records are values, not services; so are a
     # certificate design, its looks and the uploaded images it is checked into, and a landing page's
@@ -120,7 +133,7 @@ services:
     # data and template definitions are values, not services.
     CattoLearning\Document\:
         resource: '../src/Document/'
-        exclude: '../src/Document/{DocumentType.php,PageSettings.php,RenderedDocument.php,DocumentSampleData.php,*Exception.php,Template/PlaceholderKind.php,Template/PlaceholderDefinition.php,Template/CollectionDefinition.php,Template/PlaceholderSet.php}'
+        exclude: '../src/Document/{DocumentType.php,DocumentSampleData.php}'
 
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
@@ -163,9 +176,7 @@ services:
         exclude: '../src/Company/{CompanyScope.php,NoCompanyChosen.php}'
 
     # Support/ is value objects with private constructors and static factories, which is why it is
-    # not registered wholesale - doing so makes the container refuse to compile. GeoIpLocator is the
-    # exception: it is a service that happens to live among them.
-    CattoLearning\Support\GeoIpLocator: ~
+    # not registered wholesale - doing so makes the container refuse to compile.
 
     CattoLearning\Event\:
         resource: '../src/Event/'
@@ -173,17 +184,15 @@ services:
     # Site analytics and lockouts. The lockout check runs before the container is built, and the rest of what is excluded are values.
     CattoLearning\SiteAnalytics\:
         resource: '../src/SiteAnalytics/'
-        exclude: '../src/SiteAnalytics/{LockoutGate.php,LockoutGateRepository.php,VisitorAgent.php,RequestFacts.php,SitePeriod.php,SiteAnalyticsWords.php}'
+        exclude: '../src/SiteAnalytics/{SitePeriod.php,SiteAnalyticsWords.php}'
 
     # Messages to the owner by Telegram (owner, 2026-11-05).
     CattoLearning\OwnerMessages\:
         resource: '../src/OwnerMessages/'
-        exclude: '../src/OwnerMessages/TelegramFailed.php'
 
-    # ScheduledJob is the list of scheduled jobs, an enum, not a service.
+    # The scheduled jobs are CattoPHP scheduled tasks (src/Maintenance/Tasks/), found by autoconfiguration.
     CattoLearning\Maintenance\:
         resource: '../src/Maintenance/'
-        exclude: '../src/Maintenance/ScheduledJob.php'
 
     # LmsMcpTools is constructed per MCP session with that session's identity, by the MCP server
     # entrypoint. It is not a service.
@@ -212,11 +221,10 @@ services:
     CattoLearning\Infrastructure\Persistence\RestrictViolationMiddleware:
         tags: ['doctrine.middleware']
 
-    # Identity verification through Didit (owner, 2026-10-19). A decision and the webhook signature are
-    # values and rules, and the refusal is an exception, not a service.
+    # Identity verification through Didit (owner, 2026-10-19), CattoPHP's since 2026-11-12: cattolms's pages over it, the
+    # account reference Didit is told and the certificates an approval issues.
     CattoLearning\Identity\:
         resource: '../src/Identity/'
-        exclude: '../src/Identity/{IdentityDecision.php,DiditSignature.php,InvalidDiditWebhook.php}'
 
     # The setup wizard (owner, 2026-10-20): Administration → System → Setup.
     CattoLearning\Setup\:
@@ -226,22 +234,28 @@ services:
     # Mailing, step 1 (owner, 2026-10-26): who agreed to be emailed about what.
     CattoLearning\Mailing\:
         resource: '../src/Mailing/'
-        exclude: '../src/Mailing/{EmailBlocks.php,MailingTransportUnavailable.php,MailingTransportRefused.php,CattomailQuotaExceeded.php,CattomailSignature.php,FollowIntent.php,TemplateDesign.php}'
+        exclude: '../src/Mailing/{EmailBlocks.php,FollowIntent.php,TemplateDesign.php}'
 
     CattoLearning\Contact\:
         resource: '../src/Contact/'
         exclude: '../src/Contact/ContactReason.php'
+
+    # The Inbox (owner, 2026-11-11), CattoPHP's since 2026-11-12: cattolms's pages of it, the documents a reply may attach
+    # and how a reply is sent.
+    CattoLearning\Inbox\:
+        resource: '../src/Inbox/'
 
     # The public legal documents (Terms, Refund Policy, Privacy Policy): their dates and footer entries.
     # The seller they name is the Site Owner (Configuration\SiteOwner).
     CattoLearning\Legal\:
         resource: '../src/Legal/'
 
-    # Search engines and AI (owner, 2026-11-06): the head's metadata and structured data, share pictures, /llms.txt and
-    # the AI crawler setting. The structured data's nodes and the AI crawler list are static rules, not services.
+    # Search engines and AI (owner, 2026-11-06): each kind of page's head and the structured data of courses and bundles,
+    # the public pages, the sitemap's first source, what /llms.txt says and the site picture as shared, given to CattoPHP's
+    # search engines module (config/packages/cattophp.yaml, search). The structured data's nodes are static rules.
     CattoLearning\Search\:
         resource: '../src/Search/'
-        exclude: '../src/Search/{StructuredData.php,AiCrawlers.php,PublicPages.php}'
+        exclude: '../src/Search/{CatalogueStructuredData.php}'
     # The FAQ's questions, which its page and its structured data share.
     CattoLearning\Help\:
         resource: '../src/Help/'

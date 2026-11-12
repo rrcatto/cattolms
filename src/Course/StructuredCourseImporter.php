@@ -224,6 +224,8 @@ final class StructuredCourseImporter
                 'description_html' => $this->courseHtml->preserve((string) ($courseInput['description_html'] ?? '')),
                 'level' => trim((string) ($courseInput['level'] ?? '')),
                 'estimated_minutes' => max(0, (int) ($courseInput['estimated_minutes'] ?? 0)),
+                // A package without it is a full course, as every package before short courses was.
+                'course_type' => ($courseInput['course_type'] ?? 'full') === 'short' ? 'short' : 'full',
                 'default_access_period_seconds' => max(1, (int) ($courseInput['default_access_period_seconds'] ?? 31536000)),
                 'first_module_number' => (int) ($courseInput['first_module_number'] ?? 1) === 0 ? 0 : 1,
                 'module_weight' => (float) ($courseInput['module_weight'] ?? 0.5),

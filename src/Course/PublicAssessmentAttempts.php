@@ -193,7 +193,11 @@ final class PublicAssessmentAttempts
      */
     public function courseResult(array $attempt, array $attempts): ?array
     {
-        if (($attempt['assessment_role'] ?? '') !== 'final' || $attempt['attempt_mode'] !== 'graded' || $attempt['status'] === 'in_progress') { return null; }
+        if ($attempt['attempt_mode'] !== 'graded' || $attempt['status'] === 'in_progress') { return null; }
+        // The final closes a course; a short course, which has none, is closed by its one assessment (specification 4.13, 15.5).
+        $closing = $this->itemRecords->closingAssessment((int) $attempt['course_id']);
+        if ($closing === null || (int) $closing['node_id'] !== (int) $attempt['node_id']) { return null; }
+        $short = $closing['assessment_role'] !== 'final';
         $graded = []; $final = null;
         foreach ($this->itemRecords->assessmentContexts((int) $attempt['course_id']) as $context) {
             $scores = [];
@@ -204,10 +208,10 @@ final class PublicAssessmentAttempts
             $value = ScorePolicy::aggregate($scores, (string) $context['score_policy']);
             if ($context['assessment_role'] === 'final') { $final = $value; } else { $graded[] = $value; }
         }
-        if ($final === null) { return null; }
-        ['module' => $module, 'overall' => $overall] = AssessmentService::courseFigures($graded, $final);
+        if ($final === null && (!$short || $graded === [])) { return null; }
+        ['module' => $module, 'overall' => $overall] = AssessmentService::courseFigures($graded, $short ? null : $final);
         $band = AssessmentService::gradeBand($overall, $this->courses->gradeBands((int) $attempt['course_id']));
-        return ['module_percentage' => round($module, 2), 'final_percentage' => $final, 'overall_percentage' => $overall, 'grade_code' => (string) $band['grade_code']];
+        return ['module_percentage' => round($module, 2), 'final_percentage' => $short ? $overall : $final, 'overall_percentage' => $overall, 'grade_code' => (string) $band['grade_code']];
     }
 
     /**

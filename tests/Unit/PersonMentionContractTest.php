@@ -22,7 +22,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Tests\Support\RenderHarness;
 use PHPUnit\Framework\TestCase;
 

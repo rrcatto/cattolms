@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = '/admin/reports' %}{% set ph_back_label = 'Course Performance' %}{% set ph_kicker = 'Reports' %}{% set ph_title = 'Course popularity' %}{% set ph_lead = 'The stored popularity ranking of published courses, with the signals and points behind every score. Open a course for its full breakdown. The ranking is recalculated by the popularity:recalculate console command.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = '/admin/reports' %}{% set ph_back_label = 'Course Performance' %}{% set ph_kicker = 'Reports' %}{% set ph_title = 'Course popularity' %}{% set ph_lead = 'The stored popularity ranking of published courses, with the signals and points behind every score. Open a course for its full breakdown. The ranking is recalculated by the popularity:recalculate console command.' %}{% include '@CattoPHP/page/head.html.twig' %}
 <section class="cl-page-section">
 {% if run %}
 {% set weights = run.parameters.weights %}
@@ -29,7 +29,7 @@
 {% block results %}
 {% if courses %}
 {% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Courses by popularity', density: 'compact'})} %}
-{% block header %}<tr>{% for sh in popularity_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: popularity_region, sort_results: popularity_results} %}{% endfor %}</tr>{% endblock %}
+{% block header %}<tr>{% for sh in popularity_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: popularity_region, sort_results: popularity_results} %}{% endfor %}</tr>{% endblock %}
 {% block body %}
 {% for row in courses %}
 <tr>

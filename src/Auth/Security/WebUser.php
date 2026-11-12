@@ -19,6 +19,8 @@ permissions onto Symfony ROLE_ strings would create a second vocabulary for rule
 one vocabulary for, and the two would drift.
 
 Changelog:
+2026/11/09 SAST
+- CattoPHP's NamedAccount: what CattoPHP records (a setting changed) names the person by their account and name.
 2026/09/10 00:35 SAST
 - Created for the web firewall, so the Symfony routes can read the same identity Fat-Free's do.
 */
@@ -28,9 +30,10 @@ declare(strict_types=1);
 namespace CattoLearning\Auth\Security;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoPHP\Activity\NamedAccount;
 use Symfony\Component\Security\Core\User\UserInterface;
 
-final class WebUser implements UserInterface
+final class WebUser implements UserInterface, NamedAccount
 {
     public function __construct(public readonly CurrentUser $identity)
     {
@@ -49,5 +52,15 @@ final class WebUser implements UserInterface
 
     public function eraseCredentials(): void
     {
+    }
+
+    public function accountId(): string
+    {
+        return (string) $this->identity->id;
+    }
+
+    public function accountName(): string
+    {
+        return $this->identity->displayName !== '' ? $this->identity->displayName : $this->identity->primaryEmail;
     }
 }

@@ -1,6 +1,6 @@
 {#
 	The page's structured data (owner, 2026-11-06): each schema.org node in its own JSON-LD script, as
-	Search\StructuredData encodes it, so no node can end its script early. Only a public page carries any,
+	CattoPHP's Search\StructuredData encodes it, so no node can end its script early. Only a public page carries any,
 	and only what the page shows (Search\PageMetadata, and the trail ThemeRenderer adds).
 #}
 {% for structured_node in head_meta.structured_data|default([]) %}<script type="application/ld+json">{{ structured_node|raw }}</script>

@@ -40,7 +40,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Support\GeoIpLocator;
+use CattoPHP\Network\GeoIp;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
@@ -116,11 +116,10 @@ final class CourseAssignmentIntegrationTest extends TestCase
             $container->get(RoleRepository::class),
             $container->get(CompanyRepository::class),
             $container->get(CourseRepository::class),
-            $container->get(OptionRepository::class),
             $container->get(RuntimeSettings::class),
             $container->get(AuditRepository::class),
             $mailer,
-            $container->get(GeoIpLocator::class),
+            $container->get(GeoIp::class),
             $container->get(EntityLookupRepository::class),
             $container->get(AuthSessionRepository::class)
         );

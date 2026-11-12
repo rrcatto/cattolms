@@ -1,7 +1,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Roles and permissions', eyebrow: 'Roles & ACL', summary: 'Roles, permissions and access-control assignments.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Roles and permissions', eyebrow: 'Roles & ACL', summary: 'Roles, permissions and access-control assignments.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
@@ -16,12 +16,12 @@
 {% block header %}
 
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Role'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Role family', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 35, label: 'Description', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Permissions', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Users'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Actions'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Role'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Role family', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 35, label: 'Description', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Permissions', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Users'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Actions'}} %}
 					</tr>
 
 {% endblock %}
@@ -51,7 +51,7 @@
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
-									{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/roles/' ~ (role.id), icon: 'action-manage'}) }}
+									{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/roles/' ~ role.role_key, icon: 'action-manage'}) }}
 
 {% endblock %}
 {% endembed %}

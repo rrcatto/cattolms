@@ -9,12 +9,14 @@ Version: 0.9.6
 
 Description:
 The payment methods a site offers (owner, 2026-10-19): EFT and card (Stitch) for now, a method offered
-only when ticked and configured, card not until its keys are in .env and Stitch is connected, the
+only when ticked and configured, card once Stitch's keys are set (Settings over .env; live keys on a live site), the
 simulated card only on a demo site and never on a live one, the wallet not a payment method, and each
 method named with its provider at checkout and on a receipt. No method collects card details here: no
 template has a card number field.
 
 Changelog:
+2026/11/11 SAST
+- Card needs Stitch's keys from Settings over .env, and a live site live keys (StitchFixture).
 2026/10/19 SAST
 - Created.
 */
@@ -25,6 +27,7 @@ namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Commerce\Settings\PaymentMethods;
 use CattoLearning\Configuration\SiteMode;
+use CattoLearning\Tests\Support\StitchFixture;
 use PHPUnit\Framework\TestCase;
 
 final class PaymentMethodsTest extends TestCase
@@ -40,21 +43,27 @@ final class PaymentMethodsTest extends TestCase
         self::assertFalse($live->isOffered('wallet'), 'The wallet is not a payment method: it is always available to spend.');
     }
 
-    public function testCardCannotBeTickedUntilItsKeysAreSetAndStitchIsConnected(): void
+    /**
+     * Card needs Stitch's client ID and secret, from Settings > Card payments (Stitch) or .env beneath it (owner, 2026-11-11),
+     * and a live site Stitch's live ID: its test ID takes no real money.
+     */
+    public function testCardCanBeTickedOnceStitchsKeysAreSetAndALiveSiteHasLiveOnes(): void
     {
-        $methods = new PaymentMethods(SiteMode::fixed(SiteMode::LIVE));
-        $previous = [$_ENV['STITCH_CLIENT_ID'] ?? null, $_ENV['STITCH_CLIENT_SECRET'] ?? null];
-        try {
-            $_ENV['STITCH_CLIENT_ID'] = ''; $_ENV['STITCH_CLIENT_SECRET'] = '';
-            self::assertSame('Add STITCH_CLIENT_ID and STITCH_CLIENT_SECRET to .env first.', $methods->problem('card'));
-            $_ENV['STITCH_CLIENT_ID'] = 'id'; $_ENV['STITCH_CLIENT_SECRET'] = 'secret';
-            self::assertSame('Card payments through Stitch are not connected yet.', $methods->problem('card'));
-            self::assertNotContains('card', $methods->offered());
-        } finally {
-            [$_ENV['STITCH_CLIENT_ID'], $_ENV['STITCH_CLIENT_SECRET']] = $previous;
-            if ($previous[0] === null) unset($_ENV['STITCH_CLIENT_ID']);
-            if ($previous[1] === null) unset($_ENV['STITCH_CLIENT_SECRET']);
-        }
+        self::assertSame('Card payments through Stitch are not set up in this installation.', (new PaymentMethods(SiteMode::fixed(SiteMode::LIVE)))->problem('card'));
+
+        $site = new StitchFixture([], SiteMode::LIVE);
+        $methods = new PaymentMethods(SiteMode::fixed(SiteMode::LIVE), null, null, $site->stitch());
+        self::assertSame('Enter Stitch\'s client ID and client secret at Settings > Card payments (Stitch) first.', $methods->problem('card'));
+        self::assertNotContains('card', $methods->offered());
+
+        $site->settings->save('payment_stitch', ['STITCH_CLIENT_ID' => 'test-958fd377-3a5d', 'STITCH_CLIENT_SECRET' => 'a-test-secret']);
+        self::assertStringContainsString('This live site has Stitch\'s test client ID', (string) $methods->problem('card'));
+
+        $site->settings->save('payment_stitch', ['STITCH_CLIENT_ID' => 'live-958fd377-3a5d', 'STITCH_CLIENT_SECRET' => null]);
+        self::assertNull($methods->problem('card'), 'Live keys on a live site.');
+
+        $demo = new StitchFixture(['STITCH_CLIENT_ID' => 'test-958fd377-3a5d', 'STITCH_CLIENT_SECRET' => 'from-env'], SiteMode::DEMO);
+        self::assertNull((new PaymentMethods(SiteMode::fixed(SiteMode::DEMO), null, null, $demo->stitch()))->problem('card'), 'Test keys from .env on a demo site.');
     }
 
     public function testCheckoutAndReceiptsNameTheMethodAndItsProvider(): void

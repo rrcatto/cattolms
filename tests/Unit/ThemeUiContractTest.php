@@ -42,8 +42,8 @@ final class ThemeUiContractTest extends TestCase
     /** The one bundled theme is the default (owner, 2026-11-07: the other themes "on ice until further notice"). */
     public function testTheDefaultThemeCompliesWithThemePackage4(): void
     {
-        self::assertSame('saharan-sunset', \CattoLearning\View\ThemeManager::DEFAULT_SLUG);
-        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
+        self::assertSame('saharan-sunset', \CattoLearning\View\ProjectTheme::DEFAULT_SLUG);
+        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG;
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('catto-learning-theme', $manifest['format'] ?? null);
         self::assertSame('4.0', $manifest['schema_version'] ?? null);
@@ -58,13 +58,13 @@ final class ThemeUiContractTest extends TestCase
     /** The default theme keeps its own colours; the core palette system stays for any theme that declares palettes. */
     public function testTheDefaultThemeKeepsItsOwnColoursAndCoreStillOffersPalettes(): void
     {
-        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
+        $root = __DIR__ . '/../../themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG;
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame([], $manifest['palettes'] ?? []);
         self::assertFileDoesNotExist($root . '/partials/palette-switcher.html.twig');
         self::assertFileDoesNotExist($root . '/public/js/palette-switcher.js');
 
-        $platformJs = (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js');
+        $platformJs = ((string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/js/cattophp.js') . (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js'));
         self::assertStringContainsString('/theme/palette', $platformJs);
         self::assertStringContainsString('localStorage', $platformJs);
         self::assertStringContainsString('paletteCount<2', $platformJs);
@@ -75,14 +75,15 @@ final class ThemeUiContractTest extends TestCase
         self::assertDirectoryExists(__DIR__ . '/../../resources/views/pages');
         self::assertFileExists(__DIR__ . '/../../resources/views/pages/courses.html.twig');
         // The default theme may wrap a page family (Saharan Sunset's sign-in pages), never hold a page body.
-        foreach (glob(__DIR__ . '/../../themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/pages/*.twig') ?: [] as $wrapper) {
+        foreach (glob(__DIR__ . '/../../themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG . '/pages/*.twig') ?: [] as $wrapper) {
             self::assertStringContainsString('cl-page-family', (string) file_get_contents($wrapper), basename($wrapper) . ' wraps a page family.');
         }
         $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
         // The page comes from the platform namespace; a theme cannot shadow one, because @platform
-        // is a single fixed path while @theme is the one that moves.
-        self::assertStringContainsString('pageTemplate($page)', $renderer);
-        $templates = (string) file_get_contents(__DIR__ . '/../../src/View/Twig/ThemeTemplates.php');
+        // is a single fixed path while @theme is the one that moves (CattoPHP's PageRenderer draws it, Phase 3, step 9).
+        self::assertStringContainsString('pageTemplate($page)', (string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/src/Theme/PageRenderer.php'));
+        self::assertStringContainsString('implements PageProject', $renderer);
+        $templates = (string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/src/Theme/Templates.php');
         self::assertStringContainsString("PLATFORM_NAMESPACE . '/pages/'", $templates);
         self::assertStringNotContainsString('factoryResetRoot', $renderer);
     }
@@ -93,11 +94,11 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringContainsString("id: 'quickAddPersonModal'", $admin);
         self::assertStringContainsString("ui_template('overlay.modal')", $admin);
 
-        $platformCss = (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css');
+        $platformCss = ((string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/css/cattophp.css') . (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css'));
         self::assertStringContainsString('.cl-ui-modal[hidden]', $platformCss);
         self::assertStringContainsString('.cl-ui-modal.open:not([hidden])', $platformCss);
 
-        $platformJs = (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js');
+        $platformJs = ((string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/js/cattophp.js') . (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js'));
         self::assertStringContainsString('modal.hidden = true', $platformJs);
         self::assertStringContainsString('modal.hidden = false', $platformJs);
 
@@ -134,8 +135,10 @@ final class ThemeUiContractTest extends TestCase
     public function testThemeManagerIsFilesystemOnlyAndHasNoExport(): void
     {
         self::assertFileDoesNotExist(__DIR__ . '/../../src/Infrastructure/Persistence/ThemeRepository.php');
-        $manager = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeManager.php');
-        foreach (['themesRoot()', 'findByNameVersion', 'themeUiPath', 'theme.imported', 'theme.uninstalled', 'public/css/theme.css'] as $token) {
+        // The theme system is CattoPHP's (Phase 3, step 9), and its own tests prove what it does; this keeps it free of the old
+        // database-backed themes and exports.
+        $manager = (string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/src/Theme/ThemeManager.php');
+        foreach (['themesRoot()', 'findByNameVersion', 'theme.imported', 'theme.uninstalled', 'public/css/theme.css'] as $token) {
             self::assertStringContainsString($token, $manager);
         }
         foreach (['ThemeRepository', 'theme_definitions', 'theme_files', 'theme_assets', 'exportTheme', 'versionSatisfies', 'resolveChain'] as $token) {
@@ -154,7 +157,7 @@ final class ThemeUiContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $contact = (string) file_get_contents($root . '/resources/views/pages/contact.html.twig');
-        $platformCss = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
+        $platformCss = (string) (file_get_contents($root . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents($root . '/public_html/css/catto-platform.css'));
         self::assertStringContainsString('class="cl-honeypot"', $contact);
         self::assertStringContainsString('.cl-honeypot{', $platformCss);
         self::assertStringContainsString('left:-10000px!important', $platformCss);
@@ -174,7 +177,7 @@ final class ThemeUiContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $renderer = (string) file_get_contents($root . '/src/View/ThemeRenderer.php');
-        $manager = (string) file_get_contents($root . '/src/View/ThemeManager.php');
+        $manager = (string) file_get_contents($root . '/vendor/rrcatto/cattophp/src/Theme/ThemeManager.php');
         self::assertStringContainsString('platformAssetUrl($path, self::PLATFORM_ASSET_VERSION)', $renderer);
         self::assertStringContainsString('assetFingerprint', $manager);
         self::assertStringContainsString('versionedThemeAssetUrl', $manager);

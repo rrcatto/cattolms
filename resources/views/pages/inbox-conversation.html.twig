@@ -1,0 +1,119 @@
+{#
+	A conversation (owner, 2026-11-11: "Keep message threads together in a conversation. so I can see what was sent and
+	received"; approved mockup's "A message and a reply"; InboxController::conversation). Everything received from the
+	sender and sent to them, oldest first; the reply, in plain text or HTML (CKEditor, ck-inbox.js) with the signature for
+	its format, files and the person's own documents attached, saved as a draft or sent; beside it the sender and the spam
+	check, its score and every sign behind it.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set c = conversation %}
+	{% set ph_kicker = 'Inbox · ' ~ c.reference %}
+	{% set ph_title = c.reason_label ~ ' from ' ~ c.sender.name %}
+	{% set ph_badges %}
+		{{ ui('feedback.badge', {label: c.reason_label, tone: 'neutral'}) }}
+		{% if c.folder == 'inbox' %}{{ ui('feedback.badge', {label: c.status_label, tone: c.status_tone}) }}{% else %}{{ ui('feedback.badge', {label: c.folder == 'spam' ? 'In Spam' : 'In the Trash', tone: 'danger'}) }}{% endif %}
+		{{ ui('feedback.badge', {label: c.spam_judgement.label, tone: c.spam_judgement.tone}) }}
+	{% endset %}
+	{% if can_manage %}{% set ph_actions %}
+		{% if c.folder == 'trash' %}
+			{{ ui('action.button', {label: 'Restore', variant: 'primary', form: 'conversation-act', name: 'action', value: 'restore', icon: 'action-restore'}) }}
+			{{ ui('action.button', {label: 'Delete forever', variant: 'danger', form: 'conversation-act', name: 'action', value: 'delete', icon: 'action-remove', confirm: 'Delete this conversation for good? It cannot be recovered.'}) }}
+		{% else %}
+			{% if c.answered %}{{ ui('action.button', {label: 'Mark not answered', form: 'conversation-act', name: 'action', value: 'unanswered', icon: 'action-reset'}) }}{% else %}{{ ui('action.button', {label: 'Mark answered', form: 'conversation-act', name: 'action', value: 'answered', icon: 'action-done'}) }}{% endif %}
+			{% if c.folder == 'spam' %}{{ ui('action.button', {label: 'Not spam', variant: 'primary', form: 'conversation-act', name: 'action', value: 'not_spam', icon: 'action-approve'}) }}{% else %}{{ ui('action.button', {label: 'Mark as spam', form: 'conversation-act', name: 'action', value: 'spam', icon: 'action-report'}) }}{% endif %}
+			{{ ui('action.button', {label: 'Delete', form: 'conversation-act', name: 'action', value: 'trash', icon: 'action-remove'}) }}
+		{% endif %}
+	{% endset %}{% endif %}
+	{% include '@CattoPHP/page/head.html.twig' %}
+
+	<section class="cl-page-section">
+	{# The head's actions are joined to this empty form (form="conversation-act"): inside the row, as every page's parts are. #}
+	{% if can_manage %}<form id="conversation-act" method="post" action="{{ c.href }}/act"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endif %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side'})} %}{% block body %}
+		<div class="cl-inbox-main">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Conversation', summary: 'Everything received from ' ~ c.sender.name ~ ' and sent to them about ' ~ c.reference ~ ', oldest first. Answers by email come in here by themselves once a mailbox is set in Inbox settings.'}) }}
+				<ol class="cl-inbox-thread">
+				{% for item in c.items %}
+					<li class="cl-inbox-item cl-inbox-item--{{ item.direction }}" id="item-{{ item.id }}">
+						<p class="cl-inbox-item-head"><strong>{{ item.direction == 'received' ? 'Received' : 'Sent' }}</strong> · {{ item.label }}{% if item.kind == 'reply' %}, {{ item.format == 'html' ? 'HTML' : 'plain text' }}{% if item.written_by %}, by {{ item.written_by }}{% endif %}{% endif %}{% if item.kind == 'message' %}, through the contact form{% elseif item.kind == 'answer' %}, by email{% endif %}<span class="cl-inbox-item-when">{{ item.when }}</span></p>
+						{% if item.subject and item.kind in ['reply', 'answer'] %}<p class="small"><strong>{{ item.subject }}</strong></p>{% endif %}
+						{% if item.body_html %}<div class="cl-inbox-item-body cl-inbox-item-body--html">{{ item.body_html|authored }}</div>{% else %}<div class="cl-inbox-item-body">{{ item.body_text|nl2br }}</div>{% endif %}
+						{% if item.attachments %}<p class="small">Attached: {% for attachment in item.attachments %}{% if item.kind == 'reply' %}<a href="{{ c.href }}/attachment/{{ item.public_id }}/{{ loop.index0 }}">{{ attachment.name }}</a>{% else %}{{ attachment.name }}{% endif %}{{ not loop.last ? ', ' }}{% endfor %}</p>{% endif %}
+						{% if item.error %}{{ ui('feedback.badge', {label: 'Not sent: ' ~ item.error, tone: 'danger', size: 'small'}) }}{% endif %}
+					</li>
+				{% endfor %}
+				</ol>
+			{% endblock %}{% endembed %}
+
+			{% if reply %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Reply', summary: reply.saved ? 'Draft saved ' ~ reply.saved ~ '.' : ''}) }}
+				<form id="reply" class="cl-inbox-reply" method="post" action="{{ c.href }}/reply" enctype="multipart/form-data">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('data.key-value-list', {items: [{label: 'To', value: reply.to.name ~ ' <' ~ reply.to.email ~ '>'}, {label: 'From', value: reply.from}] | merge(reply.reply_to ? [{label: 'Answers go to', value: reply.reply_to}] : [])}) }}
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subject', for: 'reply-subject', required: true, full_width: true})} %}{% block control %}<input class="cl-input" id="reply-subject" name="subject" value="{{ typed_for(c.href ~ '/reply').subject|default(reply.subject) }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+					{{ ui('form.picture-choice', {name: 'format', legend: 'Send it as', id: 'reply-format', size: 'small', selected: reply.format, items: [
+						{value: 'plain', label: 'Plain text', icon: lucide('type'), note: 'Words only. Reads the same in every mail program.'},
+						{value: 'html', label: 'HTML', icon: lucide('code'), note: 'Headings, bold, lists, links and tables, written in the editor. A plain text copy goes with it.'}
+					]}) }}
+					<div class="cl-inbox-reply-plain">
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your reply, in plain text', for: 'reply-text', full_width: true, help: 'The signature for plain text replies is below your words; change it in Inbox settings.'})} %}{% block control %}<textarea class="cl-input" id="reply-text" name="body_text" rows="12" {{ ui_field_attrs(props) }}>{{ reply.body_text }}</textarea>{% endblock %}{% endembed %}
+					</div>
+					<div class="cl-inbox-reply-html">
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your reply, in HTML', for: 'reply-html', full_width: true, help: 'The signature for HTML replies is below your words; change it in Inbox settings.'})} %}{% block control %}<textarea class="cl-input" id="reply-html" name="body_html" rows="12" data-inbox-rich {{ ui_field_attrs(props) }}>{{ reply.body_html }}</textarea>{% endblock %}{% endembed %}
+					</div>
+					{% if reply.attachments %}
+					{{ ui('form.picture-choice', {multiple: true, list: 'remove', legend: 'Attached: tick one to remove it', id: 'reply-attached', size: 'small', selected: [], items: reply.attachments|filter(a => a.type == 'file')|map(a => {value: a.index, label: a.name, icon: lucide('paperclip'), note: a.size|default('')})}) }}
+					{% endif %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Attach files', for: 'reply-files', full_width: true, help: 'Up to ' ~ reply.max_size ~ ' each.'})} %}{% block control %}<input class="cl-input" id="reply-files" type="file" name="attachments[]" multiple {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% if reply.documents %}
+					{{ ui('form.picture-choice', {multiple: true, list: 'documents', legend: 'Attach their invoices, receipts or credit notes', id: 'reply-documents', size: 'small', columns: 4, selected: reply.documents|filter(d => d.ticked)|map(d => d.id), items: reply.documents|map(d => {value: d.id, label: d.number, icon: lucide('file-text'), note: d.label})}) }}
+					{% endif %}
+					{{ ui('form.picture-choice', {multiple: true, legend: 'When it is sent', legend_hidden: true, id: 'reply-answered', size: 'small', selected: reply.mark_answered ? ['mark_answered'] : [], items: [{value: 'mark_answered', label: 'Mark the message answered when the reply is sent', icon: lucide('check-check'), note: 'Untick it to keep the message among those not answered.'}]}) }}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+						{% block primary_actions %}{{ ui('action.button', {label: 'Send reply', variant: 'primary', type: 'submit', name: 'send', value: 'send', icon: 'action-send'}) }}{{ ui('action.button', {label: 'Save draft', variant: 'secondary', type: 'submit', name: 'send', value: 'draft', icon: 'action-save', skip_validation: true}) }}{% endblock %}
+						{% block secondary_actions %}{% if reply.draft_id %}{{ ui('action.button', {label: 'Discard', variant: 'quiet', type: 'submit', form_action: c.href ~ '/reply/discard', icon: 'action-cancel', skip_validation: true}) }}{% endif %}{% endblock %}
+					{% endembed %}
+				</form>
+			{% endblock %}{% endembed %}
+			{% endif %}
+		</div>
+		<div class="cl-inbox-side">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'The sender'}) }}
+				{% set sender_items = [{label: 'Name', person: c.sender}, {label: 'Email', value: c.sender_email}] %}
+				{% if c.sender.reference %}{% set sender_items = sender_items|merge([{label: 'Account Reference', value: c.sender.reference}]) %}{% elseif c.account_reference %}{% set sender_items = sender_items|merge([{label: 'Account reference typed', value: c.account_reference}]) %}{% endif %}
+				{% if c.order_number %}{% set sender_items = sender_items|merge([{label: 'Order named', value: c.order_number}]) %}{% endif %}
+				{% if c.course_title %}{% set sender_items = sender_items|merge([{label: 'Course', value: c.course_title}]) %}{% endif %}
+				{% for line in c.detail_lines %}{% set sender_items = sender_items|merge([{label: line.label, value: line.value}]) %}{% endfor %}
+				{% set sender_items = sender_items|merge([{label: 'Sent', value: c.received}]) %}
+				{% if c.answered_by %}{% set sender_items = sender_items|merge([{label: 'Answered by', person: c.answered_by}]) %}{% endif %}
+				{{ ui('data.key-value-list', {items: sender_items}) }}
+				{% if c.earlier %}<p class="small">Earlier messages: {% for e in c.earlier %}<a href="/inbox/{{ e.reference }}">{{ e.reference }}</a> ({{ e.folder == 'spam' ? 'in Spam' : (e.folder == 'trash' ? 'in the Trash' : (e.answered ? 'answered' : 'not answered')) }}){{ not loop.last ? ', ' }}{% endfor %}</p>{% endif %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Spam check'}) }}
+				<p>{{ ui('feedback.badge', {label: c.spam_judgement.label, tone: c.spam_judgement.tone}) }} {% if c.spam_score is not null %}<strong>{{ c.spam_score }}</strong> of 100{% else %}Not checked (it came before the spam check){% endif %}</p>
+				<p class="small">Messages scoring {{ c.spam_line }} or more go straight to Spam (Inbox settings).</p>
+				{% if c.spam_signs %}<ul class="cl-inbox-signs-list">{% for sign in c.spam_signs %}<li>{{ sign.points > 0 ? '+' : '' }}{{ sign.points != 0 ? sign.points ~ ': ' : '' }}{{ sign.words }}</li>{% endfor %}</ul>{% elseif c.spam_score is not null %}<p class="small">No sign of spam.</p>{% endif %}
+				{% set sent_how = [] %}
+				{% if c.country %}{% set sent_how = sent_how|merge([{label: 'Sent from', value: c.country}]) %}{% endif %}
+				{% if c.seconds_on_page is not null %}{% set sent_how = sent_how|merge([{label: 'Time on the page', value: c.seconds_on_page < 60 ? c.seconds_on_page ~ ' seconds' : (c.seconds_on_page // 60) ~ ' min'}]) %}{% endif %}
+				{% if c.browser %}{% set sent_how = sent_how|merge([{label: 'Browser', value: c.browser}]) %}{% endif %}
+				{% if sent_how %}{{ ui('data.key-value-list', {items: sent_how}) }}{% endif %}
+				{% if can_manage and c.folder != 'trash' %}
+				<form method="post" action="{{ c.href }}/act" class="cl-inbox-block">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('action.button', {label: 'Block this address', variant: 'secondary', size: 'small', name: 'action', value: 'block_email', icon: 'action-lock-out', confirm: 'Block ' ~ c.sender_email ~ '? Their later messages go straight to Spam.'}) }}
+					{{ ui('action.button', {label: 'Block the whole domain', variant: 'quiet', size: 'small', name: 'action', value: 'block_domain', icon: 'action-lock-out', confirm: 'Block every address at this domain? Later messages from it go straight to Spam.'}) }}
+				</form>
+				{% endif %}
+			{% endblock %}{% endembed %}
+		</div>
+	{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

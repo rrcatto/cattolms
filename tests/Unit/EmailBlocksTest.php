@@ -21,7 +21,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Mailing\CattomailSignature;
 use CattoLearning\Mailing\EmailBlocks;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -45,18 +44,6 @@ final class EmailBlocksTest extends TestCase
         self::assertSame([$text], $blocks);
         self::assertSame('Text: Hello', EmailBlocks::summary($text));
         self::assertSame('HTML: Our own page', EmailBlocks::summary(['id' => 'b0000000001', 'type' => 'html', 'html' => '<p>Our <b>own</b> page</p>']));
-    }
-
-    public function testCattomailsSignatureIsCheckedWithEitherSecretWithinFiveMinutes(): void
-    {
-        $body = '{"id":"evt_1","type":"webhook.test"}';
-        $now = 1_800_000_000;
-        $header = 't=' . $now . ',v1=' . hash_hmac('sha256', $now . '.' . $body, 'old-secret');
-        self::assertTrue(CattomailSignature::valid($header, $body, ['new-secret', 'old-secret'], $now + 10), 'The previous secret still works while it changes.');
-        self::assertFalse(CattomailSignature::valid($header, $body, ['new-secret'], $now));
-        self::assertFalse(CattomailSignature::valid($header, $body . ' ', ['old-secret'], $now), 'A changed body fails.');
-        self::assertFalse(CattomailSignature::valid($header, $body, ['old-secret'], $now + 301), 'A stale one fails.');
-        self::assertFalse(CattomailSignature::valid('v1=abc', $body, ['old-secret'], $now));
     }
 
     /** A text block written in the editor keeps only what an email can show (owner, 2026-10-28, decision 6A). */

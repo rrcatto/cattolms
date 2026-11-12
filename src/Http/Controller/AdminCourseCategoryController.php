@@ -56,7 +56,7 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseService;
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use RuntimeException;
@@ -76,7 +76,7 @@ final class AdminCourseCategoryController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
+        private readonly \CattoPHP\Ui\IconLibrary $icons,
         private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
         private readonly AddressKeyRepository $keys,
         private readonly \CattoLearning\Search\SearchOverrides $searchOverrides,

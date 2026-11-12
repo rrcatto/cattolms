@@ -6,7 +6,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Issued Certificates' %}
 	{% set ph_lead = 'Every certificate issued, newest first, with its transcript. A certificate states that the learner took the course, in their verified name. Open one to see it or to revoke it.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Find certificates', summary: 'Search by certificate or transcript number, learner or course.'}) }}
 		<form action="/admin/certificates" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -20,7 +20,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'certificates', pagination: certificates_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Number'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Learner'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 28, label: 'Course', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Issued', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'State'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: ''}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Number'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Learner'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 28, label: 'Course', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Issued', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'State'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: ''}} %}</tr>{% endblock %}
 			{% block body %}
 				{% for row in rows %}
 					<tr data-certificate-id="{{ row.id }}">

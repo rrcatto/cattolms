@@ -70,7 +70,7 @@ final class AuthWorkflowRegressionTest extends TestCase
                 self::assertSame('The sign-in email could not be sent.', $e->getMessage());
             }
 
-            $rows = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM auth_login_tokens WHERE email=:email', ['email' => $email]);
+            $rows = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM cattophp_links WHERE email=:email', ['email' => $email]);
             self::assertSame(0, (int) ($rows[0]['total'] ?? -1));
         } finally {
             $fixture->cleanup();
@@ -175,13 +175,13 @@ final class AuthWorkflowRegressionTest extends TestCase
             self::assertNotSame('', trim((string) ($rows[0]['last_login_at'] ?? '')));
 
             $roles = $db->fetchAllAssociative(
-                'SELECT r.role_key FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=:user_id',
+                'SELECT role_key FROM cattophp_account_roles WHERE account_id = CAST(:user_id AS TEXT)',
                 ['user_id' => $userId]
             );
             self::assertContains('STUDENT', array_map(static fn(array $row): string => (string) $row['role_key'], $roles));
 
             $sessions = $db->fetchAllAssociative(
-                'SELECT revoked_at,expires_at FROM auth_sessions WHERE user_id=:user_id',
+                'SELECT ended_at AS revoked_at, expires_at FROM cattophp_sessions WHERE account_id = CAST(:user_id AS TEXT)',
                 ['user_id' => $userId]
             );
             self::assertCount(1, $sessions);
@@ -212,7 +212,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             } catch (RuntimeException $e) {
                 self::assertSame('The sign-in email could not be sent.', $e->getMessage());
             }
-            $afterFailure = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM auth_login_tokens WHERE email=:email', ['email'=>$email]);
+            $afterFailure = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM cattophp_links WHERE email=:email', ['email'=>$email]);
             self::assertSame(0, (int) ($afterFailure[0]['total'] ?? -1));
 
             $mailer = new FakeMailer();
@@ -220,7 +220,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             $retryAuth->requestLogin($email, '/account/courses');
             self::assertCount(1, $mailer->messages);
             self::assertSame('magic_link', $mailer->messages[0]['type']);
-            $afterRetry = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM auth_login_tokens WHERE email=:email AND used_at IS NULL', ['email'=>$email]);
+            $afterRetry = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM cattophp_links WHERE email=:email AND used_at IS NULL', ['email'=>$email]);
             self::assertSame(1, (int) ($afterRetry[0]['total'] ?? -1));
         } finally {
             $fixture->cleanup();
@@ -272,7 +272,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             self::assertSame([$eighteenToday, 'ZA'], [$kept['born'], $kept['residence_country']], 'Eighteen today registers; the date of birth comes from the ID number.');
             self::assertSame(\CattoLearning\Auth\SouthAfricanIdNumber::fromInput($valid, new \DateTimeImmutable())->fingerprint(), $kept['id_number_hash']);
             self::assertStringNotContainsString($valid, (string) $kept['id_number_encrypted'], 'The number is kept encrypted.');
-            self::assertSame(1, (int)$db->fetchOne("SELECT COUNT(*) FROM audit_log a JOIN user_emails ue ON ue.user_id = a.user_id WHERE ue.email=:email AND a.event_key='user.id_number_given' AND a.metadata->>'when' = 'registration'", ['email'=>$email]));
+            self::assertSame(1, (int)$db->fetchOne("SELECT COUNT(*) FROM cattophp_activity a JOIN user_emails ue ON ue.user_id = account_person(a.actor_id) WHERE ue.email=:email AND a.action='user.id_number_given' AND a.details->>'when' = 'registration'", ['email'=>$email]));
             $fixture->rememberEmail($email);
         } finally { unset($_COOKIE['catto_learning_session']); $fixture->cleanup(); }
     }
@@ -309,7 +309,8 @@ final class AuthWorkflowRegressionTest extends TestCase
                     $this->authService($container, $mailer),
                     $container->get(\CattoLearning\View\ThemeRenderer::class),
                     new \Symfony\Component\HttpFoundation\RequestStack(),
-                    $container->get(\CattoLearning\Support\GeoIpLocator::class)
+                    $container->get(\CattoPHP\Network\GeoIp::class),
+                    $container->get(\CattoPHP\Signup\SignupChecks::class)
                 );
                 $_SESSION = [];
                 $_POST = ['csrf' => \CattoLearning\Support\Csrf::token(), 'email' => $email,

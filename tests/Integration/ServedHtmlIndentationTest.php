@@ -26,6 +26,13 @@ Inline SVG is deliberately exempt. An icon inside a link is one token to a reade
 across lines introduces rendered whitespace inside the link, so those stay on one line by design.
 
 Changelog:
+2026/11/09 SAST
+- The body too (CattoPHP's HtmlLayout, Phase 3): on the site's own pages every line of the body sits one step inside the
+  line that opened its parent, closes at its opener's depth, tabs only; a course's own description is served byte for byte.
+2026/11/09 SAST
+- The head is laid out element by element (owner, 2026-11-09: the meta tags after robots ran together on one line, and
+  the head's tags did not line up): every element on its own line one step inside the head, the structured data as
+  indented JSON, and the generator tag first, naming CattoPHP's version before CattoLMS's.
 2026/09/10 03:05 SAST
 - Created after the generator tag was found at the wrong indent depth in all five themes.
 */
@@ -85,6 +92,58 @@ final class ServedHtmlIndentationTest extends TestCase
         }
     }
 
+    /**
+     * The body as a person reads it (CattoPHP's HtmlLayout, Phase 3, 2026-11-09): every line one step at most inside the line
+     * before, each element that opens on a line of its own closing at its depth, tabs only. Raw contents (pre, a text box, a
+     * script, a style) keep their own lines and are skipped. The pages hold none of a course's own HTML, which keeps its own.
+     */
+    public function testEveryLineOfTheBodySitsOneStepInsideItsParent(): void
+    {
+        foreach (self::pages(['/help' => 'help', '/faq' => 'faq', '/terms' => 'terms', '/login' => 'sign in', '/register' => 'register', '/bundles' => 'bundles']) as $name => $html) {
+            self::assertSame(1, preg_match('/^(?<indent>\t*)<body\b[^>]*>\n(?<inner>.*)\n(?P=indent)<\/body>$/ms', $html, $body), $name . ': the body opens and closes on lines of its own.');
+            $open = [[strlen($body['indent']), 'body']];
+            $previous = strlen($body['indent']);
+            $raw = null;
+            foreach (explode("\n", $body['inner']) as $number => $line) {
+                if ($raw !== null) {
+                    if (preg_match('~</' . $raw . '\s*>~i', $line) === 1) $raw = null;
+                    continue;
+                }
+                $where = sprintf('%s, line %d of the body: %s', $name, $number + 1, substr(trim($line), 0, 100));
+                self::assertDoesNotMatchRegularExpression('/^\t* /', $line, $where . ' (tabs only)');
+                $depth = strlen($line) - strlen(ltrim($line, "\t"));
+                self::assertLessThanOrEqual($previous + 1, $depth, $where . ' (one step at most)');
+                $previous = $depth;
+                $text = ltrim($line, "\t");
+                if (preg_match('~^<(pre|textarea|script|style)\b~i', $text, $rawStart) === 1 && preg_match('~</' . $rawStart[1] . '\s*>~i', $text) !== 1) {
+                    $raw = $rawStart[1];
+                    continue;
+                }
+                if (preg_match('~^</([a-z][a-z0-9-]*)>$~i', $text, $close) === 1) {
+                    $opener = array_pop($open);
+                    self::assertSame([$opener[0], $opener[1]], [$depth, strtolower($close[1])], $where . ' (closes at its opener\'s depth)');
+                    continue;
+                }
+                if (preg_match('~^<([a-z][a-z0-9-]*)\b[^>]*>$~i', $text, $start) === 1
+                    && !in_array(strtolower($start[1]), ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr', 'use', 'path'], true)
+                    && !str_ends_with($text, '/>')) {
+                    $open[] = [$depth, strtolower($start[1])];
+                }
+            }
+            self::assertSame([[strlen($body['indent']), 'body']], $open, $name . ': everything opened is closed');
+        }
+    }
+
+    /** A course's own description is served exactly as it was written, whatever the layout does around it. */
+    public function testACoursesOwnHtmlIsServedByteForByte(): void
+    {
+        $row = \CattoLearning\Tests\Support\IntegrationContainer::db()->fetchAssociative("SELECT slug, description_html FROM courses WHERE status = 'published' AND description_html LIKE '%\n%' ORDER BY id LIMIT 1");
+        if ($row === false) self::markTestSkipped('No published course with a description over several lines.');
+        $page = self::pages(['/courses/' . $row['slug'] => 'course'])['course'];
+        self::assertStringContainsString((string) $row['description_html'], $page);
+        self::assertStringNotContainsString('as-written:', $page, 'the marks go');
+    }
+
     public function testNoLineRunsSeveralBlockTagsTogether(): void
     {
         foreach (self::pages() as $name => $html) {
@@ -110,16 +169,17 @@ final class ServedHtmlIndentationTest extends TestCase
      * Through the kernel rather than the renderer, because the tag this guards is injected after
      * the theme has finished - so rendering a template alone would never see it.
      *
+     * @param array<string,string> $paths address => name
      * @return array<string,string>
      */
-    private static function pages(): array
+    private static function pages(array $paths = ['/' => 'home', '/about' => 'about', '/contact' => 'contact', '/courses' => 'catalogue']): array
     {
         $instanceRoot = (string) CliBootstrap::boot()['instance_root'];
         $kernel = new Kernel('test', true, $instanceRoot);
         $kernel->boot();
 
         $pages = [];
-        foreach (['/' => 'home', '/about' => 'about', '/contact' => 'contact'] as $path => $name) {
+        foreach ($paths as $path => $name) {
             $response = $kernel->handle(Request::create($path));
             self::assertSame(200, $response->getStatusCode(), $path . ' did not render.');
             $pages[$name] = (string) $response->getContent();
@@ -134,4 +194,31 @@ final class ServedHtmlIndentationTest extends TestCase
 
         return $match[0];
     }
+    public function testEveryElementOfTheHeadIsOnItsOwnLineOneStepInside(): void
+    {
+        foreach (self::pages() as $name => $html) {
+            self::assertSame(1, preg_match('/^(?<indent>[ \t]*)<head\b[^>]*>\n(?<inner>.*?)\n(?P=indent)<\/head>/ms', $html, $head), $name . ': the head opens and closes on lines of its own.');
+            $child = $head['indent'] . "\t";
+            $lines = explode("\n", $head['inner']);
+            self::assertStringStartsWith($child . '<meta name="generator" content="CattoPHP ', $lines[0], $name . ': the generator tag first.');
+            self::assertMatchesRegularExpression('/content="CattoPHP [^",]+, CattoLMS v[0-9]+(\.[0-9]+)+"/', $lines[0], $name . ': CattoPHP\'s version, then CattoLMS\'s.');
+            $inScript = false;
+            foreach ($lines as $line) {
+                if ($inScript) {
+                    if ($line === $child . '</script>') $inScript = false;
+                    else self::assertTrue($line === '' || str_starts_with($line, $child . "\t"), $name . ': a script\'s lines sit a step inside it: ' . $line);
+                    continue;
+                }
+                self::assertMatchesRegularExpression('/^' . preg_quote($child, '/') . '<[a-zA-Z!\/]/', $line, $name . ': one step inside the head: ' . substr($line, 0, 80));
+                self::assertLessThanOrEqual(1, preg_match_all('/<(meta|link|title|script|style)\b/', $line), $name . ': one element a line: ' . substr($line, 0, 120));
+                if (preg_match('/^\s*<script type="application\/ld\+json">$/', $line) === 1) $inScript = true;
+            }
+            preg_match_all('/<script type="application\/ld\+json">\n(.*?)\n\s*<\/script>/s', $head['inner'], $data);
+            foreach ($data[1] as $json) {
+                self::assertIsObject(json_decode($json), $name . ': the structured data is still JSON.');
+                self::assertStringNotContainsString('</', $json, $name . ': and still cannot end its script early.');
+            }
+        }
+    }
+
 }

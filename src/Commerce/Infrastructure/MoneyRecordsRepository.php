@@ -355,6 +355,7 @@ final class MoneyRecordsRepository
                 (SELECT op.payment_method FROM commerce_order_preferences op WHERE op.order_id = o.id) AS payment_method,
                 (SELECT string_agg(CASE i.product_type WHEN 'bundle' THEN 'Bundle: ' || COALESCE(i.snapshot->>'bundle_title', '')
                     WHEN 'company_credit' THEN i.quantity || ' credits for ' || COALESCE(i.snapshot->>'course_title', '')
+                    WHEN 'bundle_credit' THEN i.quantity || ' bundle credits for ' || COALESCE(i.snapshot->>'bundle_title', '')
                     ELSE COALESCE(i.snapshot->>'course_title', '') END, ', ' ORDER BY i.id) FROM commerce_order_items i WHERE i.order_id = o.id) AS bought "
             . self::ORDER_FROM . ' WHERE ' . $where . ' ORDER BY ' . $order . ' LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset), $params);
     }

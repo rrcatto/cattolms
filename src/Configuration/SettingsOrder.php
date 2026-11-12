@@ -22,6 +22,8 @@ when the saved order has changed since.
 
 Changelog:
 2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): a section of its own, after Site Owner.
+2026/11/09 SAST
 - Created.
 */
 
@@ -38,18 +40,18 @@ final class SettingsOrder
     public const OPTION = 'settings.section_order';
     /** Every section of Settings, in the order the page starts with. */
     public const STANDARD = [
-        'site-mode', 'site-notification', 'identity', 'site-owner', 'owner-messages', 'sign-in', 'two-step', 'signup-checks',
-        'search-engines', 'smtp', 'payment-methods', 'identity-verification', 'commerce-fees', 'commerce-references',
-        'commerce-wallet', 'commerce-orders', 'configuration', 'course-positions', 'maintenance',
+        'site-mode', 'site-notification', 'identity', 'site-owner', 'footer-social', 'owner-messages', 'sign-in', 'two-step', 'signup-checks',
+        'search-engines', 'smtp', 'payment-methods', 'card-payments', 'identity-verification', 'commerce-fees', 'commerce-references',
+        'commerce-wallet', 'commerce-orders', 'configuration', 'course-positions', 'bundle-positions', 'maintenance',
     ];
     /** Each section's name, for its handle and menu. */
     public const TITLES = [
-        'site-mode' => 'Site mode', 'site-notification' => 'Site notification', 'identity' => 'Platform identity', 'site-owner' => 'Site Owner',
-        'owner-messages' => 'Messages to you', 'sign-in' => 'Who can sign in', 'two-step' => 'Two-step sign-in', 'signup-checks' => 'Sign-up checks',
-        'search-engines' => 'Search engines and AI', 'smtp' => 'SMTP / outgoing email', 'payment-methods' => 'Payment methods',
+        'site-mode' => 'Site mode', 'site-notification' => 'Site notification', 'identity' => 'Platform identity', 'site-owner' => 'Site Owner', 'footer-social' => 'Footer social media',
+        'owner-messages' => 'Connect to Telegram bot', 'sign-in' => 'Who can sign in', 'two-step' => 'Two-step sign-in', 'signup-checks' => 'Sign-up checks',
+        'search-engines' => 'Search engines and AI', 'smtp' => 'SMTP / outgoing email', 'payment-methods' => 'Payment methods', 'card-payments' => 'Card payments (Stitch)',
         'identity-verification' => 'Identity verification', 'commerce-fees' => 'Commerce: fees', 'commerce-references' => 'Commerce: account references',
         'commerce-wallet' => 'Commerce: wallet credit', 'commerce-orders' => 'Commerce: orders and refunds', 'configuration' => 'Configuration model',
-        'course-positions' => 'Course positions', 'maintenance' => 'Maintenance',
+        'course-positions' => 'Course positions', 'bundle-positions' => 'Bundle positions', 'maintenance' => 'Maintenance',
     ];
     public const DIRECTIONS = ['top', 'up', 'down', 'bottom'];
 

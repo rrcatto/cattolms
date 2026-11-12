@@ -39,7 +39,7 @@ declare(strict_types=1);
 namespace CattoLearning\Course\Certificate;
 
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\PageSettings;
+use CattoPHP\Document\PageSettings;
 
 final class CertificateDesignCompiler
 {

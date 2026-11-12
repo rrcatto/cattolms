@@ -14,7 +14,7 @@ use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
 use CattoLearning\Support\Address\CatalogueAddress;
 use CattoLearning\Support\Money;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\RequestStack;

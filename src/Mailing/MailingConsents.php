@@ -21,6 +21,9 @@ Subscriptions or with the list's join link), and chooses once how they hear abou
 or monthly; until they choose, it is one digest a week.
 
 Changelog:
+2026/11/12 SAST
+- The answers are kept, and recorded in the activity log, by CattoPHP's consent rules (CattoPHP\Mailing\Consents, CattoPHP
+  Phase 4, step 9, part 2); the kinds, the places, follows before signing in, the welcome email and My Subscriptions stay here.
 2026/11/07 SAST
 - A follow names a category or a tag by its slug, never its row id.
 2026/10/28 SAST
@@ -35,6 +38,7 @@ namespace CattoLearning\Mailing;
 
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoPHP\Mailing\Consents;
 use InvalidArgumentException;
 
 final class MailingConsents
@@ -62,6 +66,7 @@ final class MailingConsents
         private readonly TransactionManager $transactions,
         private readonly MailingRepository $mailing,
         private readonly AuditRepository $audit,
+        private readonly Consents $consents,
         private readonly ?UpdateRepository $updates = null,
         private readonly ?MailingSettings $settings = null,
         private readonly ?CampaignRepository $campaigns = null,
@@ -127,15 +132,10 @@ final class MailingConsents
     public function joinList(int $userId, int $listId, string $source): bool
     {
         if (!isset(self::SOURCES[$source])) throw new InvalidArgumentException('Unknown place for an answer.');
-        $list = $this->mailing->ownList($listId);
-        if ($list === null || $list['closed_at'] !== null) throw new InvalidArgumentException('That list cannot be joined now.');
 
         return (bool) $this->transactions->run(function () use ($userId, $listId, $source): bool {
-            $done = $this->mailing->answer($listId, $userId, 'subscribed', $source);
-            if ($done) {
-                $this->audit->record($userId, 'mailing.subscribed', ['list_id' => $listId, 'source' => $source]);
-                $this->campaigns?->queueWelcome($listId, $userId);
-            }
+            $done = $this->consents->joinList((string) $userId, $listId, $source);
+            if ($done) $this->campaigns?->queueWelcome($listId, $userId);
 
             return $done;
         });
@@ -182,15 +182,7 @@ final class MailingConsents
     {
         if (!isset(self::SOURCES[$source])) throw new InvalidArgumentException('Unknown place for an answer.');
 
-        return (int) $this->transactions->run(function () use ($userId, $source): int {
-            $stopped = 0;
-            foreach ($this->mailing->subscribedListIds($userId) as $listId) {
-                if ($this->mailing->answer($listId, $userId, 'unsubscribed', $source)) $stopped++;
-            }
-            if ($stopped > 0) $this->audit->record($userId, 'mailing.unsubscribed_all', ['lists' => $stopped, 'source' => $source]);
-
-            return $stopped;
-        });
+        return $this->consents->unsubscribeAll((string) $userId, $source);
     }
 
     /** Stops one list by its id, as a unsubscribe link in an email does. False when they had already stopped it. */
@@ -198,17 +190,12 @@ final class MailingConsents
     {
         if (!isset(self::SOURCES[$source])) throw new InvalidArgumentException('Unknown place for an answer.');
 
-        return (bool) $this->transactions->run(function () use ($userId, $listId, $source): bool {
-            $done = $this->mailing->answer($listId, $userId, 'unsubscribed', $source);
-            if ($done) $this->audit->record($userId, 'mailing.unsubscribed', ['list_id' => $listId, 'source' => $source]);
-
-            return $done;
-        });
+        return $this->consents->unsubscribeList((string) $userId, $listId, $source);
     }
 
     public function isSubscribedToList(int $userId, int $listId): bool
     {
-        return in_array($listId, $this->mailing->subscribedListIds($userId), true);
+        return $this->consents->isSubscribedToList((string) $userId, $listId);
     }
 
     public function isSubscribed(int $userId, string $kind, ?int $subjectId = null): bool
@@ -256,13 +243,10 @@ final class MailingConsents
         if ($kind !== 'news' && ($subjectId === null || $subjectId < 1)) throw new InvalidArgumentException('Choose what to follow.');
         $subjectId = $kind === 'news' ? null : $subjectId;
         $this->transactions->run(function () use ($userId, $kind, $subjectId, $status, $source): void {
-            // A no to a list nobody has joined makes no list.
-            $listId = $this->mailing->listId($kind, $subjectId, $status === 'subscribed');
-            if ($listId === null) return;
-            if ($this->mailing->answer($listId, $userId, $status, $source)) {
-                $this->audit->record($userId, $status === 'subscribed' ? 'mailing.subscribed' : 'mailing.unsubscribed', ['kind' => $kind, 'subject_id' => $subjectId, 'source' => $source]);
-                if ($status === 'subscribed') $this->campaigns?->queueWelcome($listId, $userId);
-            }
+            // A no to a list nobody has joined makes no list (CattoPHP's rule); a yes that changed something brings the
+            // list's welcome email.
+            $listId = $status === 'subscribed' ? $this->consents->subscribe((string) $userId, $kind, $subjectId, $source) : $this->consents->unsubscribe((string) $userId, $kind, $subjectId, $source);
+            if ($listId !== null && $status === 'subscribed') $this->campaigns?->queueWelcome($listId, $userId);
         });
     }
 }

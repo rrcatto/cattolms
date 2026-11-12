@@ -25,6 +25,10 @@ path pattern - platforms change their URL shapes and we would be wrong within a 
 scheme must be https, because http would be downgrading every visitor who follows it.
 
 Changelog:
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): the footer shows a mark for each of the site's own profiles that Settings > Footer
+  social media sets, and all of them linking to the platforms' home pages only while none is set; Telegram is one of
+  them, after WhatsApp (owner: "yes, add Telegram to the footer social media too").
 2026/10/17 SAST
 - Each platform names its home page (home()), where the footer's mark links until a profile address is set.
 2026/09/10 02:25 SAST
@@ -82,28 +86,33 @@ final class SocialPlatform
         return self::CATALOGUE[$platform]['home'] ?? '';
     }
 
-    /** The platforms the site footer shows a mark for, in its order. */
-    public const FOOTER = ['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'];
+    /** The platforms the site footer shows a mark for, in its order (Telegram after WhatsApp, as in Share; owner, 2026-11-09). */
+    public const FOOTER = ['facebook', 'whatsapp', 'telegram', 'x', 'linkedin', 'instagram', 'youtube'];
 
     /**
-     * The site footer's marks (footer_social): each platform's profile address where the installation sets one, else its
-     * home page (owner, 2026/10/17).
+     * The site footer's marks (footer_social): a mark for each platform where the site has its own profile (Settings >
+     * Footer social media, owner 2026-11-09), in the footer's order. With none set, every platform's mark links to its
+     * home page (owner, 2026/10/17), so the footer is never bare and a mark never links to nowhere; once the site has a
+     * profile of its own, a mark beside it linking to another platform's home page would look like the site's and is left out.
      *
      * @param array<array-key,mixed> $configured platform => profile address
      * @return list<array{key:string,label:string,href:string}>
      */
     public static function footerMarks(array $configured): array
     {
-        $marks = [];
+        $own = [];
         foreach (self::FOOTER as $key) {
-            $marks[] = ['key' => $key, 'label' => self::label($key), 'href' => trim((string) ($configured[$key] ?? '')) ?: self::home($key)];
+            $href = trim(is_string($configured[$key] ?? null) ? $configured[$key] : '');
+            if ($href !== '') $own[] = ['key' => $key, 'label' => self::label($key), 'href' => $href];
         }
-        return $marks;
+        if ($own !== []) return $own;
+
+        return array_map(static fn (string $key): array => ['key' => $key, 'label' => self::label($key), 'href' => self::home($key)], self::FOOTER);
     }
 
     /**
      * The footer's marks that link to the site's own profiles, not a platform's home page: what the home page's
-     * Organization names as its social profiles (sameAs; owner, 2026-11-06).
+     * Organization names as its social profiles (sameAs; owner, 2026-11-06), from Settings > Footer social media.
      *
      * @param array<array-key,mixed> $configured platform => profile address
      * @return list<string>

@@ -14,6 +14,8 @@ use CattoLearning\View\ThemeRenderer;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use CattoPHP\Settings\Settings;
+use CattoLearning\Configuration\SiteMode;
 
 /** The site notification (owner, 2026-11-05): set at Settings, under the demo notice on every page, demo or live. */
 final class SiteNotificationIntegrationTest extends TestCase
@@ -129,7 +131,7 @@ final class SiteNotificationIntegrationTest extends TestCase
         $service = IntegrationContainer::get()->get(PlatformAdministrationService::class);
         $service->saveSiteNotification(['show' => true, 'kind' => 'warning', 'message' => 'Going offline tonight.'], $this->actor);
         $service->removeSiteNotification($this->actor);
-        $rows = $this->db->fetchFirstColumn("SELECT metadata::text FROM audit_log WHERE user_id = :user AND event_key = 'platform.site_notification_changed' ORDER BY id", ['user' => $this->actor]);
+        $rows = $this->db->fetchFirstColumn("SELECT details::text FROM cattophp_activity WHERE actor_id = CAST(:user AS TEXT) AND action = 'platform.site_notification_changed' ORDER BY id", ['user' => $this->actor]);
         self::assertCount(2, $rows);
         self::assertStringContainsString('Going offline tonight.', (string) $rows[0]);
         self::assertStringContainsString('Going offline tonight.', (string) $rows[1], 'Removing says what it removed.');
@@ -139,11 +141,11 @@ final class SiteNotificationIntegrationTest extends TestCase
     {
         $this->options->set('site_notification', (string) json_encode(['show' => true, 'kind' => 'warning', 'heading' => '', 'message' => 'Going offline tonight.', 'countdown_words' => '', 'ends_at' => null]));
         $renderer = IntegrationContainer::get()->get(ThemeRenderer::class);
-        $this->options->set('site_mode', 'demo');
+        IntegrationContainer::get()->get(Settings::class)->set(SiteMode::SETTING, 'demo');
         $demo = $renderer->renderFragment('partials/flash-messages', ['flash_messages' => []]);
         self::assertGreaterThan(strpos($demo, 'data-demo-site'), strpos($demo, 'data-site-notification'));
         self::assertStringContainsString('Going offline tonight.', $demo);
-        $this->options->set('site_mode', 'live');
+        IntegrationContainer::get()->get(Settings::class)->set(SiteMode::SETTING, 'live');
         $live = $renderer->renderFragment('partials/flash-messages', ['flash_messages' => []]);
         self::assertStringNotContainsString('data-demo-site', $live);
         self::assertStringContainsString('Going offline tonight.', $live);

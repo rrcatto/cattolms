@@ -42,7 +42,7 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Slug;
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use InvalidArgumentException;
 
 final class CatalogueFile

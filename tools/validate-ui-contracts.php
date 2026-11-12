@@ -10,9 +10,10 @@ $read = static function (string $path) use ($need): string {
     return is_file($path) ? (string) file_get_contents($path) : '';
 };
 
-// The bundled default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07, the other themes "on ice").
-$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ThemeManager.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
-$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme.');
+// The bundled default theme is the one cattolms names for CattoPHP's theme system (Saharan Sunset since 2026-11-07, the other
+// themes "on ice").
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ProjectTheme.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ProjectTheme must name the bundled default theme.');
 $manifest = json_decode($read($root . '/themes/' . $defaultSlug . '/theme.json'), true);
 $need(is_array($manifest), 'The default theme.json must decode as JSON.');
 $need(($manifest['schema_version'] ?? '') === '4.0', 'The default theme must use Theme Package 4.0.');
@@ -34,13 +35,13 @@ $need(str_contains($defaultFooter, '@platform/partials/site-footer.html.twig') |
 $coreFooter = $read($root . '/resources/views/partials/site-footer.html.twig');
 $need(str_contains($coreFooter, 'footer_navigation'), 'The core footer must render the core footer_navigation array.');
 
-$coreJs = $read($root . '/public_html/js/platform-overrides.js');
+$coreJs = $read($root . '/vendor/rrcatto/cattophp/public/js/cattophp.js') . $read($root . '/public_html/js/platform-overrides.js');
 foreach (['data-open-modal','details[data-cl-dropdown]','dataset.tabHistory','localStorage','/theme/palette','cl-palette-switcher','modal.hidden = true','modal.hidden = false'] as $token) {
     $need(str_contains($coreJs, $token), 'Core platform interaction missing: ' . $token);
 }
 $need(!str_contains($coreJs, 'data-admin-tab'), 'Legacy Administration tab JavaScript must not return.');
 
-$coreCss = $read($root . '/public_html/css/catto-platform.css');
+$coreCss = $read($root . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . $read($root . '/public_html/css/catto-platform.css');
 foreach (['.cl-admin-workspace{display:grid;','.cl-account-workspace,.cl-company-workspace','.activity-filters{width:100%','.pagination-row{display:flex','.acl-groups{display:grid','.cl-ui-modal[hidden]','.cl-palette-switcher'] as $token) {
     $need(str_contains($coreCss, $token), 'Core functional CSS missing: ' . $token);
 }
@@ -82,7 +83,7 @@ foreach (['activity-filters','event.ip_address','event.geo_location','activity_p
 
 // v0.5.7.6 large-data contracts. Every standalone list must be able to state its own size,
 // and no list partial may reintroduce a whole-table <select> or an undefined table wrapper.
-$pagination = $read($root . '/resources/views/partials/pagination.html.twig');
+$pagination = $read($root . '/vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 // The short wording (owner, 2026-10-21): "X–Y of N · Pg P of T", icons for first, previous, next and last.
 foreach (['pagination-row','pagination-summary','pagination-page-size','{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·','Pg {{ pg.page }} of {{ pg.total_pages }}',"rel: 'prev'","rel: 'next'","icon: 'page-first'","icon: 'page-last'",'>Show Pg</label>','>Rows per pg</label>'] as $token) {
     $need(str_contains($pagination, $token), 'Shared pagination control missing: ' . $token);
@@ -146,9 +147,7 @@ foreach ($viewFiles as $viewFile) {
     if (!str_ends_with($viewFile->getFilename(), '.twig')) continue;
     $need(!str_contains($read($viewFile->getPathname()), '<!--'), $viewFile->getFilename() . ' must use Twig comments.');
 }
-$dataset = $read($root . '/resources/views/ui/data/dataset-layout.html.twig');
-$need(substr_count($dataset, 'partials/pagination.html.twig') === 2, 'The canonical dataset must render the shared pager above and below its results.');
-$need(str_contains($dataset, 'partials/dataset-search.html.twig'), 'The dataset must delegate search to the shared control.');
+// The dataset, its pager above and below and its search are CattoPHP's components, checked by CattoPHP's own tests.
 
 // The whole-table selectors these screens used to carry are what defeated pagination.
 $credits = $read($root . '/resources/views/partials/admin/credits.html.twig');
@@ -249,20 +248,22 @@ foreach ([['enrolments', $enrolments], ['requests', $requests]] as [$dataset, $m
 // records strip. Asserting the absence keeps a future edit from inventing a total for it.
 $reports = $read($root . '/resources/views/partials/admin/reports.html.twig');
 
-$manager = $read($root . '/src/View/ThemeManager.php');
-foreach (['discoverInstalledThemes','filesystem_key','$row = $registry[$key] ?? null;','resyncRegistry'] as $token) $need(str_contains($manager, $token), 'Filesystem theme recovery missing: ' . $token);
+// The theme system is CattoPHP's (Phase 3, step 9): cattolms gives it its theme index and where the chosen theme is kept.
+$themeConfig = $read($root . '/config/packages/cattophp.yaml');
+foreach (['registry: CattoLearning\\Infrastructure\\Persistence\\ThemeRegistryRepository', 'choice: CattoLearning\\View\\OptionThemeChoice'] as $token) $need(str_contains($themeConfig, $token), 'CattoPHP\'s theme system is not given cattolms\'s: ' . $token);
 
-require_once $root . '/src/View/Ui/UiOwnershipAudit.php';
+// The audit is CattoPHP's (CattoPHP Phase 3, step 2), given cattolms's own functional classes.
+require_once $root . '/vendor/autoload.php';
 foreach (['public_html/js', 'assets/controllers'] as $directory) {
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/' . $directory, FilesystemIterator::SKIP_DOTS)) as $file) {
-        if ($file->getExtension() === 'js') $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::javascript((string) file_get_contents($file->getPathname()), $file->getPathname()));
+        if ($file->getExtension() === 'js') $errors = array_merge($errors, \CattoPHP\Ui\Contract\SourceAudit::javascript((string) file_get_contents($file->getPathname()), $file->getPathname()));
     }
 }
 foreach (glob($root . '/themes/*/public/css/*.css') ?: [] as $file) {
-    $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::themeGeometry((string) file_get_contents($file), $file));
+    $errors = array_merge($errors, \CattoPHP\Ui\Contract\SourceAudit::themeGeometry((string) file_get_contents($file), $file, \CattoLearning\View\Ui\ProjectComponents::FUNCTIONAL_CLASSES));
 }
 foreach ($viewFiles as $file) {
-    if ($file->getExtension() === 'twig') $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::stimulusActions((string) file_get_contents($file->getPathname()), $file->getPathname()));
+    if ($file->getExtension() === 'twig') $errors = array_merge($errors, \CattoPHP\Ui\Contract\SourceAudit::stimulusActions((string) file_get_contents($file->getPathname()), $file->getPathname()));
 }
 
 if ($errors !== []) {

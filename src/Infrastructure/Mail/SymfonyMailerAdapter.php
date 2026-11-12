@@ -12,6 +12,11 @@ Provides mail infrastructure for Symfony Mailer, resolving the effective SMTP tr
 
 Changelog:
 2026/11/09 SAST
+- Sent through CattoPHP's mailer (CattoPHP Phase 2, step 7b): the sender, the reply-to and a demo site's [DEMO] from
+  its settings, the transport built from the mail server Settings names; this class still checks a real server is set.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
+2026/11/09 SAST
 - Every email but a message to the site's own inbox is drawn in the template chosen for account and order emails
   (Mailing\EmailRenderer::account), with its logo; it goes plain if the template cannot be drawn.
 2026/11/06 SAST
@@ -39,21 +44,20 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Mail;
 
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Mailing\EmailRenderer;
 use CattoLearning\Support\Env;
 use RuntimeException;
-use Symfony\Component\Mailer\Mailer;
-use Symfony\Component\Mailer\Transport;
+use CattoPHP\Mail\Mailer;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
 class SymfonyMailerAdapter implements MailerInterface
 {
     /** $design draws each email in the template chosen for account and order emails (owner, 2026-11-09). */
-    public function __construct(private readonly RuntimeSettings $settings, private readonly ?SiteMode $site = null, private readonly ?EmailRenderer $design = null)
+    public function __construct(private readonly RuntimeSettings $settings, private readonly Mailer $mailer, private readonly ?SiteMode $site = null, private readonly ?EmailRenderer $design = null)
     {
     }
 
@@ -160,6 +164,11 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendInboxReply(Email $email): void
+    {
+        $this->mailer->send($email);
+    }
+
     public function sendAdministratorMessage(string $email, string $subject, string $body): void
     {
         $paragraphs = array_filter(array_map('trim', preg_split('/\R{2,}/', $body) ?: []), static fn(string $p): bool => $p !== '');
@@ -224,8 +233,8 @@ class SymfonyMailerAdapter implements MailerInterface
             $html .= '<tr><td><strong>' . $this->escape($label) . '</strong></td><td>' . $this->escape($value) . '</td></tr>';
             $text .= $label . ': ' . $value . "\n";
         }
-        $html .= '</table><p>' . nl2br($this->escape($message['message'])) . '</p><p><a href="' . $this->escape($message['admin_url']) . '">Open ' . $this->escape($message['reference']) . ' in Administration</a></p>';
-        $text .= "\n" . $message['message'] . "\n\nOpen it in Administration: " . $message['admin_url'] . "\n";
+        $html .= '</table><p>' . nl2br($this->escape($message['message'])) . '</p><p><a href="' . $this->escape($message['admin_url']) . '">Open ' . $this->escape($message['reference']) . ' in the Inbox</a></p>';
+        $text .= "\n" . $message['message'] . "\n\nOpen it in the Inbox: " . $message['admin_url'] . "\n";
         $this->send($configuration['from_address'], 'Website contact ' . $message['reference'] . ': ' . $message['reason'], $html, $text, $message['email'], $name);
     }
 
@@ -425,12 +434,10 @@ class SymfonyMailerAdapter implements MailerInterface
             $html = '<p><strong>' . $this->escape($notice) . '</strong></p>' . $html;
             $text = $notice . "\n\n" . $text;
         }
+        // A real mail server is set (never a test or example one), or nothing is sent.
         $configuration = $this->settings->mailConfiguration();
-        $mailer = new Mailer(Transport::fromDsn($configuration['dsn']));
-        $from = new Address($configuration['from_address'], $configuration['from_name']);
 
         $message = (new Email())
-            ->from($from)
             ->to($to)
             ->subject($subject)
             ->html($html)
@@ -445,7 +452,8 @@ class SymfonyMailerAdapter implements MailerInterface
         foreach ($attachments as $name => $bytes) {
             $message->attach($bytes, (string) $name, str_ends_with(strtolower((string) $name), '.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf');
         }
-        $mailer->send($message);
+        // CattoPHP's mailer gives the sender (MAIL_FROM_*) and sends it through the server Settings names.
+        $this->mailer->send($message);
     }
 
     private function escape(string $value): string

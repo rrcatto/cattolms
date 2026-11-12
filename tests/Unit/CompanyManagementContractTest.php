@@ -128,7 +128,7 @@ final class CompanyManagementContractTest extends TestCase
      */
     public function testTheSharedSearchControlIsLiveAndDegrades(): void
     {
-        $markup = self::source('resources/views/partials/dataset-search.html.twig');
+        $markup = self::source('vendor/rrcatto/cattophp/templates/ui/data/dataset-search.html.twig');
 
         self::assertStringContainsString('delay:300ms', $markup, 'Typing must not fire a request until the reader pauses.');
         self::assertStringContainsString('input changed', $markup, 'The input event catches typing, pasting and clearing; an unchanged value fires nothing.');
@@ -174,7 +174,7 @@ final class CompanyManagementContractTest extends TestCase
      */
     public function testCurrentPageFilteringSkipsServerSearchedRegions(): void
     {
-        $js = self::source('public_html/js/platform-overrides.js');
+        $js = (self::source('vendor/rrcatto/cattophp/public/js/cattophp.js') . self::source('public_html/js/platform-overrides.js'));
 
         self::assertStringContainsString("input.closest('[data-server-search]')", $js);
     }

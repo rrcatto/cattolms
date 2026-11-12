@@ -12,7 +12,7 @@ use CattoLearning\Commerce\Wallet\LedgerKind;
 use CattoLearning\Commerce\Wallet\WalletRepository;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use RuntimeException;

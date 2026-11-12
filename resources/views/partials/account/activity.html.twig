@@ -7,11 +7,11 @@
 {% block header %}
 
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Time'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 31, label: 'Activity'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Subject'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'IP', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Location', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Time'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 31, label: 'Activity'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Subject'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'IP', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Location', wide: true}} %}
 					</tr>
 
 {% endblock %}

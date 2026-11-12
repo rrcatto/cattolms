@@ -28,7 +28,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Symfony;
 
 use CattoLearning\Api\ApiScope;
-use CattoLearning\Api\Security\ApiUser;
+use CattoPHP\Api\ApiUser;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
@@ -41,6 +41,6 @@ final class ApiProfileController
     #[IsGranted('ACCOUNT.PROFILE.VIEW')]
     public function me(#[CurrentUser] ApiUser $user): JsonResponse
     {
-        return ApiResponse::data($user->identity->toArray());
+        return ApiResponse::data(\CattoLearning\Api\ApiPerson::toArray($user->identity));
     }
 }

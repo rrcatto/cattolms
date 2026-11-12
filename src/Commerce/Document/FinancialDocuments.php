@@ -19,7 +19,7 @@ the values with the exact template version that drew them. A source (order:, pay
 issues one document however often it is replayed.
 
 render() and pdf() draw an issued document again from its stored values and its own template
-version only, through the same DocumentTemplateRenderer and DocumentPdfRenderer as every preview, so
+version only, through the same DocumentTemplateRenderer and PdfRenderer as every preview, so
 a later design, billing profile, course, bundle or promotion never changes it. The PDF is made the
 first time it is asked for - to view, to download or to attach to an email - and kept
 (commerce_document_files), so every later copy is the same file.
@@ -35,10 +35,10 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\RenderedDocument;
+use CattoPHP\Document\RenderedDocument;
 use RuntimeException;
 
 final class FinancialDocuments
@@ -47,7 +47,7 @@ final class FinancialDocuments
         private readonly CommerceRepository $records,
         private readonly FinancialDocumentDataBuilder $builder,
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly DocumentPdfRenderer $pdf,
+        private readonly PdfRenderer $pdf,
     ) {}
 
     /**

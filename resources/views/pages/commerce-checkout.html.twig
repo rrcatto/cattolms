@@ -1,16 +1,26 @@
 {% extends layout %}
+{#
+    The checkout: My details, Payment and Review, with the steps in the page head (owner, 2026-11-11, the approved mockup of the
+    Review page, https://claude.ai/artifact/CuvD4JFnvSPSjkxp4PgpTq). The review is two columns: the order, who is billed, how
+    they pay and what they want by email on the left; the summary with the promo code, the amount to pay, the two acceptances
+    and the button on the right. The place-order form is in the summary; the email choices on the left belong to it by their
+    form attribute, so the promo code keeps its own forms and nothing is nested.
+#}
 {% block page_body %}
-    {% set ph_title = 'Checkout' %}{% set ph_kicker = '' %}
-    {% include '@platform/partials/page-head.html.twig' %}
+    {% set ph_kicker = 'Checkout' %}
+    {% set ph_title = step == 'review' ? 'Review my order' : (step == 'payment' ? 'Payment and invoice' : 'My details') %}
+    {% set done_details = checkout.profile_confirmed|default(false) and step != 'profile' %}
+    {% set progress = [
+        {label: 'Signed in', state: 'done', href: ''},
+        {label: 'My details', state: step == 'profile' ? 'current' : (done_details ? 'done' : ''), href: '/checkout/profile'},
+        {label: 'Payment', state: step == 'payment' ? 'current' : (step == 'review' ? 'done' : ''), href: checkout.profile_confirmed|default(false) ? '/checkout/payment' : ''},
+        {label: 'Review', state: step == 'review' ? 'current' : '', href: ''},
+    ] %}
+    {% set ph_actions %}<nav aria-label="Checkout progress" class="cl-checkout-progress"><ol>{% for s in progress %}<li class="cl-checkout-progress-step{{ s.state ? ' is-' ~ s.state : '' }}"{% if s.state == 'current' %} aria-current="step"{% endif %}><span class="cl-checkout-progress-mark" aria-hidden="true">{% if s.state == 'done' %}{{ lucide('check')|authored }}{% else %}{{ loop.index }}{% endif %}</span>{% if s.href and s.state != 'current' %}<a href="{{ s.href }}">{{ s.label }}</a>{% else %}<span>{{ s.label }}</span>{% endif %}{% if s.state == 'done' %}<span class="visually-hidden"> (done)</span>{% endif %}</li>{% endfor %}</ol></nav>{% endset %}
+    {% include '@CattoPHP/page/head.html.twig' %}
+    {% if step != 'review' %}
     <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
-
-        <nav aria-label="Checkout progress" class="cl-checkout-steps">
-            <span>1. Signed in</span>
-            <a href="/checkout/profile" {% if step == 'profile' %}aria-current="step"{% endif %}>2. My details</a>
-            {% if checkout.profile_confirmed|default(false) %}<a href="/checkout/payment" {% if step == 'payment' %}aria-current="step"{% endif %}>3. Payment</a>{% else %}<span>3. Payment</span>{% endif %}
-            <span {% if step == 'review' %}aria-current="step"{% endif %}>4. Review</span>
-        </nav>
         {% if step == 'profile' %}
             <h2 class="h4">My details</h2><p>Signed in as {{ user_email }}. Your personal details are saved to your profile and your billing details to your reusable billing profile, which you can also change in Account → Profile.</p>
             <form action="/checkout/profile" method="post">
@@ -67,52 +77,101 @@
 {% endblock %}
 {% endembed %}
             </form>
-        {% else %}
-            <h2 class="h4">Review my order</h2>
-            {% for item in cart.items %}<p><strong>{{ item.title }}</strong> · {{ item.days }} days · {% include '@platform/partials/price.html.twig' with {price: item, price_saving: true} %}</p>{% endfor %}
-            {% for bundle in cart.bundles %}{% include '@platform/partials/commerce-bundle-line.html.twig' %}{% endfor %}
-            {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
-            {% include '@platform/partials/commerce-promo-code.html.twig' %}
-            <h3 class="h5 mt-7">Order total</h3>
-            {{ ui('data.key-value-list', {items: cart.totals}) }}
-            {% if cart.total_minor == 0 %}<p>Nothing to pay: the promotion covers this order, so it completes when you place it.</p>{% endif %}
-            {% if wallet_applied_minor > 0 %}
-            {{ ui('data.key-value-list', {items: [{label: 'Paid from your wallet', value: wallet_applied_label}, {label: 'To pay', value: to_pay_label}]}) }}
-            {% if to_pay_minor == 0 %}<p>Your wallet pays the whole order, so it completes when you place it.</p>{% endif %}
-            {% endif %}
-            <h3 class="h5">Billed to</h3>
-            {% include '@platform/partials/billing-address.html.twig' %}
-            <p><a href="/checkout/profile">Change billing details</a></p>
-            {% if to_pay_minor > 0 %}<p>Payment{{ wallet_applied_minor > 0 ? ' of what is left' : '' }}: {{ payment_method_label }}. <a href="/checkout/payment">Change</a></p>{% endif %}
-            <p>{{ checkout.invoice_email ? 'Email my invoice and make it available in My Orders.' : 'Make my invoice available in My Orders.' }}</p>
-            <form action="/checkout/place" method="post">
-                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
-                <p>An order that is not paid within {{ payment_due_words }} is cancelled automatically. Every course starts as soon as your payment is confirmed (for an EFT, when we confirm we have received it), and its access period then runs to its end.</p>
-                <p>No VAT is charged. Once a course has started, its content has been supplied and it cannot be cancelled for a refund. This does not affect your rights if a course is faulty, is not as described or cannot be provided. Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
-                {# Keep me informed (mailing, step 1; owner, 2026-10-26: a private buyer is asked at checkout): News and Updates and
-                   each course bought, unticked, leaving out what they have already. #}
-                {% set ki_courses = [] %}
-                {% for item in cart.items %}{% if item.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: item.course_id, title: item.title}]) %}{% endif %}{% endfor %}
-                {% for bundle in cart.bundles %}{% for course in bundle.courses %}{% if course.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: course.course_id, title: course.title}]) %}{% endif %}{% endfor %}{% endfor %}
-                {% if not news_subscribed|default(false) or ki_courses %}
-                <div class="cl-keep-informed">
-                    {% if not news_subscribed|default(false) %}{{ ui('form.picture-choice', {multiple: true, legend: 'Keep me informed by email', size: 'small', selected: [], items: [
-                        {value: 'news', label: 'Send me News and Updates', icon: lucide('newspaper'), note: 'New courses, offers and news about the site.'},
-                    ]}) }}{% endif %}
-                    {% if ki_courses %}{{ ui('form.picture-choice', {multiple: true, list: 'follow_course', legend: 'Updates about what I am buying', size: 'small', selected: [], items: ki_courses|map(course => {value: course.id, label: course.title, icon: lucide('bell'), note: 'Send me the updates written about this course.'})}) }}{% endif %}
-                    <p class="help">You can stop at any time under Account › My Subscriptions.</p>
-                </div>
-                {% endif %}
-                {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
-                {% include '@platform/partials/commerce-start-acceptance.html.twig' %}
-                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-{{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-buy'}) }}<a href="/cart">Edit My Cart</a>
-{% endblock %}
-{% endembed %}
-            </form>
         {% endif %}
 
 {% endblock %}
 {% endembed %}</section>
+    {% else %}
+        {# What they get by email already is left out: News and Updates, and each course of the order not followed yet. #}
+        {% set ki_courses = [] %}
+        {% for item in cart.items %}{% if item.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: item.course_id, title: item.title}]) %}{% endif %}{% endfor %}
+        {% for bundle in cart.bundles %}{% for course in bundle.courses %}{% if course.course_id not in following_course_ids|default([]) %}{% set ki_courses = ki_courses|merge([{id: course.course_id, title: course.title}]) %}{% endif %}{% endfor %}{% endfor %}
+        {% set ki_items = [] %}
+        {% if ki_courses %}{% set ki_items = ki_items|merge([{value: 'follow_courses', label: ki_courses|length > 1 ? 'Send me updates about these courses' : 'Send me updates about this course', icon: lucide('bell'), note: 'New lessons, changes and offers on ' ~ ki_courses|map(c => c.title)|join(', ', ' and ') ~ '.'}]) %}{% endif %}
+        {% if not news_subscribed|default(false) %}{% set ki_items = ki_items|merge([{value: 'news', label: 'Send me News and Updates', icon: lucide('newspaper'), note: 'New courses, offers and news about the site.'}]) %}{% endif %}
+        {% set method = checkout.payment_method|default('') %}
+        {% set line_count = cart.items|length + cart.bundles|length %}
+        {% set summary_rows = [{label: (cart.bundles is empty ? 'Courses' : (cart.items is empty ? 'Bundles' : 'Courses and bundles')) ~ ' (' ~ line_count ~ ')', value: (cart.totals|first).value}] %}
+        {% if cart.discount_minor > 0 %}{% set summary_rows = summary_rows|merge([cart.totals[1]]) %}{% endif %}
+        {% if wallet_applied_minor > 0 %}{% set summary_rows = summary_rows|merge([{label: 'Paid from your wallet', value: '−' ~ wallet_applied_label}]) %}{% endif %}
+        {% set summary_rows = summary_rows|merge([{label: 'VAT', value: 'None charged'}]) %}
+        <section class="cl-page-section">{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'main-side', section_spacing: false})} %}{% block body %}
+        <div class="cl-checkout-main">
+            {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'checkout-order'})} %}{% block surface_body %}
+                <div class="cl-checkout-card-head"><h2 class="h4">Your order</h2><a href="/cart">Edit my cart</a></div>
+                <ul class="cl-checkout-lines">
+                    {% for item in cart.items %}
+                    <li class="cl-checkout-line" data-checkout-line="course">
+                        <span class="cl-checkout-line-picture" aria-hidden="true">{% if item.cover %}<img src="{{ item.cover }}" alt="" loading="lazy">{% else %}{{ item.title|first|upper }}{% endif %}</span>
+                        <span class="cl-checkout-line-text"><a class="cl-checkout-line-title" href="/courses/{{ item.slug }}">{{ item.title }}</a><span class="cl-checkout-line-note">{{ item.access_label }} of access, from the day your payment is confirmed</span></span>
+                        <span class="cl-checkout-line-price">{% include '@platform/partials/price.html.twig' with {price: item} %}</span>
+                    </li>
+                    {% endfor %}
+                    {% for bundle in cart.bundles %}
+                    <li class="cl-checkout-line" data-checkout-line="bundle">
+                        <span class="cl-checkout-line-picture" aria-hidden="true">{% if bundle.cover %}<img src="{{ bundle.cover }}" alt="" loading="lazy">{% else %}{{ bundle.title|first|upper }}{% endif %}</span>
+                        <span class="cl-checkout-line-text"><span class="cl-checkout-line-title">{{ ui('feedback.badge', {label: 'Bundle', tone: 'info', size: 'small'}) }} <a href="/bundles/{{ bundle.slug }}">{{ bundle.title }}</a></span><span class="cl-checkout-line-note">Includes {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }}: {{ bundle.course_titles|join(', ') }}</span><span class="cl-checkout-line-note">{{ bundle.access_label }} of access to each course, from the day your payment is confirmed</span>{% if bundle.owned_count %}<span class="cl-checkout-line-note">You already have access to {{ bundle.owned_count }} of its {{ bundle.course_count }} courses. The bundle price stays the same, and the bundle still gives each of its courses its own access period alongside the access you have.</span>{% endif %}</span>
+                        <span class="cl-checkout-line-price">{% include '@platform/partials/price.html.twig' with {price: bundle} %}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
+            {% endblock %}{% endembed %}
+            <div class="cl-checkout-pair">
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'checkout-billed'})} %}{% block surface_body %}
+                    <div class="cl-checkout-card-head"><h2 class="h4">Billed to</h2><a href="/checkout/profile" aria-label="Change billing details">Change</a></div>
+                    {% include '@platform/partials/billing-address.html.twig' %}
+                {% endblock %}{% endembed %}
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'checkout-paying'})} %}{% block surface_body %}
+                    <div class="cl-checkout-card-head"><h2 class="h4">Paying by</h2><a href="/checkout/payment" aria-label="Change how I pay">Change</a></div>
+                    {% if cart.total_minor == 0 %}
+                        {% set pay = {icon: 'gift', title: 'Nothing to pay', note: 'The promotion covers this order, so it completes when you place it.'} %}
+                    {% elseif to_pay_minor == 0 %}
+                        {% set pay = {icon: 'wallet', title: 'Your wallet credit', note: 'Your wallet pays the whole order, so it completes when you place it.'} %}
+                    {% elseif method == 'card' %}
+                        {% set pay = {icon: 'credit-card', title: 'Card, on Stitch\'s secure page', note: 'Placing your order takes you to Stitch to pay. This site never sees your card.'} %}
+                    {% elseif method == 'eft' %}
+                        {% set pay = {icon: 'landmark', title: 'EFT: bank transfer', note: 'Once you place your order, it shows our bank account and your payment reference.'} %}
+                    {% elseif method == 'dummy' %}
+                        {% set pay = {icon: 'credit-card', title: 'Simulated card', note: 'For testing on this demo site only. No money is charged.'} %}
+                    {% else %}
+                        {% set pay = {icon: 'credit-card', title: payment_method_label, note: ''} %}
+                    {% endif %}
+                    <p class="cl-checkout-method"><span class="cl-checkout-method-icon" aria-hidden="true">{{ lucide(pay.icon)|authored }}</span><span><strong>{{ pay.title }}</strong>{% if pay.note %}<span class="cl-checkout-method-note">{{ pay.note }}</span>{% endif %}{% if wallet_applied_minor > 0 and to_pay_minor > 0 %}<span class="cl-checkout-method-note">Your wallet pays {{ wallet_applied_label }}, and this pays the rest.</span>{% endif %}</span></p>
+                {% endblock %}{% endembed %}
+            </div>
+            {% if ki_items %}
+            {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'checkout-informed'})} %}{% block surface_body %}
+                <div class="cl-checkout-card-head"><h2 class="h4">Keep me informed by email</h2></div>
+                <div class="cl-keep-informed">
+                    <p class="cl-checkout-help">{{ ki_items|length > 1 ? 'Both are optional.' : 'It is optional.' }} You can stop at any time under Account › My Subscriptions.</p>
+                    {{ ui('form.picture-choice', {multiple: true, form: 'checkout-place', legend: 'Keep me informed by email', legend_hidden: true, size: 'small', selected: [], items: ki_items}) }}
+                </div>
+            {% endblock %}{% endembed %}
+            {% endif %}
+        </div>
+        <div class="cl-checkout-side">
+            {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'checkout-summary'})} %}{% block surface_body %}
+                <div class="cl-order-summary">
+                    <div class="cl-checkout-card-head"><h2 class="h4">Order summary</h2></div>
+                    <div data-order-summary>{{ ui('data.key-value-list', {items: summary_rows}) }}</div>
+                    {% include '@platform/partials/commerce-promo-code.html.twig' %}
+                    <p class="cl-order-to-pay" data-to-pay><span>To pay now</span> <strong>{{ to_pay_label }}</strong></p>
+                    <form id="checkout-place" class="cl-order-place" action="/checkout/place" method="post">
+                        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
+                        {% for course in ki_courses %}<input type="hidden" name="follow_course[]" value="{{ course.id }}">{% endfor %}
+                {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
+                {% include '@platform/partials/commerce-start-acceptance.html.twig' %}
+                        {{ ui('action.button', {label: to_pay_minor > 0 and method == 'card' ? 'Place my order and pay by card' : 'Place my order', variant: 'primary', type: 'submit', icon: 'action-buy', full_width: true}) }}
+                    </form>
+                    <ul class="cl-order-small-print">
+                        <li>Your invoice is in My Orders as soon as you place the order{{ checkout.invoice_email|default(false) ? ', and we email it to you' : '' }}.</li>
+                        {% if to_pay_minor > 0 %}<li>An order that is not paid within {{ payment_due_words }} is cancelled automatically.</li>{% endif %}
+                        <li>Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</li>
+                    </ul>
+                </div>
+            {% endblock %}{% endembed %}
+        </div>
+        {% endblock %}{% endembed %}</section>
+    {% endif %}
 {% endblock %}

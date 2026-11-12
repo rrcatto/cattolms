@@ -7,7 +7,7 @@
 	{% set ph_kicker = 'Mailing' %}
 	{% set ph_title = 'Messages' %}
 	{% set ph_lead = 'A message is an email you write to the lists you choose. Saving never sends it: send a proof to yourself first, then send it now or at a time you set.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	{% if can_manage %}
 	<section class="cl-page-section">
@@ -40,7 +40,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'campaigns', pagination: campaigns_pagination, search: {ds_name: 'campaigns', ds_label: 'Search names and subjects', ds_value: campaigns_search, ds_action: '/mailing/messages'}})} %}{% block results %}
 			{% if campaigns %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Campaign'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Date'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Campaign'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Date'}} %}</tr>{% endblock %}
 			{% block body %}{% for c in campaigns %}<tr>
 				<td class="cell-text"><a href="/mailing/messages/{{ c.id }}">{{ c.name }}</a><br><span class="small cl-text-secondary">{{ kind_labels[c.kind] }}{{ c.subject ? ' · ' ~ c.subject : '' }}</span></td>
 				<td>{{ ui('feedback.badge', {label: status_labels[c.status], tone: status_tones[c.status]}) }}</td>

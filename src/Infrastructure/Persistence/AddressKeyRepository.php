@@ -124,10 +124,10 @@ final class AddressKeyRepository
         return AddressKey::fits($number, RecordAddress::CERTIFICATE) ? $this->id('SELECT id FROM certificates WHERE certificate_number = :key', $number) : null;
     }
 
-    /** A contact message by its reference (contact_messages_reference_key). */
+    /** A contact message by its reference (an Inbox conversation's, cattophp_inbox_conversations_reference_key). */
     public function message(string $reference): ?int
     {
-        return AddressKey::fits($reference, RecordAddress::MESSAGE) ? $this->id('SELECT id FROM contact_messages WHERE reference = :key', $reference) : null;
+        return AddressKey::fits($reference, RecordAddress::MESSAGE) ? $this->id('SELECT id FROM cattophp_inbox_conversations WHERE reference = :key', $reference) : null;
     }
 
     /** A Course Item by the slug of its name (course_items_name_slug_key, on course_item_slug(name)). */

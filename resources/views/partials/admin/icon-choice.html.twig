@@ -11,9 +11,9 @@
 	{{ ui('layout.section-head', {heading: 'Icon', heading_level: 2, summary: 'Shown beside the ' ~ ic_kind ~ ' wherever it appears. Choose one from the icon library, find another by a word, or upload your own.'}) }}
 	<div class="cl-icon-choice">
 		<div class="cl-icon-choice-current">
-			{% if ic_current %}<span class="{{ ic_kind == 'tag' ? 'cl-tag-icon cl-tag-icon--preview' : 'cl-category-icon cl-category-icon--preview' }}" aria-hidden="true">{{ ic_current|raw }}</span><span>The current icon</span>{% else %}<span>No icon yet</span>{% endif %}
+			{% if ic_current %}<span class="{{ ic_kind == 'tag' ? 'cl-tag-icon cl-tag-icon--preview' : 'cl-category-icon cl-category-icon--preview' }}" aria-hidden="true">{{ ic_current|authored }}</span><span>The current icon</span>{% else %}<span>No icon yet</span>{% endif %}
 		</div>
-		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'icon', ds_label: 'Find an icon in the library', ds_value: ic_choice.query, ds_action: ic_choice.action, ds_help: 'A word, such as lock, book or chart. Without one, the icons that fit the name are shown.'} %}
+		{% include '@CattoPHP/ui/data/dataset-search.html.twig' with {ds_name: 'icon', ds_label: 'Find an icon in the library', ds_value: ic_choice.query, ds_action: ic_choice.action, ds_help: 'A word, such as lock, book or chart. Without one, the icons that fit the name are shown.'} %}
 		<form action="{{ ic_save }}" method="post" enctype="multipart/form-data">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<div id="icon-region"><div id="icon-results">

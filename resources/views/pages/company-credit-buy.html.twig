@@ -1,9 +1,9 @@
 {% extends layout %}
 {% block page_body %}
     {% set ph_back_href = '/company/credits' %}{% set ph_back_label = 'Company credits' %}
-    {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Buy course credits' %}
+    {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Buy course and bundle credits' %}
     {% set ph_lead = 'Select courses, access periods and quantities for ' ~ basket.company.name ~ '. Credits become available only after payment is confirmed.' %}
-    {% include '@platform/partials/page-head.html.twig' %}
+    {% include '@CattoPHP/page/head.html.twig' %}
     <section class="cl-page-section">
         {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}{% block body %}
             {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
@@ -29,9 +29,18 @@
                 {% if basket_error %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}{% block body %}{{ basket_error }} Cancel this purchase and start again, or ask an administrator to restore the offer.{% endblock %}{% endembed %}{% endif %}
                 {% if basket.items %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
                     {% for item in basket.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
+                        {% if item.fulfilment_type|default('') == 'bundle_credit' %}
+                        <strong>{{ ui('feedback.badge', {label: 'Bundle credits', tone: 'info', size: 'small'}) }} {{ item.bundle_title }}</strong><p>Includes {{ item.courses|map(c => c.title)|join(', ', ' and ') }} · {{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
+                        <p class="cl-bundle-credit-rule">{{ item.quantity == 1 ? 'This credit is for one person, who gets every course in the bundle.' : 'Each of these ' ~ item.quantity ~ ' credits is for one person, who gets every course in the bundle.' }}</p>
+                        {% else %}
                         <strong>{{ item.course_title }}</strong><p>{{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
+                        {% endif %}
                     {% endblock %}{% block actions %}
+                        {% if item.fulfilment_type|default('') == 'bundle_credit' %}
+                        <form action="/company/credits/buy/remove-bundle" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="bundle_offer_id" value="{{ item.bundle_offer_id }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-remove', aria_label: 'Remove ' ~ item.bundle_title}) }}</form>
+                        {% else %}
                         <form action="/company/credits/buy/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.variant_id }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-remove'}) }}</form>
+                        {% endif %}
                     {% endblock %}{% endembed %}{% endfor %}
                 {% endblock %}{% endembed %}<p><strong>Total: {{ basket.total_label }}</strong></p>
                     {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Review and pay', variant: 'primary', size: 'normal', href: '/company/credits/checkout', icon: 'action-pay'}) }}{% endblock %}{% endembed %}
@@ -40,4 +49,25 @@
             {% endblock %}{% endembed %}
         {% endblock %}{% endembed %}
     </section>
+    {# Bundles, as bundle credits (owner, 2026-11-11: "1 credit for an entire bundle which must be assigned to 1 student ...
+       this needs to be made clear to them when they buy it"). #}
+    {% if bundle_offers|default([]) %}
+    <section class="cl-page-section" id="bundles">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+        {{ ui('layout.section-head', {heading: 'Bundles', heading_level: 2, summary: 'Two or more courses for one price and one access period.'}) }}
+        {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: bundle_rule})} %}{% block body %}A bundle of three courses cannot be shared out as one course to each of three people: give each bundle credit to one person, and they get all three.{% endblock %}{% endembed %}
+        {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+            {% for offer in bundle_offers %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
+                <strong id="bundle-offer-{{ offer.id }}">{{ offer.title }}</strong>{% if offer.id == chosen_bundle|default(0) %} {{ ui('feedback.badge', {label: 'Chosen', tone: 'success', size: 'small'}) }}{% endif %}
+                <p>Includes {{ offer.course_titles|join(', ', ' and ') }}</p>
+                <p>{{ offer.access_label }} of access to each course · {% include '@platform/partials/price.html.twig' with {price: offer} %} per bundle credit, for one person</p>
+            {% endblock %}{% block actions %}
+                <form action="/company/credits/buy/add-bundle" method="post">
+                    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="bundle_offer_id" value="{{ offer.id }}">
+                    <label for="bundle-quantity-{{ offer.id }}">Bundle credits (one person each)</label> <input id="bundle-quantity-{{ offer.id }}" type="number" name="quantity" min="1" max="10000" value="1" required>
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add bundle credits', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
+                </form>
+            {% endblock %}{% endembed %}{% endfor %}
+        {% endblock %}{% endembed %}
+    {% endblock %}{% endembed %}</section>
+    {% endif %}
 {% endblock %}

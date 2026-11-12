@@ -128,7 +128,7 @@ final class PopoutClippingContractTest extends TestCase
      */
     public function testCoreKeepsTheTableWrapperFromClippingInEveryTheme(): void
     {
-        $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        $core = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
         $ours = self::declarations($core, 'overflow', '.cl-ui-table');
 
         $winner = null;
@@ -161,8 +161,8 @@ final class PopoutClippingContractTest extends TestCase
     /** The menu itself is restated by core, because themes style `details` as a bordered panel. */
     public function testCoreOwnsTheRowMenuOutrightRatherThanInheritingIt(): void
     {
-        $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
-        // Canonical theme geometry is forbidden by UiOwnershipAudit. These functional core
+        $core = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
+        // Canonical theme geometry is forbidden by CattoPHP's SourceAudit. These functional core
         // declarations therefore need no cascade escalation; keep checking their actual values.
         self::assertMatchesRegularExpression('/\.cl-ui-row-panel[^{}]*\{[^{}]*position:absolute(?:;|!important)/', $core);
         self::assertMatchesRegularExpression('/\.cl-ui-row-panel[^{}]*\{[^{}]*display:grid(?:;|!important)/', $core);
@@ -193,7 +193,7 @@ final class PopoutClippingContractTest extends TestCase
      */
     public function testTheThirdNavigationLevelNestsInsideASidebar(): void
     {
-        $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        $core = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
 
         self::assertStringContainsString('.cl-sidebar .cl-nav-group>.cl-nav-subpanel', $core);
         self::assertNotSame(

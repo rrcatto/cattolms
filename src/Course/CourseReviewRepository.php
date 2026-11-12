@@ -48,7 +48,7 @@ final class CourseReviewRepository
                 AND e.completed_at IS NOT NULL AND e.review_requested_at IS NULL
                 AND e.completed_at <= CAST(:asked_after AS timestamptz) AND e.completed_at > CAST(:asked_until AS timestamptz)
                 AND NOT EXISTS (SELECT 1 FROM course_reviews r WHERE r.course_id = e.course_id AND r.user_id = e.user_id)
-                AND NOT EXISTS (SELECT 1 FROM mailing_suppressions s WHERE s.email = LOWER(ue.email))
+                AND NOT EXISTS (SELECT 1 FROM cattophp_mailing_suppressions s WHERE s.email = LOWER(ue.email))
               ORDER BY e.completed_at, e.id
               LIMIT :limit
                 FOR UPDATE OF e SKIP LOCKED",

@@ -7,12 +7,15 @@ Description:
 Validates the Catto Learning release contract (written for v0.5.8, kept current): PHP 8.5.12 or later, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/11/12 SAST
+- 107 permissions with PLATFORM.INBOX.VIEW/MANAGE (the Inbox; owner, 2026-11-11); permissions are no longer looked for
+  in the baseline, since roles became CattoPHP's and the permissions this code alone.
 2026/11/08 SAST
 - Upgrade migrations are allowed again (owner: "There is NO RULE that says that step by step migrations are
   disallowed"): one baseline is still required, and every other migration must be named by its time and come after it.
   The 2026/10/06 "exactly one migration" check had turned a request to consolidate into a ban.
 2026/11/07 SAST
-- The default theme is the one ThemeManager names (Saharan Sunset); its package, its baseline seed and its contracts are
+- The default theme is the one ProjectTheme names (Saharan Sunset); its package, its baseline seed and its contracts are
   checked in place of Factory Reset's. The release version is read from composer.json, never pinned here.
 2026/10/19 SAST
 - 101 permissions with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE.
@@ -129,11 +132,13 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // (issued certificates, revoking one) and PLATFORM.IDENTITY.VIEW/MANAGE (identity verification).
 // 103 with PLATFORM.MAILING.VIEW and PLATFORM.MAILING.MANAGE (mailing, step 2; owner, 2026-10-26).
 // 105 with PLATFORM.SITEANALYTICS.VIEW and PLATFORM.SITEANALYTICS.MANAGE (site analytics; owner, 2026-11-04).
-$need(count($permissionKeys) === 105, 'PermissionCatalog must define exactly 105 reserved/current secure actions for this release.');
-foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
+// 107 with PLATFORM.INBOX.VIEW and PLATFORM.INBOX.MANAGE (the Inbox; owner, 2026-11-11).
+// Since roles became CattoPHP's (migration 20261109180000_roles_to_cattophp.php) the permissions are this code alone: the
+// baseline's permission rows are moved and their table dropped, so a permission is no longer looked for in the baseline.
+$need(count($permissionKeys) === 107, 'PermissionCatalog must define exactly 107 reserved/current secure actions for this release.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 95, 'ACL catalogue must contain 10 SYSTEM and 95 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 97, 'ACL catalogue must contain 10 SYSTEM and 97 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -174,7 +179,7 @@ $need(str_contains($baseline, 'CHECK (level BETWEEN 1 AND 3)'), 'Course categori
 $acl = $read($root . '/src/Auth/AclService.php');
 $roles = $read($root . '/src/Infrastructure/Persistence/RoleRepository.php');
 foreach (["in_array(RoleCatalog::ADMIN, \$roleKeys, true)",'return $this->catalog->keys();','acl_revision'] as $token) $need(str_contains($acl, $token), 'ACL service missing protected ADMIN/session-cache contract: ' . $token);
-foreach (["VALUES ('ADMIN','Administrator','System Administrator')",'bootstrapAdministrator','replaceRolePermissions'] as $token) $need(str_contains($roles, $token), 'Role repository missing ACL contract: ' . $token);
+foreach (["VALUES ('ADMIN', 'Administrator', 'Holds every permission, now and as new ones are added.', NOW(), NOW())",'bootstrapAdministrator','replaceRolePermissions'] as $token) $need(str_contains($roles, $token), 'Role repository missing ACL contract: ' . $token);
 
 // Routes are attributes on the actions that serve them; there is no table to read.
 $app = '';
@@ -190,7 +195,7 @@ $requiredRoutes = [
     'GET /account','GET /account/dashboard','GET /account/profile','GET /account/courses','GET /account/sessions','GET /account/activity',
     'GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses',
     'GET /admin','GET /admin/dashboard','GET /admin/courses','GET /admin/people','GET /admin/companies','GET /admin/course/enrolments','GET /admin/course/credits','GET /admin/activity','GET /admin/reports','GET /admin/themes','GET /admin/roles','GET /admin/settings',
-    'POST /admin/roles/{id}/permissions','POST /admin/themes/resync',
+    'POST /admin/roles/{key}/permissions','POST /admin/themes/resync',
 ];
 foreach ($requiredRoutes as $route) $need(str_contains($app, $route), 'Required semantic route missing: ' . $route);
 $accountController = $read($root . '/src/Http/Controller/AccountController.php');
@@ -209,12 +214,12 @@ foreach (["PLATFORM_ASSET_VERSION = '" . (string) ($composer['version'] ?? '') .
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
-$manager = $read($root . '/src/View/ThemeManager.php');
-foreach (['discoverInstalledThemes','$row = $registry[$key] ?? null;',"\$item['filesystem_key']",'installKey((string) $meta[\'slug\'], (string) $meta[\'version\'])','resyncRegistry','registry->rebuild'] as $token) {
-    $need(str_contains($manager, $token), 'ThemeManager filesystem-authoritative recovery contract missing: ' . $token);
+// The theme system is CattoPHP's (Phase 3, step 9), proved by its own tests (the bundled default winning over a stale copy,
+// older installs recovered, the index rebuilt); cattolms gives it its index and where the chosen theme is kept.
+$themeConfig = $read($root . '/config/packages/cattophp.yaml');
+foreach (['registry: CattoLearning\\Infrastructure\\Persistence\\ThemeRegistryRepository', 'choice: CattoLearning\\View\\OptionThemeChoice', 'default: !php/const CattoLearning\\View\\ProjectTheme::DEFAULT_SLUG'] as $token) {
+    $need(str_contains($themeConfig, $token), 'CattoPHP\'s theme system is not given cattolms\'s: ' . $token);
 }
-$need(str_contains($manager, 'Older releases could leave one enclosing package'), 'Theme discovery must retain legacy enclosing-directory recovery.');
-$need(str_contains($manager, 'stale persistent duplicate cannot shadow'), 'The bundled default theme must win over stale same-version persistent duplicates.');
 
 foreach (['AccountSectionRegistry.php','AdministrationSectionRegistry.php','CompanySectionRegistry.php','RoleAdministrationService.php'] as $file) {
     $need(is_file($root . '/src/Application/' . $file), 'Missing application registry/service: ' . $file);
@@ -232,10 +237,10 @@ foreach (['event.ip_address','event.geo_location','activity_pagination','activit
 $roleEdit = $read($root . '/resources/views/pages/admin-role-edit.html.twig');
 foreach (['name="permissions[]"','Save permissions'] as $token) $need(str_contains($roleEdit, $token), 'Role permission editor missing explicit-save control: ' . $token);
 
-// The default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07, when the owner put the other five
-// "on ice until further notice"): it is discovered from the code root, never copied, and never uninstalled.
-$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $manager, $slugMatch) === 1 ? $slugMatch[1] : '';
-$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme (DEFAULT_SLUG).');
+// The default theme is the one cattolms names (Saharan Sunset since 2026-11-07, when the owner put the other five "on ice
+// until further notice"): it is discovered from the code root, never copied, and never uninstalled.
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ProjectTheme.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ProjectTheme must name the bundled default theme (DEFAULT_SLUG).');
 $defaultRoot = $root . '/themes/' . $defaultSlug;
 $defaultManifest = json_decode($read($defaultRoot . '/theme.json'), true);
 $defaultName = (string) ($defaultManifest['theme']['name'] ?? $defaultSlug);
@@ -275,8 +280,10 @@ foreach ($bundledNames as $bundledName) {
     $need(preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*-v\d+\.\d+\.\d+\.zip$/', $bundledName) === 1, 'Bundled theme package must be named <slug>-v<version>.zip: ' . $bundledName);
 }
 
-$requiredDocs = ['THEME-SDK.md','COURSE-SPECIFICATION.md','COURSES.md','OPERATIONS.md','UI-COMPONENTS.md','ux-ui-rules.md'];
+$requiredDocs = ['THEME-SDK.md','COURSES.md','OPERATIONS.md','UI-COMPONENTS.md','ux-ui-rules.md'];
 foreach ($requiredDocs as $doc) $need(is_file($root . '/docs/' . $doc), 'Required documentation missing: ' . $doc);
+// The course specification carries its version in its name, docs/COURSE-SPECIFICATION-v4.13.md (owner, 2026-11-11), and there is one.
+$need(count(glob($root . '/docs/COURSE-SPECIFICATION-v*.md') ?: []) === 1, 'Required documentation missing: exactly one docs/COURSE-SPECIFICATION-v<version>.md');
 $themeSdk = $read($root . '/docs/THEME-SDK.md');
 $need(str_contains($themeSdk, 'self-contained') || str_contains($themeSdk, 'standalone'), 'Theme SDK must be sufficient for external theme generation.');
 $need(str_contains($themeSdk, 'footer_navigation'), 'Theme SDK must document footer_navigation.');
@@ -308,10 +315,10 @@ foreach (['find-a-course', 'buy-access', 'course-structure', 'learn', 'sign-in',
     $need(str_contains($help, "id: '" . $helpSection . "'"), 'Public Help is missing section: ' . $helpSection);
 }
 
-require_once $root . '/src/View/ThemePackageValidator.php';
+require_once $root . '/vendor/autoload.php';
 if (class_exists(ZipArchive::class) && is_file($root . '/extras/themes/' . $defaultPackage)) {
-    try { (new CattoLearning\View\ThemePackageValidator())->inspect($root . '/extras/themes/' . $defaultPackage); }
-    catch (Throwable $e) { $errors[] = 'The bundled default theme package fails ThemePackageValidator: ' . $e->getMessage(); }
+    try { CattoLearning\View\ProjectTheme::validator()->inspect($root . '/extras/themes/' . $defaultPackage); }
+    catch (Throwable $e) { $errors[] = 'The bundled default theme package fails the theme package check: ' . $e->getMessage(); }
 }
 
 if ($errors !== []) {

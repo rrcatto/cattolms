@@ -11,6 +11,8 @@ Description:
 Provides shared support functionality for env used across Catto Learning.
 
 Changelog:
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/26 SAST
 - seconds(): a length of time written the one way (Support\Duration: 30m, 1d, 1h30m), as seconds (owner,
   2026-10-26: "I'd also like to create a standard method of expressing time").
@@ -27,6 +29,8 @@ Changelog:
 declare(strict_types=1);
 
 namespace CattoLearning\Support;
+
+use CattoPHP\Foundation\Duration;
 
 final class Env
 {

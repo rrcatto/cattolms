@@ -11,6 +11,8 @@ Description:
 Handles web requests for base operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/09 SAST
+- A refused form's values are kept and shown once by CattoPHP's TypedForm (CattoPHP Phase 2).
 2026/11/07 SAST
 - handle(..., keepTyped: true), keepTyped() and typed(): a refused create form comes back as it was typed and chosen.
 - personIdFromAddress() and companyIdFromAddress(): a person or company named by its account reference, once.
@@ -61,7 +63,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Http\HttpRedirect;
-use CattoLearning\Http\TypedForm;
+use CattoPHP\Http\TypedForm;
 use CattoLearning\Http\ViewIdentity;
 use CattoLearning\Support\Csrf;
 use CattoLearning\View\ThemeRenderer;
@@ -208,15 +210,12 @@ abstract class BaseController
     }
 
     /**
-     * Says that a page's refresh of itself (partials/live-status.html.twig) is not a visit, so the Site Log does not fill with
+     * Says that a page's refresh of itself (CattoPHP's @CattoPHP/page/live-status.html.twig) is not a visit, so the Site Log does not fill with
      * its own refreshes. Only a page that refreshes itself calls this, so sending the header elsewhere hides nobody.
      */
     protected function liveRefreshIsNotAVisit(): void
     {
-        $request = $this->request();
-        if ($request->isMethod('GET') && $request->headers->has('X-Live-Refresh') && $request->headers->has('HX-Request')) {
-            $request->attributes->set(\CattoLearning\SiteAnalytics\RequestRecorder::LIVE_REFRESH, true);
-        }
+        \CattoPHP\Http\LiveRefresh::notAVisit($this->request());
     }
 
     protected function isHtmxRequest(): bool
@@ -279,9 +278,12 @@ abstract class BaseController
         $data['page_title'] = $data['page_title'] ?? ($data['title'] ?? '');
         $data['page_kicker'] = $data['page_kicker'] ?? '';
         $data['flash_messages'] = $this->consumeFlash();
-        $data['typed_form'] = $this->takeTyped();
+        $response = new Response($this->view->render($page, $data, $status), $status);
+        // A refused form's values show once, on the page the reader is sent back to: its form took them as it was drawn
+        // (typed_for), and whatever it did not use is forgotten now.
+        TypedForm::forget($this->request());
 
-        return new Response($this->view->render($page, $data, $status), $status);
+        return $response;
     }
 
     /**
@@ -394,11 +396,12 @@ abstract class BaseController
     /**
      * A refused form comes back as it was typed and chosen (2026-11-07: a refused New course form came back empty): what
      * this request sent is kept for the next page drawn, the form's own page or the page holding its window, which reads
-     * it by the form's action (typed_for() in a template, typed() here). Never the form's token.
+     * it by the form's action (typed_for() in a template, typed() here), once. Never the form's token. CattoPHP's
+     * TypedForm keeps it, in this site's own PHP session.
      */
     protected function keepTyped(): void
     {
-        $_SESSION[TypedForm::SESSION] = TypedForm::kept($this->request()->getPathInfo(), $_POST);
+        TypedForm::keep($this->request());
     }
 
     /**
@@ -409,20 +412,9 @@ abstract class BaseController
      */
     protected function typed(string $action): array
     {
-        return TypedForm::for($_SESSION[TypedForm::SESSION] ?? null, $action);
+        return TypedForm::peek($this->request(), $action);
     }
 
-    /**
-     * What a refused form sent, taken for the page being drawn: it shows once, on the page the reader is sent back to.
-     *
-     * @return array{action:string,values:array<string,mixed>}|null
-     */
-    private function takeTyped(): ?array
-    {
-        $kept = $_SESSION[TypedForm::SESSION] ?? null;
-        unset($_SESSION[TypedForm::SESSION]);
-        return TypedForm::valid($kept);
-    }
     private function activeNavigation(): string
     {
         $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';

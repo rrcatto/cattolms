@@ -130,6 +130,24 @@ final class SlideLayouts
         'site' => ['label' => 'Introducing the site', 'slides' => [8, 15]],
     ];
 
+    /**
+     * A short course's own sizes (Course Specification 4.13, section 15; owner, 2026-11-11): its course preview 5 to 8 slides and
+     * its module's presentation 4 to 6. Every other kind, and every kind in a full course, is as KINDS says.
+     */
+    public const SHORT_SLIDES = ['intro' => [4, 6], 'trailer' => [5, 8]];
+
+    /**
+     * How many slides a presentation of this kind has, in a course of this type ('full' or 'short'): the one place the
+     * sizes are decided, for the import review, the editor's checks and the editor's choices alike.
+     *
+     * @return array{0:int,1:int}
+     */
+    public static function slides(string $kind, string $courseType = 'full'): array
+    {
+        if ($courseType === 'short' && isset(self::SHORT_SLIDES[$kind])) return self::SHORT_SLIDES[$kind];
+        return self::KINDS[$kind]['slides'] ?? [1, self::MAX_SLIDES];
+    }
+
     public const TONES = ['base', 'alt', 'accent'];
     public const THEMES = ['light' => 'Light', 'dark' => 'Dark'];
     public const ACTIONS = ['enrol' => 'Get this course', 'preview' => 'Preview the course', 'register' => 'Register', 'courses' => 'Browse the courses'];

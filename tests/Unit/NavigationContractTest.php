@@ -6,6 +6,9 @@ Version: 0.5.7.5.1
 Description:
 Protects the core-owned standard primary and footer navigation hierarchies. Themes style these arrays but may not invent or omit authorised platform destinations.
 Changelog:
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): the footer's marks come from the setting, so the default is checked with none
+  set and the site's own profiles in SocialPlatformTest and FooterSocialIntegrationTest.
 2026/10/19 SAST
 - Credits & Orders lists the Money Ledger but not Payment Events or the Commerce Trail.
 2026/10/18 SAST
@@ -293,15 +296,16 @@ final class NavigationContractTest extends TestCase
     /** The footer's social marks link to each platform's home page until the settings give a profile address (owner, 2026-10-17). */
     public function testFooterSocialMarksLinkToTheirPlatformUntilAnAddressIsSet(): void
     {
-        $method = new ReflectionMethod(ThemeRenderer::class, 'footerSocial');
-        $marks = array_column($method->invoke($this->renderer(), []), 'href', 'key');
-        self::assertSame(['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'], array_keys($marks));
+        $renderer = $this->renderer();
+        (new ReflectionProperty(ThemeRenderer::class, 'socialProfiles'))->setValue($renderer, null);
+        $marks = array_column((new ReflectionMethod(ThemeRenderer::class, 'footerSocial'))->invoke($renderer), 'href', 'key');
+        self::assertSame(['facebook', 'whatsapp', 'telegram', 'x', 'linkedin', 'instagram', 'youtube'], array_keys($marks));
         foreach ($marks as $key => $href) self::assertSame(SocialPlatform::home($key), $href, $key . ' links to its home page by default.');
-        $configured = array_column($method->invoke($this->renderer(), ['platform_social' => ['linkedin' => 'https://www.linkedin.com/company/catto-learning']]), 'href', 'key');
-        self::assertSame('https://www.linkedin.com/company/catto-learning', $configured['linkedin'], 'A profile address replaces the default.');
-        self::assertSame(SocialPlatform::home('youtube'), $configured['youtube']);
+        // Settings > Footer social media sets the site's own (owner, 2026-11-09); then only those are shown.
+        $configured = array_column(SocialPlatform::footerMarks(['linkedin' => 'https://www.linkedin.com/company/example']), 'href', 'key');
+        self::assertSame(['linkedin' => 'https://www.linkedin.com/company/example'], $configured, 'A profile address replaces the default.');
         // Firefox does not apply the sprite's own style to <use> content, so the page's CSS gives a mark its colour.
-        self::assertMatchesRegularExpression('/\.cl-footer-social-icon\{[^}]*fill:currentColor;stroke:none/', (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
+        self::assertMatchesRegularExpression('/\.cl-footer-social-icon\{[^}]*fill:currentColor;stroke:none/', (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css')));
     }
 
     /** Every bundled theme draws Core's social marks; none writes social links of its own or a link to nowhere. */
@@ -322,7 +326,7 @@ final class NavigationContractTest extends TestCase
 
     public function testTheDefaultThemeRendersCoreNavigationArraysInsteadOfHardCodedMenus(): void
     {
-        $root = dirname(__DIR__, 2) . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
+        $root = dirname(__DIR__, 2) . '/themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG;
         $base = (string) file_get_contents($root . '/base.html.twig');
         $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/navigation.html.twig');
         $footer = (string) file_get_contents($root . '/partials/footer.html.twig');
@@ -371,7 +375,7 @@ final class NavigationContractTest extends TestCase
             'The group heading must be a button, or the flyout cannot be opened from the keyboard.'
         );
 
-        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
         self::assertStringContainsString('.cl-nav-subpanel{display:none', $css, 'The members are hidden until the group opens.');
         self::assertStringContainsString('.cl-nav-group:hover>.cl-nav-subpanel', $css);
         self::assertStringContainsString(

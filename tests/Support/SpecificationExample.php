@@ -8,7 +8,7 @@ Date time: 2026/11/01 SAST
 Version: 1.0.4
 
 Description:
-The complete example course in the course specification, docs/COURSE-SPECIFICATION.md section 14, read from the
+The complete example course in the course specification, docs/COURSE-SPECIFICATION-v<version>.md section 14, read from the
 document itself (owner, 2026-11-01: "I want one source of truth"), so the tests import exactly what the document tells
 an author to write, and the document and the importer cannot drift apart.
 
@@ -25,12 +25,23 @@ use RuntimeException;
 
 final class SpecificationExample
 {
-    public const DOCUMENT = __DIR__ . '/../../docs/COURSE-SPECIFICATION.md';
+    /**
+     * The course specification: the one docs/COURSE-SPECIFICATION-v<version>.md (owner, 2026-11-11: "The version number is now
+     * included in the filename, so I can tell at a glance which version it is").
+     */
+    public static function document(): string
+    {
+        $found = glob(dirname(__DIR__, 2) . '/docs/COURSE-SPECIFICATION-v*.md') ?: [];
+        if (count($found) !== 1) {
+            throw new RuntimeException('There must be exactly one docs/COURSE-SPECIFICATION-v<version>.md; found ' . count($found) . '.');
+        }
+        return $found[0];
+    }
 
     /** The example course's HTML: the html code block under the heading "A complete example". */
     public static function html(): string
     {
-        $document = (string) file_get_contents(self::DOCUMENT);
+        $document = (string) file_get_contents(self::document());
         if (preg_match('/^## \d+\. A complete example\n.*?^```html\n(.*?)^```$/ms', $document, $match) !== 1) {
             throw new RuntimeException('The course specification has no complete example.');
         }

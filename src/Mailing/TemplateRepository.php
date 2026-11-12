@@ -26,7 +26,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 final class TemplateRepository
 {
     private const COLUMNS = 't.id, t.name, t.mode, t.design, t.html, t.text_mode, t.text_part, t.default_for_messages, t.default_for_digest, t.default_for_account, t.updated_at,
-        (SELECT COUNT(*) FROM mailing_campaigns c WHERE c.template_id = t.id) AS used';
+        (SELECT COUNT(*) FROM mailing_campaign_settings c WHERE c.template_id = t.id) AS used';
 
     public function __construct(private readonly Database $db)
     {

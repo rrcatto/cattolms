@@ -21,7 +21,7 @@
 		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
 {% block toolbar_primary %}
 
-				<h3 style="margin:0">
+				<h3 class="cl-themes-title">
 					Installed themes
 				</h3>
 				<p class="muted small">
@@ -89,10 +89,10 @@
 {% block header %}
 
 			<tr>
-				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Theme'}} %}
-				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Version', wide: true}} %}
-				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status'}} %}
-				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Actions'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Theme'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Version', wide: true}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Actions'}} %}
 			</tr>
 
 {% endblock %}
@@ -101,7 +101,7 @@
 			{% for themeItem in themes %}
 				<tr>
 					<td>
-						<div style="padding-left:{{ themeItem.is_child ? '28px' : '0' }}">
+						<div{% if themeItem.is_child %} class="cl-theme-child"{% endif %}>
 							{% if themeItem.is_child %}
 								<span class="muted" aria-hidden="true">↳ </span>
 							{% endif %}

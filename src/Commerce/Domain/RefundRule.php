@@ -23,6 +23,8 @@ reason, which RefundAdministrationService records with the refund; the Refund Po
 it. The statutory rights of a buyer of a faulty course are not affected by the rule.
 
 Changelog:
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/17 SAST
 - A started course is never refunded, and every course starts on payment; the window is the refund
   window setting (a Duration), no longer a constant.
@@ -34,7 +36,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Domain;
 
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use DateTimeImmutable;
 
 final class RefundRule

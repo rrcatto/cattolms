@@ -14,6 +14,10 @@ from LegalDocuments, the supplier's details, and the figures the code enforces (
 the automatic start and the payment deadline) so the text cannot drift from them.
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): the Privacy Policy's keeping periods come from its ProtectionSettings.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/19 SAST
 - The Refund Policy names no payment provider and prints no provider's fees (owner, 2026-10-19).
 2026/10/13 SAST
@@ -40,9 +44,10 @@ final class LegalController extends BaseController
         RequestStack $requests,
         private readonly LegalDocuments $legal,
         private readonly CommerceSettings $settings,
-        private readonly \CattoLearning\Document\DocumentPdfRenderer $pdfs,
-        private readonly \CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection,
-        private readonly \CattoLearning\Configuration\SiteLogo $siteLogo
+        private readonly \CattoPHP\Document\PdfRenderer $pdfs,
+        private readonly \CattoPHP\Protection\ProtectionSettings $siteProtection,
+        private readonly \CattoLearning\Configuration\SiteLogo $siteLogo,
+        private readonly \CattoPHP\Inbox\InboxSettings $inbox,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -122,8 +127,12 @@ final class LegalController extends BaseController
             'supplier' => $this->legal->supplier(),
             // The periods and fees the documents state, from the commerce settings in force now.
             // How long the Site Log and flagged addresses are kept, from Site protection settings (owner, 2026-11-04).
-            'site_log_kept_for' => \CattoLearning\Support\Duration::parse((string) $this->siteProtection->values()['log_kept_for'])->words(),
-            'site_flags_kept_for' => \CattoLearning\Support\Duration::parse((string) $this->siteProtection->values()['flags_kept_for'])->words(),
+            'site_log_kept_for' => \CattoPHP\Foundation\Duration::parse((string) $this->siteProtection->values()['log_kept_for'])->words(),
+            'site_flags_kept_for' => \CattoPHP\Foundation\Duration::parse((string) $this->siteProtection->values()['flags_kept_for'])->words(),
+            // How long the Inbox keeps conversations, Spam and the Trash, from Inbox settings (owner, 2026-11-11).
+            'inbox_kept_for' => $this->inbox->keptFor()->words(),
+            'inbox_spam_kept_for' => $this->inbox->spamKeptFor()->words(),
+            'inbox_trash_kept_for' => $this->inbox->trashKeptFor()->words(),
             'refund_window' => $this->settings->refundWindow()->words(),
             'payment_due' => $this->settings->paymentDue()->words(),
             'wallet_expiry' => $this->settings->walletExpiry()->words(),

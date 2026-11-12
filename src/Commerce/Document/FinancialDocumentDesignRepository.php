@@ -24,7 +24,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\PageSettings;
+use CattoPHP\Document\PageSettings;
 use CattoLearning\Infrastructure\Persistence\Database;
 use RuntimeException;
 

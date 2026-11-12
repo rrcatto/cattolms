@@ -32,12 +32,12 @@
 		</form>
 		{% else %}
 		<div class="cl-security-actions">
-			<form action="/account/security" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
+			<form action="/account/security" method="get" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
 				<input type="hidden" name="two_step" value="codes">
 				{{ ui('action.button', {label: 'New recovery codes', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-refresh'}) }}
 			</form>
 			{% if not two.required %}
-			<form action="/account/security" method="get" {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
+			<form action="/account/security" method="get" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: '/account/security'} only %}>
 				<input type="hidden" name="two_step" value="off">
 				{{ ui('action.button', {label: 'Turn off', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-disable'}) }}
 			</form>

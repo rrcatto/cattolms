@@ -14,9 +14,13 @@ neither the page nor ADMIN gives one, so no two public pages share a description
 and a description of their own (SearchOverrides::pages). The words describe what each page holds, plainly: no page is
 described by a list of search terms.
 
-ThemeRenderer asks key() which of these a request is, and PageMetadata::complete() fills its head from here.
+Given to CattoPHP's search engines module as its public pages (CattoPHP\Search\PublicPageProvider, since CattoPHP Phase 4,
+step 5): CattoPHP's PageHead finds which of these a request is and fills its head, and keeps ADMIN's words for each.
 
 Changelog:
+2026/11/12 SAST
+- Given to CattoPHP as its public pages (pages()); key() is CattoPHP's PublicPages::key now.
+
 2026/11/09 SAST
 - Created.
 */
@@ -25,7 +29,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Search;
 
-final class PublicPages
+use CattoPHP\Search\PublicPage;
+use CattoPHP\Search\PublicPageProvider;
+
+final class PublicPages implements PublicPageProvider
 {
     /** key => [the name ADMIN sees, the address, the description search engines are given, the title the page gives itself] */
     public const PAGES = [
@@ -43,12 +50,12 @@ final class PublicPages
         'privacy' => ['Privacy Policy', '/privacy', 'How personal information is handled on this site, as the Protection of Personal Information Act (POPIA) requires.', 'Privacy Policy'],
     ];
 
-    /** Which of these pages a template drawn at a path is, or null (a category, a tag, or a page not listed). */
-    public static function key(string $template, string $path): ?string
+    /** @return iterable<PublicPage> each page as CattoPHP's search engines module takes it */
+    public function pages(): iterable
     {
-        if (!isset(self::PAGES[$template])) return null;
-        // The catalogue's template draws its categories too, and the tag browser its tags: only their own address is theirs.
-        return rtrim($path, '/') === rtrim(self::PAGES[$template][1], '/') || ($template === 'home' && $path === '/') ? $template : null;
+        foreach (self::PAGES as $key => [$label, $path, $description, $title]) {
+            yield new PublicPage($key, $label, $path, $description, $title);
+        }
     }
 
     public static function label(string $key): string

@@ -8,31 +8,22 @@ Date time: 2026/08/18 22:47 SAST
 Version: 0.5.7.5.1
 
 Description:
-Protects the optional Geocoder PHP audit-IP integration contract.
+Protects the optional Geocoder PHP audit-IP integration contract: the address and its place on the Activity Centre.
+
+Changelog:
+2026/11/12 SAST
+- The place is CattoPHP's GeoIp, through Geocoder as GeoIpLocator was (CattoPHP Phase 4, step 8); the private-address and
+  flag cases moved to CattoPHP's NetworkTest with GeoIpLocator.
 */
 
 declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Support\GeoIpLocator;
 use PHPUnit\Framework\TestCase;
 
 final class GeoIpContractTest extends TestCase
 {
-    public function testPrivateIpDoesNotRequireGeoipDatabase(): void
-    {
-        // A database that is not there (an empty path now means GEOIP_DATABASE, which a development site sets).
-        $locator = new GeoIpLocator('/nonexistent/GeoLite2-City.mmdb');
-
-        self::assertFalse($locator->isAvailable());
-        self::assertSame('Local/private', $locator->locate('127.0.0.1'));
-        self::assertSame('GeoIP unavailable', $locator->locate('8.8.8.8'));
-        self::assertSame('🇿🇦', GeoIpLocator::flagForCountryCode('ZA'));
-        self::assertSame('🇬🇧', GeoIpLocator::flagForCountryCode('gb'));
-        self::assertSame('', GeoIpLocator::flagForCountryCode('invalid'));
-    }
-
     public function testAuditPersistenceAndViewsExposeIpAndLocation(): void
     {
         $root = dirname(__DIR__, 2);
@@ -40,10 +31,13 @@ final class GeoIpContractTest extends TestCase
         $activity = (string) file_get_contents($root . '/resources/views/partials/admin/activity.html.twig');
         $composer = (string) file_get_contents($root . '/composer.json');
 
-        self::assertStringContainsString('ClientFingerprint::ipAddress()', $audit);
+        // The address is recorded by CattoPHP's activity log, raw and never hashed (ActivityLogIntegrationTest proves it).
+        self::assertStringContainsString('private readonly ActivityLog $activity', $audit);
         self::assertStringNotContainsString('ip_hash', $audit);
         self::assertStringContainsString('event.ip_address', $activity);
         self::assertStringContainsString('event.geo_location', $activity);
+        // The place is CattoPHP's GeoIp (CattoPHP Phase 4, step 8), through Geocoder's GeoIP2 provider; its own tests are CattoPHP's.
         self::assertStringContainsString('geocoder-php/geoip2-provider', $composer);
+        self::assertStringContainsString('CattoPHP\\Network\\GeoIp $geoIp', (string) file_get_contents($root . '/src/Application/PlatformAdministrationService.php'));
     }
 }

@@ -14,7 +14,7 @@ use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Commerce\Wallet\WalletOwner;
 use CattoLearning\Commerce\Wallet\WalletService;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
 use CattoLearning\Support\Address\CompanyAddress;
@@ -37,7 +37,8 @@ final class PaymentAdministrationController extends BaseController
         private readonly WalletService $wallets, private readonly CommerceSettings $settings,
         private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
         private readonly \CattoLearning\Commerce\Application\OrderStory $story,
-        private readonly AddressKeyRepository $keys)
+        private readonly AddressKeyRepository $keys,
+        private readonly \CattoLearning\Commerce\Application\StitchRefunds $stitchRefunds)
     { parent::__construct($auth,$view,$requests); }
 
     /** The order an address names by its number (CL-00000689, owner 2026-11-06: no row id in an address). */
@@ -65,7 +66,7 @@ final class PaymentAdministrationController extends BaseController
         foreach ($items as &$item) {
             $details=CommerceRepository::decode((string)$item['snapshot']);
             $item['is_bundle']=$item['product_type']==='bundle';
-            $item['title']=$item['is_bundle'] ? 'Bundle: '.$details['bundle_title'] : ($details['course_title'] ?? 'Course');
+            $item['title']=$item['is_bundle'] || $item['product_type']==='bundle_credit' ? 'Bundle: '.$details['bundle_title'].($item['product_type']==='bundle_credit' ? ' (includes '.implode(', ',array_map(static fn(array $c): string => (string)$c['title'],(array)($details['courses'] ?? []))).')' : '') : ($details['course_title'] ?? 'Course');
             $item['includes']=$item['is_bundle'] ? implode(', ',array_map(static fn(array $c): string => (string)$c['title'],(array)$details['courses'])) : '';
             // Per course: the access source this bundle line created, and whether another source also held the course then.
             $titles=$item['is_bundle'] ? array_column((array)$details['courses'],'title','course_id') : [];
@@ -107,7 +108,11 @@ final class PaymentAdministrationController extends BaseController
             $refund['wallet_part_label']=Money::ofMinorUnits((int)$refund['wallet_part_minor'],(string)$refund['currency'])->format();
             $refund['deduction_lines']=array_map(static fn(array $d): string => $d['label'].': '.Money::strictMinorUnits((int)$d['amount_minor'],(string)$refund['currency'])->format(),CommerceRepository::decode((string)$refund['deductions']));
             $refund['to_pay']=$refund['destination']==='money_back' && (int)$refund['net_minor']>0 && $refund['payout_paid_at']===null;
-            $refund['payout_instruction']=$refund['to_pay'] ? RefundAdministrationService::payoutInstruction($refund) : '';
+            // A refund of an order paid through Stitch goes back to the card from here (owner, 2026-11-11).
+            $refund['stitch_card']=$refund['to_pay'] && $actor->hasPermission('PLATFORM.REFUND.MANAGE') && $this->stitchRefunds->canSend($refund);
+            $refund['payout_instruction']=$refund['to_pay'] ? ($refund['stitch_card']
+                ? 'This order was paid by card through Stitch: send '.$refund['net_label'].' back to that card. If Stitch cannot refund it, pay it another way and record it below.'
+                : RefundAdministrationService::payoutInstruction($refund)) : '';
             $refund['actor_person']=\CattoLearning\Commerce\Application\MoneyRecords::person((int)$refund['actor_user_id'],(string)$refund['actor_name'],(string)($refund['actor_reference'] ?? ''),(string)($refund['actor_email'] ?? ''));
         }
         unset($refund);
@@ -173,10 +178,31 @@ final class PaymentAdministrationController extends BaseController
             // A refund given from the order page answers the buyer's open request for that line too (2026-10-26 audit: it
             // stayed on the queue, and refusing it later told the buyer no after the money went back).
             $open=$this->records->openRefundRequestForItem((int)$this->posted('item_id'));
-            $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination,$open===null ? null : (int)$open['id']);
+            $refundId=$this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination,$open===null ? null : (int)$open['id']);
+            // Money back on an order paid through Stitch goes straight back to the card (owner, 2026-11-11).
+            $refund=$this->records->refund($refundId);
+            if ($refund!==null && $this->stitchRefunds->canSend($refund)) {
+                $sent=$this->stitchRefunds->send($actor,$refundId);
+                $this->flash($sent['done'] ? 'success' : 'warning','Refund approved and documented with a credit note. '.$sent['words']);
+                $this->redirect(OrderAddress::admin($id));
+            }
             $this->flash('success',$destination==='money_back' ? 'Refund approved and documented with a credit note. Pay it as shown under Approved refunds, then record its reference.' : 'Refund approved, credited to the wallet and documented with a credit note.');
             $this->redirect(OrderAddress::admin($id));
         },OrderAddress::admin($id));
+    }
+
+    /** A money-back refund sent to the card through Stitch, again after Stitch refused it or could not be reached. */
+    #[Route('/admin/commerce/refunds/{id}/stitch',name:'admin_commerce_refund_stitch',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    public function refundToCard(): Response
+    {
+        $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=(int)$this->param('id');
+        $refund=$this->records->refund($id) ?? throw $this->notFound('Refund not found.');
+        $back=OrderAddress::admin((int)$refund['order_id']);
+        return $this->handle(function () use ($actor,$id,$back): void {
+            $sent=$this->stitchRefunds->send($actor,$id);
+            $this->flash($sent['done'] ? 'success' : 'warning',$sent['words']);
+            $this->redirect($back);
+        },$back);
     }
 
     #[Route('/admin/commerce/refunds/{id}/payout',name:'admin_commerce_refund_payout',requirements:['id'=>'[0-9]+'],methods:['POST'])]

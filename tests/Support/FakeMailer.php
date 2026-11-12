@@ -61,6 +61,14 @@ final class FakeMailer implements MailerInterface
         $this->record('wallet_expiry_reminder', compact('email', 'name', 'lines', 'walletUrl'));
     }
 
+    public function sendInboxReply(\Symfony\Component\Mime\Email $email): void
+    {
+        $this->record('inbox_reply', ['email' => $email->getTo()[0]->getAddress(), 'subject' => (string) $email->getSubject(), 'text' => (string) $email->getTextBody(),
+            'html' => (string) $email->getHtmlBody(), 'from' => ($email->getFrom()[0] ?? null)?->toString() ?? '', 'reply_to' => ($email->getReplyTo()[0] ?? null)?->getAddress() ?? '',
+            'message_id' => $email->getHeaders()->get('Message-ID')?->getBodyAsString() ?? '', 'in_reply_to' => $email->getHeaders()->get('In-Reply-To')?->getBodyAsString() ?? '',
+            'attachments' => array_map(static fn($part): string => (string) $part->getFilename(), $email->getAttachments())]);
+    }
+
     public function sendAdministratorMessage(string $email, string $subject, string $body): void
     {
         $this->record('administrator_message', compact('email', 'subject', 'body'));

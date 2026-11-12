@@ -39,10 +39,10 @@ if ($rawToken === '') {
     exit(1);
 }
 
-$identity = $container->get(\CattoLearning\Api\ApiAuthService::class)->authenticateToken($rawToken);
+$identity = $container->get(\CattoPHP\Api\ApiTokens::class)->authenticate($rawToken);
 $tools = new LmsMcpTools(
     $identity,
-    $container->get(\CattoLearning\Api\AuthorizationService::class),
+    $container->get(\CattoPHP\Api\ApiAccess::class),
     $container->get(\CattoLearning\Course\CourseService::class),
     $container->get(\CattoLearning\Course\LearningService::class),
     $container->get(\CattoLearning\Infrastructure\Persistence\AuditRepository::class)

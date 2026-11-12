@@ -1,0 +1,47 @@
+{#
+	Sent and Drafts (owner, 2026-11-11; InboxController::replyList, InboxService::replies): every reply sent from the Inbox,
+	newest first, and every draft being written, each opening its conversation. Delete on a draft puts it in the Trash.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Inbox' %}
+	{% set ph_title = status == 'sent' ? 'Sent' : 'Drafts' %}
+	{% set ph_lead = status == 'sent' ? 'Every reply sent from the Inbox, newest first. Each opens its conversation.' : 'Replies saved and not sent yet. Each opens its conversation, where you finish and send it.' %}
+	{% if can_manage and status == 'draft' %}{% set ph_actions %}{{ ui('action.button', {label: 'Delete', form: 'inbox-list', name: 'action', value: 'trash', icon: 'action-remove'}) }}{% endset %}{% endif %}
+	{% include '@CattoPHP/page/head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: status == 'sent' ? 'Replies sent' : 'Drafts', summary: total == 1 ? (status == 'sent' ? '1 reply.' : '1 draft.') : total ~ (status == 'sent' ? ' replies.' : ' drafts.')}) }}
+		<form class="cl-inbox-filters" method="get" action="{{ path }}" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: path} only %}>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', for: 'inbox-q'})} %}{% block control %}<input class="cl-input" id="inbox-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Reference, name, email or words" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show', variant: 'secondary', type: 'submit', icon: 'action-filter'}) }}{% if filters.q %}{{ ui('action.link', {label: 'Clear', variant: 'quiet', href: path, icon: 'action-clear'}) }}{% endif %}{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		</form>
+		<form id="inbox-list" method="post" action="/inbox/act">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="back" value="{{ path }}">
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'messages', pagination: messages_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: ph_title})} %}
+			{% block header %}<tr>
+				{% if can_manage and status == 'draft' %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Tick'}} %}{% endif %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'To'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Reply', wide: true}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent as'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: status == 'sent' ? 'Sent' : 'Saved'}} %}
+			</tr>{% endblock %}
+			{% block body %}{% for row in rows %}
+				<tr data-inbox-reply="{{ row.id }}">
+					{% if can_manage and status == 'draft' %}<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Tick'})} %}{% block control %}<input type="checkbox" name="drafts[]" value="{{ row.id }}" aria-label="Tick the draft to {{ row.to }}">{% endblock %}{% endembed %}</td>{% endif %}
+					<td class="cell-text">{{ row.to }}<br><span class="small">{{ row.reference }}</span></td>
+					<td class="cell-text"><a href="{{ row.href }}"><strong>{{ row.subject }}</strong></a><br><span class="small">{{ row.excerpt ?: '(empty)' }}</span>{% if row.error %}<br>{{ ui('feedback.badge', {label: 'Not sent: ' ~ row.error, tone: 'danger', size: 'small'}) }}{% endif %}</td>
+					<td>{{ row.format }}</td>
+					<td>{{ row.when }}</td>
+				</tr>
+			{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filters.q ? 'Nothing matches.' : (status == 'sent' ? 'No replies sent yet.' : 'No drafts.')}) }}{% endif %}
+		{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

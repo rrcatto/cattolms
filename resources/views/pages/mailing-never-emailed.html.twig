@@ -8,7 +8,7 @@
 	{% set ph_kicker = 'Mailing' %}
 	{% set ph_title = 'Addresses Never Emailed' %}
 	{% set ph_lead = 'News never goes to these. An address bounced as not existing, its person marked an email as spam, or an administrator added it.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'add'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Add an address', summary: 'For someone who asked, some other way, never to be emailed news.'}) }}
@@ -29,7 +29,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'suppressions', pagination: suppressions_pagination, search: {ds_name: 'suppressions', ds_label: 'Search addresses', ds_value: suppressions_search, ds_action: '/mailing/never-emailed'}})} %}{% block results %}
 			{% if suppressions %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Address'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Why'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Since'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Address'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Why'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Since'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
 			{% block body %}{% for row in suppressions %}<tr>
 				<td class="cell-text">{% if row.user_id %}<a href="{{ person_url(row.account_reference) }}">{{ row.email }}</a>{% else %}{{ row.email }}{% endif %}</td>
 				<td class="cell-text">{{ reasons[row.reason] }}{% if row.detail %}<br><span class="small cl-text-secondary">{{ row.detail }}</span>{% endif %}</td>

@@ -87,7 +87,7 @@ final class SlantedTextureContractTest extends TestCase
     {
         // Comments are stripped first. A guard that matches its own explanatory comment passes
         // while the rule it protects is gone, which has happened in this codebase twice.
-        $css = (string) file_get_contents(self::CORE_CSS);
+        $css = (string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/css/cattophp.css') . (string) file_get_contents(self::CORE_CSS);
 
         return (string) preg_replace('#/\*.*?\*/#s', '', $css);
     }

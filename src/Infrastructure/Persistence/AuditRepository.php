@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for audit records.
 
 Changelog:
+2026/11/09 SAST
+- Records into CattoPHP's activity log (CattoPHP Phase 2, step 4), which masks secrets, notes the request's reference and
+  keeps the address as before; the old table's entries moved there with their numbers. The calls are as they were.
 2026/10/19 SAST
 - deleteBefore(): the daily clean-up deletes activity log entries older than 5 years, as the Privacy
   Policy states (owner, 2026-10-19).
@@ -28,39 +31,29 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Support\ClientFingerprint;
+use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Activity\Actor;
 use DateTimeImmutable;
 
 final class AuditRepository
 {
     public function __construct(
-        private readonly Database $db
+        private readonly ActivityLog $activity
     ) {
     }
 
     /** @param array<string,mixed> $metadata */
     public function record(?int $userId, string $event, array $metadata = []): void
     {
-        // An audit row records what an identity did, so it belongs to that identity's universe.
-        // A genuine ADMIN acting on seed data therefore still writes a REAL audit row, which is
-        // exactly the accountability the decision D4 allowlist exists to preserve.
-        $ipAddress = ClientFingerprint::ipAddress();
-        $this->db->executeStatement(
-            'INSERT INTO audit_log ( user_id, event_key, metadata, ip_address, created_at)
-             VALUES ( :user_id, :event_key, :metadata, :ip_address, :created_at)',
-            [
-                'user_id' => $userId,
-                'event_key' => $event,
-                'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
-                'ip_address' => $ipAddress !== '' ? $ipAddress : null,
-                'created_at' => gmdate('Y-m-d H:i:sP'),
-            ]
-        );
+        // An entry records what an identity did, so it belongs to that identity's universe. A genuine ADMIN acting on
+        // seed data therefore still writes a REAL entry, which is exactly the accountability the decision D4 allowlist
+        // exists to preserve. Nobody is the system.
+        $this->activity->record($event, $metadata, actor: $userId !== null && $userId > 0 ? new Actor((string) $userId, (string) $userId) : Actor::system());
     }
 
     /** Retention: removes activity log entries recorded before a moment. @return int entries deleted */
     public function deleteBefore(DateTimeImmutable $before): int
     {
-        return $this->db->executeStatement('DELETE FROM audit_log WHERE created_at < :before', ['before' => $before->format('Y-m-d H:i:sP')]);
+        return $this->activity->removeBefore($before);
     }
 }

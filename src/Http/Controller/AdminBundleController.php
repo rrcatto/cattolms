@@ -12,7 +12,8 @@ use CattoLearning\Bundle\BundleRepository;
 use CattoLearning\Bundle\BundleService;
 use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
 use CattoLearning\Support\Address\CatalogueAddress;
-use CattoLearning\Support\{AccessPeriod, ListView, Money, Pagination, SortOrder, WasPrice};
+use CattoLearning\Support\{AccessPeriod, ListView, Money, SortOrder, WasPrice};
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -43,7 +44,7 @@ final class AdminBundleController extends BaseController
 
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests,
         private readonly BundleService $bundles, private readonly BundleRepository $records, private readonly \CattoLearning\Course\CourseService $courses,
-        private readonly AddressKeyRepository $keys)
+        private readonly AddressKeyRepository $keys, private readonly \CattoLearning\Bundle\BundlePositions $positions)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -62,11 +63,12 @@ final class AdminBundleController extends BaseController
         $pagination = $view === ListView::GRID
             ? Pagination::within($_GET[PlatformAdministrationService::pageParam(self::DATASET)] ?? null, $_GET[PlatformAdministrationService::sizeParam(self::DATASET)] ?? null, $total, ListView::pageSizes(self::DATASET, ListView::GRID))
             : Pagination::create($_GET[PlatformAdministrationService::pageParam(self::DATASET)] ?? null, $_GET[PlatformAdministrationService::sizeParam(self::DATASET)] ?? null, $total, 25);
-        // Sorted by any of its columns, or the most recently changed first; a grid has the same sorts as a Sort (UX rule 2.6g).
-        $sort = SortOrder::create($_GET[self::DATASET . '_sort'] ?? null, $_GET[self::DATASET . '_dir'] ?? null, array_keys(BundleRepository::LIST_SORTS), 'updated', SortOrder::DESCENDING);
+        // In the order bundles are listed in by default (owner, 2026-11-12), or by any of its columns; a grid has the same
+        // sorts as a Sort (UX rule 2.6g).
+        $sort = SortOrder::create($_GET[self::DATASET . '_sort'] ?? null, $_GET[self::DATASET . '_dir'] ?? null, array_keys(BundleRepository::LIST_SORTS), 'position', SortOrder::ASCENDING);
         $rows = array_map(self::listed(...), $this->records->list($filters, $pagination->pageSize, $pagination->offset, $sort));
         $kept = array_filter([PlatformAdministrationService::searchParam(self::DATASET) => $search, 'status' => $status]);
-        $sorted = $sort->key === 'updated' ? [] : [self::DATASET . '_sort' => $sort->key, self::DATASET . '_dir' => $sort->direction];
+        $sorted = $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING ? [] : [self::DATASET . '_sort' => $sort->key, self::DATASET . '_dir' => $sort->direction];
         $chips = [];
         foreach (self::STATUSES as $value => $label) {
             $query = array_filter([PlatformAdministrationService::searchParam(self::DATASET) => $search, 'status' => $value]);
@@ -79,18 +81,60 @@ final class AdminBundleController extends BaseController
         foreach ($rows as $row) {
             if ((int) $row['id'] === $editing) $edit = $this->bundles->form($row);
         }
-        // The owner's columns where they fit (2026-11-06), each with its share of the table (UX rule 2.1).
-        $columns = ['code' => 'Code|11', 'title' => 'Bundle|21', 'status' => 'Status|10', 'price' => 'Price|12', 'from' => 'On sale from|11', 'until' => 'On sale until|11',
-            'access' => 'Access|8', 'courses' => 'Courses|5', 'sales' => 'Sales|5', 'actions' => 'Actions|6'];
+        // Dragged into order, as courses are (owner, 2026-11-12), by whoever manages bundles while the list is in that order;
+        // a bundle dropped first on the page goes straight after the one before the page's first row.
+        $arrange = $canManage && $view !== ListView::GRID && $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING;
+        // The owner's columns where they fit (2026-11-06), each with its share of the table (UX rule 2.1); the position first (2026-11-12).
+        $columns = ['position' => 'Position|7', 'code' => 'Code|10', 'title' => 'Bundle|19', 'status' => 'Status|10', 'price' => 'Price|11', 'from' => 'On sale from|10', 'until' => 'On sale until|10',
+            'access' => 'Access|8', 'courses' => 'Courses|5', 'sales' => 'Sales|4', 'actions' => 'Actions|6'];
         return $this->render('admin-bundles', PlatformAdministrationService::sortViewFor(self::DATASET, $sort, self::BASE, $columns, array_keys(BundleRepository::LIST_SORTS), $kept,
-            ['from' => SortOrder::DESCENDING, 'until' => SortOrder::DESCENDING, 'price' => SortOrder::DESCENDING, 'sales' => SortOrder::DESCENDING]) + [
+            ['from' => SortOrder::DESCENDING, 'until' => SortOrder::DESCENDING, 'price' => SortOrder::DESCENDING, 'sales' => SortOrder::DESCENDING, 'updated' => SortOrder::DESCENDING]) + [
             'title' => 'Bundles', 'bundles' => $rows, 'bundles_search' => $search, 'status_filters' => $chips,
             'bundles_pagination' => PlatformAdministrationService::paginationPayload(self::DATASET, $pagination, self::BASE, 'Bundles', $kept + $sorted, null, null, $view === ListView::GRID ? ListView::pageSizes(self::DATASET, ListView::GRID) : null),
             'bundles_view' => $view, 'bundles_view_switch' => ListView::switcher(self::DATASET, $view, self::BASE, $kept + $sorted),
             'bundles_editing' => $edit === null ? 0 : $editing, 'bundle_edit' => $edit, 'bundle_error' => '',
             'bundles_list_href' => self::listHref((string) ($_SERVER['REQUEST_URI'] ?? '')),
             'can_manage' => $canManage, 'units' => array_keys(AccessPeriod::UNITS), 'currency' => Money::platformCurrency(),
+            'arrange' => $arrange, 'bundles_before_page' => $arrange && $rows !== [] ? $this->records->codeBefore((int) $rows[0]['id']) : '',
+            // Renumber in the toolbar while the list is in its order, as a table or as cards.
+            'bundles_can_renumber' => $canManage && $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING,
         ]);
+    }
+
+    /**
+     * Moves a bundle in the list's order (owner, 2026-11-12: "drag and drop them into the positions they display in"): after
+     * the bundle whose code is in `after` (empty for first), from a drag; or up, down or to the top in `direction`, from the
+     * ⋯ menu without JavaScript. A drag asks for JSON and is answered with each bundle whose number changed, by its code.
+     */
+    #[Route('/admin/bundles/{code}/move', name: 'admin_bundle_move', requirements: ['code' => CatalogueAddress::BUNDLE], methods: ['POST'])]
+    public function move(): Response
+    {
+        $this->requireCsrf();
+        $actor = $this->requirePermission('BUNDLE.MANAGE');
+        $id = $this->bundleId();
+        $wantsJson = str_contains((string) $this->request()->headers->get('Accept', ''), 'application/json');
+        $move = function () use ($id, $actor): array {
+            if (array_key_exists('after', $_POST)) {
+                $after = trim((string) $_POST['after']);
+                $afterId = $after === '' ? null : ($this->keys->bundle($after) ?? throw new \InvalidArgumentException('Choose a valid position.'));
+                return $this->positions->arrange($id, $afterId, $actor->id);
+            }
+            return $this->positions->move($id, trim((string) ($_POST['direction'] ?? '')), $actor->id);
+        };
+        if ($wantsJson) {
+            try {
+                $positions = [];
+                foreach ($move() as $movedId => $position) $positions[$this->code((int) $movedId)] = $position;
+                return new \Symfony\Component\HttpFoundation\JsonResponse(['positions' => (object) $positions]);
+            } catch (\InvalidArgumentException $refused) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => $refused->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+        return $this->handle(function () use ($move): void {
+            $move();
+            $this->flash('success', 'The bundle was moved.');
+            $this->redirect(self::BASE);
+        }, self::BASE);
     }
 
     #[Route('/admin/bundles/new', name: 'admin_bundle_new', methods: ['GET'])]
@@ -167,7 +211,7 @@ final class AdminBundleController extends BaseController
             $code = $this->param('code');
             $this->redirect(self::BASE . ($edit ? '?edit=' . rawurlencode($code) : '') . '#' . CatalogueAddress::bundleAnchor($code));
         }
-        return $this->rowFragment($actor, $id, $edit, (string) ($_GET['view'] ?? ListView::LIST), self::listHref((string) ($_SERVER['HTTP_HX_CURRENT_URL'] ?? '')));
+        return $this->rowFragment($actor, $id, $edit, (string) ($_GET['view'] ?? ListView::LIST), self::listHref((string) ($_SERVER['HTTP_HX_CURRENT_URL'] ?? '')), arrange: ($_GET['arrange'] ?? '') === '1');
     }
 
     /**
@@ -190,14 +234,14 @@ final class AdminBundleController extends BaseController
                 $code = $this->param('code');
                 $this->redirect($list . 'edit=' . rawurlencode($code) . '#' . CatalogueAddress::bundleAnchor($code));
             }
-            return $this->rowFragment($actor, $id, true, $view, $list, $refused->getMessage(), $_POST, 422);
+            return $this->rowFragment($actor, $id, true, $view, $list, $refused->getMessage(), $_POST, 422, arrange: ($_POST['arrange'] ?? '') === '1');
         }
         if (!$this->isHtmxRequest()) {
             $this->flash('success', 'The bundle was saved.');
             // The code may have changed: the anchor is the code it has now.
             $this->redirect(rtrim($list, '?&') . '#' . CatalogueAddress::bundleAnchor($this->code($id)));
         }
-        return $this->rowFragment($actor, $id, false, $view, $list, saved: true);
+        return $this->rowFragment($actor, $id, false, $view, $list, saved: true, arrange: ($_POST['arrange'] ?? '') === '1');
     }
 
     #[Route('/admin/bundles/{code}/courses', name: 'admin_bundle_course_add', requirements: ['code' => CatalogueAddress::BUNDLE], methods: ['POST'])]
@@ -311,7 +355,7 @@ final class AdminBundleController extends BaseController
      *
      * @param array<string,mixed> $typed
      */
-    private function rowFragment(CurrentUser $actor, int $id, bool $edit, string $view, string $list, string $error = '', array $typed = [], int $status = 200, bool $saved = false): Response
+    private function rowFragment(CurrentUser $actor, int $id, bool $edit, string $view, string $list, string $error = '', array $typed = [], int $status = 200, bool $saved = false, bool $arrange = false): Response
     {
         $row = $this->records->listRow($id) ?? throw $this->notFound('This bundle does not exist.');
         $row = self::listed($row);
@@ -321,11 +365,13 @@ final class AdminBundleController extends BaseController
             foreach (['code', 'title', 'status', 'price', 'was_price', 'available_from', 'available_until', 'access_period_value', 'access_period_unit'] as $field) {
                 if (array_key_exists($field, $typed) && is_scalar($typed[$field])) $form[$field] = (string) $typed[$field];
             }
+            if (is_scalar($typed['catalogue_position'] ?? null)) $form['position'] = (string) $typed['catalogue_position'];
         }
         $grid = $view === ListView::GRID;
         return $this->renderFragment('partials/admin/bundle-' . ($grid ? 'card' : 'row') . ($edit ? '-edit' : ''), [
             'bundle' => $row, 'bundle_edit' => $form, 'bundle_error' => $error, 'bundle_saved' => $saved,
             'can_manage' => $actor->hasPermission('BUNDLE.MANAGE'), 'bundles_list_href' => $list, 'units' => array_keys(AccessPeriod::UNITS), 'currency' => Money::platformCurrency(),
+            'arrange' => $arrange && $actor->hasPermission('BUNDLE.MANAGE'),
         ], $status);
     }
 
@@ -374,6 +420,7 @@ final class AdminBundleController extends BaseController
         foreach (['code', 'title', 'slug', 'short_description', 'description_html', 'cover_svg', 'available_from', 'available_until'] as $field) {
             if (is_scalar($_POST[$field] ?? null)) $draft[$field] = (string) $_POST[$field];
         }
+        if (is_scalar($_POST['catalogue_position'] ?? null)) $draft['position'] = (string) $_POST['catalogue_position'];
         $_SESSION['bundle_draft'][$key] = $draft;
         $this->flash('danger', $failed->getMessage());
         $this->redirect($back);

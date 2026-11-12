@@ -14,6 +14,8 @@ from LegalDocuments, the supplier block prints the email address and domain of t
 configuration, and the footer of every page lists the three documents.
 
 Changelog:
+2026/11/09 SAST
+- The supplier block read without the whitespace between tags, which the served page's layout lays out.
 2026/10/13 SAST
 - Created for the public legal pages.
 */
@@ -101,7 +103,8 @@ final class LegalPagesIntegrationTest extends TestCase
         self::assertNotSame('', $email);
         self::assertNotSame('', $domain);
 
-        $terms = $this->html('/terms');
+        // Read without the whitespace between tags, which the served page's layout lays out (CattoPHP's HtmlLayout) and no browser draws.
+        $terms = (string) preg_replace('/>\s+</', '><', $this->html('/terms'));
         self::assertStringContainsString('<span class="cl-ui-accordion-eyebrow">Section 1</span><span class="cl-ui-accordion-title">Supplier information</span>', $terms, 'Section 1, an accordion (owner, 2026-10-20).');
         // The page prints whatever the Site Owner says (.env or Settings): no detail is written into the code.
         $supplier = IntegrationContainer::get()->get(LegalDocuments::class)->supplier();
@@ -123,7 +126,7 @@ final class LegalPagesIntegrationTest extends TestCase
         }
         self::assertStringContainsString('href="mailto:' . $email . '"', $terms);
 
-        $privacy = $this->html('/privacy');
+        $privacy = (string) preg_replace('/>\s+</', '><', $this->html('/privacy'));
         self::assertStringContainsString('<dt>Email address</dt><dd>' . $email . '</dd>', $privacy);
         self::assertStringContainsString('<dt>Website</dt><dd>' . $domain . '</dd>', $privacy);
         self::assertStringContainsString('<dt>Information Officer</dt><dd>' . htmlspecialchars((string) $supplier['information_officer'], ENT_QUOTES) . '</dd>', $privacy);

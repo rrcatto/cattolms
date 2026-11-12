@@ -42,7 +42,7 @@ use CattoLearning\Commerce\Wallet\{WalletOwner, WalletRepository, WalletService}
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,InProcessPage,IntegrationContainer,PromotionFixture,WalletFixture};
@@ -577,7 +577,26 @@ final class WalletLedgerIntegrationTest extends TestCase
             self::assertSame(AccountReference::checkCharacter($body), $this->db->fetchOne('SELECT account_reference_check(:body)', ['body' => $body]), $body);
         }
 
-        WalletFixture::settings($this->db)->saveSection('references', ['account_prefix' => 'ZZ'], $users[0]);
+        // An account the site makes takes .env's prefix when Settings saved none: until 2026-11-09 the database read only a
+        // saved one, so COMMERCE_ACCOUNT_PREFIX in .env never reached an account.
+        $accounts = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\UserRepository::class);
+        $made = fn(string $name): string => (string) $accounts->createWithPrimaryEmail($name . '-' . $this->fixture->suffix() . '@example.test')['account_reference'];
+        $before = [$_ENV['COMMERCE_ACCOUNT_PREFIX'] ?? null, $_SERVER['COMMERCE_ACCOUNT_PREFIX'] ?? null, getenv('COMMERCE_ACCOUNT_PREFIX')];
+        $_ENV['COMMERCE_ACCOUNT_PREFIX'] = $_SERVER['COMMERCE_ACCOUNT_PREFIX'] = 'XY';
+        putenv('COMMERCE_ACCOUNT_PREFIX=XY');
+        try {
+            $fromEnv = $made('reference-env');
+            self::assertStringStartsWith('XY' . date('Ymd'), $fromEnv, '.env\'s prefix reaches a new account.');
+            self::assertTrue(AccountReference::isValid($fromEnv));
+
+            WalletFixture::settings($this->db)->saveSection('references', ['account_prefix' => 'ZZ'], $users[0]);
+            self::assertStringStartsWith('ZZ', $made('reference-saved'), 'What Settings saved wins over .env.');
+        } finally {
+            [$inEnv, $inServer, $fromGetenv] = $before;
+            if ($inEnv === null) unset($_ENV['COMMERCE_ACCOUNT_PREFIX']); else $_ENV['COMMERCE_ACCOUNT_PREFIX'] = $inEnv;
+            if ($inServer === null) unset($_SERVER['COMMERCE_ACCOUNT_PREFIX']); else $_SERVER['COMMERCE_ACCOUNT_PREFIX'] = $inServer;
+            putenv($fromGetenv === false ? 'COMMERCE_ACCOUNT_PREFIX' : 'COMMERCE_ACCOUNT_PREFIX=' . $fromGetenv);
+        }
         $later = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id=:id', ['id' => $this->fixture->createUser('Reference three')]);
         self::assertStringStartsWith('ZZ', $later, 'A new account takes the prefix in force.');
         self::assertTrue(AccountReference::isValid($later));

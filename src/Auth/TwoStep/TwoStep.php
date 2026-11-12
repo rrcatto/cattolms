@@ -17,6 +17,11 @@ policy (TwoStepPolicy) names the person. An administrator's reset (a person's pa
 their phone and their codes, never for themselves. Every change is in the activity log.
 
 Change log:
+2026/11/09 SAST
+- Kept by CattoPHP's two-step sign-in (CattoPHP Phase 2, step 6b): the key in the same encrypted form, the last code
+  used, the unused recovery codes' hashes and when it was set up, under the person's account; CattoPHP checks each code
+  under a lock and records each change in the activity log. This class keeps the platform's rules: the policy that
+  requires it, never one's own reset, the site's name in the app.
 2026/11/05 SAST
 - Created.
 */
@@ -26,13 +31,13 @@ declare(strict_types=1);
 namespace CattoLearning\Auth\TwoStep;
 
 use CattoLearning\Configuration\RuntimeSettings;
-use CattoLearning\Configuration\SecretCipher;
-use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Security\TwoStep\OneTimeCode;
+use CattoPHP\Security\TwoStep\QrPicture;
+use CattoPHP\Security\TwoStep\TwoStep as Codes;
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Component\Clock\ClockInterface;
-use Throwable;
 
 class TwoStep
 {
@@ -41,27 +46,25 @@ class TwoStep
     public const OWN_RESET = 'You cannot reset your own two-step sign-in. Another administrator can.';
 
     public function __construct(
-        private readonly TwoStepRepository $store,
-        private readonly SecretCipher $cipher,
+        private readonly Codes $codes,
         private readonly TransactionManager $transactions,
-        private readonly AuditRepository $audit,
-        private readonly ClockInterface $clock,
         private readonly ?RuntimeSettings $settings = null,
     ) {
     }
 
     public function isOn(int $userId): bool
     {
-        return $this->store->find($userId) !== null;
+        return $this->codes->isSetUp((string) $userId);
     }
 
     /** @return array{on:bool,since:string,left:int} where a person's two-step stands, for their page and an administrator's */
     public function state(int $userId): array
     {
-        $row = $this->store->find($userId);
+        if (!$this->isOn($userId)) return ['on' => false, 'since' => '', 'left' => 0];
+        $since = $this->codes->setUpAt((string) $userId);
 
-        return ['on' => $row !== null, 'since' => $row === null ? '' : (new \DateTimeImmutable($row['confirmed_at']))->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('j F Y'),
-            'left' => $row === null ? 0 : $this->store->recoveryLeft($userId)];
+        return ['on' => true, 'since' => $since === null ? '' : $since->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('j F Y'),
+            'left' => $this->codes->recoveryCodesLeft((string) $userId)];
     }
 
     /** A new key to set up with. */
@@ -86,15 +89,7 @@ class TwoStep
      */
     public function turnOn(int $userId, string $secret, string $code): ?array
     {
-        $step = OneTimeCode::matchingCounter($secret, $code, $this->now());
-        if ($step === null) return null;
-        $codes = RecoveryCodes::make();
-        $this->transactions->run(function () use ($userId, $secret, $step, $codes): void {
-            $this->store->save($userId, $this->cipher->encrypt($secret), $step, array_map(static fn(string $one): string => RecoveryCodes::hash($userId, $one), $codes));
-            $this->audit->record($userId, 'auth.two_step_on', ['user_id' => $userId]);
-        });
-
-        return $codes;
+        return $this->codes->setUp((string) $userId, $secret, $code);
     }
 
     /**
@@ -102,28 +97,11 @@ class TwoStep
      */
     public function confirm(int $userId, string $typed): ?string
     {
-        return $this->transactions->run(function () use ($userId, $typed): ?string {
-            $row = $this->store->find($userId, true);
-            if ($row === null) return null;
-            // Six digits are the app's code; anything else may be a recovery code (eight letters and digits).
-            if (preg_match('/^\d{6}$/', (string) preg_replace('/\s+/', '', $typed)) === 1) {
-                try {
-                    $secret = $this->cipher->decrypt($row['secret_encrypted']);
-                } catch (Throwable) {
-                    return null;
-                }
-                $step = OneTimeCode::matchingCounter($secret, $typed, $this->now(), $row['last_used_step']);
-                if ($step === null) return null;
-                $this->store->useStep($userId, $step);
-
-                return 'app';
-            }
-            $code = RecoveryCodes::normalise($typed);
-            if ($code === null || !$this->store->useRecovery($userId, RecoveryCodes::hash($userId, $code))) return null;
-            $this->audit->record($userId, 'auth.two_step_recovery_used', ['user_id' => $userId, 'left' => $this->store->recoveryLeft($userId)]);
-
-            return 'recovery';
-        });
+        return match ($this->codes->confirm((string) $userId, $typed)) {
+            'code' => 'app',
+            'recovery' => 'recovery',
+            default => null,
+        };
     }
 
     /** Turns it off, after a current code, unless the policy names this person. */
@@ -132,8 +110,7 @@ class TwoStep
         if ($required) throw new RuntimeException(self::REQUIRED);
         $this->transactions->run(function () use ($userId, $typed): void {
             if ($this->confirm($userId, $typed) === null) throw new InvalidArgumentException(self::WRONG);
-            $this->store->delete($userId);
-            $this->audit->record($userId, 'auth.two_step_off', ['user_id' => $userId]);
+            $this->codes->reset((string) $userId, self::actor($userId));
         });
     }
 
@@ -146,11 +123,8 @@ class TwoStep
     {
         return $this->transactions->run(function () use ($userId, $typed): array {
             if ($this->confirm($userId, $typed) === null) throw new InvalidArgumentException(self::WRONG);
-            $codes = RecoveryCodes::make();
-            $this->store->replaceRecovery($userId, array_map(static fn(string $one): string => RecoveryCodes::hash($userId, $one), $codes));
-            $this->audit->record($userId, 'auth.two_step_new_recovery_codes', ['user_id' => $userId]);
 
-            return $codes;
+            return $this->codes->renewRecoveryCodes((string) $userId);
         });
     }
 
@@ -161,17 +135,14 @@ class TwoStep
     public function reset(int $targetUserId, ?int $actorUserId): bool
     {
         if ($actorUserId !== null && $actorUserId === $targetUserId) throw new RuntimeException(self::OWN_RESET);
+        if (!$this->isOn($targetUserId)) return false;
+        $this->codes->reset((string) $targetUserId, $actorUserId === null ? Actor::system() : self::actor($actorUserId));
 
-        return $this->transactions->run(function () use ($targetUserId, $actorUserId): bool {
-            $done = $this->store->delete($targetUserId);
-            if ($done) $this->audit->record($actorUserId, 'auth.two_step_reset', ['user_id' => $targetUserId, 'by' => $actorUserId === null ? 'console' : 'administrator']);
-
-            return $done;
-        });
+        return true;
     }
 
-    private function now(): int
+    private static function actor(int $userId): Actor
     {
-        return $this->clock->now()->getTimestamp();
+        return new Actor((string) $userId, (string) $userId);
     }
 }

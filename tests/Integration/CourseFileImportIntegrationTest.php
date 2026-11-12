@@ -74,7 +74,7 @@ final class CourseFileImportIntegrationTest extends TestCase
         $this->portability = $container->get(CoursePortabilityService::class);
         $this->courses = $container->get(CourseRepository::class);
         $this->service = $container->get(CourseService::class);
-        $roles = new RoleRepository($this->db);
+        $roles = IntegrationContainer::get()->get(RoleRepository::class);
         $this->admin = $this->fixture->createUser('Course file importer', 'course-file-importer-' . strtolower($this->fixture->suffix()) . '@seed.test');
         $roles->assign($this->admin, 'ADMIN');
         $this->user = new CurrentUser($this->admin, Uuid::v4(), 'course-file-importer@seed.test', 'Course file importer', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());

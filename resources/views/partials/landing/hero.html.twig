@@ -31,7 +31,7 @@
 				{% if hero.picture.kind == 'resource' %}
 					<div class="cl-picture-head-art"><img src="{{ hero.picture.src }}" alt="{{ hero.picture.alt }}" width="960" height="640" decoding="async"></div>
 				{% else %}
-					<div class="cl-picture-head-art" aria-hidden="true">{{ landing.course.cover_svg|raw }}</div>
+					<div class="cl-picture-head-art" aria-hidden="true">{{ landing.course.cover_svg|authored }}</div>
 				{% endif %}
 				<div class="cl-picture-head-text cl-landing-hero-copy">{{ hero_copy }}</div>
 			</div>

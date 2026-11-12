@@ -26,7 +26,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course\Certificate;
 
-use CattoLearning\Document\PageSettings;
+use CattoPHP\Document\PageSettings;
 use CattoLearning\Infrastructure\Persistence\Database;
 
 final class CertificateDesignRepository

@@ -3,7 +3,7 @@
 	{% set ph_kicker = 'Company' %}
 	{% set ph_title = 'All sections' %}
 	{% set ph_lead = 'Every company section in one place. Each one also has a page of its own.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section cl-company-workspace" data-company-workspace>
 		{% include '@platform/partials/company-context.html.twig' %}
 		{% for section in company_sections %}

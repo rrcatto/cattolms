@@ -113,7 +113,7 @@ if ($action === 'create') {
     // mail-links.cjs sends one contact message as a visitor at an address that receives no mail; this removes it.
     $email = (string) ($argv[2] ?? '');
     if (!str_ends_with($email, '.invalid') && !str_ends_with($email, '.test')) throw new RuntimeException('Only a check\'s own contact message, at a domain that receives no mail, is removed.');
-    echo 'Removed ' . $db->executeStatement('DELETE FROM contact_messages WHERE sender_email = :email', ['email' => $email]) . " contact message.\n";
+    echo 'Removed ' . $db->executeStatement('DELETE FROM cattophp_inbox_conversations WHERE sender_email = :email', ['email' => $email]) . " contact message.\n";
 } else {
     throw new RuntimeException('Usage: php tests/Browser/no-row-ids-fixture.php create|cleanup|forget-contact [state-path|email]');
 }

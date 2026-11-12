@@ -11,13 +11,13 @@
 	{% if can_manage %}
 	{% set ph_actions %}{{ ui('action.link', {label: 'Make a list', href: '#make', variant: 'secondary', icon: 'action-add'}) }}{% endset %}
 	{% endif %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set ml_kinds = {news: 'News and Updates', own: 'Your list', category: 'Category', course: 'Course', tag: 'Tag'} %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'every'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Every list', summary: lists|length == 1 ? '1 list.' : lists|length ~ ' lists. A category, course or tag has a list once someone follows it.'}) }}
 		{% if lists %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every mailing list'})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'List'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Template'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On My Subscriptions'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Since'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'List'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Kind'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On it'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Template'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'On My Subscriptions'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Since'}} %}</tr>{% endblock %}
 			{% block body %}{% for list in lists %}<tr>
 				<td class="cell-text"><a href="/mailing/lists/{{ list.id }}">{{ list.name ?: 'Removed ' ~ ml_kinds[list.kind]|lower }}</a>{% if list.own and list.own.closed_at %} {{ ui('feedback.badge', {label: 'Closed', tone: 'neutral'}) }}{% endif %}</td>
 				<td>{{ ml_kinds[list.kind] }}</td>

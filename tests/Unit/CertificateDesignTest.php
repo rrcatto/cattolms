@@ -44,15 +44,16 @@ use CattoLearning\Course\Certificate\CertificateIssuer;
 use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Course\Certificate\CertificateWording;
 use CattoLearning\Document\DocumentAssetRepository;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\DocumentRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentSampleData;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentTemplateRepository;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\Template\DocumentValueFormatter;
+use CattoPHP\Document\ValueFormatter;
 use CattoLearning\Document\Template\PlaceholderRegistry;
-use CattoLearning\Document\Template\TemplateValidator;
-use CattoLearning\Document\TemplateValidationException;
+use CattoPHP\Document\TemplateValidator;
+use CattoPHP\Document\TemplateValidationException;
 use CattoLearning\Tests\Support\ImageFileDatabase;
 use DateTimeZone;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -73,8 +74,8 @@ final class CertificateDesignTest extends TestCase
         $files[str_repeat('a', 64)] = __DIR__ . '/../../resources/certificates/looks/minimal.png';
         $db = new ImageFileDatabase($files);
         $registry = new PlaceholderRegistry();
-        $this->renderer = new DocumentTemplateRenderer(new DocumentTemplateRepository($db), $registry, new TemplateValidator($registry),
-            new DocumentValueFormatter(new DateTimeZone('Africa/Johannesburg')), new DocumentAssetRepository($db));
+        $this->renderer = new DocumentTemplateRenderer(new DocumentTemplateRepository($db), $registry,
+            new DocumentRenderer(new TemplateValidator(), new ValueFormatter(new DateTimeZone('Africa/Johannesburg')), new DocumentAssetRepository($db)));
         $this->compiler = new CertificateDesignCompiler();
     }
 
@@ -132,7 +133,7 @@ final class CertificateDesignTest extends TestCase
             self::assertStringNotContainsString('result.', $wording, $key . ' prints no result.');
             self::assertStringNotContainsStringIgnoringCase('successfully', $wording, $key . ' never says the learner passed.');
         }
-        (new TemplateValidator(new PlaceholderRegistry()))->validate(DocumentType::Certificate, $head . $main, '');
+        (new TemplateValidator())->validate((new PlaceholderRegistry())->forType(DocumentType::Certificate), DocumentType::Certificate->label(), $head . $main, '');
         self::assertSame(['', '<p>Only ' . '{{ learner.name }}</p>'], CertificateWording::toTemplateParts('<p>Only ' . CertificateWording::chip('learner.name') . '</p>'));
     }
 
@@ -165,7 +166,7 @@ final class CertificateDesignTest extends TestCase
     {
         $design = $this->design($key, 'Dr. Pieter van der Merwe', 'Head of Training');
         $compiled = $this->compiler->compile($design);
-        (new TemplateValidator(new PlaceholderRegistry()))->validate(DocumentType::Certificate, $compiled['html'], $compiled['css']);
+        (new TemplateValidator())->validate((new PlaceholderRegistry())->forType(DocumentType::Certificate), DocumentType::Certificate->label(), $compiled['html'], $compiled['css']);
         foreach (['sample' => DocumentSampleData::for(DocumentType::Certificate), 'long' => self::long()] as $label => $data) {
             [$pages, $fits, $body] = $this->draw($compiled, $data);
             self::assertSame(1, $pages, $key . ' with ' . $label . ' values is one page.');
@@ -232,7 +233,7 @@ final class CertificateDesignTest extends TestCase
 
     public function testEveryPhaseIRuleStillHoldsForCertificateTemplates(): void
     {
-        $validator = new TemplateValidator(new PlaceholderRegistry());
+        $validator = new TemplateValidator();
         foreach ([
             '<script>alert(1)</script><p>{{ learner.name }}</p>' => '<script>',
             '<img src="https://example.com/signature.png">' => 'embedded data: images',
@@ -245,13 +246,13 @@ final class CertificateDesignTest extends TestCase
             '<p>{{ certificate.title }}</p>' => 'Unknown placeholder',
         ] as $html => $message) {
             try {
-                $validator->validate(DocumentType::Certificate, $html, '');
+                $validator->validate((new PlaceholderRegistry())->forType(DocumentType::Certificate), DocumentType::Certificate->label(), $html, '');
                 self::fail('Refused: ' . $html);
             } catch (TemplateValidationException $refused) {
                 self::assertStringContainsString($message, implode(' ', $refused->errors));
             }
         }
-        $validator->validate(DocumentType::Certificate, '<img alt="" src="asset:' . str_repeat('b', 64) . '"><p>{{ course.accreditation }}</p>', '.x{background:url(asset:' . str_repeat('c', 64) . ')}');
+        $validator->validate((new PlaceholderRegistry())->forType(DocumentType::Certificate), DocumentType::Certificate->label(), '<img alt="" src="asset:' . str_repeat('b', 64) . '"><p>{{ course.accreditation }}</p>', '.x{background:url(asset:' . str_repeat('c', 64) . ')}');
         self::addToAssertionCount(1);
     }
 
@@ -356,14 +357,14 @@ final class CertificateDesignTest extends TestCase
     }
 
     /**
-     * @param array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int,signature_room_mm:?float} $compiled
+     * @param array{html:string,css:string,settings:\CattoPHP\Document\PageSettings,box_height_mm:int,signature_room_mm:?float} $compiled
      * @param array<string,mixed> $data
      * @return array{0:int,1:bool,2:string,3:array<string,array{x:float,y:float,w:float,h:float}>} pages, whether the words fit, the rendered body, the signature's boxes
      */
     private function draw(array $compiled, array $data): array
     {
         $document = $this->renderer->renderSource(DocumentType::Certificate, $compiled['html'], $compiled['css'], $compiled['settings'], $data);
-        $out = (new DocumentPdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::LAYOUT_ID, CertificateDesignCompiler::SIGN_IMAGE_ID, CertificateDesignCompiler::SIGN_TEXT_ID]);
+        $out = (new PdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::LAYOUT_ID, CertificateDesignCompiler::SIGN_IMAGE_ID, CertificateDesignCompiler::SIGN_TEXT_ID]);
         $height = $out['boxes'][CertificateDesignCompiler::LAYOUT_ID]['h'] ?? 0.0;
         return [preg_match_all('#/Type\s*/Page(?![a-zA-Z])#', $out['pdf']), $height <= $compiled['box_height_mm'] * 72 / 25.4 + 1.0, $document->body, $out['boxes']];
     }
@@ -373,7 +374,7 @@ final class CertificateDesignTest extends TestCase
     {
         $probe = $this->compiler->signatureProbe($design) ?? self::fail('A design with a signature picture has a probe.');
         $document = $this->renderer->renderSource(DocumentType::Certificate, $probe['html'], $probe['css'], $probe['settings'], DocumentSampleData::for(DocumentType::Certificate));
-        return (new DocumentPdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::SIGN_TEXT_ID])['boxes'][CertificateDesignCompiler::SIGN_TEXT_ID]['h'] * 25.4 / 72;
+        return (new PdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::SIGN_TEXT_ID])['boxes'][CertificateDesignCompiler::SIGN_TEXT_ID]['h'] * 25.4 / 72;
     }
 
     private static function withSignature(CertificateDesign $design, CertificateImage $signature): CertificateDesign

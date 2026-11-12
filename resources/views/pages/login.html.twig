@@ -9,7 +9,7 @@
 	{% set ph_kicker = 'Passwordless access' %}
 	{% set ph_title = 'Sign in' %}
 	{% set ph_lead = telegram_offered|default(false) ? 'Choose how we reach you. There is no password to remember.' : 'Enter the email address on your account. We will send a one-time sign-in link that expires after 30 minutes.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
@@ -60,8 +60,7 @@
 					{% endif %}
 				</form>
 				{% if telegram_offered|default(false) %}
-				{# Only the chosen way shows, and only its button carries its name, so Enter in either field sends the chosen way. #}
-				<script>(()=>{const form=document.querySelector('[data-sign-in-form]');if(!form)return;const sync=()=>{const chosen=form.querySelector('input[name=how]:checked')?.value||'email';form.querySelectorAll('[data-sign-in-how]').forEach((set)=>{const on=set.dataset.signInHow===chosen;set.hidden=!on;const button=set.querySelector('button[value]');if(button){if(on)button.name='how';else button.removeAttribute('name');}});};form.querySelectorAll('input[name=how]').forEach((card)=>card.addEventListener('change',()=>{sync();form.querySelector('[data-sign-in-how]:not([hidden]) input')?.focus();}));sync();})();</script>
+				{# Only the chosen way shows, and only its button carries its name, so Enter in either field sends the chosen way (page-controls.js). #}
 				<p class="small cl-text-secondary mt-5 mb-0">
 					New here? <a href="/register{{ follow|default('') ? '?follow=' ~ follow|url_encode ~ '&return=' ~ return_path|url_encode : '' }}">Register</a>
 				</p>

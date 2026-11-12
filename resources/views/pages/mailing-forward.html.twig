@@ -7,7 +7,7 @@
 	{% set ph_kicker = 'Forward to a friend' %}
 	{% set ph_title = subject ?: 'Forward this email' %}
 	{% set ph_lead = 'Your friend gets this email once, with your name and your note. We do not put them on any list, and they can ask us never to email them.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'forward'})} %}{% block surface_body %}
 		{% if sent %}{{ ui('feedback.notice', {tone: 'success', heading: 'It is on its way to ' ~ sent ~ '.'}) }}{% endif %}
 		{% if error %}{{ ui('feedback.notice', {tone: 'danger', heading: error}) }}{% endif %}

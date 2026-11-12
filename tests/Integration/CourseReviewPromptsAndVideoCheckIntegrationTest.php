@@ -121,7 +121,7 @@ final class CourseReviewPromptsAndVideoCheckIntegrationTest extends TestCase
             $reviewed = $finished('5 days');
             $container->get(CourseReviewService::class)->submit($reviewed['id'], $course['id'], 5, '');
             $suppressed = $finished('6 days');
-            $db->executeStatement("INSERT INTO mailing_suppressions (email, reason) VALUES (:e, 'hard_bounce')", ['e' => strtolower($suppressed['email'])]);
+            $db->executeStatement("INSERT INTO cattophp_mailing_suppressions (email, reason) VALUES (:e, 'hard_bounce')", ['e' => strtolower($suppressed['email'])]);
 
             $mailer = new FakeMailer();
             $requests = new ReviewRequests($container->get(CourseReviewRepository::class), $container->get(TransactionManager::class), $mailer, new MockClock($now));

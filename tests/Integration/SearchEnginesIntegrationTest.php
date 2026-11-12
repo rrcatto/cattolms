@@ -7,8 +7,6 @@ namespace CattoLearning\Tests\Integration;
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Course\CourseService;
-use CattoLearning\Course\Sitemap;
-use CattoLearning\Course\SitemapRepository;
 use CattoLearning\Http\Controller\BundleController;
 use CattoLearning\Http\Controller\CourseController;
 use CattoLearning\Http\Controller\HelpController;
@@ -16,16 +14,23 @@ use CattoLearning\Http\Controller\HomeController;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Kernel;
-use CattoLearning\Search\AiCrawlers;
-use CattoLearning\Search\LlmsTxt;
 use CattoLearning\Search\SearchEnginesAdministration;
-use CattoLearning\Search\SearchSettings;
-use CattoLearning\Search\SharePictures;
+use CattoLearning\Search\SiteSummary;
 use CattoLearning\Tests\Support\BundleFixture;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\InProcessPage;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\View\ThemeRenderer;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Installation\Installation;
+use CattoPHP\Runtime\SiteMode as CattoSiteMode;
+use CattoPHP\Search\AiCrawlers;
+use CattoPHP\Search\LlmsTxt;
+use CattoPHP\Search\RobotsTxt;
+use CattoPHP\Search\SearchSettings;
+use CattoPHP\Search\SharePictures;
+use CattoPHP\Search\Sitemap;
+use CattoPHP\Settings\Settings;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -136,7 +141,7 @@ final class SearchEnginesIntegrationTest extends TestCase
         $picture = 'https://learning.example.test/share/course/' . $slug . '.png?v=' . SharePictures::version($cover);
         if (IntegrationContainer::get()->get(SharePictures::class)->available()) {
             self::assertStringContainsString('<meta property="og:image" content="' . htmlspecialchars($picture) . '">', $html);
-            self::assertStringContainsString('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">', $html);
+            self::assertStringContainsString("<meta property=\"og:image:width\" content=\"1200\">\n\t\t<meta property=\"og:image:height\" content=\"630\">", $html, 'each on its own line in the head');
             self::assertStringContainsString('<meta property="og:image:alt" content="Rows of seedlings in a raised bed">', $html);
             self::assertStringContainsString('<meta name="twitter:card" content="summary_large_image">', $html);
             self::assertSame($picture, $course['image']);
@@ -229,9 +234,9 @@ final class SearchEnginesIntegrationTest extends TestCase
     public function testTheHomePageNamesTheBusinessTheSiteAndCarriesTheCodes(): void
     {
         $options = new OptionRepository($this->db);
-        $settings = new SearchSettings($options);
+        $settings = IntegrationContainer::get()->get(SearchSettings::class);
         $actor = $this->fixture->createUser('Search engines settings');
-        $settings->save(['ai_crawlers' => 'all', 'google' => '<meta name="google-site-verification" content="' . self::GOOGLE . '" />', 'bing' => self::BING], $actor);
+        $settings->save(['ai_crawlers' => 'all', 'google' => '<meta name="google-site-verification" content="' . self::GOOGLE . '" />', 'bing' => self::BING], new Actor((string) $actor, (string) $actor));
         $_SERVER['REQUEST_URI'] = '/';
         $html = InProcessPage::run(null, HomeController::class, 'index')['body'];
         self::assertStringContainsString('<meta name="google-site-verification" content="' . self::GOOGLE . '">', $html);
@@ -282,19 +287,22 @@ final class SearchEnginesIntegrationTest extends TestCase
         $_SERVER['REQUEST_URI'] = '/admin/settings';
         $meta = ['structured_data' => ['{"@context":"https://schema.org","@type":"Thing"}'], 'verification' => ['msvalidate.01' => self::BING]];
         foreach (['admin-section', 'account-section', 'learn-item', 'course-public-preview', 'login', 'error'] as $template) {
-            $model = $renderer->viewModel($template, ['page_meta' => $meta], \CattoLearning\View\ThemeManager::DEFAULT_SLUG, false);
+            $model = $renderer->viewModel($template, ['page_meta' => $meta], \CattoLearning\View\ProjectTheme::DEFAULT_SLUG, false);
             self::assertSame([], $model['meta']['structured_data'], $template);
             self::assertSame([], $model['meta']['verification'], $template);
         }
         // A public page that asks not to be indexed (an ADMIN preview) carries none either.
         $_SERVER['REQUEST_URI'] = '/landing/a-preview';
-        $preview = $renderer->viewModel('landing-page', ['page_meta' => $meta + ['robots' => 'noindex, nofollow'], 'title' => 'Preview'], \CattoLearning\View\ThemeManager::DEFAULT_SLUG, false);
+        $preview = $renderer->viewModel('landing-page', ['page_meta' => $meta + ['robots' => 'noindex, nofollow'], 'title' => 'Preview'], \CattoLearning\View\ProjectTheme::DEFAULT_SLUG, false);
         self::assertSame([], $preview['meta']['structured_data']);
     }
 
     public function testRobotsTxtFollowsEachAiCrawlerChoice(): void
     {
-        $repository = IntegrationContainer::get()->get(SitemapRepository::class);
+        // The site's own robots.txt, as Settings > Search engines and AI saves each choice (rolled back with the test).
+        $container = IntegrationContainer::get();
+        $robots = $container->get(RobotsTxt::class);
+        $settings = $container->get(SearchSettings::class);
         $groups = static function (string $robots): array {
             $groups = [];
             $agent = null;
@@ -305,9 +313,11 @@ final class SearchEnginesIntegrationTest extends TestCase
             }
             return $groups;
         };
+        $this->siteMode('demo');
         foreach ([SearchSettings::ALLOW_ALL, SearchSettings::SEARCH_ONLY, SearchSettings::BLOCK_ALL] as $choice) {
-            $robots = (new Sitemap($repository, SiteMode::fixed(SiteMode::DEMO), new ArrayAdapter(), Sitemap::LIMIT, SearchSettings::fixed(['ai_crawlers' => $choice])))->robots();
-            $byAgent = $groups($robots);
+            $settings->save(['ai_crawlers' => $choice, 'google' => '', 'bing' => '']);
+            $text = $robots->document();
+            $byAgent = $groups($text);
             self::assertNotContains('Disallow /', $byAgent['*'], 'Search engines are never kept out: ' . $choice);
             self::assertContains('Disallow /admin/', $byAgent['*']);
             foreach (AiCrawlers::all() as $token => $crawler) {
@@ -320,13 +330,16 @@ final class SearchEnginesIntegrationTest extends TestCase
                     self::assertSame(['Disallow /'], $byAgent[$token], $token . ' is kept out: ' . $choice);
                 }
             }
-            self::assertStringNotContainsString('llms.txt', $robots, 'A demo site has no llms.txt.');
+            self::assertStringNotContainsString('llms.txt', $text, 'A demo site has no llms.txt.');
+            self::assertStringNotContainsString('Sitemap:', $text, 'Nor a sitemap.');
         }
-        $search = $groups((new Sitemap($repository, SiteMode::fixed(SiteMode::DEMO), new ArrayAdapter(), Sitemap::LIMIT, SearchSettings::fixed(['ai_crawlers' => SearchSettings::SEARCH_ONLY])))->robots());
+        $settings->save(['ai_crawlers' => SearchSettings::SEARCH_ONLY, 'google' => '', 'bing' => '']);
+        $search = $groups($robots->document());
         self::assertSame(['Disallow /'], $search['GPTBot'], 'A training crawler is kept out.');
         self::assertContains('Allow /', $search['OAI-SearchBot'], 'An AI search crawler comes in.');
         self::assertContains('Allow /', $search['ChatGPT-User'], 'An assistant reading a page for a person comes in.');
-        $live = (new Sitemap($repository, SiteMode::fixed(SiteMode::LIVE), new ArrayAdapter()))->robots();
+        $this->siteMode('live');
+        $live = $robots->document();
         self::assertStringContainsString("Sitemap: https://learning.example.test/sitemap.xml\n", $live);
         self::assertStringContainsString('https://learning.example.test/llms.txt', $live, 'A live site names its llms.txt.');
     }
@@ -335,7 +348,7 @@ final class SearchEnginesIntegrationTest extends TestCase
     {
         [, $slug] = $this->publishedCourse('Compost Basics');
         $container = IntegrationContainer::get();
-        $make = static fn(string $mode): LlmsTxt => new LlmsTxt(SiteMode::fixed($mode), $container->get(\CattoLearning\Configuration\SiteOwner::class), $container->get(\CattoLearning\Configuration\RuntimeSettings::class), $container->get(\CattoLearning\Search\SearchRepository::class), $container->get(\CattoLearning\Legal\LegalDocuments::class));
+        $make = static fn(string $mode): LlmsTxt => new LlmsTxt(new Sitemap([], CattoSiteMode::fixed($mode), new Installation($container->get(\CattoPHP\Settings\Settings::class)), new ArrayAdapter()), CattoSiteMode::fixed($mode), $container->get(SiteSummary::class));
         self::assertNull($make(SiteMode::DEMO)->document(), 'A demo site has none.');
         $document = (string) $make(SiteMode::LIVE)->document();
         $lines = explode("\n", $document);
@@ -359,7 +372,7 @@ final class SearchEnginesIntegrationTest extends TestCase
             $_ENV['APP_SITE_MODE'] = 'live';
             $llms = $this->send('/llms.txt');
             // The site's own Settings may hold a site mode that overrides .env; only a live one answers.
-            if ((new SiteMode(new OptionRepository(IntegrationContainer::db())))->isDemo()) self::markTestSkipped('This site\'s Settings make it a demo site.');
+            if (IntegrationContainer::get()->get(SiteMode::class)->isDemo()) self::markTestSkipped('This site\'s Settings make it a demo site.');
             self::assertSame(200, $llms->getStatusCode());
             self::assertStringStartsWith('text/plain', (string) $llms->headers->get('Content-Type'));
             self::assertStringStartsWith('# ', (string) $llms->getContent());
@@ -385,10 +398,16 @@ final class SearchEnginesIntegrationTest extends TestCase
         }
         $administration->save(['ai_crawlers' => 'none', 'google' => self::GOOGLE, 'bing' => ''], $actor);
         self::assertSame(['ai_crawlers' => 'none', 'google' => self::GOOGLE, 'bing' => ''], $settings->saved());
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE user_id = :actor AND event_key = 'platform.search_engines_changed'", ['actor' => $actor]), 'The change is in the Activity log.');
+        self::assertSame(['SEARCH_AI_CRAWLERS', 'SEARCH_GOOGLE_CODE'], array_map('strval', $this->db->fetchFirstColumn("SELECT subject_id FROM cattophp_activity WHERE actor_id = CAST(:actor AS TEXT) AND action = 'settings.changed' ORDER BY subject_id", ['actor' => $actor])), 'Each change is in the Activity log as its setting\'s.');
         $view = $administration->view();
         self::assertSame('none', $view['ai_crawlers']);
         self::assertStringStartsWith('No AI crawler may come in.', $view['summary']);
+    }
+
+    /** The site mode as Settings > Site mode saves it, for this test alone (rolled back with it). */
+    private function siteMode(string $mode): void
+    {
+        IntegrationContainer::get()->get(Settings::class)->set('APP_SITE_MODE', $mode);
     }
 
     private function send(string $path): \Symfony\Component\HttpFoundation\Response

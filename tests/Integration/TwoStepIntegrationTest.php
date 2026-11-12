@@ -28,11 +28,15 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\SignInSecurityAdministration;
 use CattoLearning\Auth\{AclService, AuthService, IdNumbers, RoleCatalog, SignInRestriction, TwoStepPolicy};
-use CattoLearning\Auth\TwoStep\{OneTimeCode, PendingSignIn, RecoveryCodes, TwoStep, TwoStepRepository, TwoStepResetCommand};
-use CattoLearning\Configuration\{SecretCipher, SiteMode};
+use CattoLearning\Auth\TwoStep\{PendingSignIn, TwoStep, TwoStepRepository, TwoStepResetCommand};
+use CattoLearning\Configuration\SiteMode;
+use CattoPHP\Security\SecretCipher;
+use CattoPHP\Security\TwoStep\{OneTimeCode, RecoveryCodes};
 use CattoLearning\Event\EventDispatcher;
-use CattoLearning\Infrastructure\Persistence\{AuditRepository, AuthSessionRepository, Database, LoginTokenRepository, OptionRepository, RoleRepository, TransactionManager, UserProfileRepository, UserRepository};
-use CattoLearning\OwnerMessages\{OwnerMessageRepository, OwnerMessages, OwnerMessageSettings, TelegramAccountRepository, TelegramClient, TelegramMessenger};
+use CattoLearning\Infrastructure\Persistence\{AuditRepository, AuthSessionRepository, Database, LoginTokenRepository, RoleRepository, TransactionManager, UserProfileRepository, UserRepository};
+use CattoLearning\OwnerMessages\{OwnerMessages, TelegramSignInAccounts};
+use CattoPHP\Activity\Actor;
+use CattoPHP\Telegram\{TelegramAccounts, TelegramBot, TelegramClient, TelegramLog, TelegramMessenger, TelegramState, TelegramWords};
 use CattoLearning\Tests\Support\{CheckIdNumbers, DevelopmentFixture, FakeMailer, IntegrationContainer, TelegramStandIn};
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -45,7 +49,6 @@ final class TwoStepIntegrationTest extends TestCase
     private Database $db;
     private DevelopmentFixture $fixture;
     private MockClock $clock;
-    private OptionRepository $options;
     private TwoStep $twoStep;
     private TwoStepPolicy $policy;
     private FakeMailer $mailer;
@@ -62,12 +65,13 @@ final class TwoStepIntegrationTest extends TestCase
         $container = IntegrationContainer::get();
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable());
-        $this->options = $container->get(OptionRepository::class);
-        $this->options->set(OwnerMessageSettings::ADDRESS_OPTION, 'http://127.0.0.1:9');
-        (new SignInRestriction($this->options))->reset();
-        $this->policy = new TwoStepPolicy($this->options);
+        $db = $this->db;
+        self::assertInstanceOf(\CattoLearning\Infrastructure\Persistence\DbalDatabase::class, $db);
+        (new TelegramState($db->connection()))->set(TelegramState::ADDRESS, 'http://127.0.0.1:9');
+        (IntegrationContainer::get()->get(SignInRestriction::class))->reset();
+        $this->policy = IntegrationContainer::get()->get(TwoStepPolicy::class);
         $this->policy->save(TwoStepPolicy::CHOICE);
-        $this->twoStep = new TwoStep($container->get(TwoStepRepository::class), $container->get(SecretCipher::class), new TransactionManager($this->db), $container->get(AuditRepository::class), $this->clock);
+        $this->twoStep = \CattoLearning\Tests\Support\TwoStepFixture::twoStep($this->clock);
         $this->mailer = new FakeMailer();
         $this->admin = $this->person('Naledi Administrator')['id'];
         $container->get(RoleRepository::class)->assign($this->admin, RoleCatalog::ADMIN);
@@ -93,7 +97,7 @@ final class TwoStepIntegrationTest extends TestCase
         $code = $this->code($secret);
         self::assertSame('app', $this->twoStep->confirm($who, $code));
         self::assertNull($this->twoStep->confirm($who, $code), 'Replaying a code fails.');
-        $stored = (string) $this->db->fetchOne('SELECT secret_encrypted FROM user_two_step WHERE user_id = :user', ['user' => $who]);
+        $stored = (string) $this->db->fetchOne('SELECT secret_encrypted FROM cattophp_two_step WHERE account_id = CAST(:user AS TEXT)', ['user' => $who]);
         self::assertStringNotContainsString($secret, $stored, 'The key is kept encrypted.');
         self::assertSame(['on' => true, 'left' => 8], array_intersect_key($this->twoStep->state($who), ['on' => 1, 'left' => 1]));
     }
@@ -105,7 +109,7 @@ final class TwoStepIntegrationTest extends TestCase
         self::assertSame('recovery', $this->twoStep->confirm($who, strtolower(str_replace('-', ' ', $codes[0]))), 'Small letters and a space instead of the hyphen.');
         self::assertNull($this->twoStep->confirm($who, $codes[0]), 'Once only.');
         self::assertSame(7, $this->twoStep->state($who)['left']);
-        $hashes = implode(' ', $this->db->fetchFirstColumn('SELECT code_hash FROM user_two_step_recovery WHERE user_id = :user', ['user' => $who]));
+        $hashes = (string) $this->db->fetchOne('SELECT recovery_hashes::text FROM cattophp_two_step WHERE account_id = CAST(:user AS TEXT)', ['user' => $who]);
         foreach ($codes as $code) self::assertStringNotContainsString(str_replace('-', '', $code), str_replace('-', '', $hashes), 'Only hashes are kept.');
         try {
             $this->twoStep->newRecoveryCodes($who, '123');
@@ -135,7 +139,7 @@ final class TwoStepIntegrationTest extends TestCase
         self::assertSame('/account/certificates', $auth->passTwoStep($this->code($secret)));
         self::assertSame(1, $this->sessions($person['id']));
         self::assertNull($auth->pendingSignIn(), 'The waiting sign-in is gone.');
-        $login = $this->db->fetchAssociative("SELECT metadata->>'via' AS via, metadata->>'two_step' AS two_step FROM audit_log WHERE event_key = 'auth.login' AND user_id = :user", ['user' => $person['id']]);
+        $login = $this->db->fetchAssociative("SELECT details->>'via' AS via, details->>'two_step' AS two_step FROM cattophp_activity WHERE action = 'auth.login' AND actor_id = CAST(:user AS TEXT)", ['user' => $person['id']]);
         self::assertSame(['via' => 'email', 'two_step' => 'app'], $login);
     }
 
@@ -145,12 +149,12 @@ final class TwoStepIntegrationTest extends TestCase
         [, $codes] = $this->turnOn($person['id']);
         $telegram = new TelegramStandIn();
         $container = IntegrationContainer::get();
-        $settings = $container->get(OwnerMessageSettings::class);
+        $settings = $container->get(TelegramBot::class);
         $settings->forget();
-        $settings->setKey(TelegramStandIn::KEY, TelegramStandIn::BOT, $this->admin);
-        $settings->setSignIn(true, $this->admin);
-        $messenger = new TelegramMessenger($settings, $container->get(OwnerMessageRepository::class), new TelegramClient($telegram->client()));
-        $container->get(TelegramAccountRepository::class)->connect($person['id'], '5559001', 'thandi_m');
+        $settings->setKey(TelegramStandIn::KEY, TelegramStandIn::BOT, new Actor((string) $this->admin, (string) $this->admin));
+        $settings->setSignIn(true, new Actor((string) $this->admin, (string) $this->admin));
+        $messenger = new TelegramMessenger($settings, $container->get(TelegramLog::class), new TelegramClient($telegram->client()));
+        $container->get(TelegramAccounts::class)->connect((string) $person['id'], '5559001', 'thandi_m');
         $auth = $this->auth($messenger);
         $row = (int) $auth->requestTelegramLogin('thandi_m');
         $messenger->deliverHeld();
@@ -159,7 +163,7 @@ final class TwoStepIntegrationTest extends TestCase
         self::assertSame(0, $this->sessions($person['id']));
         self::assertSame('/account/courses', $auth->passTwoStep($codes[3]), 'A recovery code does the same job.');
         self::assertSame(1, $this->sessions($person['id']));
-        self::assertSame('recovery', $this->db->fetchOne("SELECT metadata->>'two_step' FROM audit_log WHERE event_key = 'auth.login' AND user_id = :user", ['user' => $person['id']]));
+        self::assertSame('recovery', $this->db->fetchOne("SELECT details->>'two_step' FROM cattophp_activity WHERE action = 'auth.login' AND actor_id = CAST(:user AS TEXT)", ['user' => $person['id']]));
     }
 
     public function testFiveWrongCodesOrTenMinutesEndTheSignIn(): void
@@ -241,7 +245,7 @@ final class TwoStepIntegrationTest extends TestCase
         $this->policy->save(TwoStepPolicy::CHOICE);
         $this->twoStep->turnOff($who, $this->code($secret), $this->auth()->twoStepRequired($who, 'x@example.test'));
         self::assertFalse($this->twoStep->isOn($who));
-        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM user_two_step_recovery WHERE user_id = :user', ['user' => $who]), 'Its recovery codes go with it.');
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_two_step WHERE account_id = CAST(:user AS TEXT)', ['user' => $who]), 'Its recovery codes go with it.');
     }
 
     public function testTheAdministratorsResetWorksAndNeverOnOneself(): void
@@ -250,17 +254,17 @@ final class TwoStepIntegrationTest extends TestCase
         $this->turnOn($who);
         $this->turnOn($this->admin);
         $container = IntegrationContainer::get();
-        $admin = new SignInSecurityAdministration($this->policy, $this->twoStep, $container->get(TelegramAccountRepository::class), $container->get(AuditRepository::class));
+        $admin = new SignInSecurityAdministration($this->policy, $this->twoStep, $container->get(TelegramAccounts::class), $container->get(AuditRepository::class));
         self::assertSame(['on' => true, 'left' => 8], array_intersect_key($admin->personView($who)['two_step'], ['on' => 1, 'left' => 1]));
         $this->assertRefused(fn() => $admin->resetTwoStep($this->admin, $this->admin), TwoStep::OWN_RESET);
         self::assertTrue($this->twoStep->isOn($this->admin));
         self::assertTrue($admin->resetTwoStep($who, $this->admin));
         self::assertFalse($this->twoStep->isOn($who));
-        self::assertSame((string) $who, $this->db->fetchOne("SELECT metadata->>'user_id' FROM audit_log WHERE event_key = 'auth.two_step_reset' AND user_id = :actor", ['actor' => $this->admin]), 'It is in the activity log, by whom.');
+        self::assertSame((string) $who, $this->db->fetchOne("SELECT subject_id FROM cattophp_activity WHERE action = 'two_step.reset' AND subject_type = 'account' AND actor_id = CAST(:actor AS TEXT)", ['actor' => $this->admin]), 'It is in the activity log, by whom.');
 
         // A sole administrator who lost everything: the console, by email address.
         $email = (string) $this->db->fetchOne('SELECT email FROM user_emails WHERE user_id = :user', ['user' => $this->admin]);
-        $command = new CommandTester(new TwoStepResetCommand($this->twoStep, IntegrationContainer::get()->get(TwoStepRepository::class)));
+        $command = new CommandTester(new TwoStepResetCommand($this->twoStep, IntegrationContainer::get()->get(\CattoLearning\Auth\CattolmsAccounts::class)));
         self::assertSame(0, $command->execute(['email' => strtoupper($email)]));
         self::assertFalse($this->twoStep->isOn($this->admin));
         self::assertSame(1, $command->execute(['email' => 'nobody-' . $this->fixture->suffix() . '@inbox.test']));
@@ -269,12 +273,12 @@ final class TwoStepIntegrationTest extends TestCase
     public function testThePolicySavedInSettingsOverridesTheEnvironmentAndResetReturnsToIt(): void
     {
         $container = IntegrationContainer::get();
-        $admin = new SignInSecurityAdministration($this->policy, $this->twoStep, $container->get(TelegramAccountRepository::class), $container->get(AuditRepository::class));
+        $admin = new SignInSecurityAdministration($this->policy, $this->twoStep, $container->get(TelegramAccounts::class), $container->get(AuditRepository::class));
         $admin->savePolicy('everyone', $this->admin);
         self::assertSame(['EVERYONE', 'database'], [$admin->settingsView()['value'], $admin->settingsView()['source']]);
         $admin->resetPolicy($this->admin);
         self::assertSame([TwoStepPolicy::CHOICE, 'environment'], [$admin->settingsView()['value'], $admin->settingsView()['source']], 'phpunit.xml says CHOICE.');
-        self::assertSame(2, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE user_id = :actor AND event_key IN ('settings.two_step_saved', 'platform.setting_reset')", ['actor' => $this->admin]));
+        self::assertSame(2, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE actor_id = CAST(:actor AS TEXT) AND action IN ('settings.two_step_saved', 'platform.setting_reset')", ['actor' => $this->admin]));
     }
 
     // Helpers.
@@ -306,14 +310,15 @@ final class TwoStepIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $cipher = $container->get(SecretCipher::class);
-        $settings = $container->get(OwnerMessageSettings::class);
+        $settings = $container->get(TelegramBot::class);
+        $words = new TelegramWords(new \CattoPHP\Runtime\SiteMode(null, 'live'), new \CattoPHP\Installation\Installation($container->get(\CattoPHP\Settings\Settings::class)));
 
         return new AuthService(new TransactionManager($this->db), $container->get(UserRepository::class), $container->get(RoleRepository::class), $container->get(AclService::class),
             $container->get(LoginTokenRepository::class), $container->get(AuthSessionRepository::class), $container->get(AuditRepository::class), $this->mailer, $container->get(EventDispatcher::class),
-            $container->get(UserProfileRepository::class), null, SiteMode::fixed('live'), new SignInRestriction($this->options), idNumbers: $container->get(IdNumbers::class),
-            ownerMessages: new OwnerMessages($settings, $container->get(OwnerMessageRepository::class), SiteMode::fixed('live')),
+            $container->get(UserProfileRepository::class), null, SiteMode::fixed('live'), IntegrationContainer::get()->get(SignInRestriction::class), idNumbers: $container->get(IdNumbers::class),
+            ownerMessages: new OwnerMessages($settings, $container->get(TelegramLog::class), $words, new \CattoLearning\OwnerMessages\TelegramRepository($this->db)),
             twoStep: $this->twoStep, twoStepPolicy: $this->policy, pending: new PendingSignIn($cipher, $this->clock),
-            telegramAccounts: $container->get(TelegramAccountRepository::class), telegram: $messenger, telegramSettings: $messenger === null ? null : $settings);
+            telegramAccounts: new TelegramSignInAccounts($container->get(TelegramAccounts::class), new \CattoLearning\OwnerMessages\TelegramRepository($this->db)), telegram: $messenger, telegramSettings: $messenger === null ? null : $settings);
     }
 
     /** The token in the latest email link. */
@@ -327,12 +332,12 @@ final class TwoStepIntegrationTest extends TestCase
 
     private function sessions(int $userId): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM auth_sessions WHERE user_id = :user', ['user' => $userId]);
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_sessions WHERE account_id = CAST(:user AS TEXT)', ['user' => $userId]);
     }
 
     private function logins(int $userId): int
     {
-        return (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'auth.login' AND user_id = :user", ['user' => $userId]);
+        return (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'auth.login' AND actor_id = CAST(:user AS TEXT)", ['user' => $userId]);
     }
 
     private function assertRefused(callable $attempt, string $words): void

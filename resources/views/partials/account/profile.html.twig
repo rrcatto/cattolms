@@ -1,5 +1,5 @@
 {#
-  The identity block that used to open this page is now partials/account/identity-head.html.twig,
+  The identity block that used to open this page is now CattoPHP's identity band (@CattoPHP/page/identity.html.twig),
   included by the Account section page so that all six pages open with it rather than this one.
 #}
 {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
@@ -102,7 +102,7 @@
 		scripts at the end of the body, so emitting it here keeps it first without asking five
 		themes to carry a tag for one page.
 #}
-		{{ importmap() }}
+		{{ importmap('app', {nonce: csp_nonce()}) }}
 		<div class="cl-profile-image-panel" {{ stimulus_controller('profile-image', {size: profile_image_size}) }}>
 			<div class="cl-profile-image-current" {{ stimulus_target('profile-image', 'placeholder') }}>
 				{% if profile_image_url %}

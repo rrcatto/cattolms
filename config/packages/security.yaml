@@ -33,8 +33,8 @@ security:
             stateless: true
             provider: api_tokens
             custom_authenticators:
-                - CattoLearning\Api\Security\ApiTokenAuthenticator
-            entry_point: CattoLearning\Api\Security\ApiTokenAuthenticator
+                - CattoPHP\Api\ApiTokenAuthenticator
+            entry_point: CattoPHP\Api\ApiTokenAuthenticator
 
         # The web firewall. It authenticates every request from the session the platform already
         # keeps and refuses none: an anonymous visitor is not an error on a platform whose catalogue

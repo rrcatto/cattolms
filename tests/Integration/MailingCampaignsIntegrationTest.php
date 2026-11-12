@@ -39,37 +39,41 @@ namespace CattoLearning\Tests\Integration;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteOwner;
-use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Mailing\CampaignRepository;
 use CattoLearning\Mailing\CampaignService;
-use CattoLearning\Mailing\CattomailClient;
-use CattoLearning\Mailing\CattomailTransport;
-use CattoLearning\Mailing\CattomailWebhook;
+use CattoLearning\Mailing\CattolmsCampaigns;
 use CattoLearning\Mailing\EmailRenderer;
 use CattoLearning\Mailing\MailingAssets;
+use CattoLearning\Mailing\MailingConsents;
 use CattoLearning\Mailing\MailingForwards;
 use CattoLearning\Mailing\MailingLists;
-use CattoLearning\Mailing\MailingConsents;
-use CattoLearning\Mailing\MailingOutcomes;
 use CattoLearning\Mailing\MailingRepository;
-use CattoLearning\Mailing\MailingSender;
 use CattoLearning\Mailing\MailingSettings;
-use CattoLearning\Mailing\MailingTransportRefused;
-use CattoLearning\Mailing\MailingTransports;
-use CattoLearning\Mailing\SmtpMailingTransport;
 use CattoLearning\Mailing\UpdateDelivery;
 use CattoLearning\Mailing\UpdateRecorder;
 use CattoLearning\Mailing\UpdateRepository;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
+use CattoLearning\Tests\Support\RecordingMailingTransport;
+use CattoPHP\Mailing\Campaigns;
+use CattoPHP\Mailing\CampaignSender;
+use CattoPHP\Mailing\CattoMail\CattoMailClient;
+use CattoPHP\Mailing\CattoMail\CattoMailEvents;
+use CattoPHP\Mailing\CattoMail\CattoMailTransport;
+use CattoPHP\Mailing\Copies;
+use CattoPHP\Mailing\CopyOutcomes;
+use CattoPHP\Mailing\MailingSettings as SendingSettings;
+use CattoPHP\Mailing\MailingTransports;
+use CattoPHP\Mailing\Subscriptions;
+use CattoPHP\Mailing\Suppressions;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class MailingCampaignsIntegrationTest extends TestCase
 {
@@ -114,7 +118,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
         // A course of the test's own: its followers are only the test's people (the site's News list has the owner's own).
         $course = $this->ownCourse($admin, 'Walking Tours');
         foreach ([$first, $second, $barred] as $person) $consents->subscribe($person, 'course', $course, 'checkout');
-        $this->repo()->suppress('chris-' . $suffix . '@example.test', 'manual', 'Asked never to be emailed.', null, $admin);
+        $this->get(Suppressions::class)->suppress('chris-' . $suffix . '@example.test', 'manual', 'Asked never to be emailed.', null, (string) $admin);
         $this->rules['hourly_limit'] = 1;
 
         $service = $this->service();
@@ -154,8 +158,8 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $delivery = $this->repo()->deliveries($id, 'handed', 1, 0)[0];
         $company = $this->fixture->createCompany($admin, 'Mail Co', 'mailco-' . $suffix . '.test');
         $consents->subscribe($first, 'course', $this->fixture->createCourse($admin, $company, 'mail-course-' . $suffix, 'Mail course'), 'follow_button');
-        $this->get(MailingOutcomes::class)->record($this->repo()->deliveryById((int) $delivery['id']), 'complained');
-        self::assertTrue($this->repo()->isSuppressed('ayanda-' . $suffix . '@example.test'));
+        $this->get(CopyOutcomes::class)->record($this->repo()->deliveryById((int) $delivery['id']), 'complained');
+        self::assertTrue($this->get(Suppressions::class)->isSuppressed('ayanda-' . $suffix . '@example.test'));
         self::assertSame([], $this->get(MailingRepository::class)->subscribedListIds($first));
         self::assertNotNull($this->repo()->deliveryById((int) $delivery['id'])['unsubscribed_at']);
     }
@@ -179,12 +183,12 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $sender->run();
         $handed = $this->repo()->deliveries($id, 'handed', 10, 0);
         self::assertCount(2, $handed);
-        $this->get(MailingOutcomes::class)->record($handed[0], 'bounced', 'No such mailbox');
+        $this->get(CopyOutcomes::class)->record($handed[0], 'bounced', 'No such mailbox');
         $sender->run();
         $campaign = $this->repo()->find($id);
         self::assertSame('paused', $campaign['status']);
         self::assertStringStartsWith('Paused by itself: 1 of the 2 emails sent bounced', (string) $campaign['status_note']);
-        self::assertTrue($this->repo()->isSuppressed((string) $handed[0]['email']), 'A hard bounce is never emailed again.');
+        self::assertTrue($this->get(Suppressions::class)->isSuppressed((string) $handed[0]['email']), 'A hard bounce is never emailed again.');
 
         $service->resume($id, $admin);
         $campaign = $this->repo()->find($id);
@@ -227,7 +231,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
         self::assertSame('2 new lessons or sections in Payroll Advanced', $byEvent['content_added']['headline'], 'Changes of one kind merge while held.');
         self::assertStringStartsWith('Payroll Advanced: now R', $byEvent['price_lowered']['headline']);
         self::assertStringContainsString(', was R', $byEvent['price_lowered']['headline']);
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM mailing_campaigns WHERE kind IN ('digest', 'updates') AND created_at >= NOW() - INTERVAL '1 minute' AND name LIKE '%Payroll%'"), 'Nothing is sent: they are held.');
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_mailing_campaigns WHERE kind IN ('digest', 'updates') AND created_at >= NOW() - INTERVAL '1 minute' AND name LIKE '%Payroll%'"), 'Nothing is sent: they are held.');
     }
 
     public function testReleasedUpdatesGoAsEachPersonChoseToTheFollowersOfWhatTheyAreAboutOnceWithWhy(): void
@@ -251,7 +255,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $consents->subscribe($perList, 'category', $child, 'follow_button');
         $consents->chooseHow($perList, 'per_list', 'daily');
         // They followed before the release on this test's frozen clock: an update never goes to someone who followed after it.
-        $this->db->executeStatement("UPDATE mailing_subscriptions SET changed_at = '2026-11-02 09:00:00+00' WHERE user_id IN (:a, :b, :c)", ['a' => $instant, 'b' => $weekly, 'c' => $perList]);
+        $this->db->executeStatement("UPDATE cattophp_mailing_subscriptions SET changed_at = '2026-11-02 09:00:00+00' WHERE account IN (CAST(:a AS TEXT), CAST(:b AS TEXT), CAST(:c AS TEXT))", ['a' => $instant, 'b' => $weekly, 'c' => $perList]);
 
         $updates = $this->get(UpdateRepository::class);
         $about = $updates->create('recorded', 'first_published', $course, null, 'New course: Tax for Small Businesses', 'From R1 200,00.', 'https://example.test/courses/tax', null);
@@ -271,7 +275,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $this->clock->modify('+1 minute');
         $consents->subscribe($late, 'tag', $tag, 'follow_button');
         // The database's clock is not the test's: the follow is dated after the release, as it would be.
-        $this->db->executeStatement('UPDATE mailing_subscriptions SET changed_at = :at WHERE user_id = :u', ['at' => '2026-11-02 10:01:00+00', 'u' => $late]);
+        $this->db->executeStatement('UPDATE cattophp_mailing_subscriptions SET changed_at = :at WHERE account = CAST(:u AS TEXT)', ['at' => '2026-11-02 10:01:00+00', 'u' => $late]);
         // Monday 2 November is no weekly day (Friday) but every day is the daily one.
         $this->clock->modify('+1 day');
         self::assertSame(1, $delivery->digests(), 'The daily digest, for the one person who chose it.');
@@ -345,13 +349,13 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $forwards = $this->get(MailingForwards::class);
         $unsent = $forwards->copy($token);
         self::assertNull($unsent, 'A copy not yet sent has no web copy.');
-        $this->db->executeStatement("UPDATE mailing_deliveries SET status = 'handed', handed_at = NOW() WHERE token = :t", ['t' => $token]);
+        $this->db->executeStatement("UPDATE cattophp_mailing_copies SET status = 'handed', handed_at = NOW() WHERE token = :t", ['t' => $token]);
         $copy = $forwards->copy($token) ?? self::fail('A copy sent has its web copy.');
         $web = $forwards->webCopy($copy);
         self::assertStringContainsString('Hello Jabu, here is our news.', $web['html'], 'The person\'s own copy.');
         self::assertStringContainsString('/m/f/' . $token, $web['html'], 'With Forward to a friend.');
         self::assertStringNotContainsString('/m/o/' . $token, $web['html'], 'And nothing recorded.');
-        $this->repo()->suppress('blocked-' . $suffix . '@example.test', 'complaint', 'Marked as spam.', null, null);
+        $this->get(Suppressions::class)->suppress('blocked-' . $suffix . '@example.test', 'complaint', 'Marked as spam.');
         foreach ([['not an address', 'Write your friend\'s email address in full, such as thandi@example.com.'], ['JABU-' . $suffix . '@example.test', 'That is your own address. Write your friend\'s.'],
             ['blocked-' . $suffix . '@example.test', 'We do not email that address.']] as [$address, $refusal]) {
             try {
@@ -361,7 +365,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
                 self::assertSame($refusal, $refused->getMessage());
             }
         }
-        $this->db->executeStatement("INSERT INTO mailing_forwards (delivery_id, user_id, to_email, token) SELECT d.id, d.user_id, 'friend' || g || '-' || :s || '@example.test', md5(random()::text) FROM mailing_deliveries d, generate_series(1, 5) g WHERE d.token = :t",
+        $this->db->executeStatement("INSERT INTO cattophp_mailing_forwards (copy_id, account, to_email, token) SELECT d.id, d.account, 'friend' || g || '-' || :s || '@example.test', md5(random()::text) FROM cattophp_mailing_copies d, generate_series(1, 5) g WHERE d.token = :t",
             ['s' => $suffix, 't' => $token]);
         try {
             $forwards->forward($copy, 'another-' . $suffix . '@example.test', '', '');
@@ -370,41 +374,9 @@ final class MailingCampaignsIntegrationTest extends TestCase
             self::assertSame('This email has been forwarded to 5 friends already, the most it can be.', $refused->getMessage());
         }
         self::assertSame(5, $forwards->countFor($campaign));
-        $friend = (string) $this->db->fetchOne("SELECT token FROM mailing_forwards WHERE to_email = :e", ['e' => 'friend1-' . $suffix . '@example.test']);
+        $friend = (string) $this->db->fetchOne("SELECT token FROM cattophp_mailing_forwards WHERE to_email = :e", ['e' => 'friend1-' . $suffix . '@example.test']);
         self::assertSame('friend1-' . $suffix . '@example.test', $forwards->neverEmail($friend));
-        self::assertTrue($this->repo()->isSuppressed('friend1-' . $suffix . '@example.test'), 'Never email me puts the friend on Addresses never emailed.');
-    }
-
-    public function testCattomailIsGivenOneJobPerListWithEachCopysTokenAndItsOwnTrackingOff(): void
-    {
-        $requests = [];
-        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$requests): MockResponse {
-            $requests[] = ['method' => $method, 'url' => $url, 'body' => json_decode((string) ($options['body'] ?? 'null'), true), 'headers' => $options['normalized_headers'] ?? []];
-            if (str_ends_with($url, '/send-jobs')) return new MockResponse((string) json_encode(['id' => 'job-1', 'status' => 'collecting']), ['http_code' => 201]);
-            if (str_contains($url, '/messages')) return new MockResponse((string) json_encode(['data' => [['id' => 'm1', 'external_recipient_reference' => str_repeat('a', 32), 'current_status' => 'remote_accepted'], ['id' => 'm2', 'external_recipient_reference' => str_repeat('b', 32), 'current_status' => 'queued']], 'pagination' => ['next_cursor' => null]]), ['http_code' => 200]);
-
-            return new MockResponse((string) json_encode(['ok' => true]), ['http_code' => str_ends_with($url, '/submit') ? 202 : 201]);
-        });
-        $this->values = ['cattomail_url' => 'https://mail.example.test', 'cattomail_key' => 'shk_test'];
-        $transport = new CattomailTransport(new CattomailClient($client, $this->settings()));
-        $copy = static fn(int $id, string $token): array => ['delivery_id' => $id, 'token' => $token, 'to' => $token . '@example.test', 'subject' => 'Hi', 'html' => '<p>Hi</p>', 'text' => 'Hi', 'unsubscribe_url' => 'https://news.example.test/m/u/' . $token, 'list_id' => 7, 'list_name' => 'News and Updates'];
-        $result = $transport->send(['id' => 5, 'kind' => 'message'], [$copy(1, str_repeat('a', 32)), $copy(2, str_repeat('b', 32))], ['email' => 'news@news.example.test', 'name' => 'Site']);
-        self::assertSame(['job-1', 'job-1'], array_column($result['handed'], 'job_id'));
-        self::assertSame(['https://mail.example.test/v1/send-jobs', 'https://mail.example.test/v1/send-jobs/job-1/recipients', 'https://mail.example.test/v1/send-jobs/job-1/submit'], array_column($requests, 'url'));
-        $job = $requests[0]['body'];
-        self::assertSame('subscription', $job['message_class']);
-        self::assertSame(['opens' => false, 'clicks' => false], $job['tracking'], 'The copies carry the site\'s own tracking.');
-        self::assertSame('News and Updates <list-7.news.example.test>', $job['list_id']);
-        self::assertSame([str_repeat('a', 32), str_repeat('b', 32)], array_column($requests[1]['body']['recipients'], 'external_recipient_reference'));
-        self::assertSame('https://news.example.test/m/u/' . str_repeat('a', 32), $requests[1]['body']['recipients'][0]['unsubscribe_url']);
-        self::assertNotEmpty($requests[0]['headers']['idempotency-key'] ?? null);
-        self::assertSame(['Authorization: Bearer shk_test'], $requests[0]['headers']['authorization'] ?? null);
-        self::assertSame([['token' => str_repeat('a', 32), 'message_id' => 'm1', 'status' => 'delivered'], ['token' => str_repeat('b', 32), 'message_id' => 'm2', 'status' => null]], $transport->outcomes('job-1'));
-
-        $refusing = new CattomailTransport(new CattomailClient(new MockHttpClient(new MockResponse((string) json_encode(['type' => 'https://errors.example/submit-rejected', 'title' => 'Submit rejected', 'detail' => 'The sending domain has no active DKIM key.']), ['http_code' => 422])), $this->settings()));
-        $this->expectException(MailingTransportRefused::class);
-        $this->expectExceptionMessage('The sending domain has no active DKIM key.');
-        $refusing->send(['id' => 5, 'kind' => 'message'], [$copy(1, str_repeat('a', 32))], ['email' => 'news@news.example.test', 'name' => 'Site']);
+        self::assertTrue($this->get(Suppressions::class)->isSuppressed('friend1-' . $suffix . '@example.test'), 'Never email me puts the friend on Addresses never emailed.');
     }
 
     public function testCattomailsEventsAreKeptOnceAndAHardBounceIsRecorded(): void
@@ -418,14 +390,15 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $this->repo()->addDeliveries($campaign, [['user_id' => $person, 'email' => 'gugu-' . $suffix . '@example.test', 'list_id' => $list, 'reasons' => ['News and Updates']]]);
         $delivery = $this->repo()->deliveries($campaign, '', 1, 0)[0];
         $this->repo()->updateDelivery((int) $delivery['id'], ['status' => 'handed', 'transport' => 'cattomail', 'transport_job_id' => 'job-9', 'handed_at' => '2026-11-02 10:00:00+00']);
-        $webhook = $this->get(CattomailWebhook::class);
+        $events = $this->get(CattoMailEvents::class);
         $body = (string) json_encode(['id' => 'evt-' . $suffix, 'type' => 'message.hard_bounced', 'data' => ['message' => ['id' => 'msg-1', 'external_recipient_reference' => $delivery['token']], 'event' => ['detail' => '550 5.1.1 No such user']]]);
-        self::assertTrue($webhook->receive('evt-' . $suffix, 'message.hard_bounced', $body));
-        self::assertFalse($webhook->receive('evt-' . $suffix, 'message.hard_bounced', $body), 'A repeat is kept once.');
-        self::assertGreaterThanOrEqual(1, $webhook->process());
+        self::assertTrue($events->receive('evt-' . $suffix, 'message.hard_bounced', $body));
+        self::assertFalse($events->receive('evt-' . $suffix, 'message.hard_bounced', $body), 'A repeat is kept once.');
+        self::assertGreaterThanOrEqual(1, $events->process());
+        self::assertSame('Recorded: a hard bounce.', $events->recent('message.hard_bounced', 1)[0]['outcome'], 'cattolms\'s handler said what it did.');
         $after = $this->repo()->deliveryById((int) $delivery['id']);
         self::assertSame(['bounced', 'msg-1', '550 5.1.1 No such user'], [$after['status'], $after['transport_message_id'], $after['status_detail']]);
-        self::assertTrue($this->repo()->isSuppressed('gugu-' . $suffix . '@example.test'));
+        self::assertTrue($this->get(Suppressions::class)->isSuppressed('gugu-' . $suffix . '@example.test'));
         self::assertTrue($this->get(MailingConsents::class)->isSubscribed($person, 'news'), 'A bounce is not a choice: what they follow stays.');
     }
 
@@ -443,7 +416,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $campaign = $this->repo()->create('message', 'Stop', $admin, ['subject' => 'Hi', 'status' => 'sent', 'list_ids' => [$list]]);
         $this->repo()->addDeliveries($campaign, [['user_id' => $person, 'email' => 'hlengiwe-' . $suffix . '@example.test', 'list_id' => $list, 'reasons' => ['News and Updates']]]);
         $delivery = $this->repo()->deliveryByToken((string) $this->repo()->deliveries($campaign, '', 1, 0)[0]['token']);
-        $outcomes = $this->get(MailingOutcomes::class);
+        $outcomes = $this->get(CopyOutcomes::class);
         self::assertSame(1, $outcomes->unsubscribe($delivery, false, 'unsubscribe_link'));
         self::assertFalse($consents->isSubscribed($person, 'news'));
         self::assertTrue($consents->isSubscribed($person, 'course', $course), 'Only the email\'s list stops.');
@@ -505,27 +478,18 @@ final class MailingCampaignsIntegrationTest extends TestCase
         $this->sent[] = $copy;
     }
 
-    private function sender(): MailingSender
+    private function sender(): CampaignSender
     {
         $settings = $this->settings();
-        $smtp = new class ($settings, $this->get(RuntimeSettings::class), $this->get(GeneratedDomainRouter::class)) extends SmtpMailingTransport {
-            public ?MailingCampaignsIntegrationTest $test = null;
+        $smtp = new RecordingMailingTransport($this->recordSent(...));
+        $sending = new SendingSettings();
+        $transports = new MailingTransports($sending, $smtp, new CattoMailTransport(new CattoMailClient(new MockHttpClient(), $sending), 'cattolms'));
+        $project = new CattolmsCampaigns($this->repo(), $this->renderer($settings), $settings, $this->get(RuntimeSettings::class));
+        /** @var Connection $connection */
+        $connection = IntegrationContainer::get()->get('doctrine.dbal.default_connection');
 
-            public function send(array $campaign, array $copies, array $sender): array
-            {
-                $handed = [];
-                foreach ($copies as $copy) {
-                    $this->test->recordSent($copy);
-                    $handed[$copy['delivery_id']] = ['job_id' => null, 'message_id' => 'test-' . $copy['delivery_id']];
-                }
-
-                return ['handed' => $handed, 'failed' => []];
-            }
-        };
-        $smtp->test = $this;
-        $transports = new MailingTransports($settings, $smtp, new CattomailTransport(new CattomailClient(new MockHttpClient(), $settings)));
-
-        return new MailingSender($this->repo(), $this->renderer($settings), $transports, $settings, $this->get(MailingOutcomes::class), $this->get(MailingConsents::class), $this->get(RuntimeSettings::class), $this->get(TransactionManager::class), $this->clock);
+        return new CampaignSender($this->get(Campaigns::class), $this->get(Copies::class), $transports, $this->get(CopyOutcomes::class), $this->get(Subscriptions::class),
+            $this->get(Suppressions::class), $project, $connection, $this->clock);
     }
 
     private function renderer(MailingSettings $settings): EmailRenderer
@@ -535,7 +499,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
 
     private function service(): CampaignService
     {
-        return new CampaignService($this->repo(), $this->get(MailingRepository::class), $this->renderer($this->settings()), $this->get(MailingAssets::class), $this->get(RuntimeSettings::class), $this->get(TransactionManager::class), $this->get(AuditRepository::class), $this->clock);
+        return new CampaignService($this->repo(), $this->get(MailingRepository::class), $this->renderer($this->settings()), $this->get(MailingAssets::class), $this->get(RuntimeSettings::class), $this->get(TransactionManager::class), $this->get(AuditRepository::class), $this->clock, $this->mailer());
     }
 
     private function recorder(): UpdateRecorder
@@ -558,7 +522,7 @@ final class MailingCampaignsIntegrationTest extends TestCase
     private function copiesOf(int $updateId): array
     {
         $copies = [];
-        foreach ($this->db->fetchAllAssociative('SELECT d.id, d.user_id, d.list_id, d.content FROM mailing_update_deliveries u JOIN mailing_deliveries d ON d.id = u.delivery_id WHERE u.update_id = :u', ['u' => $updateId]) as $row) {
+        foreach ($this->db->fetchAllAssociative('SELECT d.id, CAST(d.account AS BIGINT) AS user_id, d.list_id, d.content FROM mailing_update_deliveries u JOIN cattophp_mailing_copies d ON d.id = u.delivery_id WHERE u.update_id = :u', ['u' => $updateId]) as $row) {
             $copies[(int) $row['user_id']] = ['list_id' => (int) $row['list_id'], 'content' => (array) json_decode((string) $row['content'], true)];
         }
 
@@ -577,6 +541,15 @@ final class MailingCampaignsIntegrationTest extends TestCase
     private function repo(): CampaignRepository
     {
         return $this->get(CampaignRepository::class);
+    }
+
+    /** CattoPHP's mailer, which sends a campaign's test (CattoPHP Phase 2, step 7b). */
+    private function mailer(): \CattoPHP\Mail\Mailer
+    {
+        $mailer = IntegrationContainer::get()->get('cattolms.cattophp_mailer');
+        self::assertInstanceOf(\CattoPHP\Mail\Mailer::class, $mailer);
+
+        return $mailer;
     }
 
     /**

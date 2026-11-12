@@ -108,7 +108,7 @@ final class CourseRestructurerIntegrationTest extends TestCase
             self::assertFalse($restructurer->needsArranging($course), 'An arranged course is not arranged again.');
             $before = count($rows);
             self::assertCount($before, $items->structure($course));
-            self::assertSame(1, (int) $db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'course_content.arranged_into_modules' AND metadata->>'course_id' = :c", ['c' => (string) $course]));
+            self::assertSame(1, (int) $db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'course_content.arranged_into_modules' AND details->>'course_id' = :c", ['c' => (string) $course]));
         } finally {
             @unlink($temporary);
             if ($key !== null) {

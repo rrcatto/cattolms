@@ -15,6 +15,11 @@ person's digest on its day), the campaigns are sent at their pace within the sen
 minutes. Says in a sentence what it did.
 
 Changelog:
+2026/11/12 SAST
+- News is sent by CattoPHP's sender (CampaignSender, CattoPHP Phase 4, step 9, part 3), given cattolms's side by
+  CattolmsCampaigns.
+- catto-mail's events are CattoPHP's to keep and work through (CattoMailEvents, CattoPHP Phase 4, step 9), and the
+  connection is CattoPHP's.
 2026/10/28 SAST
 - Updates recorded, released and delivered in place of the new-course digest.
 2026/10/26 SAST
@@ -26,6 +31,9 @@ declare(strict_types=1);
 namespace CattoLearning\Mailing;
 
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
+use CattoPHP\Mailing\CattoMail\CattoMailConnection;
+use CattoPHP\Mailing\CampaignSender;
+use CattoPHP\Mailing\CattoMail\CattoMailEvents;
 use DateTimeImmutable;
 use DateTimeZone;
 use Symfony\Component\Clock\ClockInterface;
@@ -35,20 +43,20 @@ class MailingJob
     private const SLEEPING_LAST = 'mailing.sleeping_last_day';
 
     public function __construct(
-        private readonly CattomailWebhook $webhook,
+        private readonly CattoMailEvents $events,
         private readonly UpdateRecorder $recorder,
         private readonly UpdateDelivery $delivery,
-        private readonly MailingSender $sender,
+        private readonly CampaignSender $sender,
         private readonly SleepingAddresses $sleeping,
         private readonly OptionRepository $options,
         private readonly ClockInterface $clock,
-        private readonly ?CattomailConnection $cattomail = null,
+        private readonly ?CattoMailConnection $cattomail = null,
     ) {
     }
 
     public function run(): string
     {
-        $events = $this->webhook->process();
+        $events = $this->events->process();
         // While catto-mail cannot send from the domain yet, ask it again every five minutes (page 9, step 3).
         $asked = $this->cattomail?->recheckIfWaiting() ?? false;
         $recorded = $this->recorder->run();

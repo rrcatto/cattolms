@@ -1,8 +1,8 @@
 {% extends layout %}
 {% block page_body %}
 {# Stimulus, for a row's or card's percentage off as its prices are typed (bundle_price_controller.js; owner, 2026-11-09). #}
-{{ importmap() }}
-{% set ph_kicker = 'Administration' %}{% set ph_title = 'Bundles' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New bundle', variant: 'primary', href: '/admin/bundles/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Several published courses sold together for one bundle price. A bundle is not a course: each of its courses is granted to the buyer as an ordinary course purchase, and an order keeps the bundle exactly as it was sold.' %}{% include '@platform/partials/page-head.html.twig' %}
+{{ importmap('app', {nonce: csp_nonce()}) }}
+{% set ph_kicker = 'Administration' %}{% set ph_title = 'Bundles' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New bundle', variant: 'primary', href: '/admin/bundles/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Several published courses sold together for one bundle price. A bundle is not a course: each of its courses is granted to the buyer as an ordinary course purchase, and an order keeps the bundle exactly as it was sold.' %}{% include '@CattoPHP/page/head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'All bundles', eyebrow: 'Bundles', summary: 'Every bundle with its code, status, price, sale dates, access, courses and sales. The pencil edits a bundle here, as the course list does.'}) }}
@@ -10,7 +10,7 @@
 {% for chip in status_filters %}<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>{% endfor %}
 </nav>
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'bundles', pagination: bundles_pagination, search: {ds_name: 'bundles', ds_label: 'Search codes, titles and web addresses', ds_value: bundles_search, ds_action: '/admin/bundles'}})} %}
-{% block toolbar %}{% if bundles_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: bundles_view_switch} %}{% if bundles_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'bundles', gs_headers: bundles_sort_headers, gs_pager: bundles_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if bundles_pagination %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: bundles_view_switch} %}{# Renumber, straight after List and Grid (owner, 2026-11-12): every bundle back in its code's band, 100 apart, in this order (Settings > Bundle positions). #}{% if bundles_can_renumber %}<form class="cl-renumber-form" action="/admin/settings/bundle-positions/renumber" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="bundles">{{ ui('action.button', {label: 'Renumber positions', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-sort', title: 'Every bundle back in its code\'s band, 100 apart, in this order', confirm: 'Renumber every bundle in its band, keeping their order?'}) }}</form>{% endif %}{% if bundles_view == 'grid' %}{% include '@CattoPHP/ui/data/grid-sort.html.twig' with {gs_name: 'bundles', gs_headers: bundles_sort_headers, gs_pager: bundles_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 {% if bundles and bundles_view == 'grid' %}
 {# The bundles as cards, 4 to a row (Support\ListView): the cover, code, price, status, sale dates and access; Manage and the pencil. #}
@@ -22,10 +22,16 @@
 {% endblock %}
 {% endembed %}
 {% elseif bundles %}
-{# The owner's columns where they fit (2026-11-06): code, title, status, price, on sale from and until, access; then its courses and sales. #}
+{# Dragged into the order bundles are listed in, as courses are (owner, 2026-11-12): by the handle, the arrow keys on it, or the
+   ⋯ menu; Renumber, in the toolbar, puts every bundle back in its code's band, 100 apart (Settings > Bundle positions). #}
+{% if arrange %}<div class="cl-course-order" data-controller="list-order" data-list-order-thing-value="bundle" data-list-order-csrf-value="{{ csrf }}" data-list-order-before-value="{{ bundles_before_page }}" data-action="dragstart->list-order#start dragover->list-order#over drop->list-order#drop dragend->list-order#end">
+<p class="visually-hidden" id="bundle-order-keys">Drag the handle, or press the up or down arrow, Home or End on it, to move the bundle in the list.</p>
+<p class="cl-course-order-status" data-list-order-target="status" role="status" aria-live="polite"></p>
+{% endif %}
+{# The owner's columns where they fit (2026-11-06): position, code, title, status, price, on sale from and until, access; then its courses and sales. #}
 {% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bundles', density: 'compact'})} %}
 {% block header %}<tr>
-	{% for sh in bundles_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: bundles_region, sort_results: bundles_results} %}{% endfor %}
+	{% for sh in bundles_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: bundles_region, sort_results: bundles_results} %}{% endfor %}
 </tr>{% endblock %}
 {% block body %}
 {% for bundle in bundles %}
@@ -33,6 +39,7 @@
 {% endfor %}
 {% endblock %}
 {% endembed %}
+{% if arrange %}</div>{% endif %}
 {% else %}
 {{ ui('feedback.empty', {heading: 'No bundles', summary: bundles_search ? 'No bundle matches this search or filter.' : 'No bundle matches this filter yet.'}) }}
 {% endif %}

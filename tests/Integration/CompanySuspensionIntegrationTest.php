@@ -130,7 +130,7 @@ final class CompanySuspensionIntegrationTest extends TestCase
     private function liveSessions(int $userId): int
     {
         return (int) $this->fixture->scalar(
-            'SELECT COUNT(*)::int AS value FROM auth_sessions WHERE user_id = :id AND revoked_at IS NULL',
+            'SELECT COUNT(*)::int AS value FROM cattophp_sessions WHERE account_id = CAST(:id AS TEXT) AND ended_at IS NULL',
             ['id' => $userId]
         );
     }

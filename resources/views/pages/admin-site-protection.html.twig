@@ -7,7 +7,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Settings' %}{% set ph_title = 'Site protection' %}
 	{% set ph_lead = 'What the site does by itself about bad actors, and how long it keeps its records.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section"><form action="/admin/site-analytics/protection" method="post" id="site-protection-form"><input type="hidden" name="csrf" value="{{ csrf }}">
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'rules'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Automatic time-outs', summary: 'Checked once a minute. Write lengths like this: 90s, 10m, 1h30m, 1d, 4w2d.'}) }}

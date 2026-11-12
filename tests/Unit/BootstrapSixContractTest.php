@@ -32,7 +32,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Course\ContentBlockRenderer;
-use CattoLearning\View\ThemePackageValidator;
+use CattoLearning\View\ProjectTheme;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -124,7 +124,7 @@ final class BootstrapSixContractTest extends TestCase
      */
     public function testEveryUtilityTheMarkupUsesIsStatedByCore(): void
     {
-        $css = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
         $utility = '/^((sm|md|lg|xl|xxl):)?((m|p)[tbsexy]?-(\d+|auto)|d-(none|block|flex|inline|inline-block|inline-flex|grid)|flex-(row|column|wrap|nowrap)|justify-content-[a-z]+|align-(items|self|content)-[a-z]+|text-(start|end|center|uppercase|lowercase|capitalize|nowrap|truncate)|fw-[a-z]+|gap-\d+|visually-hidden(-focusable)?|w-\d+|h-\d+)$/';
         $missing = [];
         $files = [...(glob(self::root() . '/resources/views/{,*/,*/*/}*.twig', GLOB_BRACE) ?: []), ...(glob(self::root() . '/themes/*/{,*/}*.twig', GLOB_BRACE) ?: []), ...(glob(self::root() . '/src/{,*/,*/*/}*.php', GLOB_BRACE) ?: [])];
@@ -149,7 +149,7 @@ final class BootstrapSixContractTest extends TestCase
      */
     public function testCoreRulesStayUnlayered(): void
     {
-        $css = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        $css = (string) (file_get_contents(self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(self::root() . '/public_html/css/catto-platform.css'));
         self::assertStringNotContainsString('@layer', (string) preg_replace('#/\*.*?\*/#s', '', $css));
     }
 
@@ -183,8 +183,8 @@ final class BootstrapSixContractTest extends TestCase
         foreach ([...(glob(self::root() . '/resources/views/{,*/,*/*/}*.twig', GLOB_BRACE) ?: []), ...(glob(self::root() . '/themes/*/{,*/}*.twig', GLOB_BRACE) ?: [])] as $file) {
             if (preg_match('/<html\b[^>]*>/', (string) file_get_contents($file), $html) === 1) self::assertStringContainsString('data-bs-theme=', $html[0], $file . ' writes the colour scheme on <html>.');
         }
-        $validator = new ThemePackageValidator();
-        $manifest = json_decode((string) file_get_contents(self::root() . '/themes/' . \CattoLearning\View\ThemeManager::DEFAULT_SLUG . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
+        $validator = ProjectTheme::validator();
+        $manifest = json_decode((string) file_get_contents(self::root() . '/themes/' . \CattoLearning\View\ProjectTheme::DEFAULT_SLUG . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         $manifest['theme']['color_scheme'] = 'auto';
         $this->expectException(RuntimeException::class);
         $validator->validateManifest($manifest);
@@ -197,7 +197,7 @@ final class BootstrapSixContractTest extends TestCase
      */
     public function testCoreAndEveryThemeStateTheirColoursInPlainValues(): void
     {
-        $sheets = ['core' => [self::root() . '/public_html/css/catto-platform.css']];
+        $sheets = ['core' => [self::root() . '/vendor/rrcatto/cattophp/public/css/cattophp.css', self::root() . '/public_html/css/catto-platform.css']];
         foreach (self::bundledThemes() as $theme) {
             $manifest = json_decode((string) file_get_contents(self::root() . '/themes/' . $theme . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
             $own = [self::root() . '/themes/' . $theme . '/public/css/theme.css'];

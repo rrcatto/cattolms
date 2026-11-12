@@ -8,7 +8,7 @@
 	{% set ph_kicker = 'Passwordless access' %}
 	{% set ph_title = setup.codes ? 'Keep your recovery codes' : 'Set up two-step sign-in' %}
 	{% set ph_lead = setup.codes ? 'Two-step sign-in is on. One last thing before you go on.' : 'This site asks you to use a code from an app on your phone each time you sign in.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}

@@ -789,7 +789,7 @@ final class CataloguePackage
 
     /** What each of a course's own fields is called in the review. */
     private const COURSE_FIELDS = ['slug' => 'its address', 'title' => 'the title', 'subtitle' => 'the subtitle', 'summary' => 'the summary', 'description_html' => 'the description',
-        'level' => 'the level', 'estimated_minutes' => 'the study time', 'default_access_period_seconds' => 'the access period', 'first_module_number' => 'the first module\'s number',
+        'level' => 'the level', 'estimated_minutes' => 'the study time', 'course_type' => 'whether it is a short course', 'default_access_period_seconds' => 'the access period', 'first_module_number' => 'the first module\'s number',
         'introduction_html' => 'the introduction', 'certificate_enabled' => 'whether it gives a certificate', 'certificate_accreditation' => 'the accreditation line',
         'course_style_key' => 'the course style', 'presentation_css' => 'the styling on its CSS tab'];
 

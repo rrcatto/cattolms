@@ -36,7 +36,7 @@ namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Commerce\Infrastructure\MoneyReportRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use DateTimeImmutable;
@@ -260,7 +260,7 @@ final class MoneyReports
         $paidStates = MoneyRecords::ORDER_STATE_GROUPS['paid_in_full']['states'];
         $sales = [];
         foreach ($this->reports->sales($month['from_at'], $month['to_before'], $paidStates) as $row) {
-            $kind = match ($row['product_type']) { 'bundle' => 'Bundle', 'company_credit' => 'Course credits', default => 'Course' };
+            $kind = match ($row['product_type']) { 'bundle' => 'Bundle', 'company_credit' => 'Course credits', 'bundle_credit' => 'Bundle credits', default => 'Course' };
             $sales[] = $row + ['kind' => $kind, 'name' => $row['title'] . ($kind === 'Course' ? '' : ' (' . strtolower($kind) . ')'),
                 'before' => self::money($row['before_minor']), 'promotions' => $row['promotions_minor'] === 0 ? '' : self::money($row['promotions_minor']), 'paid' => self::money($row['paid_minor'])];
         }

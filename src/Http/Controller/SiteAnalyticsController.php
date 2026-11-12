@@ -11,6 +11,16 @@ where they are from and what they are doing, the Site Log, flagged activity, one
 site protection settings. Only Platform Administrators see it (PLATFORM.SITEANALYTICS.VIEW and MANAGE).
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): the pages read and act through its classes (Flags, Lockouts,
+  LockoutService, RefusedEmails, ProtectionSettings, ServerLink, FormGuard), the same words and pages; a lockout's people
+  are named from their account ids (named()).
+- The Telegram log reads CattoPHP's Telegram log (TelegramRepository) and the owner's username from its TelegramBot (CattoPHP
+  Phase 4, step 4).
+2026/11/09 SAST
+- Visitors through shares (owner, 2026-11-09: "I'd like to see how many visitors arrive through shares - tag them"): How they found you names each share, and Visitors through shares counts them and the pages they arrived at.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/11/07 SAST
 - A refused lockout or refused address comes back as it was typed (keepTyped).
 - People are linked by their account references (owner, 2026-11-06: no row id in an address).
@@ -24,23 +34,25 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Auth\Signup\NetworkLookup;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
-use CattoLearning\SiteAnalytics\FlagRepository;
-use CattoLearning\SiteAnalytics\FormGuard;
-use CattoLearning\SiteAnalytics\LockoutRepository;
-use CattoLearning\SiteAnalytics\LockoutService;
-use CattoLearning\SiteAnalytics\RefusedEmailRepository;
-use CattoLearning\SiteAnalytics\RequestFacts;
-use CattoLearning\SiteAnalytics\ServerLink;
 use CattoLearning\SiteAnalytics\SiteAnalyticsWords as Words;
 use CattoLearning\SiteAnalytics\SiteLogRepository;
 use CattoLearning\SiteAnalytics\SitePeriod;
-use CattoLearning\SiteAnalytics\SiteProtectionJob;
-use CattoLearning\SiteAnalytics\SiteProtectionSettings;
 use CattoLearning\Support\ClientFingerprint;
-use CattoLearning\Support\Duration;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Protection\Addresses;
+use CattoPHP\Protection\Arrival;
+use CattoPHP\Protection\Flags;
+use CattoPHP\Protection\FormGuard;
+use CattoPHP\Protection\Lockouts;
+use CattoPHP\Protection\LockoutService;
+use CattoPHP\Protection\LockoutTarget;
+use CattoPHP\Protection\ProtectionRules;
+use CattoPHP\Protection\ProtectionSettings;
+use CattoPHP\Protection\RefusedEmails;
+use CattoPHP\Protection\ServerLink;
+use CattoPHP\Foundation\Duration;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -59,17 +71,18 @@ final class SiteAnalyticsController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly SiteLogRepository $log,
-        private readonly FlagRepository $flags,
-        private readonly LockoutRepository $lockouts,
+        private readonly Flags $flags,
+        private readonly Lockouts $lockouts,
         private readonly LockoutService $locking,
-        private readonly RefusedEmailRepository $refusedEmails,
-        private readonly SiteProtectionSettings $settings,
+        private readonly RefusedEmails $refusedEmails,
+        private readonly ProtectionSettings $settings,
         private readonly ServerLink $server,
-        private readonly NetworkLookup $network,
+        private readonly FormGuard $forms,
+        private readonly \CattoPHP\Network\GeoIpNetworkLookup $network,
         private readonly AuditRepository $audit,
         private readonly \CattoLearning\Auth\Signup\SignInHistory $signIns,
-        private readonly \CattoLearning\OwnerMessages\OwnerMessageRepository $ownerMessages,
-        private readonly \CattoLearning\OwnerMessages\OwnerMessageSettings $ownerMessageSettings,
+        private readonly \CattoLearning\OwnerMessages\TelegramRepository $ownerMessages,
+        private readonly \CattoPHP\Telegram\TelegramBot $ownerMessageSettings,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -118,6 +131,7 @@ final class SiteAnalyticsController extends BaseController
             'doing' => $this->log->doing($period),
             'pages' => array_map(static fn(array $page): array => $page + ['name' => Words::pageName($page['path'], $courses), 'href' => self::BASE . '/log?' . http_build_query(['sitelog_q' => $page['path']] + $period->query())], $this->log->topPages($period, $leaveOut)),
             'sources' => self::sources($this->log->sources($period, $leaveOut)),
+            'shares' => self::shares($this->log->shares($period, $leaveOut), $courses, $period),
             'devices' => self::devices($this->log->devices($period, $leaveOut)),
             'on_site' => $this->onSite($courses, $leaveOut),
         ]);
@@ -210,7 +224,7 @@ final class SiteAnalyticsController extends BaseController
                     'id' => (int) $row['id'], 'body' => (string) $row['body'], 'when' => $when($row['created_at']), 'sent' => $sentAt($row['sent_at']), 'tries' => (int) $row['tries'],
                     'kind' => match ((string) $row['kind']) {
                         'sign_in' => 'Sign-in', 'registration' => 'Registration', 'order' => 'New order', 'sale' => 'Sale', 'test' => 'Test',
-                        'money_report' => 'Money report',
+                        'money_report' => 'Money report', 'message' => 'Inbox message',
                         'connected' => str_starts_with((string) $row['reference'], 'connected:') ? 'Connected' : 'Bot reply',
                         default => (string) $row['kind'],
                     },
@@ -231,19 +245,19 @@ final class SiteAnalyticsController extends BaseController
         $this->requirePermission(self::VIEW);
         $this->liveRefreshIsNotAVisit();
         $state = (string) $this->request()->query->get('show', 'waiting');
-        if (!isset(FlagRepository::STATES[$state])) $state = 'waiting';
+        if (!isset(Flags::STATES[$state])) $state = 'waiting';
         $all = $this->flags->all();
-        $counts = array_fill_keys(array_keys(FlagRepository::STATES), 0);
+        $counts = array_fill_keys(array_keys(Flags::STATES), 0);
         foreach ($all as $flag) $counts[$flag['state']]++;
 
         return $this->render('admin-site-flagged', [
             'title' => 'Flagged Activity',
             'active_nav' => 'admin',
             'state' => $state,
-            'states' => FlagRepository::STATES,
+            'states' => Flags::STATES,
             'counts' => $counts,
             'rows' => array_map([self::class, 'flagRow'], array_values(array_filter($all, static fn(array $flag): bool => $flag['state'] === $state))),
-            'forms' => array_map(static fn(array $form): array => ['when' => Words::when((string) $form['at']), 'form' => FormGuard::FORMS[$form['form']] ?? (string) $form['form'], 'why' => FormGuard::SIGNALS[$form['form_signal']] ?? (string) $form['form_signal'],
+            'forms' => array_map(fn(array $form): array => ['when' => Words::when((string) $form['at']), 'form' => $this->forms->forms()[$form['form']] ?? (string) $form['form'], 'why' => FormGuard::SIGNALS[$form['form_signal']] ?? (string) $form['form_signal'],
                 'who' => (string) $form['address'], 'href' => Words::addressHref((string) $form['subject']), 'email' => (string) $form['form_email']], $this->log->formsRefused(25)),
             'can_manage' => $this->requireUser()->hasPermission(self::MANAGE),
         ]);
@@ -257,11 +271,9 @@ final class SiteAnalyticsController extends BaseController
         $subject = self::subjectFrom((string) ($_POST['a'] ?? ''));
         if ($subject === '') throw $this->notFound('That address could not be found.');
         $user = $this->requireUser();
-        $this->flags->markFine($subject, $user->id);
         // Not a problem ends what the site did by itself; a lockout by hand stays until it is lifted by hand.
-        $this->lockouts->liftAutomatic($subject, $user->id);
-        $this->audit->record($user->id, 'site.flag_not_a_problem', ['address' => $subject]);
-        $this->flash('success', $subject . ' is marked not a problem. It is left alone for ' . SiteProtectionSettings::FINE_DAYS . ' days.');
+        $this->locking->markNotAProblem($subject, self::actor($user->id));
+        $this->flash('success', $subject . ' is marked not a problem. It is left alone for ' . ProtectionSettings::FINE_DAYS . ' days.');
         $this->redirect(self::BASE . '/flagged?show=fine');
     }
 
@@ -280,14 +292,15 @@ final class SiteAnalyticsController extends BaseController
         $asn = $facts->asn ?? (isset($latest['network_asn']) ? (int) $latest['network_asn'] : null);
         $owner = $facts->networkName !== '' ? $facts->networkName : (string) ($latest['network_name'] ?? '');
         $force = $this->lockouts->inForceFor($subject, $asn);
-        $covers = $this->lockouts->forSubject($subject);
+        $force = $force === null ? null : $this->named([$force])[0];
+        $covers = $this->named($this->lockouts->forSubject($subject));
         $figures['refused'] = array_sum(array_map(static fn(array $lockout): int => (int) $lockout['refused'], $covers));
         $range = $this->network->rangeOf($plain);
         $values = $this->settings->values();
         $server = $this->server->view();
         $country = $facts->countryCode !== '' ? $facts->countryCode : (string) ($latest['country_code'] ?? '');
         $kind = (string) ($latest['network_kind'] ?? '');
-        $own = RequestFacts::subject(ClientFingerprint::ipAddress()) === $subject;
+        $own = Addresses::subject(ClientFingerprint::ipAddress()) === $subject;
         $whats = [['value' => 'address', 'label' => 'This address', 'note' => $subject]];
         if ($range !== '') $whats[] = ['value' => 'range', 'label' => 'Its whole range', 'note' => $range . ', ' . self::howMany($range)];
         if ($asn !== null) $whats[] = ['value' => 'owner', 'label' => 'Everything from this network owner', 'note' => ($owner !== '' ? $owner . ', ' : '') . 'AS' . $asn];
@@ -315,14 +328,14 @@ final class SiteAnalyticsController extends BaseController
             'vpn' => $facts->vpn || $kind === 'vpn',
             'others_flagged' => $asn !== null ? $this->log->flaggedFromOwner($asn, $subject) : 0,
             'whats' => $whats,
-            'range_people' => $range !== '' ? $this->log->peopleOn($range, null, SiteProtectionJob::SPARED_DAYS) : [],
-            'owner_people' => $asn !== null ? $this->log->peopleOn(null, $asn, SiteProtectionJob::SPARED_DAYS) : [],
+            'range_people' => $range !== '' ? $this->log->peopleOn($range, null, ProtectionRules::SPARED_DAYS) : [],
+            'owner_people' => $asn !== null ? $this->log->peopleOn(null, $asn, ProtectionRules::SPARED_DAYS) : [],
             'lengths' => LockoutService::LENGTHS,
             'firewall_offered' => $values['firewall_link'] === true && $server['available'],
             'at_firewall' => $server['available'] && $this->server->isBanned($subject),
             'own_address' => $own,
             'can_manage' => $this->requireUser()->hasPermission(self::MANAGE),
-            'draft_why' => $flag !== null ? (string) (FlagRepository::why($flag)[0]['words'] ?? '') : '',
+            'draft_why' => $flag !== null ? (string) (Flags::why($flag)[0]['words'] ?? '') : '',
         ]);
     }
 
@@ -333,7 +346,7 @@ final class SiteAnalyticsController extends BaseController
         $this->liveRefreshIsNotAVisit();
         $query = $this->request()->query;
         $kind = (string) $query->get('show', 'force');
-        if (!isset(LockoutRepository::KINDS[$kind])) $kind = 'force';
+        if (!isset(Lockouts::KINDS[$kind])) $kind = 'force';
         $counts = $this->lockouts->counts();
         $pagination = Pagination::create($query->get('lockouts_page'), $query->get('lockouts_page_size'), $counts[$kind], 25);
         $values = $this->settings->values();
@@ -343,15 +356,15 @@ final class SiteAnalyticsController extends BaseController
             'title' => 'Lockouts',
             'active_nav' => 'admin',
             'kind' => $kind,
-            'kinds' => LockoutRepository::KINDS,
+            'kinds' => Lockouts::KINDS,
             'counts' => $counts,
-            'rows' => array_map([self::class, 'lockoutRow'], $this->lockouts->page($kind, $pagination->pageSize, $pagination->offset)),
+            'rows' => array_map([self::class, 'lockoutRow'], $this->named($this->lockouts->page($kind, $pagination->pageSize, $pagination->offset))),
             'lockouts_pagination' => PlatformAdministrationService::paginationPayload('lockouts', $pagination, self::BASE . '/lockouts', 'Lockouts', ['show' => $kind]),
             'emails' => $this->refusedEmails->all(),
             'lengths' => LockoutService::LENGTHS,
             'firewall_offered' => $values['firewall_link'] === true && $server['available'],
-            'server' => $server + ['bans_rows' => array_map(static fn(array $ban): array => $ban + ['since_words' => $ban['since'] !== '' ? Words::when($ban['since']) : '', 'href' => Words::addressHref((string) RequestFacts::subject($ban['address']))], $server['bans']),
-                'probes_rows' => array_map(static fn(array $probe): array => $probe + ['when' => $probe['at'] !== '' ? Words::when($probe['at'], true) : '', 'href' => Words::addressHref((string) RequestFacts::subject($probe['address']))], $server['probes']),
+            'server' => $server + ['bans_rows' => array_map(static fn(array $ban): array => $ban + ['since_words' => $ban['since'] !== '' ? Words::when($ban['since']) : '', 'href' => Words::addressHref((string) Addresses::subject($ban['address']))], $server['bans']),
+                'probes_rows' => array_map(static fn(array $probe): array => $probe + ['when' => $probe['at'] !== '' ? Words::when($probe['at'], true) : '', 'href' => Words::addressHref((string) Addresses::subject($probe['address']))], $server['probes']),
                 'written_words' => $server['written_at'] !== '' ? Words::ago($server['written_at']) : ''],
             'can_manage' => $this->requireUser()->hasPermission(self::MANAGE),
         ]);
@@ -367,8 +380,8 @@ final class SiteAnalyticsController extends BaseController
 
         return $this->handle(function () use ($user): void {
             $target = $this->targetFromForm();
-            $this->locking->lockOut($target, (string) ($_POST['length'] ?? ''), (string) ($_POST['why'] ?? ''), !empty($_POST['firewall']), $user->id);
-            $this->flash('success', $target['label'] . ' is locked out. From now on it sees a plain page saying the site is not available, and nothing more.');
+            $this->locking->lockOut($target, (string) ($_POST['length'] ?? ''), (string) ($_POST['why'] ?? ''), !empty($_POST['firewall']), self::actor($user->id));
+            $this->flash('success', $target->label . ' is locked out. From now on it sees a plain page saying the site is not available, and nothing more.');
             $this->redirect(self::back((string) ($_POST['return'] ?? '')));
         }, $back, keepTyped: true);
     }
@@ -382,7 +395,7 @@ final class SiteAnalyticsController extends BaseController
         $user = $this->requireUser();
 
         return $this->handle(function () use ($user, $back): void {
-            $this->locking->lift((int) $this->param('id'), $user->id);
+            $this->locking->lift((int) $this->param('id'), self::actor($user->id));
             $this->flash('success', 'The lockout is lifted.');
             $this->redirect($back);
         }, $back);
@@ -396,7 +409,7 @@ final class SiteAnalyticsController extends BaseController
         $user = $this->requireUser();
 
         return $this->handle(function () use ($user): void {
-            $value = $this->refusedEmails->add((string) ($_POST['value'] ?? ''), (string) ($_POST['why'] ?? ''), $user->id);
+            $value = $this->refusedEmails->add((string) ($_POST['value'] ?? ''), (string) ($_POST['why'] ?? ''), (string) $user->id);
             $this->audit->record($user->id, 'site.email_refused', ['value' => $value]);
             $this->flash('success', $value . ' is refused from now on.');
             $this->redirect(self::BASE . '/lockouts#emails');
@@ -422,7 +435,7 @@ final class SiteAnalyticsController extends BaseController
         $this->requirePermission(self::VIEW);
         $values = $this->settings->values();
         $rules = [];
-        foreach (SiteProtectionSettings::RULES as $key => $rule) {
+        foreach (ProtectionSettings::RULES as $key => $rule) {
             $rules[] = ['key' => $key, 'name' => $rule['name'], 'counted' => $rule['counted']] + $values['rules'][$key];
         }
         $server = $this->server->view();
@@ -449,7 +462,7 @@ final class SiteAnalyticsController extends BaseController
         $user = $this->requireUser();
 
         return $this->handle(function () use ($user): void {
-            $saved = $this->settings->save($_POST, $user->id);
+            $saved = $this->settings->save($_POST, self::actor($user->id));
             $this->audit->record($user->id, 'settings.site_protection_saved', ['never_lock_out' => $saved['never_lock_out'], 'log_kept_for' => $saved['log_kept_for'], 'firewall_link' => $saved['firewall_link']]);
             $this->flash('success', 'Site protection is saved.');
             $this->redirect(self::BASE . '/protection');
@@ -461,30 +474,45 @@ final class SiteAnalyticsController extends BaseController
     {
         $this->requirePermission(self::MANAGE);
         $this->requireCsrf();
-        $this->settings->reset();
-        $this->audit->record($this->requireUser()->id, 'settings.site_protection_reset', []);
+        $user = $this->requireUser();
+        $this->settings->reset(self::actor($user->id));
+        $this->audit->record($user->id, 'settings.site_protection_reset', []);
         $this->flash('success', 'Site protection is back to the starting values.');
         $this->redirect(self::BASE . '/protection');
     }
 
-    /** @return array{kind:string,network:?string,asn:?int,label:string} */
-    private function targetFromForm(): array
+    private function targetFromForm(): LockoutTarget
     {
         $what = (string) ($_POST['what'] ?? '');
         if ($what === 'range' || $what === 'address') {
-            return $this->locking->target((string) ($_POST[$what . '_value'] ?? ''));
+            return LockoutTarget::read((string) ($_POST[$what . '_value'] ?? ''));
         }
         if ($what === 'owner') {
-            return $this->locking->target('AS' . (int) ($_POST['owner_value'] ?? 0), mb_substr((string) ($_POST['owner_name'] ?? ''), 0, 180));
+            return LockoutTarget::read('AS' . (int) ($_POST['owner_value'] ?? 0), mb_substr((string) ($_POST['owner_name'] ?? ''), 0, 180));
         }
         // Add a lockout: what was typed. A network owner's name comes from the log where it has been seen.
-        $target = $this->locking->target((string) ($_POST['target'] ?? ''));
-        if ($target['kind'] === 'owner') {
-            $name = $this->log->ownerName((int) $target['asn']);
-            if ($name !== '') $target['label'] = $name;
-        }
+        $target = LockoutTarget::read((string) ($_POST['target'] ?? ''));
 
-        return $target;
+        return $target->kind === LockoutTarget::OWNER ? LockoutTarget::read((string) ($_POST['target'] ?? ''), $this->log->ownerName((int) $target->asn)) : $target;
+    }
+
+    /** The person behind an action, as the activity log names cattolms's people: by account id. */
+    private static function actor(int $userId): Actor
+    {
+        return new Actor((string) $userId, (string) $userId);
+    }
+
+    /**
+     * Lockouts with the names of the people who put them on and lifted them.
+     *
+     * @param list<array<string,mixed>> $lockouts
+     * @return list<array<string,mixed>>
+     */
+    private function named(array $lockouts): array
+    {
+        $names = $this->log->namesOf(array_merge(array_column($lockouts, 'created_by'), array_column($lockouts, 'lifted_by')));
+
+        return array_map(static fn(array $lockout): array => $lockout + ['created_by_name' => $names[(string) ($lockout['created_by'] ?? '')] ?? '', 'lifted_by_name' => $names[(string) ($lockout['lifted_by'] ?? '')] ?? ''], $lockouts);
     }
 
     /**
@@ -585,7 +613,7 @@ final class SiteAnalyticsController extends BaseController
      */
     private static function whyList(?array $flag, ?array $latest): array
     {
-        $why = $flag === null ? [] : array_map(static fn(array $entry): string => $entry['words'], FlagRepository::why($flag));
+        $why = $flag === null ? [] : array_map(static fn(array $entry): string => $entry['words'], Flags::why($flag));
         if ($flag === null) return [];
         if (($latest['network_kind'] ?? '') === 'hosting') $why[] = 'It is on a hosting network, where people do not normally browse from.';
         if (($latest['network_kind'] ?? '') === 'vpn') $why[] = 'It is on a VPN provider\'s network.';
@@ -603,7 +631,7 @@ final class SiteAnalyticsController extends BaseController
     private static function history(?array $flag, array $lockouts, ?string $firstSeen): array
     {
         $events = [];
-        foreach ($flag === null ? [] : FlagRepository::why($flag) as $entry) {
+        foreach ($flag === null ? [] : Flags::why($flag) as $entry) {
             $events[] = [(int) strtotime($entry['at']), 'Flagged: ' . $entry['words']];
         }
         if ($flag !== null && Words::truthy($flag['fine']) && $flag['decided_at'] !== null) $events[] = [(int) strtotime((string) $flag['decided_at']), 'You marked it not a problem.'];
@@ -628,7 +656,7 @@ final class SiteAnalyticsController extends BaseController
         $address = (string) strtok($text, '/');
         if (filter_var($address, FILTER_VALIDATE_IP) === false) return '';
 
-        return RequestFacts::subject($address);
+        return Addresses::subject($address);
     }
 
     private static function compared(int $now, int $before): string
@@ -707,7 +735,11 @@ final class SiteAnalyticsController extends BaseController
         $names = ['search' => 'Search engines', 'direct' => 'Typed in or a bookmark', 'email' => 'An email', 'site' => 'Other sites'];
         $merged = [];
         foreach ($rows as $row) {
-            $name = $row['source'] === 'social' ? ucfirst((string) preg_replace('/\.[a-z.]+$/', '', $row['came_from'])) : ($names[$row['source']] ?? 'Other sites');
+            $name = match ($row['source']) {
+                'social' => ucfirst((string) preg_replace('/\.[a-z.]+$/', '', $row['came_from'])),
+                'share' => Arrival::SHARED_ON[$row['came_from']] ?? 'A shared link',
+                default => $names[$row['source']] ?? 'Other sites',
+            };
             $merged[$name] = ($merged[$name] ?? 0) + $row['visitors'];
         }
         arsort($merged);
@@ -718,6 +750,27 @@ final class SiteAnalyticsController extends BaseController
         }
 
         return $shown;
+    }
+
+    /**
+     * Visitors through shares: how many, and each page they arrived at with the words for where it was shared.
+     *
+     * @param array{visitors:int,platforms:array<string,int>,pages:list<array{path:string,visitors:int,shared_on:list<string>}>} $shares
+     * @param array<string,string> $courses
+     * @return array{visitors:string,platforms:list<array{label:string,visitors:string}>,pages:list<array{name:string,href:string,visitors:string,shared_on:string}>}
+     */
+    private static function shares(array $shares, array $courses, SitePeriod $period): array
+    {
+        $words = ['facebook' => 'Facebook', 'whatsapp' => 'WhatsApp', 'telegram' => 'Telegram', 'linkedin' => 'LinkedIn', 'x' => 'X', 'email' => 'email', 'copied_link' => 'a copied link', 'share_sheet' => "a phone's share sheet"];
+
+        $through = ['facebook' => 'Through Facebook', 'whatsapp' => 'Through WhatsApp', 'telegram' => 'Through Telegram', 'linkedin' => 'Through LinkedIn', 'x' => 'Through X', 'email' => 'Through email', 'copied_link' => 'Through a copied link', 'share_sheet' => "Through a phone's share sheet"];
+
+        return ['visitors' => number_format($shares['visitors']), 'platforms' => array_map(static fn(string $source, int $visitors): array => ['label' => $through[$source] ?? $source, 'visitors' => number_format($visitors)], array_keys($shares['platforms']), array_values($shares['platforms'])), 'pages' => array_map(static fn(array $page): array => [
+            'name' => Words::pageName($page['path'], $courses),
+            'href' => self::BASE . '/log?' . http_build_query(['sitelog_q' => $page['path']] + $period->query()),
+            'visitors' => number_format($page['visitors']),
+            'shared_on' => implode(', ', array_map(static fn(string $source): string => $words[$source] ?? $source, $page['shared_on'])),
+        ], $shares['pages'])];
     }
 
     /** @param array<string,int> $devices */

@@ -11,6 +11,8 @@ Description:
 Provides API authentication, authorisation or request support for api scope within Catto Learning.
 
 Changelog:
+2026/11/12 SAST
+- DESCRIPTIONS, the scopes CattoPHP's API tokens offer (CattoPHP Phase 4, step 7).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -35,18 +37,21 @@ final class ApiScope
     public const COURSES_PUBLISH = 'courses:publish';
     public const SYSTEM_ADMIN = 'system:admin';
 
+    /** Each scope and what a token with it may do: CattoPHP's API tokens offer these (config/packages/cattophp.yaml). */
+    public const DESCRIPTIONS = [
+        self::PROFILE_READ => 'Read the account\'s own profile.',
+        self::COURSES_READ => 'Read the published catalogue and its courses.',
+        self::LIBRARY_READ => 'Read the account\'s own course library.',
+        self::LEARNING_START => 'Start a course in the account\'s library.',
+        self::COURSES_WRITE => 'Create and change courses the account manages.',
+        self::COURSES_PUBLISH => 'Publish and retire courses the account manages.',
+        self::SYSTEM_ADMIN => 'Every scope.',
+    ];
+
     /** @return list<string> */
     public static function all(): array
     {
-        return [
-            self::PROFILE_READ,
-            self::COURSES_READ,
-            self::LIBRARY_READ,
-            self::LEARNING_START,
-            self::COURSES_WRITE,
-            self::COURSES_PUBLISH,
-            self::SYSTEM_ADMIN,
-        ];
+        return array_keys(self::DESCRIPTIONS);
     }
 
     public static function isValid(string $scope): bool

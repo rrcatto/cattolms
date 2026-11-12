@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "713fdb491d4df9955019557760adff39",
+    "content-hash": "d5a61bd98e1798df49080002484bed74",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -812,16 +812,16 @@
         },
         {
             "name": "doctrine/dbal",
-            "version": "4.5.0",
+            "version": "4.5.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/dbal.git",
-                "reference": "c435cd7ea33e17d2a89288caf994cf3d4549b879"
+                "reference": "b2815456989aa41964ee66d7ab47b7885264acf3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/dbal/zipball/c435cd7ea33e17d2a89288caf994cf3d4549b879",
-                "reference": "c435cd7ea33e17d2a89288caf994cf3d4549b879",
+                "url": "https://api.github.com/repos/doctrine/dbal/zipball/b2815456989aa41964ee66d7ab47b7885264acf3",
+                "reference": "b2815456989aa41964ee66d7ab47b7885264acf3",
                 "shasum": ""
             },
             "require": {
@@ -834,7 +834,7 @@
                 "doctrine/coding-standard": "14.0.0",
                 "fig/log-test": "^1",
                 "jetbrains/phpstorm-stubs": "2023.2",
-                "phpstan/phpstan": "2.1.30",
+                "phpstan/phpstan": "2.3.4",
                 "phpstan/phpstan-phpunit": "2.0.7",
                 "phpstan/phpstan-strict-rules": "^2",
                 "phpunit/phpunit": "11.5.56",
@@ -898,7 +898,7 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/dbal/issues",
-                "source": "https://github.com/doctrine/dbal/tree/4.5.0"
+                "source": "https://github.com/doctrine/dbal/tree/4.5.1"
             },
             "funding": [
                 {
@@ -914,7 +914,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-24T16:11:26+00:00"
+            "time": "2026-11-10T09:21:59+00:00"
         },
         {
             "name": "doctrine/deprecations",
@@ -4549,6 +4549,163 @@
             "time": "2026-07-03T07:27:17+00:00"
         },
         {
+            "name": "rrcatto/cattophp",
+            "version": "v0.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/rrcatto/cattophp.git",
+                "reference": "5f44ca04cd4c0c6e5a36e2f83175640dda10934f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rrcatto/cattophp/zipball/5f44ca04cd4c0c6e5a36e2f83175640dda10934f",
+                "reference": "5f44ca04cd4c0c6e5a36e2f83175640dda10934f",
+                "shasum": ""
+            },
+            "require": {
+                "bacon/bacon-qr-code": "^3.1",
+                "doctrine/dbal": "^4.4",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
+                "php": ">=8.5.12 <9.0",
+                "psr/clock": "^1.0",
+                "psr/log": "^3.0",
+                "symfony/clock": "~8.1.0",
+                "symfony/console": "~8.1.0",
+                "symfony/framework-bundle": "~8.1.0",
+                "symfony/mailer": "~8.1.0",
+                "symfony/rate-limiter": "~8.1.0",
+                "symfony/security-bundle": "~8.1.0",
+                "symfony/security-csrf": "~8.1.0",
+                "symfony/twig-bundle": "~8.1.0",
+                "twig/twig": "^3.21"
+            },
+            "require-dev": {
+                "dompdf/dompdf": "^3.1",
+                "geocoder-php/geoip2-provider": "^4.0",
+                "omnipay/common": "^3.5",
+                "php-http/guzzle7-adapter": "^1.1",
+                "php-http/mock-client": "^1.6",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^13.4",
+                "symfony/browser-kit": "~8.1.0",
+                "symfony/css-selector": "~8.1.0",
+                "symfony/dom-crawler": "~8.1.0",
+                "symfony/http-client": "~8.1.0"
+            },
+            "suggest": {
+                "dompdf/dompdf": "For the documents module: documents and pages drawn as PDFs",
+                "geocoder-php/geoip2-provider": "For the network lookup: an address's country and place through Geocoder (MaxMind's GeoLite2 databases by default, another Geocoder provider by configuration) and its network",
+                "omnipay/common": "For the payments module: payment gateways through Omnipay, their keys in Settings (with the gateway package, such as rrcatto/omnipay-stitch-express)",
+                "symfony/http-client": "For the Telegram, identity verification and mailing modules: Telegram's, Didit's and catto-mail's APIs"
+            },
+            "bin": [
+                "bin/cattophp-assets"
+            ],
+            "type": "symfony-bundle",
+            "autoload": {
+                "psr-4": {
+                    "CattoPHP\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "CattoPHP\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "phpunit"
+                ],
+                "test:unit": [
+                    "phpunit --testsuite Unit,Kernel"
+                ],
+                "analyse": [
+                    "phpstan analyse --no-progress --memory-limit=512M"
+                ],
+                "check": [
+                    "@test",
+                    "@analyse"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Richard Catto",
+                    "role": "Project creator and maintainer"
+                }
+            ],
+            "description": "A Symfony bundle with the foundations of a web application: sign-in with two-step codes, settings over .env, roles and permissions, an activity log, error pages, security headers and mail.",
+            "support": {
+                "source": "https://github.com/rrcatto/cattophp/tree/v0.3.0",
+                "issues": "https://github.com/rrcatto/cattophp/issues"
+            },
+            "time": "2026-11-12T19:23:43+00:00"
+        },
+        {
+            "name": "rrcatto/omnipay-stitch-express",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/rrcatto/omnipay-stitch-express.git",
+                "reference": "1d57abe8a6762dd58db132d22cc6fa91ae255c52"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rrcatto/omnipay-stitch-express/zipball/1d57abe8a6762dd58db132d22cc6fa91ae255c52",
+                "reference": "1d57abe8a6762dd58db132d22cc6fa91ae255c52",
+                "shasum": ""
+            },
+            "require": {
+                "omnipay/common": "^3.5",
+                "php": "^8.1",
+                "php-http/guzzle7-adapter": "^1.1"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.9",
+                "omnipay/tests": "^4.2",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^11.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Omnipay\\StitchExpress\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Richard Catto",
+                    "role": "Project creator and maintainer"
+                }
+            ],
+            "description": "Stitch Express gateway for the Omnipay payment processing library: payment links, payments, refunds and signed payment.paid webhooks",
+            "homepage": "https://github.com/rrcatto/omnipay-stitch-express",
+            "keywords": [
+                "South Africa",
+                "ZAR",
+                "gateway",
+                "merchant",
+                "omnipay",
+                "pay",
+                "payment",
+                "purchase",
+                "stitch",
+                "stitch express"
+            ],
+            "support": {
+                "issues": "https://github.com/rrcatto/omnipay-stitch-express/issues",
+                "source": "https://github.com/rrcatto/omnipay-stitch-express/tree/v1.0.0"
+            },
+            "time": "2026-11-11T14:30:08+00:00"
+        },
+        {
             "name": "sabberworm/php-css-parser",
             "version": "v9.5.0",
             "source": {
@@ -6538,6 +6695,77 @@
             "time": "2026-10-28T17:58:38+00:00"
         },
         {
+            "name": "symfony/options-resolver",
+            "version": "v8.1.10",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/options-resolver.git",
+                "reference": "68cc43038d234c69d510c62f37bd0058b40d548a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/options-resolver/zipball/68cc43038d234c69d510c62f37bd0058b40d548a",
+                "reference": "68cc43038d234c69d510c62f37bd0058b40d548a",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.4.1",
+                "symfony/deprecation-contracts": "^2.5|^3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\OptionsResolver\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Provides an improved replacement for the array_replace PHP function",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "config",
+                "configuration",
+                "options"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/options-resolver/tree/v8.1.10"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-10-18T14:56:39+00:00"
+        },
+        {
             "name": "symfony/password-hasher",
             "version": "v8.1.0",
             "source": {
@@ -7532,6 +7760,80 @@
                 }
             ],
             "time": "2026-11-02T10:58:30+00:00"
+        },
+        {
+            "name": "symfony/rate-limiter",
+            "version": "v8.1.11",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/rate-limiter.git",
+                "reference": "6311b3a5d7448684894d6e184d963f4d504086a5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/rate-limiter/zipball/6311b3a5d7448684894d6e184d963f4d504086a5",
+                "reference": "6311b3a5d7448684894d6e184d963f4d504086a5",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.4.1",
+                "symfony/options-resolver": "^7.4|^8.0"
+            },
+            "require-dev": {
+                "psr/cache": "^1.0|^2.0|^3.0",
+                "symfony/lock": "^7.4|^8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\RateLimiter\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Wouter de Jong",
+                    "email": "wouter@wouterj.nl"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Provides a Token Bucket implementation to rate limit input and output in your application",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "limiter",
+                "rate-limiter"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/rate-limiter/tree/v8.1.11"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-11-01T19:30:44+00:00"
         },
         {
             "name": "symfony/routing",

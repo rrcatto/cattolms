@@ -32,6 +32,7 @@
 <p>A refund for company credits is given only within {{ refund_window }} of buying the credits, and only for credits that no learner has started.</p>
 <p>A credit that is assigned to a staff member who has not started can be refunded once the Company Administrator removes that staff member from the course. That returns the credit to the company.</p>
 <p>Company credits are refunded only as wallet credit in the company's wallet, at the price the company paid for them, less any deduction in <a href="#deductions">section 6</a>. Staff members who have started keep their access. This does not affect a refund the law gives the company.</p>
+<p>Bundle credits follow the same rules, one bundle credit at a time. A bundle credit can be refunded only while it is not given to a staff member. A bundle credit given to a staff member who has started none of its courses returns to the company when the Company Administrator removes that staff member from the bundle's courses. Once the staff member starts any course in the bundle, that bundle credit is used and is not refunded.</p>
 	{% endblock %}{% endembed %}
 	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'nothing-paid', eyebrow: 'Section 4', icon: icons['nothing-paid'], heading: 'Orders with nothing to pay'})} %}{% block body %}
 <p>A free course has nothing to refund. An order that a promo code reduced to nothing has nothing to refund.</p>

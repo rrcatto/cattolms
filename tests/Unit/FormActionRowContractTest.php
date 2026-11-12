@@ -80,7 +80,7 @@ final class FormActionRowContractTest extends TestCase
         $css = (string) preg_replace(
             '#/\*.*?\*/#s',
             '',
-            (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css')
+            ((string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/css/cattophp.css') . (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css'))
         );
 
         self::assertMatchesRegularExpression('/\.cl-ui-form-actions\{[^}]*border-top:/', $css, 'An action row is separated from the fields.');

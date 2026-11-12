@@ -103,7 +103,7 @@ final class PageHeadContractTest extends TestCase
         foreach (self::pages() as $path) {
             $name = basename($path);
             $markup = (string) file_get_contents($path);
-            $has = str_contains($markup, 'partials/page-head.html.twig');
+            $has = str_contains($markup, 'page/head.html.twig');
 
             if (isset(self::WITHOUT_HEADER[$name])) {
                 self::assertFalse(
@@ -157,7 +157,7 @@ final class PageHeadContractTest extends TestCase
         foreach (self::pages() as $path) {
             $name = basename($path);
             $markup = (string) file_get_contents($path);
-            if (!str_contains($markup, 'partials/page-head.html.twig')) {
+            if (!str_contains($markup, 'page/head.html.twig')) {
                 continue;
             }
 

@@ -57,9 +57,33 @@ final class AdminAttentionRepository
     {
         return $this->db->fetchAllAssociative(
             'SELECT m.id, m.reference, m.reason, m.sender_name, m.created_at, u.id AS person_id, u.account_reference AS person_reference
-               FROM contact_messages m LEFT JOIN users u ON u.id = m.user_id
-              WHERE m.answered_at IS NULL ORDER BY m.created_at, m.id'
+               FROM cattophp_inbox_conversations m LEFT JOIN users u ON u.id = CASE WHEN m.account ~ \'^[0-9]+$\' THEN CAST(m.account AS BIGINT) END
+              WHERE m.answered_at IS NULL AND m.folder = \'inbox\' ORDER BY m.created_at, m.id'
         );
+    }
+
+    /**
+     * Published courses with no price on sale today (owner, 2026-11-11: "If a published course has no active price, it should
+     * be added to my Needs attention"), each with when its last price ended, if one did.
+     *
+     * @return list<array{id:int,code:string,title:string,ended:?string,updated_at:string}>
+     */
+    public function coursesWithoutAPrice(): array
+    {
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'title' => (string) $row['title'], 'ended' => $row['ended'] !== null ? (string) $row['ended'] : null, 'updated_at' => (string) $row['updated_at']],
+            $this->db->fetchAllAssociative(
+                "SELECT c.id, c.code, c.title, c.updated_at,
+                        (SELECT MAX(v.ends_at)::text FROM course_price_variants v WHERE v.course_id = c.id AND v.is_active AND v.ends_at <= now()) AS ended
+                   FROM courses c
+                  WHERE c.status = 'published' AND NOT EXISTS (SELECT 1 FROM course_prices_on_sale s WHERE s.course_id = c.id)
+                  ORDER BY c.catalogue_position NULLS LAST, c.title, c.id"
+            ));
+    }
+
+    /** How many published courses have no price on sale today, for the Courses menu. */
+    public function coursesWithoutAPriceCount(): int
+    {
+        return (int) $this->db->fetchOne("SELECT COUNT(*) FROM courses c WHERE c.status = 'published' AND NOT EXISTS (SELECT 1 FROM course_prices_on_sale s WHERE s.course_id = c.id)");
     }
 
     /** @return list<array<string,mixed>> */

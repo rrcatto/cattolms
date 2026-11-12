@@ -74,7 +74,7 @@ final class RowIdRouteContractTest extends TestCase
      * The paths whose every route needs a signed-in reader with the right permission (BaseController::requireUser,
      * requirePermission, or the API's token), so a guessed number shows a stranger nothing.
      */
-    private const SIGNED_IN = ['/admin/', '/account/', '/company/', '/mailing/', '/learn/', '/api/'];
+    private const SIGNED_IN = ['/admin/', '/account/', '/company/', '/mailing/', '/inbox/', '/learn/', '/api/'];
 
     /** The list may never grow past this: lower it as routes leave the list. */
     private const CEILING = 1;
@@ -102,7 +102,7 @@ final class RowIdRouteContractTest extends TestCase
         '#^/admin/courses/categories/\{([a-z_]+)\}#' => ['slug', CatalogueAddress::CATEGORY, 'a category (slug)'],
         '#^/admin/courses/tags/\{([a-z_]+)\}#' => ['slug', CatalogueAddress::TAG, 'a tag (slug)'],
         '#^/(?:admin|account)/certificates/\{([a-z_]+)\}#' => ['number', RecordAddress::CERTIFICATE, 'an issued certificate (certificate number)'],
-        '#^/admin/messages/\{([a-z_]+)\}#' => ['reference', RecordAddress::MESSAGE, 'a contact message (message reference)'],
+        '#^/inbox/\{([a-z_]+)\}#' => ['reference', RecordAddress::MESSAGE, 'a conversation in the Inbox (message reference)'],
         '#^/admin/course-items/\{([a-z_]+)\}#' => ['item', CourseItemAddress::REQUIREMENT, 'a Course Item (the slug of its name)'],
         '#^/learn/\{slug\}/\{([a-z_]+)\}#' => ['part', CoursePartAddress::REQUIREMENT, 'a part in the reader (part name)'],
         '#^/courses/\{slug\}/preview/\{([a-z_]+)\}#' => ['part', CoursePartAddress::REQUIREMENT, 'a part in the public preview (part name)'],
@@ -115,11 +115,11 @@ final class RowIdRouteContractTest extends TestCase
      * parameter" => why. It only shrinks: an entry no route matches fails until it is removed.
      */
     private const KEEP_NUMBERS = [
+        '#^GET /inbox/\{reference\}/attachment/\{item\}/\{index\} index$#' => 'An attachment\'s place in its reply, under the conversation\'s reference and the reply\'s random public id; PLATFORM.INBOX.VIEW protects it.',
         '#^\S+ /admin/activity/\{id\} id$#' => 'An activity log entry: nobody names one by a code, and PLATFORM.ACTIVITY.VIEW protects it.',
         '#^\S+ /admin/people/\{reference\}/sign-ins/\{login\}/seen login$#' => 'A sign-in is an activity log entry, under its person\'s reference, and PLATFORM.PERSON.MANAGE protects it.',
         '#^\S+ /admin/people/\{reference\}/identity/\{verification\}/revoke verification$#' => 'An identity check, under its person\'s reference: nobody names one by a code, and identity permissions protect it.',
         '#^\S+ /admin/people/signup-attempts/\{id\} id$#' => 'A sign-up attempt: nobody names one by a code, and PLATFORM.PERSON.VIEW protects it.',
-        '#^\S+ /admin/roles/\{id\}[^ ]* id$#' => 'A role: nobody names one by a code here, and PLATFORM.ROLE permissions protect it.',
         '#^\S+ /admin/certificates/designs/\{id\}[^ ]* id$#' => 'A certificate design: nobody names one by a code, and CERTIFICATE.DESIGN permissions protect it.',
         '#^\S+ /admin/courses/page-layouts/\{id\}[^ ]* id$#' => 'A course page layout: nobody names one by a code, and COURSE.MANAGEMENT.VIEW and SYSTEM.SETTING.MANAGE protect it.',
         '#^\S+ /admin/courses/\{code\}/landing/sections/\{section\}[^ ]* section$#' => 'A landing page section, under its course\'s code: nobody names one by a code, and COURSE.EDIT protects it.',
@@ -131,7 +131,7 @@ final class RowIdRouteContractTest extends TestCase
         '#^\S+ /admin/test-grants/\{id\}/(?:invite|revoke) id$#' => 'A test grant is an enrolment: nobody names one by a code, and COURSE.ENROLMENT.MANAGE protects it.',
         '#^\S+ /(?:admin/course|company)/requests/\{id\}/decision id$#' => 'A course request: nobody names one by a code, and the request permissions or the company protect it.',
         '#^\S+ /(?:admin/commerce|account)/refund-requests/\{id\}/(?:approve|refuse|withdraw) id$#' => 'A refund request: nobody names one by a code, and COMMERCE permissions or the buyer\'s own account protect it.',
-        '#^\S+ /admin/commerce/refunds/\{id\}/payout id$#' => 'A refund: nobody names one by a code, and COMMERCE.REFUND.MANAGE protects it.',
+        '#^\S+ /admin/commerce/refunds/\{id\}/(?:payout|stitch) id$#' => 'A refund (its payout recorded, or sent to the card through Stitch): nobody names one by a code, and COMMERCE.REFUND.MANAGE protects it.',
         '#^\S+ /admin/commerce/attention/\{kind\}/\{reference\}[^ ]* reference$#' => 'A Needs your attention item that is a money ledger line (overpaid, paid after cancelling: one order can have two), a refund request or a refund: nobody names one by a code. An underpaid order is named by its number on its own route.',
         '#^\S+ /admin/commerce/unmatched/\{id\}[^ ]* id$#' => 'An unmatched deposit: nobody names one by a code, and COMMERCE.PAYMENT.MANAGE protects it.',
         '#^\S+ /admin/commerce/(?:ledger|trail|payment-events)/\{id\} id$#' => 'A money ledger line, a trail event or a payment event: nobody names one by a code, and COMMERCE permissions protect it.',

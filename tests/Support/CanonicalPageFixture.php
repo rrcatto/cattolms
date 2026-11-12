@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Support;
 
 use CattoLearning\View\Twig\TwigFactory;
-use CattoLearning\View\Twig\ThemeTemplates;
+use CattoPHP\Theme\Templates;
 
 /**
  * Renders bundled theme shells with isolated presentation data for structural contracts. Given a page of
@@ -19,8 +19,11 @@ final class CanonicalPageFixture
         $root = dirname(__DIR__, 2);
         $loader = TwigFactory::loader($root);
         $paths = [$root . '/themes/' . $slug];
-        (new ThemeTemplates($loader))->use($paths);
+        (new Templates($loader))->use($paths);
         $twig = TwigFactory::create($loader, $root, sys_get_temp_dir() . '/catto-canonical-' . getmypid(), true);
+        // The application's Twig also has CattoPHP's extension; the head needs its csp_nonce() (step 7c).
+        $twig->addFunction(new \Twig\TwigFunction('csp_nonce', static fn (): string => 'test-nonce'));
+        $twig->addFilter(new \Twig\TwigFilter('authored', static fn (?string $html): string => (string) $html, ['is_safe' => ['html']]));
         $item = static fn(string $key, string $href, array $children = [], string $method = 'GET'): array => [
             'key' => $key, 'label' => ucfirst($key), 'href' => $href, 'icon_id' => 'nav-account',
             'active' => true, 'children' => $children, 'method' => $method, 'csrf' => 'test-csrf',
@@ -34,7 +37,7 @@ final class CanonicalPageFixture
         }
         $layout = is_file($paths[0] . '/pages/content.html.twig') ? '@theme/pages/content.html.twig' : '@theme/base.html.twig';
         if ($authPage !== null && is_file($paths[0] . '/pages/auth.html.twig')) $layout = '@theme/pages/auth.html.twig';
-        return $twig->createTemplate("{% extends layout %}{% block page_body %}{% include '@platform/partials/page-head.html.twig' %}<section class=\"cl-page-section\" aria-label=\"Learning guide\">{{ ui('feedback.empty', {heading: 'Learning', summary: 'Course content'}) }}</section>{% endblock %}")->render([
+        return $twig->createTemplate("{% extends layout %}{% block page_body %}{% include '@CattoPHP/page/head.html.twig' %}<section class=\"cl-page-section\" aria-label=\"Learning guide\">{{ ui('feedback.empty', {heading: 'Learning', summary: 'Course content'}) }}</section>{% endblock %}")->render([
             'layout' => $layout, 'title' => 'Help', 'app_name' => 'Catto', 'body_class' => '',
             'page' => ['title' => 'Help', 'subtitle' => 'Learning', 'type' => $authPage === null ? 'content' : 'auth', 'name' => $authPage ?? 'help', 'body_class' => ''],
             'app' => ['name' => 'Catto', 'base_url' => '/'],

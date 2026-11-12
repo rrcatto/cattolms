@@ -49,11 +49,11 @@
 					   the effect of typing in a search term"), so what it finds shows right under it. The page is morphed as the
 					   reader types, and the box itself is left alone (ds_morph_skip), so a letter typed while an answer is on its
 					   way is never put back. #}
-					{% if search %}<div id="catalogue-search" class="cl-catalogue-search">{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: search.value, ds_action: search.action, ds_push_url: true, ds_swap: 'innerMorph', ds_include: '#catalogue-state', ds_morph_skip: true} %}</div>{% endif %}
+					{% if search %}<div id="catalogue-search" class="cl-catalogue-search">{% include '@CattoPHP/ui/data/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: search.value, ds_action: search.action, ds_push_url: true, ds_swap: 'innerMorph', ds_include: '#catalogue-state', ds_morph_skip: true} %}</div>{% endif %}
 					{# Cards or a list, as the reader chose (owner, 2026-10-26; Support\ListView): cards until they choose. #}
 					{# With bundles, the courses' List and Grid are in their own head, at the right, as the bundles' are (owner, 2026-11-07). #}
-					{% if not bundles and courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: in_place ? 'innerMorph' : 'innerHTML'} %}</div>{% endif %}
-					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
+					{% if not bundles and courses and workspace.view_switch|default(null) %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: in_place ? 'innerMorph' : 'innerHTML'} %}</div>{% endif %}
+					{% if workspace.paginated %}{% include '@CattoPHP/ui/data/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
 					{% if courses and workspace.view|default('grid') == 'list' %}
 						{# One row per course, in the catalogue's order, on one line like every table's (the summary and rating
 						   are on the cards): its cover, small, and title; its category, level and price; and View course with
@@ -66,7 +66,7 @@
 								<tr>
 									<td class="cell-text">
 										<span class="cl-catalogue-row">
-											<a class="cl-catalogue-row-cover" href="{{ course_href }}" tabindex="-1" aria-hidden="true">{% if course.cover_svg is defined and course.cover_svg starts with '<svg' %}{{ course.cover_svg|raw }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ course.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
+											<a class="cl-catalogue-row-cover" href="{{ course_href }}" tabindex="-1" aria-hidden="true">{% if course.cover_svg is defined and course.cover_svg starts with '<svg' %}{{ course.cover_svg|authored }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ course.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
 											<a class="cl-catalogue-row-title" href="{{ course_href }}">{{ course.title }}</a>
 										</span>
 									</td>
@@ -88,7 +88,7 @@
 					{% else %}
 						{{ ui('feedback.empty', {heading: workspace.empty_heading, summary: workspace.empty_summary}) }}
 					{% endif %}
-					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'bottom'} %}{% endif %}
+					{% if workspace.paginated %}{% include '@CattoPHP/ui/data/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'bottom'} %}{% endif %}
 {% endset %}
 <div id="catalogue-workspace">
 	<div id="catalogue-region" data-server-search-target>
@@ -99,15 +99,15 @@
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
 					{% block surface_body %}
 						<div class="cl-catalogue-bundle-section" id="catalogue-bundles">
-							{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course bundles', summary: bundles.summary})} %}{% block section_actions %}{% include '@platform/partials/view-switch.html.twig' with {vs: bundles.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{{ ui('action.link', {label: 'View all bundles', variant: 'secondary', size: 'small', href: '/bundles', icon: 'action-view-all'}) }}{% endblock %}{% endembed %}
+							{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course bundles', summary: bundles.summary})} %}{% block section_actions %}{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: bundles.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{{ ui('action.link', {label: 'View all bundles', variant: 'secondary', size: 'small', href: '/bundles', icon: 'action-view-all'}) }}{% endblock %}{% endembed %}
 							{{ ui('catalogue.bundles', {bundles: bundles.cards, view: bundles.view}) }}
-							{% include '@platform/partials/pagination.html.twig' with {pg: bundles.pagination, pg_position: 'bottom'} %}
+							{% include '@CattoPHP/ui/data/pagination.html.twig' with {pg: bundles.pagination, pg_position: 'bottom'} %}
 						</div>
 					{% endblock %}
 				{% endembed %}
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
 					{% block surface_body %}
-						{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: workspace.search_heading|default('Courses'), summary: workspace.search_summary|default('')})} %}{% block section_actions %}{% if courses and workspace.view_switch|default(null) %}{% include '@platform/partials/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{% endif %}{% endblock %}{% endembed %}
+						{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: workspace.search_heading|default('Courses'), summary: workspace.search_summary|default('')})} %}{% block section_actions %}{% if courses and workspace.view_switch|default(null) %}{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: workspace.view_switch, vs_region: 'catalogue-region', vs_swap: 'innerMorph'} %}{% endif %}{% endblock %}{% endembed %}
 						{{ courses_body }}
 					{% endblock %}
 				{% endembed %}

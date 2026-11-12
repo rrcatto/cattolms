@@ -147,6 +147,14 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendWalletExpiryReminder($this->router->deliveryAddress($email), $name, $lines, $walletUrl);
     }
 
+    public function sendInboxReply(\Symfony\Component\Mime\Email $email): void
+    {
+        $to = $email->getTo()[0] ?? null;
+        if ($to === null || $this->holds('inbox_reply', $to->getAddress(), '')) return;
+        $email->to(new \Symfony\Component\Mime\Address($this->router->deliveryAddress($to->getAddress()), $to->getName()));
+        $this->mailer->sendInboxReply($email);
+    }
+
     public function sendAdministratorMessage(string $email, string $subject, string $body): void
     {
         if ($this->holds('administrator_message', $email, '')) return;

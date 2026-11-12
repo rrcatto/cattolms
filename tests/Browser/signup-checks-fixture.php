@@ -34,8 +34,8 @@ if ($action === 'names') {
     $emails = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     $removed = (new CheckScrub($db))->remove(['emails' => $emails]);
     $list = json_encode($emails, JSON_THROW_ON_ERROR);
-    $attempts = $db->executeStatement('DELETE FROM signup_attempts WHERE lower(email) IN (SELECT lower(jsonb_array_elements_text(CAST(:e AS jsonb))))', ['e' => $list]);
-    $db->executeStatement('DELETE FROM auth_login_tokens WHERE lower(email) IN (SELECT lower(jsonb_array_elements_text(CAST(:e AS jsonb))))', ['e' => $list]);
+    $attempts = $db->executeStatement('DELETE FROM cattophp_signup_attempts WHERE lower(email) IN (SELECT lower(jsonb_array_elements_text(CAST(:e AS jsonb))))', ['e' => $list]);
+    $db->executeStatement('DELETE FROM cattophp_links WHERE lower(email) IN (SELECT lower(jsonb_array_elements_text(CAST(:e AS jsonb))))', ['e' => $list]);
     unlink($statePath);
     echo 'Removed ' . ($removed['users'] ?? 0) . ' sign-up check accounts and ' . $attempts . " sign-up attempts.\n";
 } else {

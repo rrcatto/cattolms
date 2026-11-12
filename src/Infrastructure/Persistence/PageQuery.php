@@ -46,7 +46,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 
 final class PageQuery
 {

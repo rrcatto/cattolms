@@ -27,8 +27,7 @@ use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Commerce\Settings\FeeTiers;
 use CattoLearning\Commerce\Settings\ProcessorFee;
 use CattoLearning\Course\CourseTiming;
-use CattoLearning\Support\AccountReference;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Support\Money;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -61,37 +60,6 @@ final class CommerceSettingsValuesTest extends TestCase
         self::assertTrue(Duration::parse('30d')->isShorterThan(Duration::parse('3y'), $at));
         self::assertFalse(Duration::parse('3y')->isShorterThan(Duration::parse('30d'), $at));
         self::assertFalse(Duration::parse('7d')->isShorterThan(Duration::parse('1w'), $at), 'Equal is not shorter.');
-    }
-
-    public function testAnAccountReferenceCarriesACheckCharacterThatCatchesTypingMistakes(): void
-    {
-        // The same characters the database's account_reference_check() gives (the first three references of 17 October 2026).
-        self::assertSame(['U', 'S', 'Q'], [AccountReference::checkCharacter('CL202610170001'), AccountReference::checkCharacter('CL202610170002'), AccountReference::checkCharacter('CL202610170003')]);
-        self::assertSame('CL-20261017-0001-U', AccountReference::format('CL202610170001U'));
-        self::assertSame('not a reference', AccountReference::format('not a reference'), 'Anything else is shown as it is.');
-        $long = 'CL2026111912345' . AccountReference::checkCharacter('CL2026111912345');
-        self::assertSame('CL-20261119-12345-' . substr($long, -1), AccountReference::format($long), 'The number keeps rising past 9999.');
-        self::assertSame($long, AccountReference::parse(AccountReference::format($long)));
-        self::assertSame('CL202610170001U', AccountReference::parse('cl-20261017-0001-u'));
-        self::assertSame('CL202610170001U', AccountReference::parse(' CL 2026IOI7 OOO1 U '), 'O and I typed for 0 and 1 in the digits are read as digits.');
-        foreach (['CL-20261017-0001-S' => 'a wrong check character', 'CL-20261017-0010-U' => 'two digits swapped', 'CL-20261017-0002-U' => 'one digit wrong', 'CL-20261071-0001-U' => 'two date digits swapped'] as $typed => $mistake) {
-            self::assertFalse(AccountReference::isValid($typed), 'The check character catches ' . $mistake . '.');
-        }
-        try {
-            AccountReference::parse('CL-20261017-0001-S');
-            self::fail('A mistake is refused.');
-        } catch (InvalidArgumentException $exception) {
-            self::assertSame('That account reference has a mistake in it. Check each character.', $exception->getMessage());
-        }
-        $this->expectExceptionMessage('An account reference looks like CL-20261016-0001-K.');
-        AccountReference::parse('CL-2026-1');
-    }
-
-    public function testAnAccountReferencePrefixIsOneToThreeCapitalLetters(): void
-    {
-        foreach (['C' => true, 'CL' => true, 'CLM' => true, 'cl' => false, 'ABCD' => false, '' => false, 'C1' => false] as $prefix => $valid) {
-            self::assertSame($valid, AccountReference::validPrefix((string) $prefix), '"' . $prefix . '"');
-        }
     }
 
     public function testAProcessorFeeIsAPercentagePlusAFixedAmountRoundedHalfUp(): void
@@ -146,7 +114,7 @@ final class CommerceSettingsValuesTest extends TestCase
         self::assertSame('3y', CommerceSettings::SETTINGS['wallet_expiry'][2], 'Wallet credit lasts 3 years by default (CPA section 63).');
         self::assertSame('7d', CommerceSettings::SETTINGS['refund_window'][2]);
         self::assertSame('Use 1 to 3 capital letters, such as CL.', CommerceSettings::check('account_prefix', 'cl'));
-        self::assertSame(\CattoLearning\Support\Duration::HOW, CommerceSettings::check('wallet_expiry', '3 years'));
+        self::assertSame(\CattoPHP\Foundation\Duration::HOW, CommerceSettings::check('wallet_expiry', '3 years'));
         self::assertNotNull(CommerceSettings::check('stitch_fee', '3%'));
         $example = (string) file_get_contents(dirname(__DIR__, 2) . '/.env.example');
         foreach (CommerceSettings::SETTINGS as [, $env, $default]) {

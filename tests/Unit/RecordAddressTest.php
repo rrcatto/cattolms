@@ -58,7 +58,7 @@ final class RecordAddressTest extends TestCase
         self::assertSame('/follow/tag/raised-beds', CatalogueAddress::follow('tag', 'raised-beds'));
         self::assertSame('/admin/certificates/CL-2026-3F9A2C1B7D4E/certificate.pdf', RecordAddress::certificate('admin', ['certificate_number' => 'CL-2026-3F9A2C1B7D4E'], '/certificate.pdf'));
         self::assertSame('/account/certificates/CL-2026-3F9A2C1B7D4E/visibility', RecordAddress::certificate('account', 'CL-2026-3F9A2C1B7D4E', '/visibility'));
-        self::assertSame('/admin/messages/MSG-000043/answered', RecordAddress::message(['reference' => 'MSG-000043'], '/answered'));
+        self::assertSame('/inbox/MSG-000043/act', RecordAddress::message(['reference' => 'MSG-000043'], '/act'));
         self::assertSame('/admin/course-items/gdn-101-module-1-presentation', CourseItemAddress::admin(['id' => 5, 'name' => 'GDN-101 Module 1 Presentation']));
         self::assertSame('/learn/growing-vegetables/module-1-presentation/pdf', CoursePartAddress::reader('growing-vegetables', 'module-1-presentation', '/pdf'));
         self::assertSame('/courses/growing-vegetables/preview/module-1-presentation', CoursePartAddress::preview(['slug' => 'growing-vegetables'], ['part_name' => 'module-1-presentation']));

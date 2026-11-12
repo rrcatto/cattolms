@@ -35,7 +35,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
         $this->db->beginTransaction();
         $this->options = new OptionRepository($this->db);
         $this->env = $_ENV;
-        foreach (array_keys(SiteOwner::FIELDS) as $field) $this->options->delete('site_owner.' . $field);
+        foreach (array_keys(SiteOwner::FIELDS) as $field) IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)->reset(SiteOwner::settingName($field));
         $_ENV = array_merge($_ENV, ['SITE_OWNER_TRADING_NAME' => 'Placeholder Learning', 'SITE_OWNER_LEGAL_NAME' => 'Placeholder Learning (Pty) Ltd', 'SITE_OWNER_LEGAL_FORM' => 'company',
             'SITE_OWNER_REGISTRATION_NUMBER' => '2026/111111/07', 'SITE_OWNER_ADDRESS' => '1 Placeholder Road, Placeholder Town, 0001', 'SITE_OWNER_PHONE' => '+27 11 000 0000',
             'SITE_OWNER_BANK_NAME' => '', 'SITE_OWNER_BANK_ACCOUNT_NAME' => '', 'SITE_OWNER_BANK_ACCOUNT_NUMBER' => '', 'SITE_OWNER_BANK_BRANCH_CODE' => '']);
@@ -50,7 +50,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
 
     private function owner(): SiteOwner
     {
-        return new SiteOwner($this->options, new MockClock('2026-10-18T12:00:00+02:00'));
+        return new SiteOwner(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class), $this->options, new MockClock('2026-10-18T12:00:00+02:00'));
     }
 
     /**
@@ -94,7 +94,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
     {
         $service = IntegrationContainer::get()->get(PlatformAdministrationService::class);
         $service->saveSiteOwner($this->input(['phone' => '+27 21 555 0000', 'information_officer' => 'Placeholder Officer']), $this->actor);
-        $row = $this->db->fetchAssociative("SELECT user_id, metadata FROM audit_log WHERE event_key = 'site_owner.updated' ORDER BY id DESC LIMIT 1");
+        $row = $this->db->fetchAssociative("SELECT account_person(actor_id) AS user_id, details AS metadata FROM cattophp_activity WHERE action = 'site_owner.updated' ORDER BY id DESC LIMIT 1");
         self::assertIsArray($row);
         self::assertSame($this->actor, (int) $row['user_id']);
         $changes = json_decode((string) $row['metadata'], true)['changes'];
@@ -102,7 +102,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
         self::assertSame('Placeholder Officer', $changes['information_officer']['new']);
         self::assertArrayNotHasKey('trading_name', $changes, 'only what changed');
         $service->resetSiteOwner($this->actor);
-        $reset = json_decode((string) $this->db->fetchOne("SELECT metadata FROM audit_log WHERE event_key = 'site_owner.updated' ORDER BY id DESC LIMIT 1"), true);
+        $reset = json_decode((string) $this->db->fetchOne("SELECT details AS metadata FROM cattophp_activity WHERE action = 'site_owner.updated' ORDER BY id DESC LIMIT 1"), true);
         self::assertEquals(['old' => '+27 21 555 0000', 'new' => '+27 11 000 0000'], $reset['changes']['phone']);
     }
 
@@ -137,7 +137,7 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
     public function testALiveOrderShowsTheSiteOwnersBankDetails(): void
     {
         $owner = $this->owner();
-        $live = new RuntimeSettings($this->options, IntegrationContainer::get()->get(\CattoLearning\Configuration\SecretCipher::class), SiteMode::fixed('live'), $owner);
+        $live = new RuntimeSettings(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class), SiteMode::fixed('live'), $owner);
         self::assertStringContainsString('check this order again for the bank details', $this->orderHtml($live));
         $owner->save($this->input(['bank_name' => 'Placeholder Bank', 'bank_account_name' => 'Placeholder Learning', 'bank_account_number' => '00123456789', 'bank_branch_code' => '001234']), $this->actor);
         $html = $this->orderHtml($live);
@@ -150,9 +150,10 @@ final class SiteOwnerSettingsIntegrationTest extends TestCase
     {
         $files = new FilesystemLoader();
         $files->addPath(dirname(__DIR__, 2) . '/resources/views', 'platform');
+        $files->addPath(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/templates', 'CattoPHP');
         $twig = new Environment(new ChainLoader([new ArrayLoader(['test-layout' => '{% block page_body %}{% endblock %}']), $files]), ['strict_variables' => true]);
-        $twig->addExtension(new \CattoLearning\View\Twig\PlatformUiExtension(new \CattoLearning\View\Ui\PlatformUi()));
-        // The page's filters (account_reference names the reader's account in the identity band).
+        // The components and account_reference (which names the reader's account in the identity band) are CattoPHP's.
+        $twig->addExtension(new \CattoPHP\Twig\UiExtension(\CattoLearning\View\Ui\ProjectComponents::registry()));
         $twig->addExtension(new \CattoLearning\View\Twig\PlatformExtension());
         return $twig->render('@platform/pages/commerce-order.html.twig', [
             'layout' => 'test-layout', 'platform' => ['icon_sprite' => '/icons.svg'], 'app' => ['name' => 'Test LMS'], 'order' => ['id' => 123, 'state' => 'awaiting_payment', 'total_minor' => 10000, 'company_id' => null, 'payment_due_at' => '2026-09-20', 'details' => ['items' => [], 'payment_method' => 'eft'], 'documents' => [], 'payments' => []],

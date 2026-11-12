@@ -34,7 +34,7 @@
 			{% set course_hero = course.cover_svg|default('') starts with '<svg' %}
 			{% if course_hero %}
 				<div class="cl-picture-head mb-7">
-					<div class="cl-picture-head-art" aria-hidden="true">{{ course.cover_svg|raw }}</div>
+					<div class="cl-picture-head-art" aria-hidden="true">{{ course.cover_svg|authored }}</div>
 					<div class="cl-picture-head-text">{{ course_headline }}</div>
 				</div>
 			{% endif %}

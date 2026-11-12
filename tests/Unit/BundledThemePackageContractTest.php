@@ -23,7 +23,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\View\ThemePackageValidator;
+use CattoLearning\View\ProjectTheme;
 use PHPUnit\Framework\TestCase;
 
 final class BundledThemePackageContractTest extends TestCase
@@ -39,7 +39,7 @@ final class BundledThemePackageContractTest extends TestCase
         // out, it has to be edited by hand on every version bump, and a test that fails because
         // the owner chose a new number is noise that trains people to edit tests to make them
         // pass.
-        $default = \CattoLearning\View\ThemeManager::DEFAULT_SLUG;
+        $default = \CattoLearning\View\ProjectTheme::DEFAULT_SLUG;
         $manifest = json_decode((string) file_get_contents(__DIR__ . '/../../themes/' . $default . '/theme.json'), true);
         $expected = $default . '-v' . (string) ($manifest['theme']['version'] ?? '') . '.zip';
 
@@ -49,7 +49,7 @@ final class BundledThemePackageContractTest extends TestCase
             'The default theme\'s package (Saharan Sunset since 2026-11-07) must remain bundled at its current version; '
             . 'ThemeManager falls back to it.'
         );
-        $validator = new ThemePackageValidator();
+        $validator = ProjectTheme::validator();
         foreach ($packages as $package) {
             $result = $validator->inspect($package);
             self::assertSame('catto-learning-theme', $result['manifest']['format'] ?? null, basename($package));
@@ -77,7 +77,7 @@ final class BundledThemePackageContractTest extends TestCase
         try {
             $this->expectException(\RuntimeException::class);
             $this->expectExceptionMessage('platform.scripts');
-            (new ThemePackageValidator())->inspect($path);
+            ProjectTheme::validator()->inspect($path);
         } finally {
             @unlink($path);
         }

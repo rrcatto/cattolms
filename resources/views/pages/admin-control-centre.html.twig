@@ -1,10 +1,10 @@
 {% extends layout %}
 {% block page_body %}
-{{ importmap() }}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set ph_kicker = 'Administration' %}
 	{% set ph_title = 'All sections' %}
 	{% set ph_lead = 'Every top-level Administration area is available in one workspace. Open only the sections you need. Each one also has a page of its own.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section cl-admin-workspace" data-admin-workspace>
 		{% for section in admin_sections %}
 			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (section.label), summary: (section.description), open: section.key == 'dashboard', workspace: 'admin', section_key: (section.key)})} %}

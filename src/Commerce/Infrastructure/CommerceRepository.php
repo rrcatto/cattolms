@@ -30,22 +30,25 @@ final class CommerceRepository
     /** @return list<array<string,mixed>> */
     public function cartItems(int $cartId): array
     {
-        return $this->db->fetchAllAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status FROM commerce_cart_items i JOIN course_price_variants v ON v.id=i.variant_id JOIN courses c ON c.id=v.course_id WHERE i.cart_id=:id ORDER BY v.id', ['id'=>$cartId]);
+        // Whether each is on sale today (owner, 2026-11-11: dated prices), and the was price it is shown with.
+        return $this->db->fetchAllAssociative("SELECT v.*,(s.id IS NOT NULL) AS is_active,COALESCE(s.was_price_minor_units,v.was_price_minor_units) AS was_price_minor_units,c.title,c.slug,c.status AS course_status,CASE WHEN c.status='published' AND c.cover_svg LIKE '<svg%' THEN substr(md5(c.cover_svg),1,12) END AS cover_version FROM commerce_cart_items i JOIN course_price_variants v ON v.id=i.variant_id LEFT JOIN course_prices_on_sale s ON s.id=v.id JOIN courses c ON c.id=v.course_id WHERE i.cart_id=:id ORDER BY v.id", ['id'=>$cartId]);
     }
 
     /** @return array<string,mixed> */
     public function offer(int $variantId): array
     {
-        return $this->db->fetchAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status,c.owner_company_id FROM course_price_variants v JOIN courses c ON c.id=v.course_id WHERE v.id=:id', ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
+        // is_active says whether it is on sale today (owner, 2026-11-11: active and inside its dates, and not a default an
+        // overriding price replaces), which every purchase checks; a paid order is fulfilled whatever it says.
+        return $this->db->fetchAssociative("SELECT v.*,(s.id IS NOT NULL) AS is_active,COALESCE(s.was_price_minor_units,v.was_price_minor_units) AS was_price_minor_units,c.title,c.slug,c.status AS course_status,c.owner_company_id,CASE WHEN c.status='published' AND c.cover_svg LIKE '<svg%' THEN substr(md5(c.cover_svg),1,12) END AS cover_version FROM course_price_variants v LEFT JOIN course_prices_on_sale s ON s.id=v.id JOIN courses c ON c.id=v.course_id WHERE v.id=:id", ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
     }
 
     /** @return list<array<string,mixed>> */
     public function companyOffers(int $companyId, string $search = '', int $limit = 30): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT v.*,c.title,c.slug,c.status AS course_status,c.owner_company_id FROM course_price_variants v
+            "SELECT v.*,c.title,c.slug,c.status AS course_status,c.owner_company_id FROM course_prices_on_sale v
              JOIN courses c ON c.id=v.course_id
-             WHERE v.is_active=TRUE AND c.status='published' AND v.price_minor_units>0 AND v.currency_code='ZAR'
+             WHERE c.status='published' AND v.price_minor_units>0 AND v.currency_code='ZAR'
                AND (c.owner_company_id IS NULL OR c.owner_company_id<>:company)
                AND (:search='' OR c.title ILIKE :pattern)
              ORDER BY c.title,v.access_period_seconds,v.id LIMIT :limit",
@@ -61,9 +64,9 @@ final class CommerceRepository
                     cr.access_period_seconds,v.id AS variant_id,v.price_minor_units,v.currency_code,
                     c.title,c.slug,c.owner_company_id
              FROM course_requests cr JOIN courses c ON c.id=cr.course_id
-             JOIN course_price_variants v ON v.course_id=c.id AND v.access_period_seconds=cr.access_period_seconds
+             JOIN course_prices_on_sale v ON v.course_id=c.id AND v.access_period_seconds=cr.access_period_seconds
              WHERE cr.id=:request AND cr.company_id=:company AND cr.status='pending'
-               AND c.status='published' AND v.is_active=TRUE AND v.price_minor_units>0 AND v.currency_code='ZAR'
+               AND c.status='published' AND v.price_minor_units>0 AND v.currency_code='ZAR'
                AND (c.owner_company_id IS NULL OR c.owner_company_id<>:company)
              ORDER BY v.is_default DESC,v.id LIMIT 1",
             ['request'=>$requestId,'company'=>$companyId]
@@ -71,7 +74,8 @@ final class CommerceRepository
     }
 
     private const BUNDLE_OFFER = 'SELECT o.id, o.bundle_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
-            b.title, b.slug, b.status, b.available_from, b.available_until
+            b.title, b.slug, b.status, b.available_from, b.available_until,
+            CASE WHEN b.cover_svg LIKE \'<svg%\' THEN substr(md5(b.cover_svg), 1, 12) END AS cover_version
         FROM bundle_offers o JOIN bundles b ON b.id = o.bundle_id';
 
     /**
@@ -346,6 +350,67 @@ final class CommerceRepository
     {
         return max(0, (int)$this->order($orderId)['total_minor'] - $this->paidTotal($orderId));
     }
+    /** A card payment's checkout with its provider: the payment link's id, its address and when it expires. */
+    public function setPaymentCheckout(string $id, string $reference, string $url, ?string $expiresAt): void
+    {
+        $this->db->executeStatement('UPDATE commerce_payments SET checkout_reference=:reference,checkout_url=:url,checkout_expires_at=:expires WHERE id=:id', ['id'=>$id,'reference'=>$reference,'url'=>$url,'expires'=>$expiresAt]);
+    }
+
+    /** @return array<string,mixed>|null the payment a provider's checkout belongs to */
+    public function paymentByCheckout(string $gateway, string $reference): ?array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_payments WHERE gateway=:gateway AND checkout_reference=:reference', ['gateway'=>$gateway,'reference'=>$reference]) ?: null;
+    }
+
+    /**
+     * Card payments still waiting for the provider, oldest asked about first, each at least a minute old (the customer is
+     * usually still paying), so the minute's job can ask the provider where they stand.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function waitingCheckouts(string $gateway, string $before, int $limit): array
+    {
+        return $this->db->fetchAllAssociative("SELECT * FROM commerce_payments WHERE gateway=:gateway AND state='pending' AND checkout_reference IS NOT NULL AND created_at<=:before ORDER BY created_at LIMIT ".max(1,$limit), ['gateway'=>$gateway,'before'=>$before]);
+    }
+
+    /**
+     * What this site holds of the given Stitch records (owner, 2026-11-11, the Stitch page): for each payment link id the card
+     * payment it was made for, for each Stitch payment id the payment it paid, for each Stitch refund id the refund whose
+     * payout it is; each with its order's id and the payment's or refund's state.
+     *
+     * @param list<string> $links
+     * @param list<string> $payments
+     * @param list<string> $refunds
+     * @return array{links:array<string,array{order_id:int,state:string}>,payments:array<string,array{order_id:int,state:string}>,refunds:array<string,array{order_id:int,refund_id:int}>}
+     */
+    public function stitchMatches(string $gateway, array $links, array $payments, array $refunds): array
+    {
+        $matches = ['links' => [], 'payments' => [], 'refunds' => []];
+        if ($links !== []) {
+            foreach ($this->db->fetchAllAssociative('SELECT checkout_reference AS id, order_id, state FROM commerce_payments WHERE gateway=:gateway AND checkout_reference = ANY(CAST(:ids AS text[]))', ['gateway' => $gateway, 'ids' => self::textArray($links)]) as $row) {
+                $matches['links'][(string) $row['id']] = ['order_id' => (int) $row['order_id'], 'state' => (string) $row['state']];
+            }
+        }
+        if ($payments !== []) {
+            foreach ($this->db->fetchAllAssociative('SELECT provider_reference AS id, order_id, state FROM commerce_payments WHERE gateway=:gateway AND provider_reference = ANY(CAST(:ids AS text[]))', ['gateway' => $gateway, 'ids' => self::textArray($payments)]) as $row) {
+                $matches['payments'][(string) $row['id']] = ['order_id' => (int) $row['order_id'], 'state' => (string) $row['state']];
+            }
+        }
+        if ($refunds !== []) {
+            foreach ($this->db->fetchAllAssociative("SELECT p.external_reference AS id, r.order_id, r.id AS refund_id FROM commerce_refund_payouts p JOIN commerce_refunds r ON r.id=p.refund_id WHERE p.method='stitch' AND p.external_reference = ANY(CAST(:ids AS text[]))", ['ids' => self::textArray($refunds)]) as $row) {
+                $matches['refunds'][(string) $row['id']] = ['order_id' => (int) $row['order_id'], 'refund_id' => (int) $row['refund_id']];
+            }
+        }
+
+        return $matches;
+    }
+
+    /** @param list<string> $values a PostgreSQL text array, each value quoted */
+    private static function textArray(array $values): string
+    {
+        return '{' . implode(',', array_map(static fn (string $value): string => '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"', $values)) . '}';
+    }
+
     public function setPaymentState(string $id, string $state, ?string $reference): void
     {
         $this->db->executeStatement('UPDATE commerce_payments SET state=:state,provider_reference=COALESCE(:reference,provider_reference) WHERE id=:id', ['id'=>$id,'state'=>$state,'reference'=>$reference]);
@@ -492,6 +557,9 @@ final class CommerceRepository
     public function learnerStarted(int $enrolmentId, string $now): void
     {
         $this->db->executeStatement("UPDATE course_enrolments SET started_at=COALESCE(started_at,:now),status=CASE WHEN status='assigned' THEN 'active' ELSE status END,updated_at=:now WHERE id=:id", ['id'=>$enrolmentId,'now'=>$now]);
+        // A bundle credit is used once its person starts any of its courses (owner, 2026-11-11), here too for a course whose
+        // access has sources (one a bundle credit extended).
+        $this->db->executeStatement("UPDATE bundle_credit_allocations SET status='consumed', consumed_at=:now WHERE status='assigned' AND id IN (SELECT allocation_id FROM bundle_credit_enrolments WHERE enrolment_id=:id)", ['id'=>$enrolmentId,'now'=>$now]);
     }
     /** @return list<int> */
     public function dueEntitlements(string $now, int $limit): array

@@ -60,8 +60,8 @@ final class AccountApprovalIntegrationTest extends TestCase
             $fixture->rememberUser($userId);
             $fixture->rememberEmail($email);
             self::assertSame('awaiting_approval', $db->fetchOne('SELECT status FROM users WHERE id = :id', ['id' => $userId]));
-            self::assertSame(0, (int) $db->fetchOne('SELECT COUNT(*) FROM auth_sessions WHERE user_id = :id', ['id' => $userId]), 'No session: it is not signed in.');
-            self::assertSame(1, (int) $db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE user_id = :id AND event_key = 'user.awaiting_approval'", ['id' => $userId]));
+            self::assertSame(0, (int) $db->fetchOne('SELECT COUNT(*) FROM cattophp_sessions WHERE account_id = CAST(:id AS TEXT)', ['id' => $userId]), 'No session: it is not signed in.');
+            self::assertSame(1, (int) $db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE actor_id = CAST(:id AS TEXT) AND action = 'user.awaiting_approval'", ['id' => $userId]));
             $admin = trim((string) (getenv('APP_ADMIN_EMAIL') ?: ($_ENV['APP_ADMIN_EMAIL'] ?? '')));
             if ($admin !== '') {
                 $toAdmin = array_values(array_filter(self::sent($mailer), static fn(array $m): bool => ($m['email'] ?? '') === $admin));
@@ -136,7 +136,7 @@ final class AccountApprovalIntegrationTest extends TestCase
         $member = 'member-' . $suffix . '@example.test';
         $fixture->createUser('Existing member', $member);
         $mailer = new FakeMailer();
-        $restriction = new \CattoLearning\Auth\SignInRestriction($container->get(\CattoLearning\Infrastructure\Persistence\OptionRepository::class));
+        $restriction = $container->get(\CattoLearning\Auth\SignInRestriction::class);
         try {
             $restriction->save(true, $friend . "\n");
             $auth = $this->auth($container, $mailer, 'demo', $restriction);
@@ -185,7 +185,7 @@ final class AccountApprovalIntegrationTest extends TestCase
         $keys = ['AUTH_SIGNIN', 'AUTH_SIGNIN_ALLOWED_EMAILS'];
         // phpunit.xml gives the suite AUTH_SIGNIN=EVERYONE in $_ENV, $_SERVER and getenv(): each is set, or cleared for absent.
         $before = array_map(static fn(string $key): array => [$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)], $keys);
-        $options = $container->get(\CattoLearning\Infrastructure\Persistence\OptionRepository::class);
+        $settings = $container->get(\CattoPHP\Settings\Settings::class);
         $env = static function (?string $signIn, ?string $emails) use ($keys): void {
             foreach (array_combine($keys, [$signIn, $emails]) as $key => $value) {
                 if ($value === null) {
@@ -197,7 +197,7 @@ final class AccountApprovalIntegrationTest extends TestCase
                 }
             }
         };
-        $fresh = static fn(): \CattoLearning\Auth\SignInRestriction => new \CattoLearning\Auth\SignInRestriction($options);
+        $fresh = static fn(): \CattoLearning\Auth\SignInRestriction => \CattoLearning\Tests\Support\IntegrationContainer::get()->get(\CattoLearning\Auth\SignInRestriction::class);
         try {
             $fresh()->reset();
             foreach ([['ADMIN', 'environment', true], ['admin', 'environment', true], ['EVERYONE', 'environment', false], ['everyone', 'environment', false],

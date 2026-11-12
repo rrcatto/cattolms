@@ -25,6 +25,11 @@ too"): the heading and notice on every page, the first line of every email, and 
 HEADING, NOTICE, EMAIL_NOTICE and SIMULATION are what they say until then. An issued document keeps the words it was issued with.
 
 Changelog:
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3): APP_SITE_MODE and the words, APP_DEMO_HEADING, APP_DEMO_NOTICE,
+  APP_DEMO_EMAIL_NOTICE and cattolms's own APP_DEMO_SIMULATION (SiteModeSettings), each overriding .env with a Reset and
+  every change in CattoPHP's log. What a site had saved is carried over by an upgrade migration. The standard words are
+  cattolms's defaults for CattoPHP's settings (config/packages/cattophp.yaml). Nothing else changes.
 2026/11/03 SAST
 - The demo site's words: new standard words for the notice, the heading Demo mode, and ADMIN's own for all four (WORDS).
 2026/10/18 SAST
@@ -35,8 +40,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Configuration;
 
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Support\Env;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Settings\Settings;
 use InvalidArgumentException;
 
 final class SiteMode
@@ -44,8 +50,8 @@ final class SiteMode
     public const DEMO = 'demo';
     public const LIVE = 'live';
 
-    /** The app_options key of the override. */
-    public const OPTION = 'site_mode';
+    /** The setting, named as in .env, that Settings > Site mode overrides. */
+    public const SETTING = 'APP_SITE_MODE';
 
     /** What every page of a demo site says until ADMIN words it differently. */
     public const NOTICE = 'This site is not live. It is currently being tested and developed. Nothing on here represents an offer.';
@@ -60,12 +66,12 @@ final class SiteMode
     public const EMAIL_NOTICE = 'This email comes from a demo site for testing and development. Nothing on it is real: any order, payment, invoice or receipt is a simulation, and nothing was bought or sold.';
     public const EMAIL_PREFIX = '[DEMO] ';
 
-    /** What ADMIN words at Settings > Site mode: each one's app_options key, standard words, name and longest length. */
+    /** What ADMIN words at Settings > Site mode: each one's setting, standard words, name and longest length. */
     public const WORDS = [
-        'heading' => ['option' => 'site_demo_heading', 'standard' => self::HEADING, 'name' => 'The heading', 'limit' => 60],
-        'notice' => ['option' => 'site_demo_notice', 'standard' => self::NOTICE, 'name' => 'The notice', 'limit' => 300],
-        'email_notice' => ['option' => 'site_demo_email_notice', 'standard' => self::EMAIL_NOTICE, 'name' => 'The email message', 'limit' => 400],
-        'simulation' => ['option' => 'site_demo_simulation', 'standard' => self::SIMULATION, 'name' => 'The checkout message', 'limit' => 300],
+        'heading' => ['setting' => 'APP_DEMO_HEADING', 'standard' => self::HEADING, 'name' => 'The heading', 'limit' => 60],
+        'notice' => ['setting' => 'APP_DEMO_NOTICE', 'standard' => self::NOTICE, 'name' => 'The notice', 'limit' => 300],
+        'email_notice' => ['setting' => 'APP_DEMO_EMAIL_NOTICE', 'standard' => self::EMAIL_NOTICE, 'name' => 'The email message', 'limit' => 400],
+        'simulation' => ['setting' => 'APP_DEMO_SIMULATION', 'standard' => self::SIMULATION, 'name' => 'The checkout message', 'limit' => 300],
     ];
 
     /** The EFT details a demo site shows instead of real ones, each labelled as fake. */
@@ -77,10 +83,10 @@ final class SiteMode
     ];
 
     /**
-     * @param ?string $fixed a mode decided by the caller instead of the settings (tools and tests);
-     *                       null reads the override, then APP_SITE_MODE
+     * @param Settings|null $settings CattoPHP's settings; null reads APP_SITE_MODE from .env alone, with the standard words
+     * @param ?string $fixed a mode decided by the caller instead of the settings (tools and tests)
      */
-    public function __construct(private readonly ?OptionRepository $options = null, private readonly ?string $fixed = null) {}
+    public function __construct(private readonly ?Settings $settings = null, private readonly ?string $fixed = null) {}
 
     /** A mode that does not read the settings: for tests and for tools without a database. */
     public static function fixed(string $mode): self
@@ -91,7 +97,7 @@ final class SiteMode
     public function mode(): string
     {
         if ($this->fixed !== null) return $this->fixed;
-        return self::normalise($this->options?->find(self::OPTION) ?? Env::string('APP_SITE_MODE', self::DEMO));
+        return self::normalise($this->settings?->get(self::SETTING) ?? Env::string(self::SETTING, self::DEMO));
     }
 
     public function isDemo(): bool
@@ -102,34 +108,38 @@ final class SiteMode
     /** Where the mode comes from: 'database' (the Settings override), 'environment' (APP_SITE_MODE) or 'default'. */
     public function source(): string
     {
-        if ($this->options?->find(self::OPTION) !== null) return 'database';
-        return trim(Env::string('APP_SITE_MODE')) !== '' ? 'environment' : 'default';
+        if ($this->settings === null) return trim(Env::string(self::SETTING)) !== '' ? 'environment' : 'default';
+        return match ($this->settings->source(self::SETTING)) {
+            Settings::FROM_SETTINGS => 'database',
+            Settings::FROM_ENV => 'environment',
+            default => 'default',
+        };
     }
 
     /** The mode .env gives, which Reset returns to. */
     public function environmentMode(): string
     {
-        return self::normalise(Env::string('APP_SITE_MODE', self::DEMO));
+        return self::normalise($this->settings?->envValue(self::SETTING) ?? Env::string(self::SETTING, self::DEMO));
     }
 
     public function save(string $mode, int $actorUserId): void
     {
         $mode = strtolower(trim($mode));
         if (!in_array($mode, [self::DEMO, self::LIVE], true)) throw new InvalidArgumentException('Choose demo or live.');
-        if ($this->options === null) throw new InvalidArgumentException('This site mode is fixed.');
-        $this->options->set(self::OPTION, $mode, $actorUserId);
+        if ($this->settings === null) throw new InvalidArgumentException('This site mode is fixed.');
+        $this->settings->set(self::SETTING, $mode, self::actor($actorUserId));
     }
 
     public function reset(): void
     {
-        $this->options?->delete(self::OPTION);
+        $this->settings?->reset(self::SETTING);
     }
 
     /** ADMIN's words for one of WORDS, or its standard ones. */
     public function words(string $key): string
     {
         $word = self::WORDS[$key] ?? throw new InvalidArgumentException('There are no such words.');
-        $own = trim((string) $this->options?->find($word['option']));
+        $own = trim((string) $this->settings?->get($word['setting']));
         return $own === '' ? $word['standard'] : $own;
     }
 
@@ -157,7 +167,7 @@ final class SiteMode
     public function ownWords(): bool
     {
         foreach (self::WORDS as $word) {
-            if (trim((string) $this->options?->find($word['option'])) !== '') return true;
+            if ($this->settings?->isOverridden($word['setting'])) return true;
         }
         return false;
     }
@@ -169,7 +179,7 @@ final class SiteMode
      */
     public function saveWords(array $words, int $actorUserId): void
     {
-        if ($this->options === null) throw new InvalidArgumentException('This site mode is fixed.');
+        if ($this->settings === null) throw new InvalidArgumentException('This site mode is fixed.');
         $clean = [];
         foreach (self::WORDS as $key => $word) {
             $text = trim((string) preg_replace('/\s+/u', ' ', (string) ($words[$key] ?? '')));
@@ -178,19 +188,24 @@ final class SiteMode
             $clean[$key] = $text;
         }
         foreach (self::WORDS as $key => $word) {
-            if ($clean[$key] === $word['standard']) $this->options->delete($word['option']);
-            else $this->options->set($word['option'], $clean[$key], $actorUserId);
+            $this->settings->set($word['setting'], $clean[$key], self::actor($actorUserId));
         }
     }
 
     public function resetWords(): void
     {
-        foreach (self::WORDS as $word) $this->options?->delete($word['option']);
+        foreach (self::WORDS as $word) $this->settings?->reset($word['setting']);
     }
 
     /** live only when it says live; anything else, a typing mistake included, is the safe demo. */
     private static function normalise(string $value): string
     {
         return strtolower(trim($value)) === self::LIVE ? self::LIVE : self::DEMO;
+    }
+
+    /** Who saved it, for CattoPHP's log: the signed-in person CattoPHP finds, or this account when there is none. */
+    private static function actor(int $userId): ?Actor
+    {
+        return $userId > 0 ? new Actor((string) $userId, (string) $userId) : null;
     }
 }

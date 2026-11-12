@@ -13,7 +13,7 @@ and statements", with no CSV or ODS). The ledger: every line the Money Ledger's 
 they add up to, for ADMIN at Administration > Credits & Orders > Money Ledger. A statement: one person's or one company's
 wallet for a period, oldest first, with the balance before it, the balance after each movement and the balance at its
 end, for the wallet's owner (My Wallet, the company's Wallet) and for ADMIN (a wallet's page). The PDF is drawn by the
-shared PDF engine (DocumentPdfRenderer::renderPage) and the Excel file by OpenSpout, as Money Reports are: amounts are
+shared PDF engine (PdfRenderer::renderPage) and the Excel file by OpenSpout, as Money Reports are: amounts are
 numbers in rand and cents, made from whole cents only at the cell, dates are real dates, and every word is a text cell,
 never a formula, so a note that begins with = stays words. A PDF holds at most PDF_LINES lines and an Excel file
 EXCEL_LINES; a longer one is refused, saying why.
@@ -34,8 +34,8 @@ use CattoLearning\Commerce\Wallet\WalletRepository;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Configuration\SiteOwner;
-use CattoLearning\Document\DocumentPdfRenderer;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Document\PdfRenderer;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Money;
 use CattoLearning\View\ThemeRenderer;
 use DateTimeImmutable;
@@ -60,7 +60,7 @@ final class LedgerFiles
     public function __construct(
         private readonly MoneyRecords $money,
         private readonly WalletRepository $wallets,
-        private readonly DocumentPdfRenderer $pdfs,
+        private readonly PdfRenderer $pdfs,
         private readonly ThemeRenderer $view,
         private readonly SiteOwner $owner,
         private readonly SiteMode $site,

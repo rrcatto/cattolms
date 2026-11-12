@@ -11,6 +11,10 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for maintenance records.
 
 Changelog:
+2026/11/09 SAST
+- Sign-ins are CattoPHP's (CattoPHP Phase 2, step 6e): counted and cleared there.
+2026/11/09 SAST
+- Sign-in links are CattoPHP's links that work once (CattoPHP Phase 2, step 6d): counted and cleared there.
 2026/08/23 04:19 SAST
 - Documented the database prune as deliberately universe-agnostic expired-session collection.
 2026/08/12 23:56 SAST
@@ -58,10 +62,10 @@ final class MaintenanceRepository
         // planner runs them as three cheap aggregates and the result arrives in a single row.
         $row = $this->db->fetchAssociative(
             'SELECT
-                (SELECT COUNT(*)::int FROM auth_login_tokens
+                (SELECT COUNT(*)::int FROM cattophp_links
                   WHERE expires_at < :login_cutoff OR used_at < :login_cutoff) AS login_tokens,
-                (SELECT COUNT(*)::int FROM auth_sessions
-                  WHERE expires_at < :auth_cutoff OR revoked_at < :auth_cutoff) AS auth_sessions,
+                (SELECT COUNT(*)::int FROM cattophp_sessions
+                  WHERE expires_at < :auth_cutoff OR ended_at < :auth_cutoff) AS auth_sessions,
                 (SELECT COUNT(*)::int FROM web_sessions
                   WHERE last_activity < :web_cutoff) AS web_sessions',
             ['login_cutoff' => $loginCutoff, 'auth_cutoff' => $authCutoff, 'web_cutoff' => $webCutoff]
@@ -93,11 +97,11 @@ final class MaintenanceRepository
 
         // SQL is used for efficient bulk deletion. This remains confined to a repository.
         $this->db->executeStatement(
-            'DELETE FROM auth_login_tokens WHERE expires_at < :cutoff OR used_at < :cutoff',
+            'DELETE FROM cattophp_links WHERE expires_at < :cutoff OR used_at < :cutoff',
             ['cutoff' => $loginCutoff]
         );
         $this->db->executeStatement(
-            'DELETE FROM auth_sessions WHERE expires_at < :cutoff OR revoked_at < :cutoff',
+            'DELETE FROM cattophp_sessions WHERE expires_at < :cutoff OR ended_at < :cutoff',
             ['cutoff' => $authCutoff]
         );
         $this->db->executeStatement(

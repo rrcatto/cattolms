@@ -33,10 +33,8 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\Infrastructure\Persistence\ApiTokenRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
-use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -61,8 +59,7 @@ final class ApiFirewallIntegrationTest extends TestCase
         $suffix = $this->fixture->suffix();
         $this->userId = $this->fixture->createUser('QA api caller ' . $suffix, 'qa-api-' . $suffix . '@example.test');
         $this->db->executeStatement(
-            "INSERT INTO user_roles (user_id, role_id)
-             SELECT :user_id, id FROM roles WHERE role_key = 'STUDENT'",
+            "INSERT INTO cattophp_account_roles (account_id, role_key, granted_at) VALUES (CAST(:user_id AS TEXT), 'STUDENT', NOW())",
             ['user_id' => $this->userId]
         );
     }
@@ -70,9 +67,9 @@ final class ApiFirewallIntegrationTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->tokenPublicIds as $publicId) {
-            $this->db->executeStatement('DELETE FROM api_tokens WHERE public_id = :id', ['id' => $publicId]);
+            $this->db->executeStatement('DELETE FROM cattophp_api_tokens WHERE CAST(public_id AS text) = :id', ['id' => $publicId]);
         }
-        $this->db->executeStatement('DELETE FROM user_roles WHERE user_id = :id', ['id' => $this->userId]);
+        $this->db->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = CAST(:id AS TEXT)', ['id' => $this->userId]);
         $this->fixture->cleanup();
     }
 
@@ -126,7 +123,7 @@ final class ApiFirewallIntegrationTest extends TestCase
     /** The token carries the scope, but the account behind it holds no permissions at all. */
     public function testATokenWhoseAccountLacksThePermissionIsForbidden(): void
     {
-        $this->db->executeStatement('DELETE FROM user_roles WHERE user_id = :id', ['id' => $this->userId]);
+        $this->db->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = CAST(:id AS TEXT)', ['id' => $this->userId]);
         $response = $this->call($this->issue([ApiScope::PROFILE_READ]));
 
         self::assertSame(403, $response->getStatusCode());
@@ -136,20 +133,13 @@ final class ApiFirewallIntegrationTest extends TestCase
     /** @param list<string> $scopes */
     private function issue(array $scopes): string
     {
-        $raw = Token::generate();
         $container = CliBootstrap::boot()['container'];
-        /** @var ApiTokenRepository $tokens */
-        $tokens = $container->get(ApiTokenRepository::class);
-        $this->tokenPublicIds[] = $tokens->create(
-            $this->userId,
-            'QA firewall token',
-            Token::hash($raw),
-            $scopes,
-            $this->userId,
-            3600
-        );
+        /** @var \CattoPHP\Api\ApiTokens $tokens */
+        $tokens = $container->get(\CattoPHP\Api\ApiTokens::class);
+        $made = $tokens->create((string) $this->userId, 'QA firewall token', $scopes, 3600);
+        $this->tokenPublicIds[] = $made['public_id'];
 
-        return $raw;
+        return $made['token'];
     }
 
     private function call(?string $rawToken): Response

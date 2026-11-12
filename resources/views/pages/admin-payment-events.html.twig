@@ -8,7 +8,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Payment Events' %}
 	{% set ph_lead = 'Every card, EFT and wallet payment goes through steps: it is started, it waits, and then it goes through or fails. Later it may be refunded. Each line is one step, newest first. What the money did afterwards is in the Money Ledger.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Find steps', summary: 'Search by account reference, name, order number or bank or Stitch reference. Both dates are included.'}) }}
 		<form action="/admin/commerce/payment-events" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -27,7 +27,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'payments', pagination: payments_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% for sh in payments_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: payments_region, sort_results: payments_results} %}{% endfor %}</tr>{% endblock %}
+			{% block header %}<tr>{% for sh in payments_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: payments_region, sort_results: payments_results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}
 				{% for row in rows %}
 					<tr data-payment-event-id="{{ row.id }}" data-payment-state="{{ row.state }}">

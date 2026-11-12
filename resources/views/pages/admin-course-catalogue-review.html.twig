@@ -13,7 +13,7 @@
 	{% set ph_kicker = 'Courses' %}
 	{% set ph_title = 'Review catalogue import' %}
 	{% set ph_lead = plan.filename ~ ': nothing has changed yet. Check what the import would do, then choose Import.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set counts = plan.counts %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -51,11 +51,11 @@
 				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The package\'s courses and what the import would do with each'})} %}
 {% block header %}
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Import'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Code'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 27, label: 'Course'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'What happens'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 41, label: 'Details'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Import'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Code'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 27, label: 'Course'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'What happens'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 41, label: 'Details'}} %}
 					</tr>
 {% endblock %}
 {% block body %}
@@ -116,11 +116,11 @@
 				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The package\'s bundles and what the import would do with each'})} %}
 {% block header %}
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Import'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Code'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Bundle'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'What happens'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 41, label: 'Details'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Import'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Code'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Bundle'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'What happens'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 41, label: 'Details'}} %}
 					</tr>
 {% endblock %}
 {% block body %}

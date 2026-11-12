@@ -4,6 +4,11 @@
 {% set offered = payment_options|default([]) %}
 {% set offered_keys = offered|map(o => o.key) %}
 {% if offered %}
+{# Each method shows only what belongs to it (owner, 2026-11-12: "A person selecting Stitch to pay should only see what is relevant to
+   that payment method. ditto for EFT and simulated card payments"): its details are a block marked with the method, and the
+   stylesheet shows only the chosen method's, from the option chosen, with no script. Without that, every block shows, each saying
+   which method it is for. #}
+<div class="cl-payment-method" data-payment-method>
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Payment method', full_width: false, for: 'payment-method', required: true})} %}
 {% block control %}
 
@@ -13,8 +18,19 @@
 
 {% endblock %}
 {% endembed %}
+{% if 'card' in offered_keys %}
+<div class="cl-payment-method-detail" data-method-detail="card">
+    <p>Paying by card: you pay on Stitch's secure page, and come back here when you have paid. This site never sees your card. Your courses start as soon as Stitch confirms the payment.</p>
+</div>
+{% endif %}
+{% if 'eft' in offered_keys %}
+<div class="cl-payment-method-detail" data-method-detail="eft">
+    <p>Paying by EFT: find the bank account details and your unique payment reference on your order after placing it.</p>
+</div>
+{% endif %}
 {% if 'dummy' in offered_keys %}
-{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For testing on this demo site only. No money is charged. This does not apply to EFT.'})} %}
+<div class="cl-payment-method-detail" data-method-detail="dummy">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For testing on this demo site only. No money is charged.'})} %}
 {% block control %}
 
     <select id="method-token" name="method_token" {{ ui_field_attrs(props) }}>
@@ -24,8 +40,9 @@
 
 {% endblock %}
 {% endembed %}
+</div>
 {% endif %}
-{% if 'eft' in offered_keys %}<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>{% endif %}
+</div>
 {% else %}
 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'No payment method is available at the moment.'})} %}{% block body %}<p>Only wallet credit can pay for an order now. Please try again later or contact us.</p>{% endblock %}{% endembed %}
 {% endif %}

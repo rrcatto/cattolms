@@ -20,6 +20,9 @@ router, because a route the router cannot find is a 404 on a page that
 answers it, and the failure would look like a missing page rather than a routing mistake.
 
 Changelog:
+2026/11/09 SAST
+- CattoPHP's security headers (CattoPHP Phase 2, step 7c): the headers are CattoPHP's, and every script on a page carries its nonce or comes from the
+  site's own files.
 
 2026/09/08 21:10 SAST
 - Created with the seam and the first ported route.
@@ -67,18 +70,41 @@ final class SymfonyKernelRouteTest extends TestCase
         self::assertSame((string) $composer['version'], \CattoLearning\Support\AppVersion::current());
         foreach (['/', '/courses', '/terms'] as $path) {
             $html = (string) $this->kernelResponse(Request::create($path))->getContent();
-            self::assertStringContainsString('<meta name="generator" content="CattoLMS v' . $composer['version'] . '">', $html, $path);
+            self::assertStringContainsString(', CattoLMS v' . $composer['version'] . '">', $html, $path . ': the generator names the release in full.');
+            self::assertMatchesRegularExpression('/<meta name="generator" content="CattoPHP [^",]+, CattoLMS v/', $html, $path);
         }
     }
 
-    public function testEveryKernelResponseCarriesThePlatformHeaders(): void
+    public function testEveryKernelResponseCarriesTheSecurityHeaders(): void
     {
         $headers = $this->kernelResponse(Request::create('/api/v1'))->headers;
 
-        self::assertSame('SAMEORIGIN', $headers->get('X-Frame-Options'));
-        self::assertSame('1; mode=block', $headers->get('X-XSS-Protection'));
+        self::assertSame('SAMEORIGIN', $headers->get('X-Frame-Options'), 'the site frames its own previews');
         self::assertSame('nosniff', $headers->get('X-Content-Type-Options'));
         self::assertStringContainsString('no-store', (string) $headers->get('Cache-Control'));
+        self::assertStringContainsString("frame-ancestors 'self'", (string) $headers->get('Content-Security-Policy'));
+        self::assertStringContainsString('microphone=(self)', (string) $headers->get('Permissions-Policy'), 'narration is recorded on the site');
+        self::assertFalse($headers->has('X-XSS-Protection'), 'retired: browsers no longer read it');
+    }
+
+    /** CattoPHP Phase 2, step 7c: a script runs only from the site's own files or with the page's nonce, and no tag has a handler. */
+    public function testEveryScriptOnAPageCarriesItsNonceOrComesFromTheSite(): void
+    {
+        foreach (['/', '/courses', '/login', '/register', '/contact', '/help'] as $path) {
+            $response = $this->kernelResponse(Request::create($path));
+            $policy = (string) $response->headers->get('Content-Security-Policy');
+            self::assertMatchesRegularExpression("/script-src 'self' 'nonce-[A-Za-z0-9_-]+';/", $policy, $path);
+            self::assertStringNotContainsString('unsafe-eval', $policy, $path);
+            preg_match("/'nonce-([A-Za-z0-9_-]+)'/", $policy, $nonce);
+            $html = (string) $response->getContent();
+            preg_match_all('/<script\b([^>]*)>/i', $html, $scripts);
+            self::assertNotEmpty($scripts[1], $path);
+            foreach ($scripts[1] as $attributes) {
+                if (preg_match('/\ssrc="\//', $attributes) === 1 || str_contains($attributes, 'type="application/ld+json"')) continue;
+                self::assertStringContainsString('nonce="' . $nonce[1] . '"', $attributes, $path . ': <script' . $attributes . '>');
+            }
+            self::assertSame(0, preg_match('/<[a-zA-Z][^>]*\son[a-z]+\s*=/', $html), $path . ': a tag with an event handler');
+        }
     }
 
     /**

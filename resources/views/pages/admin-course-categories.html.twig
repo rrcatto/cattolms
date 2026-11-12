@@ -5,9 +5,9 @@
 	{% set ph_lead = 'Arrange the catalogue taxonomy: main categories, subcategories and sub-subcategories, three levels at most.' %}
 	{# The page's main action belongs to the page, so it sits in the page head. #}
 	{% set ph_actions %}{{ ui('action.link', {label: 'Add category', variant: 'primary', href: '/admin/courses/categories/new', get: '/admin/courses/categories/new', target: '#category-create-body', modal: 'category-create', icon: 'action-add'}) }}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{# Loads the Stimulus app for the category-tree controller. After the page head: themes style the page head as the first element of main. #}
-	{{ importmap() }}
+	{{ importmap('app', {nonce: csp_nonce()}) }}
 	<section class="cl-page-section">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}

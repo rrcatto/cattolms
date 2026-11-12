@@ -8,7 +8,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Commerce Trail' %}
 	{% set ph_lead = 'Everything that happened in the shop, newest first: orders placed, payments, documents issued, course access given and started, refunds and emails, each as one sentence. Nothing here can be changed or deleted.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Find events', summary: 'Search by account reference, name, order number or detail. Both dates are included.'}) }}
 		<form action="/admin/commerce/trail" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -25,7 +25,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'trail', pagination: trail_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% for sh in trail_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: trail_region, sort_results: trail_results} %}{% endfor %}</tr>{% endblock %}
+			{% block header %}<tr>{% for sh in trail_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: trail_region, sort_results: trail_results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}
 				{% for row in rows %}
 					<tr data-trail-id="{{ row.id }}" data-trail-event="{{ row.event }}">

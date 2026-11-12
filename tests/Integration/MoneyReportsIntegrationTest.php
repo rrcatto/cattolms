@@ -42,7 +42,9 @@ use CattoLearning\Course\CourseRepository;
 use CattoLearning\Http\Controller\AdminController;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository, Database, OptionRepository, TransactionManager};
 use CattoLearning\Mailing\MailingSettings;
-use CattoLearning\OwnerMessages\{OwnerMessageRepository, OwnerMessages, OwnerMessageSettings};
+use CattoLearning\OwnerMessages\OwnerMessages;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Telegram\{TelegramBot, TelegramLog};
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture, DevelopmentFixture, FakeMailer, InProcessPage, IntegrationContainer, PromotionFixture, WalletFixture};
 use OpenSpout\Reader\XLSX\Reader;
@@ -332,7 +334,7 @@ final class MoneyReportsIntegrationTest extends TestCase
         self::assertStringStartsWith('PK', $sent[0]['files']['money-report-2026-03.xlsx']);
         self::assertSame('March 2026', $sent[0]['report']['month']);
         self::assertSame('', $sent[0]['report']['no_sales']);
-        $line = $this->db->fetchAssociative("SELECT kind, body, sent_at FROM telegram_messages WHERE reference = 'money_report:2026-03'");
+        $line = $this->db->fetchAssociative("SELECT kind, body, sent_at FROM cattophp_telegram_messages WHERE reference = 'money_report:2026-03'");
         self::assertSame('money_report', $line['kind'] ?? null, 'Its line waits for the Telegram job, in the Telegram log.');
         self::assertStringContainsString('Money report, March 2026: Money in R1,250, what is left R941.50, 4 orders paid', (string) $line['body']);
 
@@ -341,7 +343,7 @@ final class MoneyReportsIntegrationTest extends TestCase
         self::assertStringContainsString('report is done', $job->run());
         $this->job($mailer)->run();
         self::assertCount(1, array_filter($mailer->messages, static fn(array $message): bool => $message['type'] === 'money_report'));
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM telegram_messages WHERE reference LIKE 'money_report:%'"));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_telegram_messages WHERE reference LIKE 'money_report:%'"));
         self::assertStringContainsString('March 2026\'s report was emailed to ', $job->status('2026-03')['sent']);
 
         // A month with no sales still goes, saying so; a tick that is off sends nothing for that month, even turned on later.
@@ -351,11 +353,11 @@ final class MoneyReportsIntegrationTest extends TestCase
         $april = array_values(array_filter($mailer->messages, static fn(array $message): bool => $message['type'] === 'money_report' && $message['report']['month'] === 'April 2026'));
         self::assertCount(1, $april);
         self::assertSame('No sales in April 2026.', $april[0]['report']['no_sales']);
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM telegram_messages WHERE reference = 'money_report:2026-04'"), 'Telegram summary was off.');
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_telegram_messages WHERE reference = 'money_report:2026-04'"), 'Telegram summary was off.');
         $settings->save(true, true, $this->admin->id);
         $this->clock->modify('+1 hour');
         $job->run();
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM telegram_messages WHERE reference = 'money_report:2026-04'"), 'April\'s moment has passed.');
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_telegram_messages WHERE reference = 'money_report:2026-04'"), 'April\'s moment has passed.');
         self::assertSame('off', $this->db->fetchOne("SELECT telegram FROM money_report_sends WHERE month = '2026-04-01'"));
 
         // A month is claimed on the 1st only: a scheduler started on the 2nd sends May's report never.
@@ -374,20 +376,21 @@ final class MoneyReportsIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $options = new OptionRepository($this->db);
-        $telegram = $container->get(OwnerMessageSettings::class);
+        $telegram = $container->get(TelegramBot::class);
 
         return new MoneyReportJob($this->reports, $container->get(MoneyReportFiles::class), new MoneyReportSettings($options), new MoneyReportRepository($this->db), $mailer,
-            $container->get(SiteOwner::class), new MailingSettings($options), $container->get(OwnerMessages::class), new OwnerMessageRepository($this->db), $telegram,
+            $container->get(SiteOwner::class), new MailingSettings($options, $container->get(\CattoPHP\Settings\Settings::class)), $container->get(OwnerMessages::class), $container->get(TelegramLog::class), $telegram,
             new TransactionManager($this->db), $this->clock);
     }
 
-    /** Telegram connected to the owner's chat, as Settings > Messages to you leaves it, inside this test's transaction. */
+    /** Telegram connected to the owner's chat, as Settings > Connect to Telegram bot leaves it, inside this test's transaction. */
     private function connectTelegram(): void
     {
-        $telegram = IntegrationContainer::get()->get(OwnerMessageSettings::class);
-        $telegram->setKey('123456:REPORT-TEST-KEY', 'report_test_bot', $this->admin->id);
-        $telegram->setUsername('report_test_owner', $this->admin->id);
-        $telegram->setChat('424242', $this->admin->id);
+        $telegram = IntegrationContainer::get()->get(TelegramBot::class);
+        $actor = new Actor((string) $this->admin->id, (string) $this->admin->id);
+        $telegram->setKey('123456:REPORT-TEST-KEY', 'report_test_bot', $actor);
+        $telegram->setUsername('report_test_owner', $actor);
+        $telegram->setChat('424242', $actor);
         self::assertTrue($telegram->connected());
     }
 

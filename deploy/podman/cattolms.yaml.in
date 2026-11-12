@@ -35,7 +35,7 @@ spec:
           mountPath: @SITE@/storage
         - name: themes
           mountPath: @SITE@/themes
-    # The commerce job every minute, popularity hourly, the clean-up daily (Maintenance\Scheduler).
+    # The commerce job every minute, popularity hourly, the clean-up daily (CattoPHP's scheduler, as schedule:run).
     - name: scheduler
       image: @IMAGE@
       args: ["php", "bin/console", "schedule:run", "--watch", "--no-debug"]

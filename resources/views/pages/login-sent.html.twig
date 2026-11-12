@@ -3,7 +3,7 @@
 	{% set ph_kicker = sign_in_words|default(false) ? 'Passwordless access' : 'Sign in' %}
 	{% set ph_title = 'Check your email' %}
 	{% set ph_lead = sign_in_words|default(false) ? 'We have sent your link if the address is right.' : 'The sign-in link is on its way.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}

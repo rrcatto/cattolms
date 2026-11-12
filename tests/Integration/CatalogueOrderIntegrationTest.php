@@ -26,7 +26,11 @@ namespace CattoLearning\Tests\Integration;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Tests\Support\{DevelopmentFixture, IntegrationContainer};
+use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Auth\PermissionCatalog;
+use CattoLearning\Http\Controller\AdminController;
+use CattoLearning\Support\Uuid;
+use CattoLearning\Tests\Support\{DevelopmentFixture, InProcessPage, IntegrationContainer};
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -61,28 +65,57 @@ final class CatalogueOrderIntegrationTest extends TestCase
         if ($this->db->isTransactionActive()) $this->db->rollBack();
     }
 
+    /**
+     * A searched list keeps dragging (owner, 2026-11-11: "searching for courses throws away the ability to drag and drop the
+     * courses"): its rows carry the handle, and a course dropped first among them goes straight after the course before the
+     * first row in the whole catalogue, so just before the courses the search shows.
+     */
+    public function testASearchedCourseListCanStillBeDraggedIntoOrder(): void
+    {
+        $admin = new CurrentUser($this->user, Uuid::v4(), 'order@example.test', 'Order administrator', ['ADMIN'], (new PermissionCatalog())->keys(), Uuid::v4());
+        $codes = [];
+        foreach ($this->id as $key => $id) { $codes[$key] = (string) $this->db->fetchOne('SELECT code FROM courses WHERE id = :id', ['id' => $id]); }
+        $this->db->executeStatement("UPDATE courses SET title = 'Order Searched ' || title WHERE id IN (:b, :c)", ['b' => $this->id['B'], 'c' => $this->id['C']]);
+        $_SESSION['csrf'] = str_repeat('c', 64);
+        $page = InProcessPage::run($admin, AdminController::class, 'courses', [], null, ['courses_q' => 'Order Searched']);
+        self::assertSame(200, $page['status']);
+        self::assertStringContainsString('data-controller="list-order"', $page['body'], 'The searched list can be dragged.');
+        self::assertStringContainsString('data-list-order-before-value="' . $codes['A'] . '"', $page['body'], 'Its first row goes after the course before it in the whole order.');
+        self::assertStringContainsString('class="cl-row-handle"', $page['body']);
+        self::assertStringNotContainsString('data-course-code="' . $codes['A'] . '"', $page['body'], 'Only the courses the search finds are listed.');
+    }
+
     public function testACourseTakesTheMidpointBetweenItsNewNeighbours(): void
     {
         self::assertSame([$this->id['C'] => 15], $this->service->arrangeInCatalogue($this->id['C'], $this->id['A'], $this->user));
         self::assertSame(['A' => 10, 'C' => 15, 'B' => 20], $this->leading(3));
         self::assertSame([$this->id['B'] => 5], $this->service->arrangeInCatalogue($this->id['B'], null, $this->user), 'First: half the next one\'s number.');
         self::assertSame(['B' => 5, 'A' => 10, 'C' => 15], $this->leading(3));
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'course.catalogue_arranged' AND user_id = :user AND metadata->>'course_id' = :course",
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'course.catalogue_arranged' AND actor_id = CAST(:user AS TEXT) AND details->>'course_id' = :course",
             ['user' => $this->user, 'course' => (string) $this->id['B']]));
     }
 
-    public function testWithNoNumberBetweenThemTheListIsNumberedAgainInHundreds(): void
+    /**
+     * With no whole number between its new neighbours (owner, 2026-11-12: bands of numbers, which numbering again from the
+     * top would undo), it and the crowded ones below it are spread up to the next number with room; the numbers above stay.
+     */
+    public function testWithNoNumberBetweenThemTheCrowdedOnesAreSpreadBelow(): void
     {
         $this->courses->setCataloguePosition($this->id['B'], 11);
+        $next = $this->courses->catalogueOrderForUpdate()[3];
         $changed = $this->service->arrangeInCatalogue($this->id['C'], $this->id['A'], $this->user);
-        self::assertSame(['A' => 100, 'C' => 200, 'B' => 300], $this->leading(3), 'Numbered again from the top, every course still in order.');
-        self::assertSame(100, $changed[$this->id['A']]);
-        $order = $this->courses->catalogueOrderForUpdate();
-        $numbers = array_values(array_filter(array_column($order, 'position'), static fn(?int $p): bool => $p !== null));
+        $leading = $this->leading(3);
+        self::assertSame(['A', 'C', 'B'], array_keys($leading), 'C goes straight after A.');
+        self::assertSame(10, $leading['A'], 'The number above it stays.');
+        self::assertArrayNotHasKey($this->id['A'], $changed);
+        self::assertGreaterThanOrEqual(10, $leading['C'] - $leading['A'], 'Spread with room to move again.');
+        self::assertGreaterThanOrEqual(10, $leading['B'] - $leading['C']);
+        $after = $this->courses->catalogueOrderForUpdate();
+        self::assertSame($next, $after[3], 'The next course keeps its place and number.');
+        $numbers = array_values(array_filter(array_column($after, 'position'), static fn(?int $p): bool => $p !== null));
         $sorted = $numbers;
         sort($sorted);
         self::assertSame($sorted, $numbers, 'No course jumped ahead of another.');
-        self::assertSame(count($numbers), count(array_unique($numbers)));
     }
 
     public function testTheMenuMovesUpDownAndToTheTop(): void

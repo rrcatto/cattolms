@@ -18,6 +18,8 @@ first and then stopping keeps the sending address clean.
 The question is a campaign of its own (kind "sleeping"), made and sent by itself once a day.
 
 Changelog:
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/26 SAST
 - Created.
 */
@@ -27,7 +29,7 @@ declare(strict_types=1);
 namespace CattoLearning\Mailing;
 
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use DateTimeImmutable;
 use DateTimeZone;
 use Symfony\Component\Clock\ClockInterface;

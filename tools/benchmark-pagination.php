@@ -47,7 +47,7 @@ use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 

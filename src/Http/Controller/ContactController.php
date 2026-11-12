@@ -14,6 +14,8 @@ may choose the reason and fill in what a page knows (/contact?reason=order&order
 its sender with its reference.
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): the contact form is guarded by its FormGuard, the same rules.
 2026/10/20 SAST
 - A reason, the account reference, an order and a course, and each reason's own fields; every message
   kept and acknowledged (owner, 2026-10-20). A drawn header picture.
@@ -40,7 +42,8 @@ final class ContactController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly ContactService $contact,
-        private readonly \CattoLearning\SiteAnalytics\FormGuard $forms
+        private readonly \CattoPHP\Protection\FormGuard $forms,
+        private readonly \CattoPHP\Http\FormStamp $stamps,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -55,6 +58,8 @@ final class ContactController extends BaseController
             'title' => 'Contact',
             'page_kicker' => 'Get in touch',
             'contact' => $this->contact->form($this->currentUser(), $this->request()->query->all(), $draft),
+            // When the form was opened, signed, for the Inbox's spam check (owner, 2026-11-11).
+            'contact_stamp' => $this->stamps->stamp(),
         ]);
     }
 
@@ -66,7 +71,7 @@ final class ContactController extends BaseController
         // Bots (the hidden website field, a script or a browser years out of date) and addresses on the refused list are
         // treated as successful without sending mail, so the form does not become an obvious oracle.
         $sender = $this->currentUser();
-        if ($this->forms->refuses(\CattoLearning\SiteAnalytics\FormGuard::CONTACT, $_POST, (string) ($_POST['email'] ?? ($sender !== null ? $sender->primaryEmail : '')))) {
+        if ($this->forms->refuses(\CattoPHP\Protection\FormGuard::CONTACT, $_POST, (string) ($_POST['email'] ?? ($sender !== null ? $sender->primaryEmail : '')))) {
             $this->flash('success', 'Thank you. Your message has been received.');
             $this->redirect('/contact');
         }

@@ -16,9 +16,15 @@ highest position anything has in it, or the start itself when nothing does. When
 the midpoint before the next range, and when even that is taken it keeps no position, as before. A course that has a
 position, typed, dragged or brought by a file, is never moved.
 
+Bands (owner, 2026-11-12, bands 10,000 apart): renumber() puts every course back in its prefix's band, 100 apart in its
+present order (Support\PositionBands), from Administration > Courses or Settings > Course positions. The bands' rows,
+saving and words are Support\PositionRanges, shared with Settings > Bundle positions.
+
 Changelog:
 2026/11/01 SAST
 - Created.
+2026/11/12 SAST
+- Bands, Renumber, and the shared PositionRanges and PositionBands (owner: "keep all the numbers within their band").
 */
 
 declare(strict_types=1);
@@ -26,33 +32,28 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use InvalidArgumentException;
+use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Support\PositionBands;
+use CattoLearning\Support\PositionRanges;
 
 final class CataloguePositions
 {
-    /** The app_options key: the ranges as JSON, {"GDN": 1000, ...}. */
+    /** The app_options key: the ranges as JSON, {"GDN": 10000, ...}. */
     public const OPTION = 'catalogue.position_ranges';
-
     /** How far apart the courses of a range are numbered (owner, 2026-11-01: "incrementing by 100"). */
-    public const STEP = 100;
+    public const STEP = PositionBands::STEP;
 
-    /** Empty rows the Settings form offers for adding ranges. */
-    private const BLANK_ROWS = 3;
+    private readonly PositionRanges $bands;
 
-    public function __construct(private readonly OptionRepository $options, private readonly CourseRepository $courses)
+    public function __construct(OptionRepository $options, private readonly CourseRepository $courses, private readonly ?TransactionManager $transactions = null)
     {
+        $this->bands = new PositionRanges($options, self::OPTION, 'course');
     }
 
     /** @return array<string,int> prefix => start, lowest start first */
     public function ranges(): array
     {
-        $saved = json_decode((string) $this->options->find(self::OPTION), true);
-        $ranges = [];
-        foreach (is_array($saved) ? $saved : [] as $prefix => $start) {
-            if (is_string($prefix) && is_int($start)) $ranges[$prefix] = $start;
-        }
-        asort($ranges);
-        return $ranges;
+        return $this->bands->ranges();
     }
 
     /**
@@ -65,24 +66,7 @@ final class CataloguePositions
      */
     public function save(array $prefixes, array $starts, int $actor): array
     {
-        $ranges = [];
-        foreach ($prefixes as $index => $raw) {
-            $prefix = strtoupper(trim((string) (is_scalar($raw) ? $raw : '')));
-            $startText = trim((string) (is_scalar($starts[$index] ?? null) ? $starts[$index] : ''));
-            if ($prefix === '' && $startText === '') continue;
-            if (preg_match('/^[A-Z0-9]{1,20}$/', $prefix) !== 1) throw new InvalidArgumentException('A prefix is the start of a course code, before its first hyphen: capital letters and digits, such as GDN.');
-            if (isset($ranges[$prefix])) throw new InvalidArgumentException($prefix . ' is listed twice. Give each prefix one range.');
-            $start = CourseService::cataloguePosition($startText) ?? throw new InvalidArgumentException('Give ' . $prefix . ' the number its range starts at, such as 1000.');
-            if (in_array($start, $ranges, true)) throw new InvalidArgumentException('Two ranges start at ' . $start . '. Give each its own starting number.');
-            $ranges[$prefix] = $start;
-        }
-        asort($ranges);
-        if ($ranges === []) {
-            $this->options->delete(self::OPTION);
-        } else {
-            $this->options->set(self::OPTION, (string) json_encode($ranges), $actor);
-        }
-        return $ranges;
+        return $this->bands->save($prefixes, $starts, $actor);
     }
 
     /**
@@ -94,20 +78,7 @@ final class CataloguePositions
      */
     public static function next(array $ranges, string $code, array $positions): ?int
     {
-        $prefix = strtoupper(explode('-', trim($code), 2)[0]);
-        if (!isset($ranges[$prefix])) return null;
-        $start = $ranges[$prefix];
-        $end = null;
-        foreach ($ranges as $other) {
-            if ($other > $start && ($end === null || $other < $end)) $end = $other;
-        }
-        $inside = array_filter($positions, static fn(int $position): bool => $position >= $start && ($end === null || $position < $end));
-        if ($inside === []) return $start;
-        $highest = max($inside);
-        $next = $highest + self::STEP;
-        if ($end === null || $next < $end) return $next;
-        // Full: halfway to the next range while there is a whole number between them.
-        return $end - $highest >= 2 ? intdiv($highest + $end, 2) : null;
+        return PositionBands::next($ranges, $code, $positions);
     }
 
     /**
@@ -126,18 +97,33 @@ final class CataloguePositions
     }
 
     /**
-     * Settings > Course positions: each saved range, then empty rows for more, and a line saying what is set.
+     * Renumber (owner, 2026-11-12: "a renumber ... button which will redo the numbering from 100 with increments of 100";
+     * "the renumber position number function needs to keep all the numbers within their band"): every course back in its
+     * prefix's band, from the band's start, 100 apart in the catalogue's present order. A course whose prefix has no band
+     * keeps its number. Each course's date of change is left alone: its place moved, not the course.
      *
-     * @return array{rows:list<array{prefix:string,start:string}>,summary:string}
+     * @return array{changed:int,unbanded:list<string>,crowded:list<string>} how many moved, the codes with no band, the
+     *         prefixes whose band is too narrow for them all
+     */
+    public function renumber(): array
+    {
+        $work = function (): array {
+            $rows = $this->courses->catalogueRenumberRows();
+            $plan = PositionBands::renumber($this->ranges(), array_map(static fn(array $row): array => ['key' => $row['id'], 'code' => $row['code'], 'position' => $row['position']], $rows));
+            foreach ($plan['changes'] as $id => $position) $this->courses->placeInCatalogue((int) $id, $position);
+            $codes = array_column($rows, 'code', 'id');
+            return ['changed' => count($plan['changes']), 'unbanded' => array_map(static fn(int|string $id): string => (string) $codes[$id], $plan['unbanded']), 'crowded' => $plan['crowded']];
+        };
+        return $this->transactions !== null ? $this->transactions->run($work) : $work();
+    }
+
+    /**
+     * Settings > Course positions: each saved range with its band, then empty rows for more, and a line saying what is set.
+     *
+     * @return array{rows:list<array{prefix:string,start:string,band:string}>,summary:string}
      */
     public function view(): array
     {
-        $ranges = $this->ranges();
-        $rows = [];
-        foreach ($ranges as $prefix => $start) $rows[] = ['prefix' => $prefix, 'start' => (string) $start];
-        for ($i = 0; $i < self::BLANK_ROWS; $i++) $rows[] = ['prefix' => '', 'start' => ''];
-        $summary = $ranges === [] ? 'No ranges: a new course goes to the end of the catalogue until it is given a position.'
-            : implode(', ', array_map(static fn(string $prefix, int $start): string => $prefix . ' from ' . $start, array_keys($ranges), $ranges)) . '.';
-        return ['rows' => $rows, 'summary' => $summary];
+        return $this->bands->view();
     }
 }

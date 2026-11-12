@@ -57,7 +57,7 @@ final class CoursePopularityRepository
             "SELECT c.id,
                     CASE WHEN bool_or(v.price_minor_units > 0) THEN 'paid' WHEN bool_or(v.id IS NOT NULL) THEN 'free' ELSE 'none' END AS offer
                FROM courses c
-               LEFT JOIN course_price_variants v ON v.course_id = c.id AND v.is_active
+               LEFT JOIN course_prices_on_sale v ON v.course_id = c.id
               WHERE c.status = 'published'
               GROUP BY c.id ORDER BY c.id"
         ) as $row) {
@@ -182,7 +182,7 @@ final class CoursePopularityRepository
         return (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_popularity p JOIN courses c ON c.id = p.course_id' . $where, $bindings);
     }
 
-    private const SALEABLE = ' AND EXISTS (SELECT 1 FROM course_price_variants v WHERE v.course_id = c.id AND v.is_active)';
+    private const SALEABLE = ' AND EXISTS (SELECT 1 FROM course_prices_on_sale v WHERE v.course_id = c.id)';
 
     /** @return array{0:string,1:array<string,mixed>} */
     private static function filter(string $search, string $offer, bool $saleableOnly): array

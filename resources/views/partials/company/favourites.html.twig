@@ -21,7 +21,7 @@
 
 								<tr>
 									{% for sh in company_favourites_sort_headers %}
-										{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_favourites_region, sort_results: company_favourites_results} %}
+										{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: company_favourites_region, sort_results: company_favourites_results} %}
 									{% endfor %}
 								</tr>
 

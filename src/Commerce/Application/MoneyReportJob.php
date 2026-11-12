@@ -21,6 +21,8 @@ sends a month whose moment has passed. An email that could not go is tried again
 and no more after a week. The scheduler's money_report job runs this every minute.
 
 Changelog:
+2026/11/12 SAST
+- The Telegram line is kept in CattoPHP's Telegram log, while CattoPHP's bot is connected (CattoPHP Phase 4, step 4).
 2026/11/06 SAST
 - Created.
 */
@@ -34,9 +36,9 @@ use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Mailing\MailingSettings;
-use CattoLearning\OwnerMessages\OwnerMessageRepository;
+use CattoPHP\Telegram\TelegramLog;
 use CattoLearning\OwnerMessages\OwnerMessages;
-use CattoLearning\OwnerMessages\OwnerMessageSettings;
+use CattoPHP\Telegram\TelegramBot;
 use CattoLearning\Support\Env;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -57,8 +59,8 @@ final class MoneyReportJob
         private readonly SiteOwner $owner,
         private readonly MailingSettings $mailing,
         private readonly OwnerMessages $ownerMessages,
-        private readonly OwnerMessageRepository $messages,
-        private readonly OwnerMessageSettings $telegram,
+        private readonly TelegramLog $messages,
+        private readonly TelegramBot $telegram,
         private readonly TransactionManager $transactions,
         private readonly ClockInterface $clock,
     ) {

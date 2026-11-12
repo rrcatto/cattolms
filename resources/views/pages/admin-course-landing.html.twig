@@ -6,8 +6,8 @@
 	address, title and description. The landing-sections controller adds dragging; every action is an
 	ordinary form without JavaScript.
 #}
-{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Landing page' %}{% set ph_title = course.title %}{% set ph_lead = 'A marketing page that sells this course, separate from its page in the catalogue. Its price, rating, reviews and outline always come from the course.' %}{% include '@platform/partials/page-head.html.twig' %}
-{{ importmap() }}
+{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Landing page' %}{% set ph_title = course.title %}{% set ph_lead = 'A marketing page that sells this course, separate from its page in the catalogue. Its price, rating, reviews and outline always come from the course.' %}{% include '@CattoPHP/page/head.html.twig' %}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 <section class="cl-page-section">
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 1, section_spacing: true})} %}
 {% block body %}

@@ -253,9 +253,10 @@ final class DatasetSearchWiringTest extends TestCase
         self::assertStringContainsString("'csrf' => Csrf::token()", $scalars, 'A fragment containing a form needs a token.');
         self::assertStringContainsString("'app_name'", $scalars);
 
-        // Both fragment paths take the same set: the htmx swap, and a workspace section rendered
-        // into a page. A section is a fragment too, and it was the section path that went without.
-        self::assertStringContainsString('$scalars = $this->platformScalars();', $renderer);
+        // Both fragment paths take the same set: the htmx swap (CattoPHP's PageRenderer, given cattolms's scalars), and a
+        // workspace section rendered into a page. A section is a fragment too, and it was the section path that went without.
+        self::assertMatchesRegularExpression('/public function scalars\(\): array\s*\{\s*return \$this->platformScalars\(\);/', $renderer);
+        self::assertStringContainsString('array_merge($this->project->scalars(), $data)', (string) file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/src/Theme/PageRenderer.php'));
         self::assertStringContainsString('array_merge($this->platformScalars(), $data)', $renderer);
     }
 
@@ -267,7 +268,7 @@ final class DatasetSearchWiringTest extends TestCase
      */
     public function testTheSearchSwapTargetsAWrapperItDoesNotReplace(): void
     {
-        $control = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/dataset-search.html.twig');
+        $control = (string) file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/templates/ui/data/dataset-search.html.twig');
 
         self::assertStringContainsString('hx-target="#{{ ds_name }}-region"', $control);
         self::assertStringContainsString('hx-select="#{{ ds_name }}-results"', $control);

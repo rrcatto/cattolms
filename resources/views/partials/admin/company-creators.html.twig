@@ -1,7 +1,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Companies that create courses', eyebrow: 'Course Creators', summary: 'Companies that own courses and offer them to others.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Companies that create courses', eyebrow: 'Course Creators', summary: 'Companies that own courses and offer them to others.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
@@ -14,7 +14,7 @@
 
 		{% include '@platform/partials/admin/company-modals.html.twig' with {cm_rows: company_creators} %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'company_creators', pagination: company_creators_pagination, search: {ds_name: 'company_creators', ds_label: 'Search course creators', ds_value: company_creators_search, ds_action: '/admin/companies/creators'}})} %}
-{% block toolbar %}{% if company_creators_view_switch is defined and company_creators_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: company_creators_view_switch} %}{% if company_creators_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'company_creators', gs_headers: company_creators_sort_headers, gs_pager: company_creators_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if company_creators_view_switch is defined and company_creators_pagination %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: company_creators_view_switch} %}{% if company_creators_view == 'grid' %}{% include '@CattoPHP/ui/data/grid-sort.html.twig' with {gs_name: 'company_creators', gs_headers: company_creators_sort_headers, gs_pager: company_creators_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 					{% if company_creators_view|default('list') == 'grid' and company_creators_pagination|default(null) %}
@@ -25,7 +25,7 @@
 
 							<tr>
 								{% for sh in company_creators_sort_headers %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_creators_region, sort_results: company_creators_results} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: company_creators_region, sort_results: company_creators_results} %}
 								{% endfor %}
 							</tr>
 

@@ -1,10 +1,10 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people', ds_help: 'Searches every page by name, any email address or account reference.', ds_hidden: people_created|default(null) ? people_created.carried : {}}})} %}
-{% block toolbar %}{% if people_view_switch is defined and people_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: people_view_switch} %}{% if people_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'people', gs_headers: people_sort_headers, gs_pager: people_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if people_view_switch is defined and people_pagination %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: people_view_switch} %}{% if people_view == 'grid' %}{% include '@CattoPHP/ui/data/grid-sort.html.twig' with {gs_name: 'people', gs_headers: people_sort_headers, gs_pager: people_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 				{# The accounts made between two days, as Money Reports' New accounts opens it (owner, 2026-11-06). #}
@@ -58,7 +58,7 @@
 
 							<tr>
 								{% for sh in people_sort_headers %}
-									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: people_region, sort_results: people_results} %}
+									{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: people_region, sort_results: people_results} %}
 								{% endfor %}
 							</tr>
 

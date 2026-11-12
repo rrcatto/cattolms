@@ -85,14 +85,17 @@ final class BundleRules
         return mb_substr($slug, 0, 180);
     }
 
+    /** The prefix of a suggested code when nothing better is known: a bundle with no courses yet. */
+    public const CODE_PREFIX = 'BDL';
+
     /**
      * A code to offer for a bundle with this title (owner, 2026-11-06: "Each bundle needs its own code, like a course
-     * code"): BDL- and the initials of its main words, up to six, then -2, -3 and on while taken. $taken says whether a
-     * code is a course's or another bundle's.
+     * code"): its prefix (owner, 2026-11-12: the one its courses share, BundleService; BDL without them) and the initials of
+     * its main words, up to six, then -2, -3 and on while taken. $taken says whether a code is a course's or another bundle's.
      *
      * @param callable(string):bool $taken
      */
-    public static function suggestCode(string $title, callable $taken): string
+    public static function suggestCode(string $title, callable $taken, string $prefix = self::CODE_PREFIX): string
     {
         $initials = '';
         foreach (preg_split('/[^\p{L}\p{N}]+/u', $title) ?: [] as $word) {
@@ -101,11 +104,12 @@ final class BundleRules
             if (preg_match('/^[A-Z0-9]$/', $letter) === 1) $initials .= $letter;
             if (strlen($initials) === 6) break;
         }
-        $stem = 'BDL-' . ($initials !== '' ? $initials : 'BUNDLE');
+        $prefix = preg_match('/^[A-Z0-9]{1,12}$/', $prefix) === 1 ? $prefix : self::CODE_PREFIX;
+        $stem = $prefix . '-' . ($initials !== '' ? $initials : 'BUNDLE');
         for ($n = 1; $n < 1000; $n++) {
             $code = $n === 1 ? $stem : $stem . '-' . $n;
             if (strlen($code) <= CourseCode::MAXIMUM && !$taken($code)) return $code;
         }
-        return 'BDL-' . strtoupper(bin2hex(random_bytes(4)));
+        return $prefix . '-' . strtoupper(bin2hex(random_bytes(4)));
     }
 }

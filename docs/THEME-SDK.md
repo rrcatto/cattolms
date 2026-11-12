@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 1.1.2 · **Updated:** 2026-11-08
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 1.2.0 · **Updated:** 2026-11-12
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -186,7 +186,8 @@ canonical accordions and controls; a theme styles them instead of rebuilding the
 ## Platform UI components
 
 [UI-COMPONENTS.md](UI-COMPONENTS.md) lists the complete namespaced registry and Twig slots. Components
-live under `resources/views/ui/{layout,actions,forms,data,feedback,overlay,helpers,catalogue}`.
+are CattoPHP's, at `@CattoPHP/ui/{layout,actions,forms,data,feedback,overlay,helpers}`, and the catalogue's under
+`resources/views/ui/catalogue`.
 The registry exists to prevent page-by-page LLM-generated markup from drifting: equivalent controls
 must share one implementation so spacing, responsive behavior, accessibility and progressive
 enhancement remain consistent.
@@ -222,7 +223,7 @@ type and borders, as with any other core content.
 
 Core owns responsive columns, stable IDs/htmx targets, minimum functional spacing, native GET/POST,
 required overflow and accessible states. Themes own colours, typography, borders, radii and shadows.
-`UiOwnershipAudit` rejects canonical component display/flex/grid, dimensions, overflow, positioning
+CattoPHP's `Ui\Contract\SourceAudit` rejects canonical component display/flex/grid, dimensions, overflow, positioning
 and visibility declarations in theme CSS, including responsive rules. Use `cl-ui-notice-heading`
 for notice headings; a broad notice `strong` selector would also restyle inline prose emphasis.
 
@@ -295,7 +296,7 @@ Bootstrap JavaScript is loaded: a theme never styles a Bootstrap component class
 ## Development validation
 
 Saharan Sunset is the one bundled theme and the default: a fresh database starts on it, and it cannot
-be uninstalled. ThemeManager reads it from `themes/saharan-sunset` in the code root and never copies it
+be uninstalled. CattoPHP's ThemeManager reads it from `themes/saharan-sunset` in the code root and never copies it
 into the instance. The other five themes that were bundled until v1.1.0 remain in the Git history at
 v1.1.0. A theme tree copied back into `themes/` is installed into the instance by
 `composer themes:install`; a theme package is uploaded and installed at Administration → Themes, and a
@@ -304,7 +305,7 @@ child theme needs its exact parent installed first.
 After changing a theme's source in development, run `composer themes:install` (it publishes Saharan
 Sunset's browser files; `-- --force` also replaces an installed copy of another tree at the same
 version), then publish the core assets and compiled AssetMapper output to the instance web root.
-ThemeManager owns theme installation and publication. Do not manually maintain a parallel theme
+CattoPHP's ThemeManager (`CattoPHP\Theme\ThemeManager`, configured in `config/packages/cattophp.yaml`) owns theme installation and publication. Do not manually maintain a parallel theme
 structure. Version changes and release packaging require the owner's instruction.
 
 Run `composer qa`, inspect `/admin/system/ui-components`, and review actual login, account,

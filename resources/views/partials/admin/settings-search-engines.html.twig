@@ -64,7 +64,7 @@
 			</form>
 			{% endif %}
 			</div>
-			{# Each public page's own title and description (the SEO brief, 2026-11-09; Search\SearchOverrides, PublicPages). #}
+			{# Each public page's own title and description (the SEO brief, 2026-11-09; CattoPHP's Search\PageOverrides over PublicPages). #}
 			{% if se.pages|default([]) %}
 			<div class="mt-12" id="search-page-words">
 			{{ ui('layout.section-head', {heading: 'Page titles and descriptions', heading_level: 3, summary: 'What a search result and a shared link say about each of the site\'s own pages. Every page has its own words already; type here only to change them, and leave a field empty for the page\'s own. Courses and categories have theirs on their own pages: a course\'s Search engines tab, a category\'s Search engines card.'}) }}

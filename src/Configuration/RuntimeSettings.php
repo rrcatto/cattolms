@@ -11,6 +11,13 @@ Description:
 Resolves administrator-overridable runtime settings with PostgreSQL taking precedence over .env defaults, and manages encrypted SMTP configuration overrides while keeping infrastructure-only configuration in .env.
 
 Changelog:
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3): the platform name is APP_NAME, and the mail connection and
+  sender are MAILER_DSN (a secret, encrypted as before), MAIL_FROM_ADDRESS, MAIL_FROM_NAME and MAIL_REPLY_TO, each
+  overriding .env with a Reset and every change in CattoPHP's log; what a site had saved is carried over by an upgrade
+  migration. The checks and the page are as they were, a blank From name still meaning the platform name.
+2026/11/09 SAST
+- The secret cipher from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 
 2026/10/07 SAST
 - Added contactEmail(): the reply-to, else the from address, for business.email in documents (Phase J).
@@ -34,21 +41,22 @@ declare(strict_types=1);
 
 namespace CattoLearning\Configuration;
 
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Support\Env;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Settings\Settings;
 use InvalidArgumentException;
 use RuntimeException;
 
 final class RuntimeSettings
 {
-    private const MAIL_DSN = 'mail_dsn_encrypted';
-    private const MAIL_FROM_ADDRESS = 'mail_from_address';
-    private const MAIL_FROM_NAME = 'mail_from_name';
-    private const MAIL_REPLY_TO = 'mail_reply_to';
+    private const MAIL_DSN = 'MAILER_DSN';
+    private const MAIL_FROM_ADDRESS = 'MAIL_FROM_ADDRESS';
+    private const MAIL_FROM_NAME = 'MAIL_FROM_NAME';
+    private const MAIL_REPLY_TO = 'MAIL_REPLY_TO';
+    private const PLATFORM_NAME = 'APP_NAME';
 
     public function __construct(
-        private readonly OptionRepository $options,
-        private readonly SecretCipher $cipher,
+        private readonly Settings $settings,
         private readonly ?SiteMode $site = null,
         private readonly ?SiteOwner $owner = null
     ) {
@@ -91,7 +99,7 @@ final class RuntimeSettings
 
     public function platformName(): string
     {
-        return $this->options->find('platform_name') ?? Env::string('APP_NAME', 'Catto Learning');
+        return $this->settings->get(self::PLATFORM_NAME);
     }
 
     /**
@@ -100,7 +108,7 @@ final class RuntimeSettings
      */
     public function contactEmail(): string
     {
-        foreach ([$this->options->find(self::MAIL_REPLY_TO) ?? Env::string('MAIL_REPLY_TO'), $this->options->find(self::MAIL_FROM_ADDRESS) ?? Env::string('MAIL_FROM_ADDRESS')] as $address) {
+        foreach ([$this->settings->get(self::MAIL_REPLY_TO), $this->settings->get(self::MAIL_FROM_ADDRESS)] as $address) {
             $address = trim($address);
             if ($address !== '' && filter_var($address, FILTER_VALIDATE_EMAIL) !== false) {
                 return $address;
@@ -111,12 +119,18 @@ final class RuntimeSettings
 
     public function platformNameSource(): string
     {
-        return $this->options->find('platform_name') !== null ? 'database' : 'environment';
+        return $this->settings->isOverridden(self::PLATFORM_NAME) ? 'database' : 'environment';
     }
 
     public function resetPlatformName(): void
     {
-        $this->options->delete('platform_name');
+        $this->settings->reset(self::PLATFORM_NAME);
+    }
+
+    /** Saves the platform name; the name .env gives is no override, so a later .env change still shows. */
+    public function savePlatformName(string $name, int $actorUserId): void
+    {
+        $this->settings->set(self::PLATFORM_NAME, $name, self::actor($actorUserId));
     }
 
 
@@ -144,18 +158,13 @@ final class RuntimeSettings
         $dsn = $this->effectiveMailerDsn();
         $this->parseMailerDsn($dsn); // structural validation
 
-        $fromAddress = $this->options->find(self::MAIL_FROM_ADDRESS)
-            ?? Env::string('MAIL_FROM_ADDRESS');
+        $fromAddress = $this->settings->get(self::MAIL_FROM_ADDRESS);
         if (filter_var($fromAddress, FILTER_VALIDATE_EMAIL) === false) {
             throw new RuntimeException('The effective mail sender address is invalid.');
         }
 
-        $fromNameOverride = $this->options->find(self::MAIL_FROM_NAME);
-        $fromName = $fromNameOverride !== null
-            ? ($fromNameOverride !== '' ? $fromNameOverride : $this->platformName())
-            : Env::string('MAIL_FROM_NAME', $this->platformName());
-        $replyTo = $this->options->find(self::MAIL_REPLY_TO)
-            ?? Env::string('MAIL_REPLY_TO');
+        $fromName = $this->settings->get(self::MAIL_FROM_NAME);
+        $replyTo = $this->settings->get(self::MAIL_REPLY_TO);
         if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL) === false) {
             throw new RuntimeException('The effective mail reply-to address is invalid.');
         }
@@ -182,14 +191,10 @@ final class RuntimeSettings
             $error = $exception->getMessage();
         }
 
-        $fromAddress = $this->options->find(self::MAIL_FROM_ADDRESS)
-            ?? Env::string('MAIL_FROM_ADDRESS');
-        $fromNameOverride = $this->options->find(self::MAIL_FROM_NAME);
-        $fromName = $fromNameOverride !== null
-            ? $fromNameOverride
-            : Env::string('MAIL_FROM_NAME', $this->platformName());
-        $replyTo = $this->options->find(self::MAIL_REPLY_TO)
-            ?? Env::string('MAIL_REPLY_TO');
+        $fromAddress = $this->settings->get(self::MAIL_FROM_ADDRESS);
+        $fromName = $this->settings->get(self::MAIL_FROM_NAME);
+        if ($fromName === '') $fromName = $this->platformName();
+        $replyTo = $this->settings->get(self::MAIL_REPLY_TO);
 
         return [
             'smtp_scheme' => $parsed['scheme'],
@@ -201,7 +206,7 @@ final class RuntimeSettings
             'mail_from_address' => $fromAddress,
             'mail_from_name' => $fromName,
             'mail_reply_to' => $replyTo,
-            'mail_connection_source' => $this->options->find(self::MAIL_DSN) !== null ? 'database' : 'environment',
+            'mail_connection_source' => $this->settings->isOverridden(self::MAIL_DSN) ? 'database' : 'environment',
             'mail_sender_source' => $this->hasAnySenderOverride() ? 'database' : 'environment',
             'mail_override_active' => $this->hasMailOverride(),
             'mail_configuration_error' => $error,
@@ -214,7 +219,7 @@ final class RuntimeSettings
         $parsed = $this->parseMailerDsn($this->effectiveMailerDsn());
         return [
             'password' => $parsed['password'],
-            'source' => $this->options->find(self::MAIL_DSN) !== null ? 'database' : 'environment',
+            'source' => $this->settings->isOverridden(self::MAIL_DSN) ? 'database' : 'environment',
         ];
     }
 
@@ -267,35 +272,36 @@ final class RuntimeSettings
         $dsn = $this->buildMailerDsn($scheme, $host, $port, $username, $password, $query);
         $this->parseMailerDsn($dsn);
 
-        $this->options->set(self::MAIL_DSN, $this->cipher->encrypt($dsn), $actorUserId);
-        $this->options->set(self::MAIL_FROM_ADDRESS, $fromAddress, $actorUserId);
-        $this->options->set(self::MAIL_FROM_NAME, $fromName, $actorUserId);
-        $this->options->set(self::MAIL_REPLY_TO, $replyTo, $actorUserId);
+        // Saved together, the connection a secret CattoPHP encrypts; a value .env already gives is no override.
+        $this->settings->save('mail', [self::MAIL_DSN => $dsn, self::MAIL_FROM_ADDRESS => $fromAddress, self::MAIL_FROM_NAME => $fromName, self::MAIL_REPLY_TO => $replyTo], self::actor($actorUserId));
     }
 
     public function resetMailOverride(): void
     {
-        foreach ([self::MAIL_DSN, self::MAIL_FROM_ADDRESS, self::MAIL_FROM_NAME, self::MAIL_REPLY_TO] as $key) {
-            $this->options->delete($key);
-        }
+        $this->settings->resetGroup('mail');
     }
 
     public function hasMailOverride(): bool
     {
-        return $this->options->find(self::MAIL_DSN) !== null || $this->hasAnySenderOverride();
+        return $this->settings->isOverridden(self::MAIL_DSN) || $this->hasAnySenderOverride();
     }
 
     private function hasAnySenderOverride(): bool
     {
-        return $this->options->find(self::MAIL_FROM_ADDRESS) !== null
-            || $this->options->find(self::MAIL_FROM_NAME) !== null
-            || $this->options->find(self::MAIL_REPLY_TO) !== null;
+        return $this->settings->isOverridden(self::MAIL_FROM_ADDRESS)
+            || $this->settings->isOverridden(self::MAIL_FROM_NAME)
+            || $this->settings->isOverridden(self::MAIL_REPLY_TO);
+    }
+
+    /** Who saved it, for CattoPHP's log. */
+    private static function actor(int $userId): ?Actor
+    {
+        return $userId > 0 ? new Actor((string) $userId, (string) $userId) : null;
     }
 
     private function effectiveMailerDsn(): string
     {
-        $encrypted = $this->options->find(self::MAIL_DSN);
-        $dsn = $encrypted !== null ? $this->cipher->decrypt($encrypted) : Env::string('MAILER_DSN');
+        $dsn = $this->settings->get(self::MAIL_DSN);
         if (
             $dsn === ''
             || preg_match('/^(null|test):\/\//i', $dsn) === 1

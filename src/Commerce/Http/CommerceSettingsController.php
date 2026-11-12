@@ -9,7 +9,7 @@ use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Commerce\Settings\FeeTiers;
 use CattoLearning\Commerce\Settings\ProcessorFee;
 use CattoLearning\Http\Controller\BaseController;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Support\Money;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;

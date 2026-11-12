@@ -8,7 +8,7 @@ Date time: 2026/11/01 SAST
 Version: 1.0.4
 
 Description:
-The course specification's complete example (docs/COURSE-SPECIFICATION.md section 14, read from the document) imported
+The course specification's complete example (docs/COURSE-SPECIFICATION-v<version>.md section 14, read from the document) imported
 as the owner imports a course (owner, 2026-11-01: one HTML file, one document, "a proper specification job which is not
 confusing"): the review finds it with no warning; the course gets its code, title, level, cover and grading scale; its
 module becomes a numbered section holding the presentation, video, lesson, summary, flash cards, practical work with

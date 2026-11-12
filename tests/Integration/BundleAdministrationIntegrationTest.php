@@ -416,6 +416,6 @@ final class BundleAdministrationIntegrationTest extends TestCase
     private function audit(int $bundleId): array
     {
         return array_map(static fn(array $row): array => ['event_key' => (string) $row['event_key'], 'metadata' => json_decode((string) $row['metadata'], true, 512, JSON_THROW_ON_ERROR)],
-            $this->db->fetchAllAssociative("SELECT event_key, metadata FROM audit_log WHERE event_key LIKE 'bundle.%' AND metadata->>'bundle_id'=:b ORDER BY id", ['b' => (string) $bundleId]));
+            $this->db->fetchAllAssociative("SELECT action AS event_key, details AS metadata FROM cattophp_activity WHERE action LIKE 'bundle.%' AND details->>'bundle_id'=:b ORDER BY id", ['b' => (string) $bundleId]));
     }
 }

@@ -11,6 +11,8 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for company records.
 
 Changelog:
+2026/11/09 SAST
+- An administrator is found among CattoPHP's role holders (CattoPHP Phase 2, step 5).
 2026/10/26 SAST
 - The company domain rule (owner, restated 2026-10-26: "no domain name, no company. And every person who belonged to
   the company had to use the same domain name"): findByDomain() and membership(); the founder's membership role
@@ -235,7 +237,7 @@ final class CompanyRepository
     public function userIsPlatformAdministrator(int $userId): bool
     {
         return (bool) $this->db->fetchOne(
-            "SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = :user_id AND r.role_key = 'ADMIN'",
+            "SELECT 1 FROM cattophp_account_roles WHERE account_id = CAST(:user_id AS TEXT) AND role_key = 'ADMIN'",
             ['user_id' => $userId]
         );
     }

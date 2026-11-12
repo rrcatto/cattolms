@@ -56,7 +56,7 @@ final class SearchRepository
     public function publishedBundles(): array
     {
         return array_map(static fn(array $row): array => ['slug' => (string) $row['slug'], 'title' => (string) $row['title'], 'short_description' => (string) ($row['short_description'] ?? '')],
-            $this->db->fetchAllAssociative("SELECT b.slug, b.title, b.short_description FROM bundles b WHERE b.status = 'published' ORDER BY b.published_at DESC NULLS LAST, b.title, b.id"));
+            $this->db->fetchAllAssociative("SELECT b.slug, b.title, b.short_description FROM bundles b WHERE b.status = 'published' ORDER BY " . \CattoLearning\Bundle\BundleRepository::LISTED_ORDER));
     }
 
     /** The name of the company that provides a course, or null for a course the Site Owner provides. */

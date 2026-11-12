@@ -163,7 +163,7 @@ final class LearningController extends BaseController
                 $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::LearnerReader, $user->id, $this->analyticsVisitor(), 'item', $nodeId, $itemId > 0 ? $itemId : null);
             }
             return $this->render('learn-item', [
-                'title' => (string) ($course['item']['node_type'] === 'section' ? ($course['item']['section_number'] !== null ? 'Module ' . $course['item']['section_number'] . ': ' : '') . $course['item']['section_title'] : ($course['item']['display_title_override'] ?: $course['item']['item_title'])),
+                'title' => (string) ($course['item']['node_type'] === 'section' ? (($course['item']['label_number'] ?? null) !== null ? 'Module ' . $course['item']['label_number'] . ': ' : '') . $course['item']['section_title'] : ($course['item']['display_title_override'] ?: $course['item']['item_title'])),
                 'course' => $course,
                 'item' => $course['item'],
                 'course_content_mode' => true,

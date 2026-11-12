@@ -23,6 +23,12 @@ The legal pages' last-updated date is the later of their text's date and the dat
 last changed. That date is found by fingerprint, so a change made in .env dates them too.
 
 Changelog:
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3), under the names .env gives, overriding .env with a Reset;
+  what a site saved is carried over by the upgrade migration 20261109160000_settings_to_cattophp.
+- The email address and website are kept as SITE_OWNER_EMAIL and SITE_OWNER_WEBSITE, starting from APP_ADMIN_EMAIL and
+  APP_DOMAIN as before, read when they are needed: APP_ADMIN_EMAIL is the administrator's address among CattoPHP's settings, which the Site
+  Owner's must not change.
 2026/10/18 SAST
 - Created.
 */
@@ -33,6 +39,8 @@ namespace CattoLearning\Configuration;
 
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Support\Env;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Settings\Settings;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Symfony\Component\Clock\ClockInterface;
@@ -64,14 +72,22 @@ final class SiteOwner
     /** The details the legal pages print; a change to one of them dates the pages. */
     public const LEGAL_FIELDS = ['trading_name', 'legal_name', 'legal_form', 'registration_number', 'tax_number', 'address', 'phone', 'email', 'website', 'information_officer', 'memberships', 'accreditation'];
 
-    private const PREFIX = 'site_owner.';
+    /** The fields kept under a name of their own, whose starting value is another .env value's (FIELDS). */
+    public const SETTING_NAMES = ['email' => 'SITE_OWNER_EMAIL', 'website' => 'SITE_OWNER_WEBSITE'];
+
+    /** Fields that may hold several lines. */
+    public const PARAGRAPHS = ['address', 'memberships', 'accreditation'];
+
     private const FINGERPRINT = 'site_owner_fingerprint';
     private const CHANGED_AT = 'site_owner_changed_at';
 
     /**
+     * @param Settings|null $settings CattoPHP's settings, which keep what Settings saved
+     * @param OptionRepository|null $options where the legal pages' last change is noted
      * @param array<string,string>|null $fixed details decided by the caller instead of the settings (tests and tools)
      */
     public function __construct(
+        private readonly ?Settings $settings = null,
         private readonly ?OptionRepository $options = null,
         private readonly ?ClockInterface $clock = null,
         private readonly ?array $fixed = null,
@@ -81,7 +97,13 @@ final class SiteOwner
     /** @param array<string,string> $values */
     public static function fixed(array $values, ?string $changedAt = null): self
     {
-        return new self(null, null, $values, $changedAt);
+        return new self(null, null, null, $values, $changedAt);
+    }
+
+    /** The name a field is kept under in CattoPHP's settings. */
+    public static function settingName(string $field): string
+    {
+        return self::SETTING_NAMES[$field] ?? self::definition($field)[0];
     }
 
     /** The value in force: the saved override, else .env, else the built-in default. */
@@ -89,14 +111,16 @@ final class SiteOwner
     {
         self::definition($field);
         if ($this->fixed !== null) return self::normalise($field, (string) ($this->fixed[$field] ?? self::defaultFor($field, $this->fixed)));
-        $override = $this->options?->find(self::PREFIX . $field);
-        return $override ?? $this->environmentValue($field);
+        $name = self::settingName($field);
+        return $this->settings?->isOverridden($name) ? $this->settings->get($name) : $this->environmentValue($field);
     }
 
     /** The .env value, or the built-in default when .env has none. */
     public function environmentValue(string $field): string
     {
         [$env] = self::definition($field);
+        // Read from .env each time, under its .env name: the email address and website start from APP_ADMIN_EMAIL and
+        // APP_DOMAIN, whatever name Settings keeps them under.
         $value = trim(Env::string($env));
         return self::normalise($field, $value !== '' ? $value : self::defaultFor($field, null));
     }
@@ -105,7 +129,7 @@ final class SiteOwner
     public function source(string $field): string
     {
         self::definition($field);
-        return $this->fixed === null && $this->options?->find(self::PREFIX . $field) !== null ? 'database' : 'environment';
+        return $this->fixed === null && $this->settings?->isOverridden(self::settingName($field)) ? 'database' : 'environment';
     }
 
     /** @return array<string,string> every detail in force */
@@ -126,7 +150,7 @@ final class SiteOwner
      */
     public function save(array $input, int $actorUserId): array
     {
-        if ($this->options === null) throw new InvalidArgumentException('These Site Owner details are fixed.');
+        if ($this->settings === null) throw new InvalidArgumentException('These Site Owner details are fixed.');
         $before = $this->details();
         $values = [];
         if (!isset(self::LEGAL_FORMS[(string) ($input['legal_form'] ?? '')])) throw new InvalidArgumentException('Choose the legal form: company or sole proprietor.');
@@ -137,8 +161,8 @@ final class SiteOwner
         }
         self::check($values);
         foreach ($values as $field => $value) {
-            if ($value === $this->environmentValue($field)) $this->options->delete(self::PREFIX . $field);
-            else $this->options->set(self::PREFIX . $field, $value, $actorUserId);
+            if ($value === $this->environmentValue($field)) $this->settings->reset(self::settingName($field));
+            else $this->settings->set(self::settingName($field), $value, $actorUserId > 0 ? new Actor((string) $actorUserId, (string) $actorUserId) : null);
         }
         return $this->changes($before);
     }
@@ -151,7 +175,7 @@ final class SiteOwner
     public function reset(): array
     {
         $before = $this->details();
-        foreach (array_keys(self::FIELDS) as $field) $this->options?->delete(self::PREFIX . $field);
+        foreach (array_keys(self::FIELDS) as $field) $this->settings?->reset(self::settingName($field));
         return $this->changes($before);
     }
 

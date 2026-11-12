@@ -14,8 +14,8 @@
 	{% set ph_title = template.name %}
 	{% set ph_lead = 'Change the look on the left and see it on the right with a sample. Messages and digests drawn in this template look like this once it is saved.' %}
 	{% set ph_badges %}{% if template.default_for_messages %}{{ ui('feedback.badge', {label: 'Default for messages', tone: 'success'}) }} {% endif %}{% if template.default_for_digest %}{{ ui('feedback.badge', {label: 'Default for the digest', tone: 'success'}) }} {% endif %}{% if template.default_for_account %}{{ ui('feedback.badge', {label: 'Account and order emails', tone: 'success'}) }} {% endif %}{{ ui('feedback.badge', {label: template.mode == 'html' ? 'Written in HTML' : 'Designed', tone: 'neutral'}) }} {{ ui('feedback.badge', {label: template.used == 1 ? 'Used by 1 message or digest' : 'Used by ' ~ template.used ~ ' messages and digests', tone: 'neutral'}) }}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
-	{{ importmap() }}
+	{% include '@CattoPHP/page/head.html.twig' %}
+	{{ importmap('app', {nonce: csp_nonce()}) }}
 
 	<section class="cl-page-section">
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}

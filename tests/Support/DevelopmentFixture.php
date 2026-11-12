@@ -11,6 +11,8 @@ Description:
 Provides reusable development-database fixtures for Catto Learning integration tests. The configured development database is used directly; its role is defined by the project owner, never inferred from its name.
 
 Changelog:
+2026/11/09 SAST
+- Roles are given among CattoPHP's role holders (CattoPHP Phase 2, step 5).
 2026/10/26 SAST
 - addCompanyMember() puts the member's address at the company's domain (the company domain rule).
 2026/09/08 19:52 SAST
@@ -53,7 +55,7 @@ final class DevelopmentFixture
 
     public function __construct(private readonly Database $db)
     {
-        $rows = $this->db->fetchAllAssociative('SELECT COALESCE(MAX(id), 0)::bigint AS id FROM audit_log');
+        $rows = $this->db->fetchAllAssociative('SELECT COALESCE(MAX(id), 0)::bigint AS id FROM cattophp_activity');
         $this->auditLogHighWaterMark = (int) ($rows[0]['id'] ?? 0);
         $this->analyticsMark = (int) $this->db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM analytics_events');
     }
@@ -77,7 +79,7 @@ final class DevelopmentFixture
         $email = strtolower(str_replace(' ', '', $first) . '.' . str_replace(' ', '', $last)) . '@' . $domain;
         // A name comes back once the check that had it is gone: sign-in requests an earlier check left under the address
         // (which no account holds now) would count against this person's sign-in limit.
-        $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email) = :email AND NOT EXISTS (SELECT 1 FROM user_emails e WHERE LOWER(e.email) = :email)', ['email' => $email]);
+        $this->db->executeStatement('DELETE FROM cattophp_links WHERE LOWER(email) = :email AND NOT EXISTS (SELECT 1 FROM user_emails e WHERE LOWER(e.email) = :email)', ['email' => $email]);
         $id = $this->createUser($first . ' ' . $last, $email);
         // Its sign-in requests go with it at the clean-up.
         $this->rememberEmail($email);
@@ -147,7 +149,7 @@ final class DevelopmentFixture
 
     private function grant(int $userId, string $role): void
     {
-        $this->db->executeStatement('INSERT INTO user_roles (user_id, role_id) SELECT :u, id FROM roles WHERE role_key = :r ON CONFLICT DO NOTHING', ['u' => $userId, 'r' => $role]);
+        $this->db->executeStatement('INSERT INTO cattophp_account_roles (account_id, role_key, granted_at) VALUES (CAST(:u AS TEXT), :r, NOW()) ON CONFLICT DO NOTHING', ['u' => $userId, 'r' => $role]);
     }
 
     public function createUser(string $label, ?string $email = null): int
@@ -338,7 +340,7 @@ final class DevelopmentFixture
         // Integration tests use the disposable development database directly.
         // Remove every audit event they generated so running QA cannot masquerade
         // as learner/administrator activity in the Administration Activity UI.
-        $this->db->executeStatement('DELETE FROM audit_log WHERE id > :id', ['id' => $this->auditLogHighWaterMark]);
+        $this->db->executeStatement('DELETE FROM cattophp_activity WHERE id > :id', ['id' => $this->auditLogHighWaterMark]);
 
         foreach (array_reverse($this->requests) as $id) {
             $this->db->executeStatement('DELETE FROM course_requests WHERE id=:id', ['id' => $id]);
@@ -361,7 +363,7 @@ final class DevelopmentFixture
             $this->db->executeStatement('DELETE FROM companies WHERE id=:id', ['id' => $id]);
         }
         foreach (array_unique($this->tokenEmails) as $email) {
-            $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email)=:email', ['email' => $email]);
+            $this->db->executeStatement('DELETE FROM cattophp_links WHERE LOWER(email)=:email', ['email' => $email]);
         }
         foreach (array_reverse($this->users) as $id) {
             $this->db->executeStatement('DELETE FROM course_items WHERE created_by_user_id=:id', ['id' => $id]);

@@ -12,7 +12,7 @@
 	{% set ph_title = 'Order ' ~ order_number(order.id) %}
 	{# The order's account under its number, once, each detail on its own line (owner, 2026-10-21); elsewhere on the page the buyer is their name alone. #}
 	{% if snapshot.company_name|default('') %}{% set ph_lead %}Account {{ account_reference }} · {{ snapshot.company_name }}<br>Placed by {{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead %}{{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% endif %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'What happened', heading_level: 2}) }}
@@ -57,8 +57,8 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'What was bought', heading_level: 2}) }}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Item'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Access', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Price'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Discount'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Refunded', wide: true}} %}</tr>{% endblock %}
-			{% block body %}{% for item in items %}<tr><td class="cell-text">{{ item.product_type == 'company_credit' ? item.quantity ~ ' course credits: ' : '' }}{{ item.title }}{% if item.is_bundle %}{% if item.grants %}{% for grant in item.grants %}<br><span class="small">{{ grant.title }}: {{ grant.outcome }}{{ grant.state == 'revoked' ? ' (withdrawn)' : '' }}</span>{% endfor %}{% else %}<br><span class="small">Includes {{ item.includes }}</span>{% endif %}{% endif %}</td><td>{{ item.access_period_seconds // 86400 }} days</td><td>{{ item.amount_label }}</td><td>{{ item.discount_label ?: '—' }}</td><td>{{ item.refunded_minor > 0 ? item.refunded_label : '—' }}</td></tr>{% endfor %}{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Item'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Access', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Price'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Discount'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Refunded', wide: true}} %}</tr>{% endblock %}
+			{% block body %}{% for item in items %}<tr><td class="cell-text">{{ item.product_type == 'company_credit' ? item.quantity ~ ' course credits: ' : (item.product_type == 'bundle_credit' ? item.quantity ~ ' bundle credits, one person each: ' : '') }}{{ item.title }}{% if item.is_bundle %}{% if item.grants %}{% for grant in item.grants %}<br><span class="small">{{ grant.title }}: {{ grant.outcome }}{{ grant.state == 'revoked' ? ' (withdrawn)' : '' }}</span>{% endfor %}{% else %}<br><span class="small">Includes {{ item.includes }}</span>{% endif %}{% endif %}</td><td>{{ item.access_period_seconds // 86400 }} days</td><td>{{ item.amount_label }}</td><td>{{ item.discount_label ?: '—' }}</td><td>{{ item.refunded_minor > 0 ? item.refunded_label : '—' }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{{ ui('data.key-value-list', {items: totals}) }}
 			{% if snapshot.promotion|default(null) %}<p class="help">Promotion {{ snapshot.promotion.code }} ({{ snapshot.promotion.name }}){{ snapshot.promotion.automatic|default(false) ? ', applied automatically by the cart,' : '' }} took {{ snapshot.promotion.label }} off {{ promotion_eligible_label }} of courses. Each course can be refunded up to what was paid for it.</p>{% endif %}
@@ -87,14 +87,14 @@
 			<h3 class="h5">Money Ledger</h3>
 			{% if story.ledger %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money in'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money out'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Wallet credit', wide: true}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'What happened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money in'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money out'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Wallet credit', wide: true}} %}</tr>{% endblock %}
 			{% block body %}{% for line in story.ledger %}<tr data-order-record="ledger"><td class="small"><a href="{{ line.href }}">{{ line.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: line.sentence_parts} only %}</td><td>{{ line.money_in }}</td><td>{{ line.money_out }}</td><td>{{ line.wallet }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>No money has moved for this order yet.</p>{% endif %}
 			<h3 class="h5">Payment Events</h3>
 			{% if story.payment_events %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Amount'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'What happened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Amount'}} %}</tr>{% endblock %}
 			{% block body %}{% for event in story.payment_events %}<tr data-order-record="payment"><td class="small"><a href="{{ event.href }}">{{ event.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: event.sentence_parts} only %}</td><td>{{ event.amount }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>No payment has been started for this order yet.</p>{% endif %}
@@ -102,7 +102,7 @@
 			<h3 class="h5">Commerce Trail</h3>
 			{% if story.timeline %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 62, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'By', wide: true}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 62, label: 'What happened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'By', wide: true}} %}</tr>{% endblock %}
 			{% block body %}{% for step in story.timeline %}<tr data-order-step data-order-record="trail"><td class="small"><a href="{{ step.href }}">{{ step.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: step.text_parts} only %}</td><td class="small">{% if step.by_person %}{{ ui('data.person', step.by_person) }}{% else %}{{ step.by }}{% endif %}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>Nothing has been recorded for this order yet.</p>{% endif %}
@@ -134,8 +134,14 @@
 			{% for refund in refunds %}
 				<p data-refund-id="{{ refund.id }}"><strong>{{ refund.approved_at|date('j M Y') }}:</strong> {{ ui('data.person', refund.actor_person) }} refunded {{ refund.amount_label }} as {{ refund.destination == 'money_back' ? 'money back' : 'wallet credit' }}{% if refund.wallet_part_minor > 0 %}, {{ refund.wallet_part_label }} of it back to the wallet it was paid from{% endif %}{% for line in refund.deduction_lines %}, less {{ line }}{% endfor %}. {% if refund.payout_paid_at %}Paid back on {{ refund.payout_paid_at|date('j M Y') }}, reference {{ refund.payout_reference }}.{% elseif refund.to_pay %}{{ ui('feedback.badge', {label: 'To pay by ' ~ refund.payout_due_at|date('j M Y'), tone: 'warning', size: 'small'}) }}{% endif %}<br><span class="small">Reason: {{ refund.reason }}{% if refund.override_reason %} · Outside the Refund Policy ({{ refund.policy_refusal }}) · Override reason: {{ refund.override_reason }}{% endif %}</span></p>
 				{% if refund.to_pay and can_refund %}
-				<form action="/admin/commerce/refunds/{{ refund.id }}/payout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+				{% if refund.stitch_card %}
+				<form action="/admin/commerce/refunds/{{ refund.id }}/stitch" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 					<p>{{ refund.payout_instruction }}</p>
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Refund ' ~ refund.net_label ~ ' to the card through Stitch', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Send ' ~ refund.net_label ~ ' back to the card that paid for this order?', icon: 'action-pay'}) }}{% endblock %}{% endembed %}
+				</form>
+				{% endif %}
+				<form action="/admin/commerce/refunds/{{ refund.id }}/payout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+					{% if not refund.stitch_card %}<p>{{ refund.payout_instruction }}</p>{% else %}<p class="small">Paid it another way? Record it here.</p>{% endif %}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date you paid it', for: 'payout-date-' ~ refund.id, required: true})} %}{% block control %}<input id="payout-date-{{ refund.id }}" type="date" name="paid_on" max="{{ today }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Stitch or bank reference', for: 'payout-reference-' ~ refund.id, required: true})} %}{% block control %}<input id="payout-reference-{{ refund.id }}" name="reference" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}

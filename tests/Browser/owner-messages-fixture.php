@@ -24,10 +24,9 @@ declare(strict_types=1);
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\OwnerMessages\OwnerMessageJob;
-use CattoLearning\OwnerMessages\OwnerMessageRepository;
-use CattoLearning\OwnerMessages\OwnerMessageSettings;
+use CattoPHP\Telegram\OwnerMessageSender;
+use CattoPHP\Telegram\TelegramLog;
+use CattoPHP\Telegram\TelegramState;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
@@ -37,7 +36,8 @@ require dirname(__DIR__, 2) . '/vendor/autoload.php';
 const OWNER_MESSAGES_PORT = 18089;
 $container = CliBootstrap::boot()['container'];
 $db = $container->get(Database::class);
-$options = $container->get(OptionRepository::class);
+// CattoPHP's Telegram values (since 2026-11-12): the bot's connection, and Telegram's address, pointed at the stand-in.
+$telegram = new TelegramState($db->connection());
 $statePath = '/tmp/catto-owner-messages-state.json';
 $action = $argv[1] ?? '';
 $flag = static function (string $name, string $state): void {
@@ -51,9 +51,9 @@ if ($action === 'create') {
     $admin = $fixture->person('ADMIN');
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($admin['id'], Token::hash($token), 7200, '', 'Owner messages browser', $admin['email']);
-    $state = ['token' => $token, 'before' => $options->find(OwnerMessageSettings::OPTION), 'address_before' => $options->find(OwnerMessageSettings::ADDRESS_OPTION), 'messages_before' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM telegram_messages'), 'scrub' => $fixture->seeds()];
-    $options->delete(OwnerMessageSettings::OPTION);
-    $options->set(OwnerMessageSettings::ADDRESS_OPTION, 'http://127.0.0.1:' . OWNER_MESSAGES_PORT, $admin['id']);
+    $state = ['token' => $token, 'before' => $telegram->get(TelegramState::BOT), 'address_before' => $telegram->get(TelegramState::ADDRESS), 'messages_before' => (int) $db->fetchOne('SELECT COALESCE(MAX(id), 0) FROM cattophp_telegram_messages'), 'scrub' => $fixture->seeds()];
+    $telegram->remove(TelegramState::BOT);
+    $telegram->set(TelegramState::ADDRESS, 'http://127.0.0.1:' . OWNER_MESSAGES_PORT, (string) $admin['id']);
     @unlink('/tmp/owner-messages-standin.log');
     touch('/tmp/owner-messages-standin.log');
     $state['pid'] = (int) shell_exec('php -S 127.0.0.1:' . OWNER_MESSAGES_PORT . ' ' . escapeshellarg(__DIR__ . '/owner-messages-standin.php') . ' > /dev/null 2>&1 & echo $!');
@@ -63,19 +63,19 @@ if ($action === 'create') {
 } elseif ($action === 'started' || $action === 'down') {
     $flag($action, (string) ($argv[2] ?? 'off'));
 } elseif ($action === 'job') {
-    $container->get(OwnerMessageRepository::class)->record('check:' . bin2hex(random_bytes(6)), 'sale', 'A message from the browser check.');
-    echo $container->get(OwnerMessageJob::class)->run(), "\n";
+    $container->get(TelegramLog::class)->record('check:' . bin2hex(random_bytes(6)), 'sale', 'A message from the browser check.');
+    echo $container->get(OwnerMessageSender::class)->run(), "\n";
 } elseif ($action === 'retry') {
-    echo $container->get(OwnerMessageJob::class)->run(), "\n";
+    echo $container->get(OwnerMessageSender::class)->run(), "\n";
 } elseif ($action === 'log') {
     echo (string) @file_get_contents('/tmp/owner-messages-standin.log');
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) { exit(0); }
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     if ((int) ($state['pid'] ?? 0) > 0) { @shell_exec('kill ' . (int) $state['pid'] . ' 2>/dev/null'); }
-    $db->executeStatement('DELETE FROM telegram_messages WHERE id > :before', ['before' => (int) ($state['messages_before'] ?? 0)]);
-    foreach ([OwnerMessageSettings::OPTION => $state['before'], OwnerMessageSettings::ADDRESS_OPTION => $state['address_before']] as $name => $value) {
-        if ($value === null) { $options->delete($name); } else { $options->set($name, $value); }
+    $db->executeStatement('DELETE FROM cattophp_telegram_messages WHERE id > :before', ['before' => (int) ($state['messages_before'] ?? 0)]);
+    foreach ([TelegramState::BOT => $state['before'], TelegramState::ADDRESS => $state['address_before']] as $name => $value) {
+        if ($value === null) { $telegram->remove($name); } else { $telegram->set($name, $value); }
     }
     foreach (['log', 'down', 'started'] as $name) { @unlink('/tmp/owner-messages-standin.' . $name); }
     (new CheckScrub($db))->remove($state['scrub']);

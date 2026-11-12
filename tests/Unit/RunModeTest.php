@@ -23,7 +23,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Configuration\RunMode;
+use CattoPHP\Runtime\RunMode;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

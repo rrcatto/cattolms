@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course\Popularity;
 
-use CattoLearning\Maintenance\ScheduledJob;
-use CattoLearning\Maintenance\Scheduler;
+use CattoPHP\Scheduler\Scheduler;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -24,7 +23,7 @@ final class RecalculatePopularityCommand extends Command
     {
         // Recorded as the scheduler's popularity job (owner, 2026-10-19), so Settings > Maintenance
         // shows when it last ran however it was started.
-        $result = $this->scheduler->run([ScheduledJob::Popularity])[ScheduledJob::Popularity->value];
+        $result = $this->scheduler->run(['popularity'])['popularity'];
         if (!$result['ok']) {
             $output->writeln('<error>Popularity recalculation failed: ' . htmlspecialchars($result['summary']) . '</error>');
             return Command::FAILURE;

@@ -13,6 +13,11 @@ it and what became of them, the forwards, the people who joined or left a list, 
 digest that started in it, the lists, the links clicked most, and the copies handed on in each slice of the period.
 
 Changelog:
+2026/11/12 SAST
+- The figures are CattoPHP's (MailingFigures, CattoPHP Phase 4, step 9, part 4): this class gives them to Mailing's
+  reports, saying which kinds of campaign count as messages, and keeps the list of lists with their names.
+2026/11/12 SAST
+- The lists and answers are CattoPHP's (CattoPHP Phase 4, step 9, part 2): the figures are read from its tables.
 2026/10/28 SAST
 - Created.
 */
@@ -22,14 +27,17 @@ declare(strict_types=1);
 namespace CattoLearning\Mailing;
 
 use CattoLearning\Infrastructure\Persistence\Database;
+use CattoPHP\Mailing\MailingFigures;
 
 final class ReportRepository
 {
+    /** The kinds of campaign the reports count as messages sent. */
+    public const SENT_KINDS = ['message', 'digest', 'updates'];
     private const LIST_NAME = "CASE l.kind WHEN 'news' THEN 'News and Updates' WHEN 'own' THEN l.name ELSE COALESCE(cat.name, co.title, t.name, '') END";
-    private const LIST_JOINS = "LEFT JOIN course_categories cat ON l.kind = 'category' AND cat.id = l.subject_id
-        LEFT JOIN courses co ON l.kind = 'course' AND co.id = l.subject_id LEFT JOIN tags t ON l.kind = 'tag' AND t.id = l.subject_id";
+    private const LIST_JOINS = "LEFT JOIN course_categories cat ON l.kind = 'category' AND l.subject = CAST(cat.id AS TEXT)
+        LEFT JOIN courses co ON l.kind = 'course' AND l.subject = CAST(co.id AS TEXT) LEFT JOIN tags t ON l.kind = 'tag' AND l.subject = CAST(t.id AS TEXT)";
 
-    public function __construct(private readonly Database $db)
+    public function __construct(private readonly Database $db, private readonly MailingFigures $figures)
     {
     }
 
@@ -39,27 +47,19 @@ final class ReportRepository
      */
     public function totals(array $p): array
     {
-        $row = $this->db->fetchAssociative(
-            "SELECT COUNT(*) AS sent, COUNT(*) FILTER (WHERE d.first_opened_at IS NOT NULL) AS opened, COUNT(*) FILTER (WHERE d.click_count > 0) AS clicked,
-                    COUNT(*) FILTER (WHERE d.status IN ('bounced', 'soft_bounced')) AS bounced, COUNT(*) FILTER (WHERE d.status = 'complained') AS complained,
-                    COUNT(*) FILTER (WHERE d.unsubscribed_at IS NOT NULL) AS unsubscribed
-             FROM mailing_deliveries d WHERE d.handed_at >= :from AND d.handed_at < :to",
-            $p
-        );
-
-        return array_map('intval', $row === false ? [] : $row);
+        return $this->figures->totals($p['from'], $p['to']);
     }
 
     /** @param array{from:string,to:string} $p */
     public function forwarded(array $p): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM mailing_forwards WHERE created_at >= :from AND created_at < :to', $p);
+        return $this->figures->forwarded($p['from'], $p['to']);
     }
 
     /** @param array{from:string,to:string} $p how many people joined (subscribed) or left (unsubscribed) a list */
     public function people(string $status, array $p): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(DISTINCT user_id) FROM mailing_subscription_events WHERE status = :s AND created_at >= :from AND created_at < :to', $p + ['s' => $status]);
+        return $this->figures->people($status, $p['from'], $p['to']);
     }
 
     /**
@@ -68,11 +68,7 @@ final class ReportRepository
      */
     public function byKind(array $p): array
     {
-        return $this->db->fetchAllAssociative(
-            "SELECT c.kind, COUNT(*) AS sent, COUNT(*) FILTER (WHERE d.first_opened_at IS NOT NULL) AS opened, COUNT(*) FILTER (WHERE d.click_count > 0) AS clicked
-             FROM mailing_deliveries d JOIN mailing_campaigns c ON c.id = d.campaign_id WHERE d.handed_at >= :from AND d.handed_at < :to GROUP BY c.kind ORDER BY sent DESC",
-            $p
-        );
+        return $this->figures->byKind($p['from'], $p['to']);
     }
 
     /**
@@ -81,13 +77,7 @@ final class ReportRepository
      */
     public function messages(array $p): array
     {
-        return $this->db->fetchAllAssociative(
-            "SELECT c.id, c.name, c.kind, c.started_at, COUNT(d.id) FILTER (WHERE d.handed_at IS NOT NULL) AS sent, COUNT(d.id) FILTER (WHERE d.first_opened_at IS NOT NULL) AS opened,
-                    COUNT(d.id) FILTER (WHERE d.click_count > 0) AS clicked, COUNT(d.id) FILTER (WHERE d.unsubscribed_at IS NOT NULL) AS unsubscribed
-             FROM mailing_campaigns c LEFT JOIN mailing_deliveries d ON d.campaign_id = c.id
-             WHERE c.started_at >= :from AND c.started_at < :to AND c.kind IN ('message', 'digest', 'updates') GROUP BY c.id ORDER BY c.started_at DESC LIMIT 50",
-            $p
-        );
+        return $this->figures->campaigns($p['from'], $p['to'], self::SENT_KINDS);
     }
 
     /**
@@ -98,10 +88,10 @@ final class ReportRepository
     {
         return $this->db->fetchAllAssociative(
             'SELECT l.id, l.kind, ' . self::LIST_NAME . " AS name,
-                    (SELECT COUNT(*) FROM mailing_subscriptions s WHERE s.list_id = l.id AND s.status = 'subscribed') AS people,
-                    (SELECT COUNT(*) FROM mailing_subscription_events e WHERE e.list_id = l.id AND e.status = 'subscribed' AND e.created_at >= :from AND e.created_at < :to) AS joined,
-                    (SELECT COUNT(*) FROM mailing_subscription_events e WHERE e.list_id = l.id AND e.status = 'unsubscribed' AND e.created_at >= :from AND e.created_at < :to) AS left_count
-             FROM mailing_lists l " . self::LIST_JOINS . ' ORDER BY people DESC, lower(' . self::LIST_NAME . ') LIMIT 25',
+                    (SELECT COUNT(*) FROM cattophp_mailing_subscriptions s WHERE s.list_id = l.id AND s.status = 'subscribed') AS people,
+                    (SELECT COUNT(*) FROM cattophp_mailing_subscription_events e WHERE e.list_id = l.id AND e.status = 'subscribed' AND e.created_at >= :from AND e.created_at < :to) AS joined,
+                    (SELECT COUNT(*) FROM cattophp_mailing_subscription_events e WHERE e.list_id = l.id AND e.status = 'unsubscribed' AND e.created_at >= :from AND e.created_at < :to) AS left_count
+             FROM cattophp_mailing_lists l " . self::LIST_JOINS . ' ORDER BY people DESC, lower(' . self::LIST_NAME . ') LIMIT 25',
             $p
         );
     }
@@ -112,19 +102,13 @@ final class ReportRepository
      */
     public function links(array $p): array
     {
-        return $this->db->fetchAllAssociative(
-            'SELECT k.url, c.id AS campaign_id, c.name AS campaign, COUNT(*) AS people, SUM(x.clicks) AS clicks FROM mailing_link_clicks x JOIN mailing_links k ON k.id = x.link_id
-             JOIN mailing_campaigns c ON c.id = k.campaign_id WHERE x.first_at >= :from AND x.first_at < :to GROUP BY k.url, c.id, c.name ORDER BY people DESC, clicks DESC LIMIT 10',
-            $p
-        );
+        return $this->figures->links($p['from'], $p['to']);
     }
 
     /** When the first copy was handed on, or null when none was yet. */
     public function firstHanded(): ?string
     {
-        $first = $this->db->fetchOne('SELECT MIN(handed_at) FROM mailing_deliveries');
-
-        return is_string($first) ? $first : null;
+        return $this->figures->firstHanded();
     }
 
     /**
@@ -134,9 +118,6 @@ final class ReportRepository
      */
     public function slices(string $unit, string $zone, string $from, string $to): array
     {
-        return array_map(static fn(array $r): array => ['slice' => (string) $r['slice'], 'sent' => (int) $r['sent']], $this->db->fetchAllAssociative(
-            'SELECT date_trunc(:unit, d.handed_at AT TIME ZONE :zone) AS slice, COUNT(*) AS sent FROM mailing_deliveries d WHERE d.handed_at >= :from AND d.handed_at < :to GROUP BY 1',
-            ['unit' => $unit, 'zone' => $zone, 'from' => $from, 'to' => $to]
-        ));
+        return $this->figures->slices($unit, $zone, $from, $to);
     }
 }

@@ -6,7 +6,7 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Commerce\Document\FinancialDocumentDataBuilder;
 use CattoLearning\Commerce\Document\FinancialDocuments;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
@@ -591,7 +591,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $transitions = $container->get(TransitionService::class);
         $promotions = PromotionFixture::service($db, $this->clock);
         // Documents are issued through this connection's repository, inside its transaction.
-        $documents = new FinancialDocuments($records, $container->get(FinancialDocumentDataBuilder::class), $container->get(DocumentTemplateRenderer::class), $container->get(DocumentPdfRenderer::class));
+        $documents = new FinancialDocuments($records, $container->get(FinancialDocumentDataBuilder::class), $container->get(DocumentTemplateRenderer::class), $container->get(PdfRenderer::class));
         $orders = new OrderService($records, $tx, WalletFixture::settings($db), $transitions, $this->clock, $promotions, $documents, WalletFixture::wallets($db, $this->clock));
         $access = new AccessService($records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);

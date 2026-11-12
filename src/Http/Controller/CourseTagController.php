@@ -9,7 +9,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -65,9 +65,11 @@ final class CourseTagController extends BaseController
         // question about the vocabulary, and answering it with the whole catalogue would be a
         // slower page that answered something nobody asked.
         $showing = $selectedTags !== [] || $search !== '';
-        $pagination = Pagination::catalogue(
+        $pagination = Pagination::within(
             $request->query->get('page'),
-            $showing ? $this->courses->catalogueCount($filter) : 0
+            CourseController::CATALOGUE_PAGE,
+            $showing ? $this->courses->catalogueCount($filter) : 0,
+            [CourseController::CATALOGUE_PAGE]
         );
         $courses = $showing
             ? $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset)

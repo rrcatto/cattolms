@@ -9,7 +9,7 @@
         open and what is typed stay as they are.
     #}
     {# Stimulus, once for the page: the sections' order and the site logo's editor. #}
-    {{ importmap() }}
+    {{ importmap('app', {nonce: csp_nonce()}) }}
     {% set settings_sections = {} %}
     {% set section_html %}
     {% if site_mode|default(null) %}
@@ -302,9 +302,38 @@
     {% endif %}
     {% endset %}{% set settings_sections = settings_sections|merge({'site-owner': section_html}) %}
     {% set section_html %}
-    {# Messages to you (owner, 2026-11-05: "yes telegram, paid orders only"): a message to the owner's phone by Telegram. The key is never shown back. #}
+    {# Footer social media (owner, 2026-11-09): the site's own profiles, which the marks at the foot of every page link to. #}
+    {% if social_profiles|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Footer social media', summary: social_profiles.count ? (social_profiles.count == 1 ? 'One profile in the footer.' : social_profiles.count ~ ' profiles in the footer.') : 'None yet: the footer links to each platform\'s home page.', id: 'settings-footer-social', open: settings_open_section|default('') == 'footer-social'})} %}
+{% block body %}
+
+			<p>The marks at the foot of every page link to the site's own profiles on these platforms. The footer shows a mark for each profile set here, in this order. While none is set, it shows all seven, each linking to the platform's home page. Leave a field empty to take that mark away.</p>
+			{% if can_manage_settings|default(false) %}
+			<form action="/admin/settings/footer-social" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+				{% for profile in social_profiles.rows %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: profile.label, for: 'footer-social-' ~ profile.key, help: 'The whole address, starting with https://'})} %}
+{% block control %}<input class="cl-input" type="url" id="footer-social-{{ profile.key }}" name="social[{{ profile.key }}]" value="{{ profile.url }}" placeholder="{{ profile.placeholder }}" maxlength="500" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save footer social media', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% else %}
+				{{ ui('data.key-value-list', {items: social_profiles.rows|map(profile => {label: profile.label, value: profile.url ?: 'Not set'})}) }}
+			{% endif %}
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'footer-social': section_html}) %}
+    {% set section_html %}
+    {# Connect to Telegram bot (owner, 2026-11-05: "yes telegram, paid orders only"; named so on 2026-11-10, since it only connects the site's Telegram bot): the bot that sends the owner's messages and the sign-in codes. The key is never shown back. #}
     {% if owner_messages|default(null) %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Messages to you', summary: owner_messages.title, summary_tone: owner_messages.title_tone, id: 'settings-owner-messages', open: settings_open_section|default('') == 'owner-messages'})} %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Connect to Telegram bot', summary: owner_messages.title, summary_tone: owner_messages.title_tone, id: 'settings-owner-messages', open: settings_open_section|default('') == 'owner-messages'})} %}
 {% block body %}
 
 			{% set om = owner_messages %}
@@ -614,6 +643,65 @@
     {% endif %}
     {% endset %}{% set settings_sections = settings_sections|merge({'payment-methods': section_html}) %}
     {% set section_html %}
+    {# Card payments through Stitch (owner, 2026-11-11): its keys over .env with a Reset, and its return address and webhook. #}
+    {% if card_payments|default(null) %}
+    {% set cp = card_payments %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Card payments (Stitch)', summary: cp.state, summary_tone: cp.tone, id: 'settings-card-payments', open: settings_open_section|default('') == 'card-payments'})} %}
+{% block body %}
+
+			<p>Card payments go through Stitch Express: the buyer pays on Stitch's secure page, and Stitch sends them back here and tells this site the moment the payment is made. This site never sees a card. The keys come from Stitch's dashboard, under Settings, Developers; test keys start with <span class="mono">test-</span>.</p>
+			{% if cp.problem and cp.ready %}
+				{{ ui('feedback.notice', {tone: 'danger', heading: cp.problem}) }}
+			{% elseif cp.kind == 'test' %}
+				{{ ui('feedback.notice', {tone: 'info', heading: 'Test mode: Stitch takes no real money with these keys.'}) }}
+			{% elseif cp.kind == 'live' and cp.demo_site %}
+				{{ ui('feedback.notice', {tone: 'warning', heading: 'These are live keys on a demo site: a card payment here takes real money. For testing, use the test keys, which start with test-.'}) }}
+			{% elseif cp.kind == 'live' %}
+				{{ ui('feedback.notice', {tone: 'success', heading: 'Live: card payments take real money.'}) }}
+			{% else %}
+				{{ ui('feedback.notice', {tone: 'neutral', heading: 'Not set up: enter the client ID and secret from Stitch.'}) }}
+			{% endif %}
+			{% if card_payments_note|default(null) %}{{ ui('feedback.notice', {tone: card_payments_note.tone, heading: card_payments_note.words}) }}{% endif %}
+			{% if can_manage_settings|default(false) %}
+			<form action="/admin/settings/card-payments" method="post" autocomplete="off">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Client ID', for: 'card-payments-client-id', help: cp.sources.client_id == 'saved' ? 'Saved here, over .env.' : (cp.sources.client_id == 'env' ? 'From STITCH_CLIENT_ID in .env.' : 'Not set.')})} %}
+{% block control %}<input class="cl-input" type="text" id="card-payments-client-id" name="client_id" value="{{ cp.client_id }}" placeholder="test-958fd377-..." autocomplete="off" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Client secret', for: 'card-payments-client-secret', help: cp.has_secret ? (cp.sources.client_secret == 'saved' ? 'Saved here, over .env. Leave it blank to keep it.' : 'From STITCH_CLIENT_SECRET in .env. Leave it blank to keep it.') : 'Not set. Stitch shows it once, when it is made.'})} %}
+{% block control %}<input class="cl-input" type="password" id="card-payments-client-secret" name="client_secret" value="" placeholder="{{ cp.has_secret ? 'Saved' : '' }}" autocomplete="new-password" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Webhook signing secret', for: 'card-payments-webhook-secret', help: cp.has_webhook_secret ? 'Saved. Leave it blank to keep it.' : 'Filled in when you register the webhook below. Only on a site Stitch can reach.'})} %}
+{% block control %}<input class="cl-input" type="password" id="card-payments-webhook-secret" name="webhook_secret" value="" placeholder="{{ cp.has_webhook_secret ? 'Saved' : 'whsec_...' }}" autocomplete="new-password" spellcheck="false" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save and check with Stitch', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% endif %}
+			<div class="cl-card-payments-addresses">
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Return address Stitch sends buyers back to', value: cp.return_address},
+				{label: 'Webhook address Stitch tells payments to', value: cp.webhook_address},
+			]}) }}
+			</div>
+			{% if can_manage_settings|default(false) and cp.ready %}
+			<div class="cl-card-payments-actions">
+				<form action="/admin/settings/card-payments/check" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Check the connection', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-connect'}) }}</form>
+				<form action="/admin/settings/card-payments/return-address" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Register the return address with Stitch', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-save'}) }}</form>
+				<form action="/admin/settings/card-payments/webhook" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Register the webhook with Stitch', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-send'}) }}</form>
+				{% if cp.overridden %}<form action="/admin/settings/card-payments/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset to .env', variant: 'danger', size: 'small', type: 'submit', confirm: 'Remove the keys saved here and use what .env says?', icon: 'action-reset'}) }}</form>{% endif %}
+			</div>
+			<p class="small cl-text-secondary mb-0">Register the return address once on each site. The webhook needs a site Stitch can reach on the internet; without it, this site asks Stitch about each waiting payment every minute.</p>
+			{% endif %}
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'card-payments': section_html}) %}
+    {% set section_html %}
     {# Identity verification (owner, 2026-10-19): through Didit's hosted page; the keys come from .env only. #}
     {% if identity_settings|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? (identity_settings.key_kind == 'sandbox' ? 'Connected to Didit\'s sandbox.' : 'Connected to Didit.') : (identity_settings.sandbox_on_live ? 'Not available: a sandbox key on a live site.' : 'Not available: keys missing from .env.'), id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity-verification'})} %}
@@ -681,34 +769,74 @@
 {% endembed %}
     {% endset %}{% set settings_sections = settings_sections|merge({'configuration': section_html}) %}
     {% set section_html %}
-    {# Course positions (owner, 2026-11-01: "yes, build automatic ranges"): a course arriving with no position takes the
-       next free number in its code's range. #}
+    {# Course positions (owner, 2026-11-01: "yes, build automatic ranges"; bands, owner 2026-11-12): a course arriving with
+       no position takes the next free number in its code's band, and Renumber puts every course back in its band. #}
     {% if course_positions|default(null) %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Course positions', summary: course_positions.summary, id: 'settings-course-positions', open: settings_open_section|default('') == 'course-positions'})} %}
 {% block body %}
-		<p>Give each course code prefix the number its range in the catalogue starts at. A course that arrives with no position, added here, imported, or new from a catalogue package, takes the next free number in its code's range, 100 after the highest one in it. With GDN from 1000 and GDN-101 at 1000, a new GDN-102 gets 1100. A course you have given a position is never moved.</p>
+		<p>Give each course code prefix the number its band in the catalogue starts at: the band runs up to the next prefix's start. With FIN from 10000 and BUS from 20000, FIN's courses are numbered 10000, 10100 and on, with room for 100. A course that arrives with no position, added here, imported, or new from a catalogue package, takes the next free number in its code's band. A course you have given a position is never moved, until you renumber.</p>
 		<form action="/admin/settings/course-positions" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Position ranges', density: 'compact'})} %}
-{% block header %}<tr><th scope="col">Prefix</th><th scope="col">Range starts at</th></tr>{% endblock %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bands', density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Prefix</th><th scope="col">Band starts at</th><th scope="col">Its band</th></tr>{% endblock %}
 {% block body %}
 			{% for row in course_positions.rows %}
 			<tr>
 				<td><input class="cl-input" name="prefix[]" value="{{ row.prefix }}" maxlength="20" autocomplete="off" aria-label="Prefix"></td>
-				<td><input class="cl-input" type="number" min="1" step="1" name="start[]" value="{{ row.start }}" autocomplete="off" aria-label="Range starts at"></td>
+				<td><input class="cl-input" type="number" min="1" step="1" name="start[]" value="{{ row.start }}" autocomplete="off" aria-label="Band starts at"></td>
+				<td>{{ row.band }}</td>
 			</tr>
 			{% endfor %}
 {% endblock %}
 {% endembed %}
-			<p class="cl-text-muted">Empty a row to remove its range. Save to add more empty rows.</p>
+			<p class="cl-text-muted">Empty a row to remove its band. Save to add more empty rows.</p>
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save course positions', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% endembed %}
+		</form>
+		<form action="/admin/settings/course-positions/renumber" method="post" class="cl-renumber-form">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<p>Renumber puts every course back in its prefix's band, from the band's start, 100 apart, in the order they are listed in now. A course whose prefix has no band keeps its number.</p>
+			{{ ui('action.button', {label: 'Renumber course positions', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-sort', confirm: 'Renumber every course in its band, keeping their order?'}) }}
 		</form>
 {% endblock %}
 {% endembed %}
     {% endif %}
     {% endset %}{% set settings_sections = settings_sections|merge({'course-positions': section_html}) %}
+    {% set section_html %}
+    {# Bundle positions (owner, 2026-11-12): the same for bundles, by their codes' prefixes, numbered apart from courses. #}
+    {% if bundle_positions|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Bundle positions', summary: bundle_positions.summary, id: 'settings-bundle-positions', open: settings_open_section|default('') == 'bundle-positions'})} %}
+{% block body %}
+		<p>Give each bundle code prefix the number its band starts at, as for courses: the band runs up to the next prefix's start, and bundles are numbered apart from courses. A bundle made with no position, or new from a catalogue package, takes the next free number in its code's band. A bundle you have given a position is never moved, until you renumber.</p>
+		<form action="/admin/settings/bundle-positions" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bands', density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Prefix</th><th scope="col">Band starts at</th><th scope="col">Its band</th></tr>{% endblock %}
+{% block body %}
+			{% for row in bundle_positions.rows %}
+			<tr>
+				<td><input class="cl-input" name="prefix[]" value="{{ row.prefix }}" maxlength="20" autocomplete="off" aria-label="Prefix"></td>
+				<td><input class="cl-input" type="number" min="1" step="1" name="start[]" value="{{ row.start }}" autocomplete="off" aria-label="Band starts at"></td>
+				<td>{{ row.band }}</td>
+			</tr>
+			{% endfor %}
+{% endblock %}
+{% endembed %}
+			<p class="cl-text-muted">Empty a row to remove its band. Save to add more empty rows.</p>
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save bundle positions', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% endembed %}
+		</form>
+		<form action="/admin/settings/bundle-positions/renumber" method="post" class="cl-renumber-form">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<p>Renumber puts every bundle back in its prefix's band, from the band's start, 100 apart, in the order they are listed in now. A bundle whose prefix has no band keeps its number.</p>
+			{{ ui('action.button', {label: 'Renumber bundle positions', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-sort', confirm: 'Renumber every bundle in its band, keeping their order?'}) }}
+		</form>
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {% endset %}{% set settings_sections = settings_sections|merge({'bundle-positions': section_html}) %}
     {% set section_html %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Maintenance', summary: 'The scheduled jobs, and expired login and session records.', id: 'settings-maintenance', open: settings_open_section|default('') == 'maintenance'})} %}
 {% block body %}

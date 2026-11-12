@@ -36,7 +36,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use PHPUnit\Framework\Attributes\DataProvider;
 use CattoLearning\Tests\Support\RouteTable;
 use PHPUnit\Framework\TestCase;
@@ -58,7 +58,7 @@ final class PaginationUiContractTest extends TestCase
 
     public function testSharedPaginationControlStatesTheFullContract(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertStringContainsString('{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·', $markup);
         // Short, so the row fits one line (owner, 2026-10-21): "Pg", icons for first, previous, next and last with their words
@@ -84,7 +84,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testSharedControlOffersBothEndsTheNumberedWindowAndAJump(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertStringContainsString('(pg.first_href)', $markup, 'First page must be reachable in one action.');
         self::assertStringContainsString('(pg.last_href)', $markup, 'Last page must be reachable in one action.');
@@ -101,7 +101,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testTheControlHidesWhenThereIsNowhereToGoAndAppearsAtBothEnds(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertStringContainsString('{% if pg.has_pages %}', $markup, 'A single page must not render dead controls.');
         // The summary sits outside that guard: how many records exist is worth stating either way.
@@ -127,7 +127,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testTheRowsDropDownStaysWhileAnotherSizeWouldPageTheList(): void
     {
-        $render = static fn(int $total, int $size): string => \CattoLearning\Tests\Support\RenderHarness::render('partials/pagination', [
+        $render = static fn(int $total, int $size): string => \CattoLearning\Tests\Support\RenderHarness::render('@CattoPHP/ui/data/pagination', [
             'pg' => \CattoLearning\Tests\Support\RenderHarness::pagination('companies', '/admin/companies', 1, $total, $size),
         ]);
         foreach ([[42, 50], [52, 100], [52, 150], [52, 250], [26, 25]] as [$total, $size]) {
@@ -144,7 +144,7 @@ final class PaginationUiContractTest extends TestCase
             self::assertMatchesRegularExpression('#1–' . $total . ' of ' . $total . ' ·</span>\s*<span class="pagination-pages">Pg 1 of 1</span>#', $html, 'One page says how many rows it holds.');
         }
         self::assertStringNotContainsString(' of 0 ·', $render(0, 50), 'An empty list states no rows.');
-        $catalogue = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('catalogue', \CattoLearning\Support\Pagination::catalogue(1, 30), '/courses', 'Courses');
+        $catalogue = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('catalogue', \CattoPHP\Ui\Pagination::within(1, \CattoLearning\Http\Controller\CourseController::CATALOGUE_PAGE, 30, [\CattoLearning\Http\Controller\CourseController::CATALOGUE_PAGE]), '/courses', 'Courses');
         self::assertFalse($catalogue['has_sizes'], 'The catalogue has one fixed size and nothing to choose.');
     }
 
@@ -155,12 +155,12 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testALongWindowGivesWayWhenTheRowIsTooWide(): void
     {
-        $script = self::read('public_html/js/platform-overrides.js');
+        $script = (self::read('vendor/rrcatto/cattophp/public/js/cattophp.js') . self::read('public_html/js/platform-overrides.js'));
         self::assertStringContainsString('const fitPagination = root =>', $script);
         self::assertStringContainsString("fitTableColumns(root); applyCellTooltips(root); fitPagination(root); fitFigures(root);", $script, 'On load, after every swap, on toggle and on resize.');
         self::assertStringContainsString("!row.querySelector('.pagination-gap')", $script, 'Only a window that already shows an ellipsis.');
         self::assertStringContainsString('index > 0 && index < items.length - 1 && index !== current', $script, 'Never the first, last or current page.');
-        self::assertStringContainsString('.pagination-pages-list>li[hidden]{display:none}', self::read('public_html/css/catto-platform.css'));
+        self::assertStringContainsString('.pagination-pages-list>li[hidden]{display:none}', (self::read('vendor/rrcatto/cattophp/public/css/cattophp.css') . self::read('public_html/css/catto-platform.css')));
     }
 
     /**
@@ -169,11 +169,11 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testAnAmountIsFittedAgainWheneverItOrItsCardChangesSize(): void
     {
-        $script = self::read('public_html/js/platform-overrides.js');
+        $script = (self::read('vendor/rrcatto/cattophp/public/js/cattophp.js') . self::read('public_html/js/platform-overrides.js'));
         self::assertStringContainsString("new ResizeObserver(entries => requestAnimationFrame(", $script, 'Fitted in the next frame, so resizing the amount cannot loop.');
         self::assertStringContainsString('figureWatch.observe(amount);', $script);
         self::assertStringContainsString('figureWatch.observe(amount.parentElement);', $script, 'And its card.');
-        self::assertStringContainsString('.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block;transition:none!important}', self::read('public_html/css/catto-platform.css'),
+        self::assertStringContainsString('.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block;transition:none!important}', (self::read('vendor/rrcatto/cattophp/public/css/cattophp.css') . self::read('public_html/css/catto-platform.css')),
             'An inline-block, so its width can be watched, and never animated: Gilded Noir\'s transition made the refit read the old size (2026-10-26).');
         self::assertStringContainsString('for (let pass = 0; pass < 4; pass++)', $script, 'Measured again after each shrink.');
     }
@@ -184,7 +184,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPaginationNeverReintroducesAWholeDatasetSelect(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertStringNotContainsString('name="{{ pg.page_param }}"><', $markup);
         self::assertDoesNotMatchRegularExpression(
@@ -201,7 +201,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPaginationIsHtmxEnhancedAndStillWorksAsPlainGet(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertStringContainsString('hx-target="#{{ pg.region }}"', $markup);
         self::assertStringContainsString('hx-select="#{{ pg.results }}"', $markup);
@@ -228,16 +228,19 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testEveryPagingTargetComesFromTheOneUrlBuilder(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
         $service = self::read('src/Application/PlatformAdministrationService.php');
 
         self::assertStringNotContainsString('{{ pg.query }}', $markup, 'A link must not rebuild its own URL from a query fragment.');
-        self::assertStringContainsString('private static function pageHref(', $service);
-        self::assertStringContainsString("'first_href' =>", $service);
-        self::assertStringContainsString("'last_href' =>", $service);
+        // The one builder is CattoPHP's pager (its own tests check every link keeps the filters and page size); cattolms's
+        // payload hands it every list.
+        self::assertStringContainsString('return Pager::payload($pagination, $dataset, $base, $label, $filters, $pageParam, $sizeParam,', $service);
+        $pager = self::read('vendor/rrcatto/cattophp/src/Ui/Pager.php');
+        self::assertStringContainsString("'first_href' =>", $pager);
+        self::assertStringContainsString("'last_href' =>", $pager);
         // The page size is dataset state like any other: a reader who chose 250 rows must still
         // have 250 rows on page 2, so it travels on every link the builder composes.
-        self::assertStringContainsString('$filters + [$pageParam => $page, $sizeParam => $pageSize]', $service);
+        self::assertStringContainsString('$filters + [$pageParam => $page, $sizeParam => $pagination->pageSize]', $pager);
     }
 
     /**
@@ -246,7 +249,7 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPagingPreservesSearchFiltersAndUniverse(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html.twig');
+        $markup = self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig');
 
         self::assertSame(
             2,
@@ -265,12 +268,12 @@ final class PaginationUiContractTest extends TestCase
         // The selector renders from the array the service supplies, so the contract is that
         // the constant itself is the approved set rather than a hard-coded cl-ui-list in markup.
         self::assertSame([25, 50, 100, 150, 250], Pagination::PAGE_SIZES);
-        self::assertStringContainsString('for size in pg.page_sizes', self::read('resources/views/partials/pagination.html.twig'));
+        self::assertStringContainsString('for size in pg.page_sizes', self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig'));
     }
 
     public function testPublicCatalogueHasAFixed24CardPolicyWithoutChangingOtherDatasets(): void
     {
-        $page = Pagination::catalogue('2', 49);
+        $page = Pagination::within('2', \CattoLearning\Http\Controller\CourseController::CATALOGUE_PAGE, 49, [\CattoLearning\Http\Controller\CourseController::CATALOGUE_PAGE]);
         self::assertSame(24, $page->pageSize);
         self::assertSame(24, $page->offset);
         self::assertSame(3, $page->totalPages);
@@ -283,7 +286,7 @@ final class PaginationUiContractTest extends TestCase
     {
         self::assertStringContainsString(
             'name="{{ pg.page_param }}" value="1"',
-            self::read('resources/views/partials/pagination.html.twig'),
+            self::read('vendor/rrcatto/cattophp/templates/ui/data/pagination.html.twig'),
             'Changing rows-per-page must reset to page 1 rather than clamping to an arbitrary page.'
         );
     }
@@ -331,10 +334,10 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testEveryPaginatedDatasetDeclaresItsHtmxRegion(): void
     {
-        $component = self::read('resources/views/ui/data/dataset-layout.html.twig');
+        $component = self::read('vendor/rrcatto/cattophp/templates/ui/data/dataset-layout.html.twig');
         self::assertStringContainsString('id="{{ props.name }}-region"', $component);
         self::assertStringContainsString('id="{{ props.name }}-results"', $component);
-        self::assertSame(2, substr_count($component, 'partials/pagination.html.twig'));
+        self::assertSame(2, substr_count($component, 'ui/data/pagination.html.twig'));
         foreach (self::paginatedPartials() as [$partial, $dataset]) {
             self::assertStringContainsString("name: '" . $dataset . "'", self::read($partial));
             self::assertStringContainsString('pagination: ' . $dataset . '_pagination', self::read($partial));
@@ -378,7 +381,7 @@ final class PaginationUiContractTest extends TestCase
 
     public function testCoreCssDefinesTheWrapperTheTablesUse(): void
     {
-        $css = self::read('public_html/css/catto-platform.css');
+        $css = (self::read('vendor/rrcatto/cattophp/public/css/cattophp.css') . self::read('public_html/css/catto-platform.css'));
 
         // The wrapper no longer scrolls. `table-layout: fixed` keeps the table inside its box, so
         // there is nothing to scroll, and a scrolling wrapper clips the row menu that has to escape
@@ -653,7 +656,7 @@ final class PaginationUiContractTest extends TestCase
 
         return array_values(array_filter(
             $paths,
-            static fn(string $path): bool => str_contains((string) file_get_contents($path), 'partials/pagination.html.twig')
+            static fn(string $path): bool => str_contains((string) file_get_contents($path), 'ui/data/pagination.html.twig')
         ));
     }
 }

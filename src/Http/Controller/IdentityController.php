@@ -19,6 +19,12 @@ Identity verification's pages (owner, 2026-10-19; IdentityVerificationService):
 - ADMIN revokes a verification with a reason and allows another try (PLATFORM.IDENTITY.MANAGE).
 
 Changelog:
+2026/11/12 SAST
+- Didit's webhook passes on the -Previous signatures too, so a rotated secret works for its 24 hours as intended; the
+  verification is CattoPHP's (CattoPHP Phase 4, step 8).
+2026/11/09 SAST
+- CattoPHP's security headers (CattoPHP Phase 2, step 7c): the page's form leads to Didit's own page, so this page alone allows a form to go to
+  another site over https (a browser holds the redirect to the policy of the page the form is on).
 2026/11/07 SAST
 - The person's identity forms are at their account reference (owner, 2026-11-06); a check keeps its number.
 2026/10/20 SAST
@@ -34,7 +40,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Identity\IdentityVerificationService;
-use CattoLearning\Identity\InvalidDiditWebhook;
+use CattoPHP\Identity\InvalidDiditWebhook;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -45,7 +51,7 @@ use Throwable;
 
 final class IdentityController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly IdentityVerificationService $identity, private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly IdentityVerificationService $identity, private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys, private readonly \CattoPHP\Http\ContentSecurityPolicy $policy)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -54,6 +60,8 @@ final class IdentityController extends BaseController
     public function show(): Response
     {
         $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        // Start sends the learner on to Didit's page, an address Didit gives only then.
+        $this->policy->allow('form-action', 'https:');
         return $this->render('identity-verification', [
             'title' => 'Identity verification',
             'active_nav' => 'account',
@@ -104,7 +112,9 @@ final class IdentityController extends BaseController
     {
         $request = $this->request();
         $headers = [];
-        foreach (['x-signature-v2', 'x-signature', 'x-timestamp'] as $name) {
+        // The -Previous signatures come for 24 hours after the secret is rotated in Didit (2026-11-06): they were checked
+        // but never passed on here until 2026-11-12.
+        foreach (['x-signature-v2', 'x-signature', 'x-timestamp', 'x-signature-v2-previous', 'x-signature-previous'] as $name) {
             $headers[$name] = (string) $request->headers->get($name, '');
         }
         try {

@@ -12,7 +12,7 @@
 
 								<tr>
 									{% for sh in requests_sort_headers %}
-										{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: requests_region, sort_results: requests_results} %}
+										{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: requests_region, sort_results: requests_results} %}
 									{% endfor %}
 								</tr>
 

@@ -55,13 +55,13 @@ final class CompanyBillingRoleIntegrationTest extends TestCase
     {
         $grants = [];
         foreach ($this->db->fetchAllAssociative(
-            "SELECT r.role_key, p.permission_key FROM role_permissions rp JOIN roles r ON r.id=rp.role_id JOIN permissions p ON p.id=rp.permission_id
-              WHERE p.permission_key IN ('COMPANY.BILLING.MANAGE','COMPANY.CREDIT.MANAGE') ORDER BY 1, 2"
+            "SELECT role_key, permission AS permission_key FROM cattophp_role_permissions
+              WHERE permission IN ('COMPANY.BILLING.MANAGE','COMPANY.CREDIT.MANAGE') ORDER BY 1, 2"
         ) as $row) {
             $grants[(string) $row['role_key']][] = (string) $row['permission_key'];
         }
+        // The Administrator holds every permission without a row.
         self::assertSame([
-            RoleCatalog::ADMIN => ['COMPANY.BILLING.MANAGE', 'COMPANY.CREDIT.MANAGE'],
             RoleCatalog::COMPANY_ADMIN => ['COMPANY.BILLING.MANAGE', 'COMPANY.CREDIT.MANAGE'],
         ], $grants, 'Course Creator (COURSE_EDITOR), Course Owner and Student hold neither.');
     }
@@ -92,7 +92,7 @@ final class CompanyBillingRoleIntegrationTest extends TestCase
         $snapshot = CommerceRepository::decode((string) $this->db->fetchOne('SELECT snapshot FROM commerce_orders WHERE id=:id', ['id' => $orderId]));
         self::assertSame('2 Corrected Road', $snapshot['billing']['address']['line_1'], 'and was frozen into the order.');
         self::assertSame($admin->id, $snapshot['purchaser_user_id'], 'The administrator is the purchaser; the company is billed.');
-        self::assertSame(2, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key='company.billing_updated' AND metadata->>'company_id'=:c", ['c' => (string) $this->companyId]));
+        self::assertSame(2, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action='company.billing_updated' AND details->>'company_id'=:c", ['c' => (string) $this->companyId]));
     }
 
     public function testCourseCreatorsAndCourseOwnersNeitherManageBillingNorBuyCredits(): void

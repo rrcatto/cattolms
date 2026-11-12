@@ -50,7 +50,7 @@ use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Token;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\BundleFixture;
 use CattoLearning\Tests\Support\DevelopmentFixture;

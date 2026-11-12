@@ -36,7 +36,7 @@ Changelog:
 declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 

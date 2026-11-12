@@ -25,6 +25,12 @@ page and I do not want to change that rule"), and Reset returns to them. A rebui
 site follows .env again.
 
 Changelog:
+2026/11/09 SAST
+- Who may sign in is CattoPHP's rule (SignInRules, CattoPHP Phase 2, step 6c): limited or not, the listed addresses
+  and whether an address may come in are its answers; this class keeps the Settings page's saving, checking and words.
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3), under the names .env gives, overriding .env with a Reset;
+  what a site saved is carried over by the upgrade migration 20261109160000_settings_to_cattophp.
 2026/10/24 SAST
 - AUTH_SIGNIN (ADMIN or EVERYONE, ADMIN unless it says EVERYONE) and AUTH_SIGNIN_ALLOWED_EMAILS in .env, overridden
   by the Settings page, with Reset (owner, 2026-10-24).
@@ -36,15 +42,13 @@ declare(strict_types=1);
 
 namespace CattoLearning\Auth;
 
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
+use CattoPHP\Settings\Settings;
+use CattoPHP\SignIn\SignInRules;
 use CattoLearning\Support\EmailAddress;
-use CattoLearning\Support\Env;
 use InvalidArgumentException;
 
 final class SignInRestriction
 {
-    public const RESTRICTED_KEY = 'signin.restricted';
-    public const ALLOWED_KEY = 'signin.allowed_emails';
     /** The .env settings the Settings page overrides: AUTH_SIGNIN is ADMIN or EVERYONE, and ADMIN unless it says EVERYONE. */
     public const ENV_SIGNIN = 'AUTH_SIGNIN';
     public const ENV_ALLOWED = 'AUTH_SIGNIN_ALLOWED_EMAILS';
@@ -52,20 +56,14 @@ final class SignInRestriction
     public const EVERYONE = 'EVERYONE';
     public const REFUSED = 'This site is open only to invited people for now. Ask the site\'s administrator to add your email address.';
 
-    /** @var list<string>|null */
-    private ?array $allowed = null;
-    private ?bool $restricted = null;
-
-    public function __construct(private readonly ?OptionRepository $options = null)
+    public function __construct(private readonly Settings $settings, private readonly SignInRules $rules)
     {
     }
 
     /** Whether only administrators and the listed addresses may sign in: the saved setting, else .env (ADMIN unless EVERYONE). */
     public function restricted(): bool
     {
-        return $this->restricted ??= $this->source() === 'database'
-            ? ($this->options?->get(self::RESTRICTED_KEY, '0') ?? '0') === '1'
-            : $this->environmentRestricted();
+        return $this->rules->limited();
     }
 
     /**
@@ -74,57 +72,54 @@ final class SignInRestriction
      */
     public function source(): string
     {
-        if ($this->options?->find(self::RESTRICTED_KEY) !== null) return 'database';
-        return self::environmentValue() !== null ? 'environment' : 'default';
+        if ($this->settings->isOverridden(self::ENV_SIGNIN)) return 'database';
+        return $this->environmentValue() !== null ? 'environment' : 'default';
     }
 
     /** What .env says, which Reset returns to: true (ADMIN) unless AUTH_SIGNIN says EVERYONE. */
     public function environmentRestricted(): bool
     {
-        return self::environmentValue() !== self::EVERYONE;
+        return $this->environmentValue() !== self::EVERYONE;
     }
 
     /** AUTH_SIGNIN as ADMIN or EVERYONE, in either case; null when it is missing, empty or anything else. */
-    private static function environmentValue(): ?string
+    private function environmentValue(): ?string
     {
-        $value = strtoupper(Env::string(self::ENV_SIGNIN));
+        $value = strtoupper($this->settings->envValue(self::ENV_SIGNIN));
         return in_array($value, [self::ADMIN, self::EVERYONE], true) ? $value : null;
     }
 
     /** @return list<string> the listed addresses, lower case: the saved list, else .env's */
     public function allowedEmails(): array
     {
-        return $this->allowed ??= $this->source() === 'database'
-            ? self::addresses((string) ($this->options?->get(self::ALLOWED_KEY, '') ?? ''))
-            : $this->environmentEmails();
+        return $this->rules->allowedEmails();
     }
 
     /** @return list<string> the addresses .env lists, lower case (none without AUTH_SIGNIN_ALLOWED_EMAILS); one that is not an address is left out */
     public function environmentEmails(): array
     {
-        return self::addresses(Env::string(self::ENV_ALLOWED));
+        return SignInRules::addresses($this->settings->envValue(self::ENV_ALLOWED));
     }
 
     public function isListed(string $email): bool
     {
-        return in_array(strtolower(trim($email)), $this->allowedEmails(), true);
+        return $this->rules->isListed($email);
     }
 
     /** Whether someone with this address may sign in or register. */
     public function allows(string $email, bool $administrator): bool
     {
-        return $administrator || !$this->restricted() || $this->isListed($email);
+        return $this->rules->mayUse($email, $administrator);
     }
 
     /**
      * Saves the choice and the list, which then override .env: one address a line (commas and semicolons separate
-     * too); each must be an email address.
+     * too); each must be an email address. A list saved empty overrides .env's too.
      *
      * @return array{restricted:bool,emails:list<string>}
      */
     public function save(bool $restricted, string $emails): array
     {
-        if ($this->options === null) throw new InvalidArgumentException('Settings cannot be saved here.');
         $list = [];
         foreach (preg_split('/[\s,;]+/', $emails) ?: [] as $entry) {
             $entry = trim($entry);
@@ -137,34 +132,15 @@ final class SignInRestriction
         }
         $list = array_values(array_unique($list));
         // Restricted with no addresses listed is allowed: only administrators can then sign in.
-        $this->options->set(self::RESTRICTED_KEY, $restricted ? '1' : '0');
-        $this->options->set(self::ALLOWED_KEY, implode("\n", $list));
-        $this->restricted = $restricted;
-        $this->allowed = $list;
+        $this->settings->set(self::ENV_SIGNIN, $restricted ? self::ADMIN : self::EVERYONE);
+        $this->settings->set(self::ENV_ALLOWED, implode("\n", $list));
         return ['restricted' => $restricted, 'emails' => $list];
     }
 
     /** Removes what the Settings page saved: the site follows .env again. */
     public function reset(): void
     {
-        $this->options?->delete(self::RESTRICTED_KEY);
-        $this->options?->delete(self::ALLOWED_KEY);
-        $this->restricted = null;
-        $this->allowed = null;
-    }
-
-    /** @return list<string> */
-    private static function addresses(string $text): array
-    {
-        $list = [];
-        foreach (preg_split('/[\s,;]+/', $text) ?: [] as $entry) {
-            if (trim($entry) === '') continue;
-            try {
-                $list[] = strtolower(EmailAddress::normalize($entry));
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-        return array_values(array_unique($list));
+        $this->settings->reset(self::ENV_SIGNIN);
+        $this->settings->reset(self::ENV_ALLOWED);
     }
 }

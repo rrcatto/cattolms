@@ -36,10 +36,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Support;
 
+use CattoPHP\Ui\ListView as Views;
+
 final class ListView
 {
-    public const LIST = 'list';
-    public const GRID = 'grid';
+    public const LIST = Views::LIST;
+    public const GRID = Views::GRID;
 
     /** The view each list opens in until its reader chooses. */
     public const DEFAULTS = [
@@ -78,27 +80,16 @@ final class ListView
         'favourites' => [24, 48, 96],
     ];
 
-    private const COOKIE_PREFIX = 'cl_view_';
-
     /**
      * The view of a list for this request: the address's choice, else the remembered one, else the default given (Company
-     * People's depends on how many people there are), else the list's own.
+     * People's depends on how many people there are), else the list's own (CattoPHP's ListView decides).
      *
      * @param array<string,mixed> $query
      * @param array<string,mixed> $cookies
      */
     public static function chosen(string $list, array $query, array $cookies, ?string $default = null): string
     {
-        $asked = $query[$list . '_view'] ?? null;
-        if (is_string($asked) && in_array($asked, [self::LIST, self::GRID], true)) {
-            return $asked;
-        }
-        $remembered = $cookies[self::COOKIE_PREFIX . $list] ?? null;
-        if (is_string($remembered) && in_array($remembered, [self::LIST, self::GRID], true)) {
-            return $remembered;
-        }
-
-        return $default ?? self::DEFAULTS[$list] ?? self::LIST;
+        return Views::chosen($list, $query, $cookies, $default ?? self::DEFAULTS[$list] ?? self::LIST);
     }
 
     /**
@@ -108,17 +99,7 @@ final class ListView
      */
     public static function rememberAsked(string $list, array $query): void
     {
-        $asked = $query[$list . '_view'] ?? null;
-        if (!is_string($asked) || !in_array($asked, [self::LIST, self::GRID], true) || headers_sent()) {
-            return;
-        }
-        setcookie(self::COOKIE_PREFIX . $list, $asked, [
-            'expires' => time() + 365 * 86400,
-            'path' => '/',
-            'secure' => (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https',
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
+        Views::rememberAsked($list, $query);
     }
 
     /**
@@ -128,7 +109,7 @@ final class ListView
      */
     public static function pageSizes(string $list, string $view): array
     {
-        return $view === self::GRID && isset(self::GRID_PAGE_SIZES[$list]) ? self::GRID_PAGE_SIZES[$list] : Pagination::PAGE_SIZES;
+        return Views::pageSizes($view, self::GRID_PAGE_SIZES[$list] ?? null);
     }
 
     /**
@@ -139,15 +120,6 @@ final class ListView
      */
     public static function switcher(string $list, string $view, string $base, array $filters = []): array
     {
-        $filters = array_filter($filters, static fn(mixed $value): bool => $value !== '' && $value !== null && $value !== 0);
-        $href = static fn(string $to): string => $base . '?' . http_build_query($filters + [$list . '_view' => $to]);
-
-        return [
-            'name' => $list,
-            'view' => $view,
-            'columns' => self::COLUMNS[$list] ?? 4,
-            'list_href' => $href(self::LIST),
-            'grid_href' => $href(self::GRID),
-        ];
+        return Views::switcher($list, $view, $base, $filters, self::COLUMNS[$list] ?? 4);
     }
 }

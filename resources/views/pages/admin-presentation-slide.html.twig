@@ -9,7 +9,7 @@
 #}
 {% extends layout %}
 {% block page_body %}
-{{ importmap() }}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set base = course_item_url(item) %}
 	{% set is_new = after is not null %}
 	{% set slide_url = is_new ? base ~ '/slides/new' : base ~ '/slides/' ~ slide.id %}
@@ -17,7 +17,7 @@
 	{% set ph_back_href = base %}{% set ph_back_label = 'The presentation: ' ~ item.title %}
 	{% set ph_kicker = item.name ~ ' · ' ~ (is_new ? 'New slide' : 'Slide ' ~ position ~ ' of ' ~ slide_count) %}
 	{% set ph_title = is_new ? 'New slide' : (slide.title|default('') ?: 'Untitled slide') %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	{% if notice %}<section class="cl-page-section">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: notice.tone})} %}{% block body %}<p>{{ notice.text }}</p>{% endblock %}{% endembed %}</section>{% endif %}
 

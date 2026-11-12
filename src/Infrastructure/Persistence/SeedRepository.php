@@ -77,7 +77,7 @@ final class SeedRepository
             'variant_id' => (int) $r['variant_id'], 'period' => (int) $r['period'], 'price' => (int) $r['price']], $this->db->fetchAllAssociative(
             "SELECT c.id, c.slug, c.title, v.id AS variant_id, v.access_period_seconds AS period, v.price_minor_units AS price
              FROM courses c
-             JOIN LATERAL (SELECT * FROM course_price_variants pv WHERE pv.course_id = c.id AND pv.is_active AND pv.price_minor_units > 0
+             JOIN LATERAL (SELECT * FROM course_prices_on_sale pv WHERE pv.course_id = c.id AND pv.price_minor_units > 0
                            ORDER BY pv.is_default DESC, pv.price_minor_units, pv.position LIMIT 1) v ON TRUE
              WHERE c.status = 'published' ORDER BY c.catalogue_position NULLS LAST, c.id"
         ));

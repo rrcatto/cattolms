@@ -9,13 +9,13 @@
 #}
 {% extends layout %}
 {% block page_body %}
-{{ importmap() }}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 	{% set p = presentation %}
 	{% set base = course_item_url(item) %}
 	{% set ph_back_href = crumb.href %}{% set ph_back_label = crumb.label %}
 	{% set ph_kicker = item.name %}{% set ph_title = 'Edit Course Item: Presentation' %}
 	{% set ph_badges %}{{ ui('feedback.badge', {label: p.kind_label, tone: 'info'}) }}{{ ui('feedback.badge', {label: p.theme_label ~ ' look', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.slides|length ~ (p.slides|length == 1 ? ' slide' : ' slides'), tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.recorded ~ ' of ' ~ p.slides|length ~ ' recorded', tone: 'neutral'}) }}{{ ui('feedback.badge', {label: p.placements|length == 1 ? 'Placed in 1 course' : 'Placed in ' ~ p.placements|length ~ ' courses', tone: 'neutral'}) }}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-preview'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Preview', summary: 'As learners see it, with every saved change. Choose a slide\'s picture below to show it here.'}) }}
@@ -29,7 +29,7 @@
 
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'presentation-slides'})} %}{% block surface_body %}<div id="slides-view">
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Slides', summary: (p.slides|length == 1 ? '1 slide' : p.slides|length ~ ' slides') ~ '. Drag a slide by its handle, or use its ⋯ menu, to change the order: it is saved as soon as you let go.'})} %}{% block section_actions %}
-			{% include '@platform/partials/view-switch.html.twig' with {vs: view_switch} %}
+			{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: view_switch} %}
 			{{ ui('action.link', {label: 'Add a slide', variant: 'primary', href: base ~ '/slides/add', get: base ~ '/slides/add', target: '#slide-add-body', modal: 'slide-add', icon: 'action-add'}) }}
 		{% endblock %}{% endembed %}
 		<div class="cl-tree-wrap" data-controller="presentation-slides" data-presentation-slides-url-value="{{ base }}/slides" data-action="dragstart->presentation-slides#start dragover->presentation-slides#over dragleave->presentation-slides#leave drop->presentation-slides#drop dragend->presentation-slides#end submit->presentation-slides#menu">

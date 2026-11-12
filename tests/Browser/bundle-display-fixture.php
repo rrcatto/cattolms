@@ -6,7 +6,7 @@ declare(strict_types=1);
 // bundles as a visitor sees them. `create` makes a company with its founding Company Administrator (a company account,
 // which is offered no bundle) and an administrator (who may preview each theme), with a session each, and writes what BundleService says the pages should show: the
 // course in the most bundles with its notes, every bundle on All courses, the top-level category with the most bundles
-// and one with none; `expect` asks again (the check runs it first). `cleanup` removes the company, the two people and everything their browsers recorded.
+// and one with none; `expect` asks again (the check runs it first). `cleanup` removes the company, the three people and everything their browsers recorded.
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Bundle\BundleService;
@@ -60,6 +60,11 @@ if ($action === 'create') {
     $sessions = $container->get(AuthSessionRepository::class);
     $token = Token::generate();
     $sessions->create($company['founder']['id'], Token::hash($token), 7200, '', 'Bundle display browser', $company['founder']['email']);
+    // One of its staff, who cannot buy: since companies buy bundles as bundle credits (owner, 2026-11-11) only its Company
+    // Administrator is shown them.
+    $staff = $fixture->staff($company);
+    $staffToken = Token::generate();
+    $sessions->create($staff['id'], Token::hash($staffToken), 7200, '', 'Bundle display browser', $staff['email']);
     // An administrator, a private account like any buyer, who may preview each theme (theme_preview) without activating it.
     $admin = $fixture->person('ADMIN');
     $adminToken = Token::generate();
@@ -67,6 +72,7 @@ if ($action === 'create') {
 
     $state = $expect() + [
         'company_token' => $token,
+        'staff_token' => $staffToken,
         'admin_token' => $adminToken,
         'scrub' => $fixture->seeds(),
     ];

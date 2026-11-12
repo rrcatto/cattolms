@@ -14,6 +14,11 @@ recently with its opens and clicks, the bounce rate of the past 30 days, and the
 days.
 
 Changelog:
+2026/11/12 SAST
+- The figures are CattoPHP's (MailingFigures, CattoPHP Phase 4, step 9, part 4): this class gives them to Mailing's
+  overview in its terms (the kinds of list and of campaign it shows).
+2026/11/12 SAST
+- The lists and answers are CattoPHP's (CattoPHP Phase 4, step 9, part 2): the figures are read from its tables.
 2026/10/28 SAST
 - Created.
 */
@@ -22,11 +27,11 @@ declare(strict_types=1);
 
 namespace CattoLearning\Mailing;
 
-use CattoLearning\Infrastructure\Persistence\Database;
+use CattoPHP\Mailing\MailingFigures;
 
 final class OverviewRepository
 {
-    public function __construct(private readonly Database $db)
+    public function __construct(private readonly MailingFigures $figures)
     {
     }
 
@@ -37,31 +42,13 @@ final class OverviewRepository
      */
     public function subscribers(string $since): array
     {
-        $row = $this->db->fetchAssociative(
-            "SELECT COUNT(DISTINCT s.user_id) AS total,
-                    COUNT(DISTINCT s.user_id) FILTER (WHERE first.joined >= :since) AS joined
-             FROM mailing_subscriptions s
-             JOIN (SELECT user_id, MIN(created_at) AS joined FROM mailing_subscription_events WHERE status = 'subscribed' GROUP BY user_id) first ON first.user_id = s.user_id
-             WHERE s.status = 'subscribed'",
-            ['since' => $since]
-        );
-
-        return ['total' => (int) ($row['total'] ?? 0), 'joined' => (int) ($row['joined'] ?? 0)];
+        return $this->figures->subscribers($since);
     }
 
     /** @return array<string,int> the lists with someone on them, by kind */
     public function listsByKind(): array
     {
-        $counts = ['news' => 0, 'category' => 0, 'course' => 0, 'tag' => 0];
-        foreach ($this->db->fetchAllAssociative(
-            "SELECT l.kind, COUNT(*) AS lists FROM mailing_lists l
-             WHERE EXISTS (SELECT 1 FROM mailing_subscriptions s WHERE s.list_id = l.id AND s.status = 'subscribed')
-             GROUP BY l.kind"
-        ) as $row) {
-            $counts[(string) $row['kind']] = (int) $row['lists'];
-        }
-
-        return $counts;
+        return array_replace(['news' => 0, 'category' => 0, 'course' => 0, 'tag' => 0], $this->figures->listsByKind());
     }
 
     /**
@@ -71,20 +58,7 @@ final class OverviewRepository
      */
     public function recentlySent(int $limit): array
     {
-        return array_map(static fn(array $row): array => [
-            'id' => (int) $row['id'], 'kind' => (string) $row['kind'], 'name' => (string) $row['name'],
-            'list_ids' => array_map('intval', (array) json_decode((string) $row['list_ids'], true)),
-            'started_at' => (string) $row['started_at'], 'sent' => (int) $row['sent'], 'opened' => (int) $row['opened'], 'clicked' => (int) $row['clicked'],
-        ], $this->db->fetchAllAssociative(
-            "SELECT c.id, c.kind, c.name, c.list_ids, c.started_at,
-                    (SELECT COUNT(*) FROM mailing_deliveries d WHERE d.campaign_id = c.id AND d.handed_at IS NOT NULL) AS sent,
-                    (SELECT COUNT(*) FROM mailing_deliveries d WHERE d.campaign_id = c.id AND d.first_opened_at IS NOT NULL) AS opened,
-                    (SELECT COUNT(*) FROM mailing_deliveries d WHERE d.campaign_id = c.id AND d.first_clicked_at IS NOT NULL) AS clicked
-             FROM mailing_campaigns c
-             WHERE c.started_at IS NOT NULL AND c.kind IN ('message', 'digest', 'updates')
-             ORDER BY c.started_at DESC, c.id DESC LIMIT :limit",
-            ['limit' => $limit]
-        ));
+        return $this->figures->recentlySent(ReportRepository::SENT_KINDS, $limit);
     }
 
     /**
@@ -94,15 +68,7 @@ final class OverviewRepository
      */
     public function bouncesSince(string $since): array
     {
-        $row = $this->db->fetchAssociative(
-            "SELECT COUNT(*) AS sent,
-                    COUNT(*) FILTER (WHERE status IN ('bounced', 'soft_bounced')) AS bounced,
-                    COUNT(*) FILTER (WHERE status = 'complained') AS complained
-             FROM mailing_deliveries WHERE handed_at >= :since",
-            ['since' => $since]
-        );
-
-        return ['sent' => (int) ($row['sent'] ?? 0), 'bounced' => (int) ($row['bounced'] ?? 0), 'complained' => (int) ($row['complained'] ?? 0)];
+        return $this->figures->bouncesSince($since);
     }
 
     /**
@@ -112,13 +78,7 @@ final class OverviewRepository
      */
     public function growing(string $since, int $limit): array
     {
-        return array_map(static fn(array $row): array => ['list_id' => (int) $row['list_id'], 'joined' => (int) $row['joined']], $this->db->fetchAllAssociative(
-            "SELECT e.list_id, COUNT(DISTINCT e.user_id) AS joined FROM mailing_subscription_events e
-             WHERE e.status = 'subscribed' AND e.created_at >= :since
-               AND EXISTS (SELECT 1 FROM mailing_subscriptions s WHERE s.list_id = e.list_id AND s.user_id = e.user_id AND s.status = 'subscribed')
-             GROUP BY e.list_id ORDER BY joined DESC, e.list_id LIMIT :limit",
-            ['since' => $since, 'limit' => $limit]
-        ));
+        return $this->figures->growing($since, $limit);
     }
 
     /**
@@ -128,9 +88,6 @@ final class OverviewRepository
      */
     public function scheduled(): array
     {
-        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'name' => (string) $row['name'], 'send_at' => (string) $row['send_at'],
-            'list_ids' => array_map('intval', (array) json_decode((string) $row['list_ids'], true))], $this->db->fetchAllAssociative(
-            "SELECT id, name, send_at, list_ids FROM mailing_campaigns WHERE status = 'scheduled' AND kind = 'message' ORDER BY COALESCE(send_at, created_at), id"
-        ));
+        return $this->figures->scheduled('message');
     }
 }

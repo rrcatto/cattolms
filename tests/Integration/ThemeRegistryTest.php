@@ -6,7 +6,7 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\ThemeRegistryRepository;
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 use PHPUnit\Framework\TestCase;
 
 final class ThemeRegistryTest extends TestCase

@@ -4,9 +4,9 @@
 	{% set ph_title = account_section.label %}
 	{% set ph_lead = account_section.description %}
 	{# The section's own actions belong to the page here, so they sit in the page head. #}
-	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: account_section.actions|default([])} %}{% endset %}
+	{% set ph_actions %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: account_section.actions|default([])} %}{% endset %}
 	{# The page head brings the identity band with it, on this page as on every other. #}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section" data-account-section="{{ account_section.key }}">
 		{{ account_section.content|raw }}
 	</section>

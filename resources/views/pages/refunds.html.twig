@@ -13,7 +13,7 @@
 	{% set ph_lead = 'When a refund is given, what is deducted, where it goes and how to ask for one.' %}
 	{# A drawn header picture with the title over it, like every page with one (owner, 2026-10-20). #}
 	{% set ph_hero %}{% include '@platform/partials/artwork/refunds-hero.html.twig' %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% include '@platform/partials/legal-document-head.html.twig' %}
 		{# Each section is a closed accordion with its icon and its number, like the FAQ and Help (owner, 2026-10-20). A link to a section's id opens it. The PDF prints them all. #}

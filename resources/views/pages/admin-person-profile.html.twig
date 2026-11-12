@@ -16,7 +16,7 @@
 			<form action="{{ person_url(target_reference, '/status') }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="disabled">{{ ui('action.button', {label: 'Disable account', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disable this account instead of approving it?', icon: 'action-disable'}) }}</form>
 		{% endset %}
 	{% endif %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set pp_status = {active: ['Active', 'success'], awaiting_approval: ['Awaiting approval', 'warning'], deactivated: ['Deactivated', 'neutral']}[profile.status]|default([profile.status|capitalize, 'danger']) %}
 	{% set pp_company_role = {owner: 'Company Administrator', administrator: 'Company Administrator', course_owner: 'Course owner', course_editor: 'Course editor'}[company_membership_role|default('')]|default('Student') %}
 
@@ -153,12 +153,12 @@
 			{% if courses_list == 'library' %}
 				{# A search of their own courses only when there are enough to need one (owner, 2026-10-20). #}
 				{% if library_total >= 5 %}
-					{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'library', ds_label: 'Search their courses', ds_value: library_search, ds_action: person_url(target_reference), ds_help: 'Searches this person\'s ' ~ library_total ~ ' courses by title.'} %}
+					{% include '@CattoPHP/ui/data/dataset-search.html.twig' with {ds_name: 'library', ds_label: 'Search their courses', ds_value: library_search, ds_action: person_url(target_reference), ds_help: 'Searches this person\'s ' ~ library_total ~ ' courses by title.'} %}
 				{% endif %}
 				<div id="library-region"><div id="library-results">
 				{% if library_courses %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access until'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}</tr>{% endblock %}
+					{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access until'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}</tr>{% endblock %}
 					{% block body %}{% for course in library_courses %}<tr>
 						<td class="cell-text"><a href="{{ course_admin_url(course) }}">{{ course.title }}</a></td>
 						<td>{{ ui('feedback.badge', {label: course.status|capitalize, tone: {completed: 'success', active: 'info', cancelled: 'danger', expired: 'neutral'}[course.status]|default('neutral')}) }}</td>
@@ -174,7 +174,7 @@
 			{% elseif courses_list == 'favourites' %}
 				{% if favourites %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course status'}} %}</tr>{% endblock %}
+					{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course status'}} %}</tr>{% endblock %}
 					{% block body %}{% for course in favourites %}<tr><td class="cell-text"><a href="{{ course_admin_url(course) }}">{{ course.title }}</a></td><td>{{ course.status|capitalize }}</td></tr>{% endfor %}{% endblock %}
 					{% endembed %}
 				{% else %}
@@ -183,7 +183,7 @@
 			{% else %}
 				{% if requests %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-					{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Course'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Asked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Decided'}} %}</tr>{% endblock %}
+					{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Course'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Status'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Asked'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Decided'}} %}</tr>{% endblock %}
 					{% block body %}{% for request in requests %}<tr><td class="cell-text"><a href="{{ course_admin_url(request) }}">{{ request.course_title }}</a></td><td>{{ request.status|capitalize }}</td><td>{{ request.requested_at|date('j M Y') }}</td><td>{{ request.decided_at ? request.decided_at|date('j M Y') : 'Not yet' }}</td></tr>{% endfor %}{% endblock %}
 					{% endembed %}
 				{% else %}
@@ -193,7 +193,7 @@
 			{# Granting access (owner, 2026-10-20: its search finds a course in the whole catalogue), opened from the card's head. #}
 			{% if can_manage_enrolments %}
 				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Grant course access', id: 'grant-course', open: grant_open, eyebrow: 'Find any course in the catalogue'})} %}{% block body %}
-					{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: person_url(target_reference), ds_push_url: true, ds_help: 'Searches every course in the catalogue by title.'} %}
+					{% include '@CattoPHP/ui/data/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: person_url(target_reference), ds_push_url: true, ds_help: 'Searches every course in the catalogue by title.'} %}
 					<div id="grant_courses-region"><div id="grant_courses-results">
 					{% if grant_course_search|length >= 2 %}
 						{# A refused grant comes back to the same courses, the one chosen and the days typed (2026-11-07). #}

@@ -106,10 +106,13 @@ final class IdentityDisplayNameContractTest extends TestCase
      */
     public function testTheIdentityBandLinksTheAccountReferenceToTheProfile(): void
     {
-        $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/account/identity-head', [
+        // The band is CattoPHP's (@CattoPHP/page/identity.html.twig); the profile it opens is cattolms's, given by ThemeRenderer.
+        $html = \CattoLearning\Tests\Support\RenderHarness::render('@CattoPHP/page/identity', [
             'is_authenticated' => true, 'identity_name' => 'Thandi Nkosi', 'identity_email' => 'reader@example.test',
             'identity_reference' => 'CL202601010001K', 'identity_roles' => [], 'identity_status' => '', 'identity_image' => '',
+            'identity_profile_href' => '/account/profile',
         ]);
+        self::assertStringContainsString("\$model['identity_profile_href'] = '/account/profile';", (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php'));
         self::assertMatchesRegularExpression('#<h2 class="cl-identity-name">\s*Thandi Nkosi\s*</h2>#', $html);
         self::assertMatchesRegularExpression('#<div class="cl-identity-account">\s*<span class="cl-identity-account-label">Account Reference:</span>\s*<a class="cl-identity-reference" href="/account/profile" title="Open your profile">CL-20260101-0001-K</a>\s*</div>#', $html);
     }

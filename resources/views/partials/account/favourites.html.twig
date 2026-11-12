@@ -27,7 +27,7 @@
 		</form>
 		<div id="favourites-list" data-favourites-kind="{{ favourites_kind }}">
 			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'favourites', pagination: favourites_pagination, search: favourites_searchable ? {ds_name: 'favourites', ds_label: 'Search your favourites', ds_value: favourites_search, ds_action: '/account/favourites', ds_hidden: favourites_kind == 'all' ? {} : {kind: favourites_kind}} : []})} %}
-{% block toolbar %}{% if favourites_cards %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: favourites_view_switch} %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if favourites_cards %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: favourites_view_switch} %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 				{% if favourites_cards and favourites_view == 'list' %}
@@ -35,10 +35,10 @@
 {% block header %}
 
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Course or bundle'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Kind', wide: true}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Actions'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Course or bundle'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Kind', wide: true}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Price'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Actions'}} %}
 						</tr>
 
 {% endblock %}
@@ -50,7 +50,7 @@
 							<tr>
 								<td class="cell-text">
 									<span class="cl-catalogue-row">
-										<a class="cl-catalogue-row-cover" href="{{ card_href }}" tabindex="-1" aria-hidden="true">{% if card.cover_svg is defined and card.cover_svg starts with '<svg' %}{{ card.cover_svg|raw }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ card.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
+										<a class="cl-catalogue-row-cover" href="{{ card_href }}" tabindex="-1" aria-hidden="true">{% if card.cover_svg is defined and card.cover_svg starts with '<svg' %}{{ card.cover_svg|authored }}{% else %}<span class="cl-course-cover-placeholder"><span>{{ card.title|slice(0, 1)|upper }}</span></span>{% endif %}</a>
 										<a class="cl-catalogue-row-title" href="{{ card_href }}">{{ card.title }}</a>
 									</span>
 								</td>

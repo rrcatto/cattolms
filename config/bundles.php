@@ -12,6 +12,8 @@ rather than installing the standard edition and pruning afterwards. DoctrineBund
 DBAL only - the ORM is not installed, and config/packages/doctrine.yaml records why.
 
 Changelog:
+2026/11/09 SAST
+- CattoPHPBundle: the foundations cattolms shares with the other Catto projects (Phase 2 of CattoPHP's plan).
 2026/09/09 23:55 SAST
 - StimulusBundle and AssetMapper, for the Symfony UX trial on /courses/tags. AssetMapper rather than
   Encore so there is no npm toolchain to keep working on the VPS.
@@ -30,4 +32,5 @@ return [
     Doctrine\Bundle\DoctrineBundle\DoctrineBundle::class => ['all' => true],
     Symfony\Bundle\SecurityBundle\SecurityBundle::class => ['all' => true],
     Symfony\UX\StimulusBundle\StimulusBundle::class => ['all' => true],
+    CattoPHP\CattoPHPBundle::class => ['all' => true],
 ];

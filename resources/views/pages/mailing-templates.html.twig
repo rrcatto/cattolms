@@ -9,7 +9,7 @@
 	{% set ph_kicker = 'Mailing' %}
 	{% set ph_title = 'Templates' %}
 	{% set ph_lead = 'A template is the look of an email: its logo, colours, fonts, header and footer. Every message and every digest is drawn in one. The unsubscribe link, why the person gets the email and your business\'s name and address are always at its foot.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 
 	{% if can_manage %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'new'})} %}{% block surface_body %}

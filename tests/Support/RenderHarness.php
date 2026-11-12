@@ -36,9 +36,9 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Support;
 
 use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\View\Twig\ThemeTemplates;
+use CattoPHP\Theme\Templates;
 use CattoLearning\View\Twig\TwigFactory;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use ReflectionClass;
 use ReflectionMethod;
 use RuntimeException;
@@ -92,14 +92,16 @@ final class RenderHarness
     {
         $name = str_ends_with($template, '.twig') ? $template : $template . '.twig';
         $name = str_ends_with($name, '.html.twig') ? $name : substr($name, 0, -5) . '.html.twig';
+        // A template named in full (a CattoPHP component, @CattoPHP/ui/...) as it is; any other is cattolms's own.
+        $name = str_starts_with($name, '@') ? $name : '@' . Templates::PLATFORM_NAMESPACE . '/' . $name;
 
         // A page template extends the theme's layout, and no theme is installed in a unit test.
         // The fixture theme stands in: it declares the two blocks and nothing else, so what the
         // assertion sees is the page's own markup rather than a theme's chrome around it.
-        (new ThemeTemplates(self::loader()))->use([__DIR__ . '/fixtures/themes/parent-theme']);
+        (new Templates(self::loader()))->use([__DIR__ . '/fixtures/themes/parent-theme']);
 
         return self::twig()->render(
-            '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/' . $name,
+            $name,
             ['layout' => '@theme/base.html.twig'] + $hive
         );
     }
@@ -110,6 +112,12 @@ final class RenderHarness
         if (self::$twig === null) {
             $root = self::root();
             self::$twig = TwigFactory::create(self::loader(), $root, self::compileDirectory(), true);
+            // The application's Twig also has CattoPHP's extension; of it these renders need only typed_for, which gives
+            // nothing because nothing was refused before them, and csp_nonce for a script in the page (step 7c).
+            self::$twig->addFunction(new \Twig\TwigFunction('typed_for', static fn (string $action): array => []));
+            self::$twig->addFunction(new \Twig\TwigFunction('csp_nonce', static fn (): string => 'test-nonce'));
+            // and |authored, which marks authored HTML only while a page is drawn for the layout, so here it gives it as it is.
+            self::$twig->addFilter(new \Twig\TwigFilter('authored', static fn (?string $html): string => (string) $html, ['is_safe' => ['html']]));
         }
 
         return self::$twig;

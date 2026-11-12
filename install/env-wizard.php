@@ -48,8 +48,9 @@ Changelog:
 
 declare(strict_types=1);
 
-// The one way a length of time is written: a plain PHP class with no packages behind it.
-require_once dirname(__DIR__) . '/src/Support/Duration.php';
+// The one way a length of time is written: CattoPHP's Duration. install.sh runs composer install before this wizard, so
+// the packages are there.
+require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 /** The settings that are lengths of time. */
 const LENGTHS_OF_TIME = ['AUTH_MAGIC_LINK_TTL', 'AUTH_SESSION_TTL', 'AUTH_SESSION_TOUCH_INTERVAL', 'AUTH_REQUEST_WINDOW', 'PHP_SESSION_TTL', 'LOG_ARCHIVES_KEPT_FOR',
@@ -125,7 +126,7 @@ function refuse(string $key, string $value): ?string
         in_array($key, ['APP_CURRENCY'], true) && preg_match('/^[A-Z]{3}$/', $value) !== 1 => 'Enter a three-letter currency code, such as ZAR.',
         in_array($key, ['APP_COUNTRY'], true) && preg_match('/^[A-Z]{2}$/', $value) !== 1 => 'Enter a two-letter country code, such as ZA.',
         in_array($key, ['AUTH_COOKIE_SECURE', 'PHP_SESSION_SECURE'], true) && !in_array($value, ['true', 'false'], true) => 'Enter true or false.',
-        in_array($key, LENGTHS_OF_TIME, true) && !\CattoLearning\Support\Duration::isValid($value) => \CattoLearning\Support\Duration::HOW,
+        in_array($key, LENGTHS_OF_TIME, true) && !\CattoPHP\Foundation\Duration::isValid($value) => \CattoPHP\Foundation\Duration::HOW,
         in_array($key, ['SIGNUP_ALLOWED_COUNTRIES', 'SIGNUP_BLOCKED_COUNTRIES'], true) && $value !== '' && preg_match('/^[A-Za-z]{2}(\s*,\s*[A-Za-z]{2})*$/', $value) !== 1
             => 'Enter two-letter country codes separated by commas, such as ZA, or nothing.',
         in_array($key, ['DB_PORT', 'AUTH_REQUEST_LIMIT_EMAIL', 'AUTH_REQUEST_LIMIT_IP'], true)
@@ -175,7 +176,7 @@ foreach ($lines as $line) {
     $default = match (true) {
         $key === 'APP_KEY' => ($old !== null && preg_match('/^[0-9a-f]{64}$/', $old) === 1) ? $old : $generated['APP_KEY'],
         // A length of time an older site wrote in seconds is offered written the one way (86400 as 1d).
-        $old !== null && in_array($key, LENGTHS_OF_TIME, true) && preg_match('/^[1-9][0-9]{0,9}$/', $old) === 1 => \CattoLearning\Support\Duration::ofSeconds((int) $old)->text,
+        $old !== null && in_array($key, LENGTHS_OF_TIME, true) && preg_match('/^[1-9][0-9]{0,9}$/', $old) === 1 => \CattoPHP\Foundation\Duration::ofSeconds((int) $old)->text,
         $old !== null && !str_contains($old, 'example.test') && !str_starts_with($old, 'replace-with-') && $old !== 'change-me' => $old,
         $key === 'APP_URL' && $domain !== '' => 'https://' . $domain,
         in_array($key, ['MAIL_FROM_ADDRESS'], true) && $domain !== '' => 'learning@' . $domain,

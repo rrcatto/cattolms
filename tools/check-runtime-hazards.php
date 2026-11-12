@@ -24,21 +24,25 @@ $errors = [];
 $need = static function(bool $ok, string $message) use (&$errors): void { if (!$ok) $errors[] = $message; };
 $read = static function(string $path) use ($need): string { $need(is_file($path), 'Missing: ' . $path); return is_file($path) ? (string)file_get_contents($path) : ''; };
 
-$manager = $read($root . '/src/View/ThemeManager.php');
-foreach (['assertInstallableManifest','findByNameVersion','themeLayers','public/css/theme.css','Theme Package 4.0','resyncRegistry','registryOutOfSync'] as $token) $need(str_contains($manager,$token),'ThemeManager runtime guard missing: '.$token);
+// The theme system is CattoPHP's (Phase 3, step 9).
+$manager = $read($root . '/vendor/rrcatto/cattophp/src/Theme/ThemeManager.php');
+foreach (['assertInstallableManifest','findByNameVersion','themeLayers','public/css/theme.css','resyncRegistry','registryOutOfSync'] as $token) $need(str_contains($manager,$token),'ThemeManager runtime guard missing: '.$token);
 foreach (['ThemeRepository','resolveChain','versionSatisfies','theme.upgraded','materialise'] as $token) $need(!str_contains($manager,$token),'Obsolete theme runtime token remains: '.$token);
 
-$validator = $read($root . '/src/View/ThemePackageValidator.php');
+$validator = $read($root . '/vendor/rrcatto/cattophp/src/Theme/PackageValidator.php');
 foreach (["SCHEMA_VERSION = '4.0'","TEMPLATE_API = '2.0'",'public/css/theme.css','standalone theme must contain base.html.twig','parent.version'] as $token) $need(str_contains($validator,$token),'Theme validator guard missing: '.$token);
 
 $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The renderer addresses templates by namespace now: @platform is the core-owned page bodies and
-// @theme is the theme a request renders in, so what is checked is that it still asks ThemeTemplates
+// @theme is the theme a request renders in, so what is checked is that it still asks CattoPHP's Templates
 // for both rather than composing a path of its own.
-foreach (['pageTemplate($page)','layoutFor(','templates->use('] as $token) $need(str_contains($renderer,$token),'Theme renderer guard missing: '.$token);
-// The bundled default theme is the one ThemeManager names (Saharan Sunset since 2026-11-07).
-$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ThemeManager.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
-$need($defaultSlug !== '', 'ThemeManager must name its bundled default theme.');
+// CattoPHP's PageRenderer does both for every page (Phase 3, step 9); cattolms's renderer is the project it asks.
+$pageRenderer = $read($root . '/vendor/rrcatto/cattophp/src/Theme/PageRenderer.php');
+foreach (['pageTemplate($page)','layoutFor(','templates->use('] as $token) $need(str_contains($pageRenderer,$token),'Theme renderer guard missing: '.$token);
+$need(str_contains($renderer, 'implements PageProject'), 'ThemeRenderer must be the project CattoPHP\'s PageRenderer draws cattolms\'s pages for.');
+// The bundled default theme is the one cattolms names (Saharan Sunset since 2026-11-07).
+$defaultSlug = preg_match("/DEFAULT_SLUG = '([a-z0-9-]+)'/", $read($root . '/src/View/ProjectTheme.php'), $slugMatch) === 1 ? $slugMatch[1] : '';
+$need($defaultSlug !== '', 'ProjectTheme must name the bundled default theme.');
 $need(!str_contains($renderer,'themes/' . $defaultSlug . '/pages'),'Theme renderer must not source functional pages from the default theme.');
 
 $base = $read($root . '/themes/' . $defaultSlug . '/base.html.twig');
@@ -72,7 +76,7 @@ $need(!is_file($root . '/src/Http/Routing/LazyControllerHandler.php'), 'Custom L
 $need(!is_file($root . '/src/Application/AppContext.php'), 'Obsolete AppContext must not exist.');
 $need(!is_file($root . '/src/Application/ServiceFactory.php'), 'Obsolete ServiceFactory must not exist.');
 
-$coreJs = $read($root . '/public_html/js/platform-overrides.js');
+$coreJs = $read($root . '/vendor/rrcatto/cattophp/public/js/cattophp.js') . $read($root . '/public_html/js/platform-overrides.js');
 foreach (['data-open-modal','/theme/palette'] as $token) $need(str_contains($coreJs,$token),'Core platform JS guard missing: '.$token);
 $need(!str_contains($coreJs,'data-admin-tab'),'Legacy Administration tab JavaScript must not return.');
 $adminWorkspace = $read($root . '/resources/views/pages/admin-control-centre.html.twig');

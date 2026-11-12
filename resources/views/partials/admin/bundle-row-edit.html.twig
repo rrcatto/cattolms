@@ -10,7 +10,9 @@
 #}
 {% set bq = bundle_edit %}
 {% set bq_form = 'bundle-quick-' ~ bundle.id %}
-<tr id="{{ bundle_anchor(bundle) }}" class="cl-course-quick" data-bundle-id="{{ bundle.id }}" data-controller="bundle-price" data-bundle-price-total-value="{{ bq.courses_total }}" data-bundle-price-currency-value="{{ bq.currency }}" data-bundle-price-locale-value="{{ bq.locale }}">
+<tr id="{{ bundle_anchor(bundle) }}" class="cl-course-quick" data-bundle-id="{{ bundle.id }}" data-order-code="{{ bundle.code }}" data-order-url="{{ bundle_admin_url(bundle, '/move') }}" data-order-title="{{ bundle.title }}" data-controller="bundle-price" data-bundle-price-total-value="{{ bq.courses_total }}" data-bundle-price-currency-value="{{ bq.currency }}" data-bundle-price-locale-value="{{ bq.locale }}">
+	{# The position typed, the fallback when dragging is not possible (owner, 2026-11-12); empty takes the next number in its code's band. #}
+	<td class="cl-course-position"><input class="cl-input" form="{{ bq_form }}" type="number" min="1" step="1" name="catalogue_position" value="{{ bq.position }}" autocomplete="off" aria-label="Position in the list"></td>
 	<td><input class="cl-input" form="{{ bq_form }}" name="code" value="{{ bq.code }}" maxlength="20" autocomplete="off" aria-label="Bundle code" autofocus></td>
 	<td class="cell-text">
 		<input class="cl-input" form="{{ bq_form }}" name="title" value="{{ bq.title }}" required maxlength="240" autocomplete="off" aria-label="Bundle title">
@@ -32,8 +34,9 @@
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<input type="hidden" name="view" value="list">
 			<input type="hidden" name="return" value="{{ bundles_list_href }}">
+			{% if arrange|default(false) %}<input type="hidden" name="arrange" value="1">{% endif %}
 			{{ ui('action.button', {label: 'Save', aria_label: 'Save ' ~ bundle.title, title: 'Save', icon: 'action-save-changes', icon_only: true, variant: 'primary', size: 'small'}) }}
-			{{ ui('action.link', {label: 'Cancel', aria_label: 'Cancel editing ' ~ bundle.title, title: 'Cancel', icon: 'action-cancel', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href|trim('?&', 'right') ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?view=list'), target: 'closest tr', swap: 'outerHTML'}) }}
+			{{ ui('action.link', {label: 'Cancel', aria_label: 'Cancel editing ' ~ bundle.title, title: 'Cancel', icon: 'action-cancel', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href|trim('?&', 'right') ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?view=list') ~ (arrange|default(false) ? '&arrange=1' : ''), target: 'closest tr', swap: 'outerHTML'}) }}
 		</form>
 	</td>
 </tr>

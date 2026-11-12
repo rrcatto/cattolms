@@ -35,15 +35,20 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Course\Certificate\CertificateAwards;
-use CattoLearning\Identity\DiditClient;
-use CattoLearning\Identity\IdentitySettings;
+use CattoLearning\Identity\CertificatesOnIdentity;
 use CattoLearning\Identity\IdentityVerificationRepository;
 use CattoLearning\Identity\IdentityVerificationService;
-use CattoLearning\Identity\InvalidDiditWebhook;
-use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Support\Env;
+use CattoPHP\Activity\ActivityLog;
+use CattoPHP\Identity\DiditClient;
+use CattoPHP\Identity\DiditSignature;
+use CattoPHP\Identity\IdentityChecks;
+use CattoPHP\Identity\IdentitySettings;
+use CattoPHP\Identity\IdentityVerification;
+use CattoPHP\Identity\InvalidDiditWebhook;
+use CattoPHP\Runtime\SiteMode;
+use CattoPHP\Settings\EnvironmentValues;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\IdentityFixture;
@@ -60,7 +65,8 @@ final class IdentityVerificationIntegrationTest extends TestCase
 
     private Database $db;
     private DevelopmentFixture $fixture;
-    private IdentityVerificationRepository $records;
+    private IdentityChecks $records;
+    private IdentityVerificationRepository $people;
     /** @var array<string,?string> */
     private array $previousEnv = [];
     /** @var list<array{method:string,url:string,body:string,headers:array<int,string>}> */
@@ -73,7 +79,8 @@ final class IdentityVerificationIntegrationTest extends TestCase
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
         $this->fixture = new DevelopmentFixture($this->db);
-        $this->records = IntegrationContainer::get()->get(IdentityVerificationRepository::class);
+        $this->records = IntegrationContainer::get()->get(IdentityChecks::class);
+        $this->people = IntegrationContainer::get()->get(IdentityVerificationRepository::class);
         foreach (self::KEYS as $key => $value) {
             $this->previousEnv[$key] = $_ENV[$key] ?? null;
             $_ENV[$key] = $value;
@@ -103,22 +110,22 @@ final class IdentityVerificationIntegrationTest extends TestCase
         self::assertSame('POST', $this->requests[0]['method']);
         self::assertSame('https://verification.didit.me/v3/session/', $this->requests[0]['url']);
         self::assertSame('workflow-1234', $sent['workflow_id']);
-        self::assertSame($this->records->accountReference($id), $sent['vendor_data'], 'The account is the vendor_data.');
-        self::assertSame(IdentitySettings::returnUrl(), $sent['callback']);
+        self::assertSame($this->people->accountReference($id), $sent['vendor_data'], 'The account reference is the vendor_data.');
+        self::assertSame(rtrim(Env::string('APP_URL'), '/') . '/account/verification/return', $sent['callback']);
         self::assertContains('x-api-key: integration-api-key', $this->requests[0]['headers']);
-        self::assertSame('started', $this->records->latest($id)['status']);
+        self::assertSame('started', ($this->records->latest((string) $id) ?? [])['status']);
 
         $state = $service->returned($user, $sessionId);
         self::assertSame('https://verification.didit.me/v3/session/' . $sessionId . '/decision/', $this->requests[1]['url'], 'The return reads the decision from Didit.');
         self::assertTrue($state['verified']);
-        $row = $this->records->approved($id);
+        $row = $this->records->approved((string) $id);
         self::assertNotNull($row);
         self::assertSame(['Lerato Dlamini', 'Identity Card', '9005125800087', 'South Africa', '1994-02-03'],
             [$row['verified_name'], $row['document_type'], $row['document_number'], $row['issuing_country'], substr((string) $row['date_of_birth'], 0, 10)]);
-        $audit = (string) $this->db->fetchOne("SELECT metadata FROM audit_log WHERE event_key = 'identity.verification_approved' AND metadata->>'user_id' = :id", ['id' => (string) $id]);
+        $audit = (string) $this->db->fetchOne("SELECT details AS metadata FROM cattophp_activity WHERE action = 'identity.verification_approved' AND details->>'user_id' = :id", ['id' => (string) $id]);
         self::assertStringNotContainsString('9005125800087', $audit, 'The Activity log never holds the document number.');
         self::assertStringNotContainsString('1994-02-03', $audit, 'The Activity log never holds the date of birth.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'identity.verification_started' AND metadata->>'user_id' = :id", ['id' => (string) $id]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'identity.verification_started' AND details->>'user_id' = :id", ['id' => (string) $id]));
         try {
             $service->start($user);
             self::fail('A verified account is never asked again.');
@@ -131,7 +138,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
     {
         [, $id] = $this->learner('Sipho Ndlovu');
         $sessionId = Uuid::v4();
-        $this->records->create($id, $sessionId);
+        $this->records->create((string) $id, $sessionId);
         $service = $this->service();
         $eventId = Uuid::v4();
         $declined = ['event_id' => $eventId, 'webhook_type' => 'status.updated', 'timestamp' => time(), 'session_id' => $sessionId, 'status' => 'Declined',
@@ -153,7 +160,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
 
         // A reviewer's later decision is a new event, and is applied.
         $service->webhook(...$this->signed(['event_id' => Uuid::v4(), 'status' => 'Approved', 'decision' => IdentityFixture::report('Approved', 'Sipho', 'Ndlovu')] + $declined));
-        self::assertSame('Sipho Ndlovu', $this->records->approved($id)['verified_name']);
+        self::assertSame('Sipho Ndlovu', ($this->records->approved((string) $id) ?? [])['verified_name']);
 
         // A webhook about a session this site did not start, or another kind of event, is ignored.
         $service->webhook(...$this->signed(['event_id' => Uuid::v4(), 'session_id' => Uuid::v4()] + $declined));
@@ -167,7 +174,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
         $service = $this->service();
         for ($try = 1; $try <= 3; $try++) {
             $session = Uuid::v4();
-            $this->records->create($id, $session);
+            $this->records->create((string) $id, $session);
             $service->apply($session, 'Declined', ['id_verifications' => [['warnings' => [['log_type' => 'error', 'short_description' => 'Face does not match']]]]]);
             self::assertSame(3 - $try, $service->state($id)['tries_left']);
         }
@@ -178,13 +185,13 @@ final class IdentityVerificationIntegrationTest extends TestCase
         } catch (\RuntimeException $blocked) {
             self::assertStringContainsString('declined 3 times', $blocked->getMessage());
         }
-        $this->db->executeStatement("UPDATE identity_verifications SET started_at = started_at - INTERVAL '1 minute' WHERE user_id = :id", ['id' => $id]);
+        $this->db->executeStatement("UPDATE cattophp_identity_verifications SET started_at = started_at - INTERVAL '1 minute' WHERE account = :id", ['id' => (string) $id]);
         $service->allowAnotherTry($id, $this->adminId());
         self::assertSame(3, $service->state($id)['tries_left'], 'ADMIN allowed another try.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'identity.retry_allowed' AND metadata->>'user_id' = :id", ['id' => (string) $id]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'identity.retry_allowed' AND details->>'user_id' = :id", ['id' => (string) $id]));
 
         IdentityFixture::verify($id, 'Thabo', 'Mokoena');
-        $approved = $this->records->approved($id);
+        $approved = $this->records->approved((string) $id);
         self::assertNotNull($approved);
         try {
             $service->revoke((int) $approved['id'], $this->adminId(), ' ');
@@ -196,7 +203,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
         self::assertFalse($service->isVerified($id), 'The account must verify again.');
         $row = $this->records->find((int) $approved['id']);
         self::assertSame(['revoked', 'The document belonged to someone else.'], [$row['status'], $row['revocation_reason']]);
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'identity.verification_revoked' AND metadata->>'user_id' = :id", ['id' => (string) $id]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'identity.verification_revoked' AND details->>'user_id' = :id", ['id' => (string) $id]));
     }
 
     public function testAVerifiedLearnerUnder18IsSentToTheAdultsOnlyPage(): void
@@ -205,7 +212,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
         $service = $this->service();
         IdentityFixture::verify($id, 'Young', 'Learner', (new \DateTimeImmutable('-16 years'))->format('Y-m-d'));
         self::assertTrue($service->state($id)['minor']);
-        $session = $this->db->fetchAssociative('SELECT u.birthdate, EXISTS (SELECT 1 FROM identity_verifications iv WHERE iv.user_id = u.id AND iv.status = \'approved\' AND iv.date_of_birth > CURRENT_DATE - INTERVAL \'18 years\') AS verified_minor FROM users u WHERE u.id = :id', ['id' => $id]);
+        $session = $this->db->fetchAssociative('SELECT u.birthdate, EXISTS (SELECT 1 FROM cattophp_identity_verifications iv WHERE iv.account = u.id::text AND iv.status = \'approved\' AND iv.date_of_birth > CURRENT_DATE - INTERVAL \'18 years\') AS verified_minor FROM users u WHERE u.id = :id', ['id' => $id]);
         self::assertTrue((bool) $session['verified_minor'], 'Every sign-in sends them to the adults-only page.');
         self::assertNotNull($session['birthdate'], 'The date of birth they gave stays as they gave it.');
         self::assertSame('adults_only', (new \ReflectionMethod(\CattoLearning\Auth\AuthService::class, 'accountStep'))->invoke(null, $session));
@@ -237,47 +244,47 @@ final class IdentityVerificationIntegrationTest extends TestCase
     /** Didit's sandbox mocks its checks and can force a pass, so a live site never takes its result; a demo site does. */
     public function testALiveSiteIgnoresASandboxResultAndADemoSiteTakesIt(): void
     {
-        $live = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::LIVE);
+        $live = SiteMode::fixed(SiteMode::LIVE);
         [, $id] = $this->learner('Thabo Mokoena');
         $sessionId = Uuid::v4();
-        $this->records->create($id, $sessionId);
+        $this->records->create((string) $id, $sessionId);
         $approved = ['event_id' => Uuid::v4(), 'webhook_type' => 'status.updated', 'session_id' => $sessionId, 'status' => 'Approved',
             'vendor_data' => 'x', 'environment' => 'sandbox', 'decision' => IdentityFixture::report('Approved', 'Thabo', 'Mokoena')];
 
         $this->service($live)->webhook(...$this->signed($approved));
         self::assertSame('started', $this->records->bySession($sessionId)['status'], 'A sandbox webhook verifies nobody on a live site.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'identity.sandbox_ignored' AND metadata->>'session_id' = :s", ['s' => (string) $sessionId]), 'It is recorded.');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'identity.sandbox_ignored' AND details->>'session_id' = :s", ['s' => (string) $sessionId]), 'It is recorded.');
 
         [$user, $other] = $this->learner('Naledi Khumalo');
         $returning = Uuid::v4();
-        $this->records->create($other, $returning);
+        $this->records->create((string) $other, $returning);
         $this->answers = [new MockResponse((string) json_encode(IdentityFixture::report('Approved', 'Naledi', 'Khumalo') + ['session_id' => $returning, 'environment' => 'sandbox']), ['http_code' => 200])];
         self::assertFalse($this->service($live)->returned($user, $returning)['verified'], 'Nor does a sandbox decision read on the learner\'s return.');
 
         $this->service($live)->webhook(...$this->signed(['event_id' => Uuid::v4(), 'environment' => 'live'] + $approved));
-        self::assertSame('Thabo Mokoena', $this->records->approved($id)['verified_name'] ?? null, 'A live result is taken on a live site.');
+        self::assertSame('Thabo Mokoena', ($this->records->approved((string) $id) ?? [])['verified_name'] ?? null, 'A live result is taken on a live site.');
 
         $this->answers = [new MockResponse((string) json_encode(IdentityFixture::report('Approved', 'Naledi', 'Khumalo') + ['session_id' => $returning, 'environment' => 'sandbox']), ['http_code' => 200])];
-        self::assertTrue($this->service(\CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::DEMO))->returned($user, $returning)['verified'], 'A demo site tests on the sandbox.');
+        self::assertTrue($this->service(SiteMode::fixed(SiteMode::DEMO))->returned($user, $returning)['verified'], 'A demo site tests on the sandbox.');
 
-        $wired = (new \ReflectionProperty(IdentityVerificationService::class, 'site'))->getValue(IntegrationContainer::get()->get(IdentityVerificationService::class));
-        self::assertInstanceOf(\CattoLearning\Configuration\SiteMode::class, $wired, 'The site\'s own service knows its mode, so the safeguard runs.');
+        $wired = (new \ReflectionProperty(IdentitySettings::class, 'site'))->getValue(IntegrationContainer::get()->get(IdentitySettings::class));
+        self::assertInstanceOf(SiteMode::class, $wired, 'The site\'s own settings know its mode, so the safeguard runs.');
     }
 
     /** Didit's keys say what they are (owner, 2026-11-06): sk_test_ is the sandbox, sk_live_ the live application. */
     public function testASandboxKeyOnALiveSiteMeansNoVerificationAndADemoSiteTakesEither(): void
     {
-        $live = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::LIVE);
-        $demo = \CattoLearning\Configuration\SiteMode::fixed(\CattoLearning\Configuration\SiteMode::DEMO);
+        $live = SiteMode::fixed(SiteMode::LIVE);
+        $demo = SiteMode::fixed(SiteMode::DEMO);
 
         $_ENV['DIDIT_API_KEY'] = 'sk_test_integration';
-        self::assertSame('sandbox', (new IdentitySettings($live))->keyKind());
-        self::assertFalse((new IdentitySettings($live))->available(), 'A live site with a sandbox key has no verification.');
-        self::assertTrue((new IdentitySettings($live))->sandboxKeyOnLiveSite());
-        self::assertTrue((new IdentitySettings($demo))->available(), 'A demo site tests on the sandbox.');
+        self::assertSame('sandbox', (new IdentitySettings(new EnvironmentValues(), $live))->keyKind());
+        self::assertFalse((new IdentitySettings(new EnvironmentValues(), $live))->available(), 'A live site with a sandbox key has no verification.');
+        self::assertTrue((new IdentitySettings(new EnvironmentValues(), $live))->sandboxKeyOnLiveSite());
+        self::assertTrue((new IdentitySettings(new EnvironmentValues(), $demo))->available(), 'A demo site tests on the sandbox.');
         [$user] = $this->learner('Ayanda Zulu');
         try {
-            $this->service($live, new IdentitySettings($live))->start($user);
+            $this->service($live, new IdentitySettings(new EnvironmentValues(), $live))->start($user);
             self::fail('No check starts on a live site with a sandbox key.');
         } catch (\RuntimeException $refused) {
             self::assertSame('Identity verification is not available at the moment. Please try again later.', $refused->getMessage());
@@ -285,24 +292,28 @@ final class IdentityVerificationIntegrationTest extends TestCase
         self::assertSame([], $this->requests, 'Didit is never called.');
 
         $_ENV['DIDIT_API_KEY'] = 'sk_live_integration';
-        self::assertSame('live', (new IdentitySettings($live))->keyKind());
-        self::assertTrue((new IdentitySettings($live))->available());
-        self::assertTrue((new IdentitySettings($demo))->available(), 'A demo site takes a live key too, and Settings warns that its checks are billed.');
+        self::assertSame('live', (new IdentitySettings(new EnvironmentValues(), $live))->keyKind());
+        self::assertTrue((new IdentitySettings(new EnvironmentValues(), $live))->available());
+        self::assertTrue((new IdentitySettings(new EnvironmentValues(), $demo))->available(), 'A demo site takes a live key too, and Settings warns that its checks are billed.');
 
         $wired = (new \ReflectionProperty(IdentitySettings::class, 'site'))->getValue(IntegrationContainer::get()->get(IdentitySettings::class));
-        self::assertInstanceOf(\CattoLearning\Configuration\SiteMode::class, $wired, 'The site\'s own settings know its mode.');
+        self::assertInstanceOf(SiteMode::class, $wired, 'The site\'s own settings know its mode.');
     }
 
-    private function service(?\CattoLearning\Configuration\SiteMode $site = null, ?IdentitySettings $settings = null): IdentityVerificationService
+    private function service(?SiteMode $site = null, ?IdentitySettings $settings = null): IdentityVerificationService
     {
         $container = IntegrationContainer::get();
         $http = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
             $this->requests[] = ['method' => $method, 'url' => $url, 'body' => (string) ($options['body'] ?? ''), 'headers' => array_map('strtolower', (array) ($options['headers'] ?? []))];
             return array_shift($this->answers) ?? new MockResponse('{}', ['http_code' => 500]);
         });
-        $settings ??= new IdentitySettings();
-        return new IdentityVerificationService($this->records, new DiditClient($http, $settings), $settings, $container->get(CertificateAwards::class),
-            new AuditRepository($this->db), new TransactionManager($this->db), new MockClock(), $site);
+        $settings ??= new IdentitySettings(new EnvironmentValues(), $site, null, '/account/verification/return');
+        // CattoPHP's activity log, as cattolms's AuditRepository holds it.
+        $activity = (new \ReflectionProperty(\CattoLearning\Infrastructure\Persistence\AuditRepository::class, 'activity'))->getValue($container->get(\CattoLearning\Infrastructure\Persistence\AuditRepository::class));
+        self::assertInstanceOf(ActivityLog::class, $activity);
+        $verification = new IdentityVerification($this->records, new DiditClient($http, $settings), $settings, new MockClock(), $activity,
+            $this->people, $container->get(CertificatesOnIdentity::class), 'user_id', 18);
+        return new IdentityVerificationService($verification, $this->people);
     }
 
     /**
@@ -315,7 +326,7 @@ final class IdentityVerificationIntegrationTest extends TestCase
     {
         $event['timestamp'] = time();
         $body = (string) json_encode($event, JSON_UNESCAPED_SLASHES);
-        $canonical = (string) \CattoLearning\Identity\DiditSignature::canonical($body);
+        $canonical = (string) DiditSignature::canonical($body);
         return [$body, ['x-signature-v2' => hash_hmac('sha256', $canonical, self::SECRET), 'x-timestamp' => (string) time()]];
     }
 }

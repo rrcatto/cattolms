@@ -43,7 +43,7 @@ use CattoLearning\Course\Certificate\CertificateRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Support\AccessPeriod;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\Slug;
 use CattoLearning\Commerce\Application\AccessService;

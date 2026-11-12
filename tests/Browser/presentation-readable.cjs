@@ -367,14 +367,14 @@ function drawers(themes) {
     const list = (dir, test) => { try { return fs.readdirSync(path.join(root, dir)).filter(test).sort().map((name) => `${dir}/${name}`); } catch { return []; } };
     const served = path.resolve(root, '../../runtime/public_html');
     const files = [
-        'public_html/js/catwalk.js', 'public_html/css/catwalk.css', 'public_html/css/catto-platform.css', 'public_html/js/platform-overrides.js',
+        'public_html/js/catwalk.js', 'public_html/css/catwalk.css', 'public_html/css/catto-platform.css', 'public_html/js/platform-overrides.js', 'vendor/rrcatto/cattophp/public/css/cattophp.css', 'vendor/rrcatto/cattophp/public/js/cattophp.js',
         ...list('src/Course/Catwalk', (n) => n.endsWith('.php')), 'src/Course/CourseItemRenderer.php', 'src/Course/CourseStyles.php',
         ...list('resources/views/layout', (n) => n.endsWith('.twig')),
         ...list('resources/views/pages', (n) => /^(learn-|course-public-preview|site-presentation)/.test(n)),
         ...list('resources/views/partials', (n) => /^course-/.test(n)),
         ...themes.map((theme) => `themes/${slugOf(theme)}/public/css/theme.css`),
     ];
-    const servedCopies = ['js/catwalk.js', 'css/catwalk.css', 'css/catto-platform.css', 'js/platform-overrides.js', ...themes.map((theme) => `themes/${keyOf(theme)}/css/theme.css`)]
+    const servedCopies = ['js/catwalk.js', 'css/catwalk.css', 'css/catto-platform.css', 'js/platform-overrides.js', 'cattophp/css/cattophp.css', 'cattophp/js/cattophp.js', ...themes.map((theme) => `themes/${keyOf(theme)}/css/theme.css`)]
         .map((file) => path.join(served, file)).filter((file) => fs.existsSync(file)).map((file) => path.relative(root, file));
     return [...files, ...servedCopies];
 }
@@ -396,7 +396,11 @@ async function main() {
         for (const theme of state.themes) for (const viewport of [[1440, 900], [1366, 768], [1920, 1080], [390, 844]]) jobs.push({kind: 'front', theme, viewport});
     }
     if (only !== 'own' && only !== 'front') {
-        for (const deck of state.decks.filter((d) => !d.own && (codes.length === 0 || codes.includes(d.code)))) jobs.push({kind: 'reader', deck, url: deck.url});
+        const hidden = state.decks.filter((d) => !d.own && d.hidden && (codes.length === 0 || codes.includes(d.code)));
+        // A course preview nobody can see (not ticked for the public preview) is named, not measured: once ticked it has
+        // never passed, so the next run measures it.
+        if (hidden.length) console.log(`  ${hidden.length} course previews seen by nobody, not ticked for the public preview, so not measured: ${hidden.map((d) => d.code).join(', ')}`);
+        for (const deck of state.decks.filter((d) => !d.own && !d.hidden && (codes.length === 0 || codes.includes(d.code)))) jobs.push({kind: 'reader', deck, url: deck.url});
     }
     if (codes.length === 0 && only !== 'site' && only !== 'front') {
         for (const deck of state.decks.filter((d) => d.own)) for (const theme of state.themes) {

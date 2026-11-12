@@ -112,6 +112,8 @@ const inspect = () => {
     // with one page size has no drop-down to keep: the catalogue, 24 courses a page (`ListView::GRID_PAGE_SIZES`).
     pagerWithoutSizes: [...main.querySelectorAll('nav.pagination-row')].filter((row) => row.getClientRects().length && row.dataset.pageSizes !== '1')
       .map((row) => Number((row.querySelector('.pagination-summary')?.textContent.match(/of\s+([\d,]+)\s+·/) || [])[1]?.replace(/,/g, '') || 0) > 25 && !row.querySelector('select') ? row.dataset.pagination : null).filter(Boolean),
+    // What the site's content policy refused on this page (CattoPHP Phase 2, step 7c), when watchPolicy() set the page up.
+    policyRefusals: (window.cattoPolicyRefusals || []).slice(0, 5),
     width: innerWidth,
     theme: [...document.querySelectorAll('link[href*="/themes/"]')].map(l => l.getAttribute('href')).join(' '),
   };
@@ -136,7 +138,31 @@ function judge(r, label) {
   if (r.cutActions.length) failures.push(`${label}: an action wider than its cell: ${r.cutActions.join(', ')}`);
   if (r.referenceFaults.length) failures.push(`${label}: the account reference is ${r.referenceFaults.join(', ')}`);
   if (r.figureSpill.length) failures.push(`${label}: a figure runs out of its card: ${r.figureSpill.join(', ')}`);
+  if (r.policyRefusals && r.policyRefusals.length) failures.push(`${label}: the content policy refused ${r.policyRefusals.join(', ')}`);
   return failures;
 }
 
-module.exports = {inspect, judge};
+/* Every page a browser context opens notes what the site's content policy refuses (CattoPHP Phase 2, step 7c): a script
+   without the page's nonce, a handler in a tag, a source the policy does not name. inspect() reports them. */
+async function watchPolicy(context) {
+  await context.addInitScript(() => {
+    window.cattoPolicyRefusals = [];
+    document.addEventListener('securitypolicyviolation', (event) => {
+      window.cattoPolicyRefusals.push(`${event.effectiveDirective || event.violatedDirective} ${event.blockedURI || 'inline'}${event.sourceFile ? ' (' + event.sourceFile.replace(location.origin, '') + ':' + event.lineNumber + ')' : ''}`);
+    });
+  });
+}
+
+/* The classes the served page's layout treats as flex or grid containers (config/packages/cattophp.yaml, html_layout.
+   flex_classes): it puts their children on lines of their own, which no browser draws only while the CSS makes them flex or
+   grid. flexClaims() runs in the page and names any element of them drawn otherwise. */
+const flexClasses = (() => {
+  const yaml = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../../config/packages/cattophp.yaml'), 'utf8');
+  const list = yaml.match(/flex_classes:\s*\[([^\]]*)\]/);
+  return list ? list[1].split(',').map((name) => name.trim()).filter(Boolean) : [];
+})();
+const flexClaims = (classes) => classes.length === 0 ? [] : [...document.querySelectorAll(classes.map((name) => '.' + name).join(','))]
+  .filter((element) => !/^((inline-)?(flex|grid)|none|contents)$/.test(getComputedStyle(element).display))
+  .slice(0, 5).map((element) => `${[...element.classList].find((name) => classes.includes(name))} drawn ${getComputedStyle(element).display}`);
+
+module.exports = {inspect, judge, watchPolicy, flexClasses, flexClaims};

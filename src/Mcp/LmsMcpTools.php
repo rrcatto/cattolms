@@ -36,20 +36,20 @@ declare(strict_types=1);
 namespace CattoLearning\Mcp;
 
 use CattoLearning\Course\CatalogueFilter;
-use CattoLearning\Api\ApiIdentity;
+use CattoPHP\Api\ApiIdentity;
 use CattoLearning\Api\ApiScope;
-use CattoLearning\Api\AuthorizationService;
+use CattoPHP\Api\ApiAccess;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use InvalidArgumentException;
 
 final class LmsMcpTools
 {
     public function __construct(
         private readonly ApiIdentity $identity,
-        private readonly AuthorizationService $authorization,
+        private readonly ApiAccess $authorization,
         private readonly CourseService $courses,
         private readonly LearningService $learning,
         private readonly AuditRepository $audit
@@ -63,7 +63,7 @@ final class LmsMcpTools
             'application' => 'Catto Learning',
             'application_version' => \CattoLearning\Support\AppVersion::current(),
             'mcp_transport' => 'stdio',
-            'identity' => $this->identity->toArray(),
+            'identity' => \CattoLearning\Api\ApiPerson::toArray($this->identity),
         ];
     }
 
@@ -104,21 +104,21 @@ final class LmsMcpTools
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::LIBRARY_READ, 'LEARNING.LIBRARY.VIEW');
 
-        return $this->learning->library($this->identity->userId);
+        return $this->learning->library(\CattoLearning\Api\ApiPerson::userId($this->identity));
     }
 
     /** @return array<string,mixed> */
     public function startCourse(string $slug): array
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::LEARNING_START, 'LEARNING.COURSE.START');
-        $this->learning->start($this->identity->userId, $slug);
-        $this->audit->record($this->identity->userId, 'mcp.course_started', [
+        $this->learning->start(\CattoLearning\Api\ApiPerson::userId($this->identity), $slug);
+        $this->audit->record(\CattoLearning\Api\ApiPerson::userId($this->identity), 'mcp.course_started', [
             'tool' => 'start_course',
             'token_id' => $this->identity->tokenPublicId,
             'course_slug' => $slug,
         ]);
 
-        return $this->learning->courseHome($this->identity->userId, $slug);
+        return $this->learning->courseHome(\CattoLearning\Api\ApiPerson::userId($this->identity), $slug);
     }
 
     /** @return array<string,mixed> */
@@ -141,8 +141,8 @@ final class LmsMcpTools
             'description_html' => $descriptionHtml,
             'access_days' => max(1, $accessPeriodDays),
             'certificate_enabled' => true,
-        ], $this->identity->userId);
-        $this->audit->record($this->identity->userId, 'mcp.course_created', [
+        ], \CattoLearning\Api\ApiPerson::userId($this->identity));
+        $this->audit->record(\CattoLearning\Api\ApiPerson::userId($this->identity), 'mcp.course_created', [
             'tool' => 'create_course',
             'token_id' => $this->identity->tokenPublicId,
             'course_id' => $courseId,
@@ -168,9 +168,9 @@ final class LmsMcpTools
         $this->courses->changeStatus(
             $courseId,
             $status,
-            $this->identity->userId
+            \CattoLearning\Api\ApiPerson::userId($this->identity)
         );
-        $this->audit->record($this->identity->userId, 'mcp.course_status_changed', [
+        $this->audit->record(\CattoLearning\Api\ApiPerson::userId($this->identity), 'mcp.course_status_changed', [
             'tool' => 'set_course_status',
             'token_id' => $this->identity->tokenPublicId,
             'course_id' => $courseId,

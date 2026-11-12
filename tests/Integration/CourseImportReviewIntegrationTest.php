@@ -9,7 +9,7 @@ Version: 1.0.4
 
 Description:
 A course reviewed at Administration > Courses > Import HTML, through real route dispatch: the course specification's
-example (read from docs/COURSE-SPECIFICATION.md) is staged, and its review opens with its format named plainly, its
+example (read from docs/COURSE-SPECIFICATION-v<version>.md) is staged, and its review opens with its format named plainly, its
 module and final assessments counted, its presentation and flash cards among its Course Items, no warnings and no
 second HTML copy to download (the file is one already). A course JSON's review, which stopped with an error page under
 strict Twig (2026-11-01), opens with its assessments counted from its Course Items. Nothing is imported; the staged

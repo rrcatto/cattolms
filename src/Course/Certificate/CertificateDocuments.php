@@ -24,15 +24,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course\Certificate;
 
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
-use CattoLearning\Document\RenderedDocument;
+use CattoPHP\Document\RenderedDocument;
 
 final class CertificateDocuments
 {
     public function __construct(
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly DocumentPdfRenderer $pdf,
+        private readonly PdfRenderer $pdf,
     ) {}
 
     /** @param array<string,mixed> $certificate an issued certificate row */

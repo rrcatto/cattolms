@@ -39,7 +39,7 @@ namespace CattoLearning\Course\Certificate;
 
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Identity\IdentityVerificationRepository;
+use CattoPHP\Identity\IdentityChecks;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use DateTimeImmutable;
@@ -55,7 +55,7 @@ final class CertificateIssuer
         private readonly TranscriptDataBuilder $transcripts,
         private readonly CertificateDesignRepository $designs,
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly IdentityVerificationRepository $identities,
+        private readonly IdentityChecks $identities,
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         private readonly ClockInterface $clock,
@@ -66,7 +66,7 @@ final class CertificateIssuer
     {
         return $this->transactions->run(function () use ($enrolmentId, $actorUserId): array {
             $context = $this->certificates->issueContext($enrolmentId) ?? throw new RuntimeException('The enrolment does not exist.');
-            $verification = $this->identities->approved((int) $context['user_id'])
+            $verification = $this->identities->approved((string) $context['user_id'])
                 ?? throw new RuntimeException('A certificate is issued only to a verified account.');
             $existing = $this->certificates->identityForEnrolment($enrolmentId);
             if ($existing !== null && $existing['revoked_at'] !== null) {

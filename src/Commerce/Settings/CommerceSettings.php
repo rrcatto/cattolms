@@ -9,7 +9,7 @@ Version: 0.9.4
 
 Description:
 The commerce settings (owner, 2026-10-17). Each has a built-in default, a .env default that replaces
-it, and a database override in app_options that replaces both, as the platform's other settings do;
+it, and a database override in CattoPHP's settings (under the .env name) that replaces both, as the platform's other settings do;
 an override can be removed to fall back to the .env default. Values are kept as entered and checked
 before anything is saved. Administration > Credits & Orders > Commerce Settings edits them, one
 section at a time.
@@ -23,6 +23,11 @@ Durations are lengths of time written the one way (Duration): 3y, 4w2d, 1h30m, 9
 (ProcessorFee) or fixed amounts by size (FeeTiers).
 
 Changelog:
+2026/11/09 SAST
+- Kept in CattoPHP's settings (CattoPHP Phase 2, step 3), under the names .env gives, overriding .env with a Reset;
+  what a site saved is carried over by the upgrade migration 20261109160000_settings_to_cattophp.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/26 SAST
 - Durations may use m (minutes) and s (seconds) too (Duration, owner 2026-10-26); a wrong one is explained with
   Duration::HOW.
@@ -34,10 +39,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Settings;
 
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\Support\AccountReference;
-use CattoLearning\Support\Duration;
-use CattoLearning\Support\Env;
+use CattoPHP\Foundation\AccountReference;
+use CattoPHP\Foundation\Duration;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Settings\Settings;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -62,22 +67,24 @@ final class CommerceSettings
 
     public const SECTIONS = ['fees', 'references', 'wallet', 'orders'];
 
-    public function __construct(private readonly OptionRepository $options)
+    public function __construct(private readonly Settings $settings)
     {
     }
 
-    /** The app_options key of a setting's database override. */
-    public static function optionKey(string $key): string
+    /** The name a setting is kept under in CattoPHP's settings: its .env name. */
+    public static function settingName(string $key): string
     {
-        return 'commerce.' . $key;
+        return self::definition($key)[1];
     }
 
     /** The text in force: the database override, else the .env default, else the built-in default. */
     public function text(string $key): string
     {
-        self::definition($key);
-        $override = $this->options->find(self::optionKey($key));
-        if ($override !== null && self::check($key, $override) === null) return $override;
+        [, $env] = self::definition($key);
+        if ($this->settings->isOverridden($env)) {
+            $override = $this->settings->get($env);
+            if (self::check($key, $override) === null) return $override;
+        }
 
         return $this->environmentText($key);
     }
@@ -85,10 +92,9 @@ final class CommerceSettings
     /** Where the value in force comes from: database, environment or default. */
     public function source(string $key): string
     {
-        $override = $this->options->find(self::optionKey($key));
-        if ($override !== null && self::check($key, $override) === null) return 'database';
         [, $env] = self::definition($key);
-        $environment = trim(Env::string($env, ''));
+        if ($this->settings->isOverridden($env) && self::check($key, $this->settings->get($env)) === null) return 'database';
+        $environment = $this->settings->envValue($env);
 
         return $environment !== '' && self::check($key, $environment) === null ? 'environment' : 'default';
     }
@@ -97,7 +103,7 @@ final class CommerceSettings
     public function environmentText(string $key): string
     {
         [, $env, $default] = self::definition($key);
-        $environment = trim(Env::string($env, ''));
+        $environment = $this->settings->envValue($env);
 
         return $environment !== '' && self::check($key, $environment) === null ? $environment : $default;
     }
@@ -137,15 +143,14 @@ final class CommerceSettings
         }
         foreach ($checked as $key => $text) {
             if ($text === $this->text($key) && $this->source($key) !== 'database') continue;
-            $this->options->set(self::optionKey($key), $text, $actorId);
+            $this->settings->set(self::settingName($key), $text, self::actor($actorId));
         }
     }
 
     /** Removes a setting's database override, so the .env default applies again. */
     public function reset(string $key): void
     {
-        self::definition($key);
-        $this->options->delete(self::optionKey($key));
+        $this->settings->reset(self::settingName($key));
     }
 
     /** Why a value cannot be used, or null when it can. */
@@ -181,6 +186,12 @@ final class CommerceSettings
             'payment_link_lifetime' => 'Payment link lifetime',
             default => $key,
         };
+    }
+
+    /** Who changed a setting, for CattoPHP's log of changes; nobody for a change no person made. */
+    private static function actor(?int $id): ?Actor
+    {
+        return $id !== null && $id > 0 ? new Actor((string) $id, (string) $id) : null;
     }
 
     /** @return array{0:string,1:string,2:string,3:string} */

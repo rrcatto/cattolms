@@ -19,7 +19,7 @@ use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\CheckScrub;
 use CattoLearning\Tests\Support\DevelopmentFixture;
@@ -43,9 +43,10 @@ $session = static function (int $user, string $email) use ($container): string {
 };
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous demo site fixture first.');
-    // The check starts from the .env site mode; a site mode the owner saved in Settings is put back by cleanup.
-    $savedMode = $db->fetchAssociative('SELECT option_key, option_value, updated_at, updated_by_user_id FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]) ?: null;
-    $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
+    // The check starts from the .env site mode; a site mode the owner saved in Settings (CattoPHP's settings) is put back
+    // by cleanup.
+    $savedMode = $db->fetchAssociative('SELECT name, value, secret, updated_at, updated_by FROM cattophp_settings WHERE name = :k', ['k' => SiteMode::SETTING]) ?: null;
+    $db->executeStatement('DELETE FROM cattophp_settings WHERE name = :k', ['k' => SiteMode::SETTING]);
     // A believable course provider (a company made with its founding administrator), two of its courses on sale, an
     // administrator and a private learner, every name one nobody on the site has (owner, 2026-10-27).
     $provider = $fixture->company();
@@ -67,7 +68,7 @@ if ($action === 'create') {
 } elseif ($action === 'follows') {
     // What the learner agreed to be emailed about (mailing, step 1): [kind, subject id, source] of each yes.
     $learner = (int) ($argv[3] ?? 0);
-    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, l.subject_id, s.source FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id WHERE s.user_id = :u AND s.status = 'subscribed' ORDER BY l.kind, l.subject_id", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
+    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, CAST(l.subject AS BIGINT) AS subject_id, s.source FROM cattophp_mailing_subscriptions s JOIN cattophp_mailing_lists l ON l.id = s.list_id WHERE s.account = CAST(:u AS TEXT) AND s.status = 'subscribed' ORDER BY l.kind, CAST(l.subject AS BIGINT)", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'order') {
     $learner = (int) ($argv[3] ?? 0);
     $records = $container->get(CommerceRepository::class);
@@ -83,10 +84,10 @@ if ($action === 'create') {
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = $readState();
-    $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
+    $db->executeStatement('DELETE FROM cattophp_settings WHERE name = :k', ['k' => SiteMode::SETTING]);
     if (is_array($state['saved_mode'] ?? null)) {
-        $db->executeStatement('INSERT INTO app_options (option_key, option_value, updated_at, updated_by_user_id) VALUES (:k, :v, :at, :by)',
-            ['k' => $state['saved_mode']['option_key'], 'v' => $state['saved_mode']['option_value'], 'at' => $state['saved_mode']['updated_at'], 'by' => $state['saved_mode']['updated_by_user_id']]);
+        $db->executeStatement('INSERT INTO cattophp_settings (name, value, secret, updated_at, updated_by) VALUES (:k, :v, FALSE, :at, :by)',
+            ['k' => $state['saved_mode']['name'], 'v' => $state['saved_mode']['value'], 'at' => $state['saved_mode']['updated_at'], 'by' => $state['saved_mode']['updated_by']]);
     }
     // Everything the check made, its orders and their money records included (owner, 2026-10-27: "you can remove the data
     // without worrying about the rules").

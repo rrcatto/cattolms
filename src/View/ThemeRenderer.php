@@ -10,6 +10,21 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/11/12 SAST
+- A public page's trail and structured data from CattoPHP's StructuredData; which pages are public from CatalogueStructuredData (CattoPHP Phase 4, step 5).
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): the count of flagged addresses comes from its Flags.
+2026/11/09 SAST
+- The served page laid out (owner, 2026-11-09: "yes, start Phase 3 with the body HTML formatter"): CattoPHP's HtmlLayout lays out the
+  whole page, head and body, in place of tidyHead, which laid out only the head; the generator tag still goes first.
+2026/11/09 SAST
+- Footer social media (owner, 2026-11-09): the footer's marks come from the setting.
+2026/11/09 SAST
+- CattoPHP's security headers (CattoPHP Phase 2, step 7c): the page-controls script on every page, after the site's own,
+  and the course content editor's page lets CKEditor fetch its list of emoji from CKEditor's own server, as it always has.
+2026/11/09 SAST
+- The head as a person reads it (owner, 2026-11-09): every element on its own line one step inside the head, the
+  structured data laid out as indented JSON, the generator tag first naming CattoPHP's version before CattoLMS's.
 2026/11/09 SAST (v1.1.3)
 - Advanced PLATFORM_ASSET_VERSION to 1.1.3.
 - app.logo: the site logo's address, for the theme's top bar.
@@ -156,14 +171,23 @@ use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Csrf;
 use CattoLearning\Support\SocialPlatform;
-use CattoLearning\View\Twig\ThemeTemplates;
+use CattoPHP\Theme\Templates;
+use CattoPHP\Theme\PageProject;
+use CattoPHP\Theme\PageRenderer;
+use CattoPHP\Theme\ThemeManager;
 use Twig\Environment;
 use CattoLearning\Support\Env;
 use RuntimeException;
 
-final class ThemeRenderer
+/**
+ * cattolms's pages (CattoPHP Phase 3, step 9): what CattoPHP's PageRenderer asks of a project, each page's family, the values
+ * every template reads, the sections drawn first and the view model (navigation, breadcrumbs, the cart, the head's metadata,
+ * the page-family objects), and the renderer controllers call. CattoPHP's PageRenderer chooses the theme, the layout and
+ * serves the page.
+ */
+final class ThemeRenderer implements PageProject
 {
-    private const PLATFORM_ASSET_VERSION = '1.1.3';
+    private const PLATFORM_ASSET_VERSION = '1.2.0';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -180,7 +204,7 @@ final class ThemeRenderer
     public const PAGE_WIDTH_NAMES = ['wide', 'full'];
     public function __construct(
         private readonly Environment $twig,
-        private readonly ThemeTemplates $templates,
+        private readonly Templates $templates,
         private readonly ThemeManager $themes,
         private readonly RuntimeSettings $settings,
         private readonly AdministrationSectionRegistry $adminSections,
@@ -189,13 +213,21 @@ final class ThemeRenderer
         private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null,
         private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
-        private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null,
-        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
+        private readonly ?\CattoPHP\Inbox\InboxStore $inbox = null,
+        private readonly ?\CattoLearning\Infrastructure\Persistence\AdminAttentionRepository $attentionRecords = null,
+        private readonly ?\CattoPHP\Protection\Flags $siteFlags = null,
         private readonly ?\CattoLearning\Configuration\SiteNotification $siteNotification = null,
         private readonly ?\CattoLearning\Configuration\SiteLogo $siteLogo = null,
-        private readonly ?\CattoLearning\Search\PageMetadata $metadata = null
+        private readonly ?\CattoLearning\Search\PageMetadata $metadata = null,
+        private readonly ?\CattoPHP\Http\ContentSecurityPolicy $policy = null,
+        private readonly ?\CattoLearning\Configuration\FooterSocial $socialProfiles = null,
+        private readonly ?\CattoPHP\Http\HtmlLayout $htmlLayout = null,
     ) {
+        $this->pages = new PageRenderer($twig, $templates, $themes, $this, $htmlLayout, \CattoPHP\Runtime\RunMode::debug(Env::string('APP_ENV')));
     }
+
+    /** CattoPHP's renderer, drawing cattolms's pages in their theme. */
+    private readonly PageRenderer $pages;
 
     /**
      * Renders one platform-owned template as a bare fragment, without the theme base layout.
@@ -208,78 +240,22 @@ final class ThemeRenderer
      */
     public function renderFragment(string $template, array $data = []): string
     {
-        if (preg_match('/^[a-zA-Z0-9_\/-]+$/', $template) !== 1) {
-            throw new RuntimeException('Invalid fragment template.');
-        }
-        $this->assertTemplateData($data);
-
-        // The platform scalars a fragment may legitimately need, set BEFORE the caller's data so a
-        // caller can still override one deliberately.
-        //
-        // A fragment is a piece of a page and must not silently have fewer facilities than the
-        // page. Without this, a fragment containing a form died mid-output on "Undefined variable
-        // $csrf" - the response was a truncated document, htmx swapped it into the results region,
-        // and because the swap replaced the element that carried the target id, the control was
-        // dead until a full page load. One missing token disabled the whole surface.
-        $scalars = $this->platformScalars();
-
-        return $this->twig->render(
-            '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/' . $template . '.html.twig',
-            array_merge($scalars, $data)
-        );
+        // The platform scalars a fragment may legitimately need, set BEFORE the caller's data so a caller can still override
+        // one deliberately: a fragment is a piece of a page and must not silently have fewer facilities than the page
+        // (without the form token, a fragment holding a form died mid-output and htmx swapped in a truncated document).
+        return $this->pages->renderFragment($template, $data);
     }
 
     /**
-     * Removes every HTML comment from rendered output, leaving script, style, pre and textarea
-     * content untouched.
-     *
-     * Every template carries a file metadata header, and several carry explanatory notes about
-     * why a control is built the way it is. Those are written for the next developer, not for the
-     * public, and an HTML comment is served verbatim: without this they are readable in view
-     * source on every page. Stripping happens here, at the one point where a response is
-     * finished, so a template author never has to think about it and no theme can opt out.
-     *
-     * The alternation consumes script, style, pre and textarea blocks whole and returns them
-     * unchanged. Imported course HTML reaches the page through a raw template token, so it can
-     * legitimately contain a script whose string holds a comment delimiter; a plain
-     * comment-stripping pattern would cut such a script in half. Whitespace-significant elements
-     * are skipped for the same reason: their content is not ours to rewrite.
-     *
-     * This is deliberately not a minifier. It removes comments and nothing else, so a rendering
-     * difference can never be blamed on it.
+     * What the generator tag says, first in every page's head (CattoPHP's PageRenderer puts it there and lays the page out):
+     * CattoPHP's version and then the release's own, in full (owner, 2026-10-20: "I want the FULL FUCKING VERSION NUMBER ON
+     * EACH PAGE"; 2026-11-09: "add CattoPHP [version number] before CattoLMS [version number] with a comma separator").
      */
-    /**
-     * Stamps the generated page with the codebase that produced it.
-     *
-     * Core-owned and injected after rendering, deliberately. The `head` element belongs to the
-     * theme, and there are five of them plus whatever an external author writes; putting the tag in
-     * each one means five edits, a Theme SDK change, and a new theme that silently omits it. Done
-     * here, no theme can leave it out and none has to know it exists.
-     *
-     * The version is the release's own, in full (AppVersion: the "version" in composer.json; owner,
-     * 2026-10-20: "I want the FULL FUCKING VERSION NUMBER ON EACH PAGE"). It used to be read from the
-     * code directory's name, which on the development checkout (cattolms-v0.9) printed only v0.9.
-     *
-     * Inserted after the opening head tag, so it is present before any stylesheet or script and a
-     * truncated response still carries it.
-     */
-    private function stampGenerator(string $html): string
+    public function generator(): string
     {
-        $tag = '<meta name="generator" content="CattoLMS v' . htmlspecialchars(\CattoLearning\Support\AppVersion::current(), ENT_QUOTES) . '">';
+        $foundation = \CattoLearning\Support\AppVersion::foundation();
 
-        // On its own line, indented one step further than the head tag it follows. Injected markup
-        // is still markup somebody has to read, and a fixed single tab put it at the wrong depth in
-        // every theme whose head is itself indented - which is all of them.
-        $stamped = preg_replace_callback(
-            '/^(?<indent>[ \t]*)(?<tag><head\b[^>]*>)/im',
-            fn(array $m): string => $m['indent'] . $m['tag'] . "\n" . $m['indent'] . "\t" . $tag,
-            $html,
-            1
-        );
-
-        // A page with no head element, or a failed match, is served unstamped rather than not at
-        // all. The tag is diagnostic; losing it is not worth an outage.
-        return $stamped ?? $html;
+        return 'CattoPHP ' . (preg_match('/^[0-9]/', $foundation) === 1 ? 'v' : '') . $foundation . ', CattoLMS v' . \CattoLearning\Support\AppVersion::current();
     }
 
     /**
@@ -294,24 +270,24 @@ final class ThemeRenderer
      */
     public function resolveTheme(array $data): array
     {
-        $themeKey = $this->themes->activeTheme();
-        $previewTheme = trim((string) ($_GET['theme_preview'] ?? ''));
-        $previewActive = false;
-        if ($previewTheme !== '' && $this->can($data, 'SYSTEM.THEME.VIEW')) {
-            try {
-                $this->themes->theme($previewTheme);
-                $themeKey = $previewTheme;
-                $previewActive = $previewTheme !== $this->themes->activeTheme();
-            } catch (RuntimeException) {
-                // Invalid preview requests do not change the selected live theme.
-            }
-        }
+        return $this->pages->resolveTheme($data);
+    }
 
-        // Selecting the theme is also what points Twig's @theme namespace at it, so the two cannot
-        // be done separately and disagree.
-        $this->templates->use($this->themes->themeTemplateRoots($themeKey));
+    /** @param array<string,mixed> $data */
+    public function mayPreview(array $data): bool
+    {
+        return $this->can($data, 'SYSTEM.THEME.VIEW');
+    }
 
-        return [$themeKey, $previewActive];
+    /**
+     * Everything a page template may read: CattoPHP's PageRenderer gives the theme's part, model() the rest.
+     *
+     * @param array<string,mixed> $data Page data, with any section fragments already materialised.
+     * @return array<string,mixed>
+     */
+    public function viewModel(string $page, array $data, string $themeKey, bool $previewActive): array
+    {
+        return $this->pages->viewModel($page, $data, $themeKey, $previewActive);
     }
 
     /**
@@ -327,9 +303,10 @@ final class ThemeRenderer
      * this that does name an engine. The caller materialises them into $data first.
      *
      * @param array<string,mixed> $data Page data, with any section fragments already materialised.
+     * @param array<string,mixed> $view The theme's part, from CattoPHP's PageRenderer.
      * @return array<string,mixed>
      */
-    public function viewModel(string $page, array $data, string $themeKey, bool $previewActive): array
+    public function model(string $page, string $family, array $data, array $view): array
     {
         $model = ['cart_summary'=>$this->carts?->summary() ?? ['items'=>[], 'count'=>0, 'total_label'=>'R 0.00', 'buyer'=>true]];
 
@@ -337,7 +314,7 @@ final class ThemeRenderer
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
             'is_authenticated' => false, 'is_platform_admin' => false, 'is_company_admin' => false,
             'is_course_editor' => false, 'is_course_owner' => false, 'user_email' => '', 'authenticated_email' => '', 'user_name' => '',
-            'load_ckeditor' => false, 'load_question_editor' => false, 'load_assessment_timer' => false, 'load_mailing_editor' => false,
+            'load_ckeditor' => false, 'load_question_editor' => false, 'load_assessment_timer' => false, 'load_mailing_editor' => false, 'load_inbox_editor' => false,
             'course_content_mode' => false, 'flash_messages' => [], 'permissions' => [],
         ] as $key => $value) {
             $model[$key] = $value;
@@ -346,18 +323,16 @@ final class ThemeRenderer
 
         $appName = $this->settings->platformName();
         $appUrl = rtrim(Env::string('APP_URL'), '/');
-        $family = $this->pageFamily($page);
-        $themeInfo = $this->themes->theme($themeKey);
-        $assetUrl = $this->themes->themeAssetUrl($themeKey);
         $csrf = Csrf::token();
 
         $model['app_name'] = $appName;
         $model['app_url'] = $appUrl;
-        $model['theme_name'] = (string) $themeInfo['name'];
-        // The theme's <html> carries it as data-bs-theme, so Bootstrap's light-dark() colours follow the theme.
-        $model['color_scheme'] = (string) ($themeInfo['color_scheme'] ?? 'light');
-        $model['theme_asset_url'] = $assetUrl;
-        $model['theme_preview_active'] = $previewActive;
+        // The theme's part, from CattoPHP's PageRenderer: its name, its colour scheme (the theme's <html> carries it as
+        // data-bs-theme), its folder's address, whether this is a preview, and the theme object below.
+        $model['theme_name'] = $view['theme_name'];
+        $model['color_scheme'] = $view['color_scheme'];
+        $model['theme_asset_url'] = $view['theme_asset_url'];
+        $model['theme_preview_active'] = $view['theme_preview_active'];
         $model['csrf'] = $csrf;
         $model['current_uri'] = (string) ($_SERVER['REQUEST_URI'] ?? '/');
         $model = $this->siteModeScalars() + $model;
@@ -375,9 +350,11 @@ final class ThemeRenderer
             $this->platformAsset('/css/bootstrap-reboot.min.css'),
             $this->platformAsset('/css/bootstrap-grid.min.css'),
             $this->platformAsset('/css/bootstrap-utilities.min.css'),
+            // CattoPHP's components on the page (CattoPHP Phase 3, step 8b), then cattolms's own stylesheet.
+            $this->platformAsset('/cattophp/css/cattophp.css'),
             $this->platformAsset('/css/catto-platform.css'),
         ];
-        if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false) || (bool) ($data['load_mailing_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
+        if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false) || (bool) ($data['load_mailing_editor'] ?? false) || (bool) ($data['load_inbox_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
         // CatWalk, the presentation engine, only on a page that shows a deck (owner, 2026-10-28, decision 7A).
         if ((bool) ($data['load_catwalk'] ?? false)) $platformStyles[] = $this->platformAsset('/css/catwalk.css');
         // htmx is a platform-owned progressive enhancement: every surface that uses it renders
@@ -386,11 +363,18 @@ final class ThemeRenderer
         // no Bootstrap script: nothing uses one, and any later need comes through the importmap.
         $platformScripts = [
             $this->platformAsset('/js/htmx.min.js'),
+            // CattoPHP's components in the browser (CattoPHP Phase 3, step 8), copied into the web root by Composer
+            // (vendor/bin/cattophp-assets), then cattolms's own behaviour.
+            $this->platformAsset('/cattophp/js/cattophp.js'),
             $this->platformAsset('/js/platform-overrides.js'),
+            // What pages once did with scripts and handlers written into them, which the content policy refuses.
+            $this->platformAsset('/js/page-controls.js'),
         ];
         if ((bool) ($data['load_ckeditor'] ?? false)) {
             $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
             $platformScripts[] = $this->platformAsset('/js/ck-main.js');
+            // Its emoji picker reads the list of emoji from CKEditor's own server; the content policy allows that on this page only.
+            $this->policy?->allow('connect-src', 'https://cdn.ckeditor.com');
         } elseif ((bool) ($data['load_certificate_editor'] ?? false)) {
             // The certificate wording editor: CKEditor with only paragraphs, text styles, bold,
             // italic, alignment and fields, so the stored wording is exactly what a certificate can show.
@@ -401,6 +385,11 @@ final class ThemeRenderer
         if ((bool) ($data['load_mailing_editor'] ?? false) && !(bool) ($data['load_ckeditor'] ?? false) && !(bool) ($data['load_certificate_editor'] ?? false)) {
             $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
             $platformScripts[] = $this->platformAsset('/js/ck-mailing.js');
+        }
+        // An Inbox reply and the HTML signature (owner, 2026-11-11): CKEditor with headings, text styles, lists, links and tables.
+        if ((bool) ($data['load_inbox_editor'] ?? false) && !(bool) ($data['load_ckeditor'] ?? false) && !(bool) ($data['load_certificate_editor'] ?? false) && !(bool) ($data['load_mailing_editor'] ?? false)) {
+            $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
+            $platformScripts[] = $this->platformAsset('/js/ck-inbox.js');
         }
         if ((bool) ($data['load_question_editor'] ?? false)) $platformScripts[] = $this->platformAsset('/js/question-editor.js');
         if ((bool) ($data['load_catwalk'] ?? false)) $platformScripts[] = $this->platformAsset('/js/catwalk.js');
@@ -418,21 +407,17 @@ final class ThemeRenderer
             // changed icon reaches a browser that already cached the old one.
             'icon_sprite' => $this->platformAsset('/img/nav-icons.svg'),
         ];
-        $model['identity_placement'] = $themeInfo['slug'] === 'gilded-noir' ? 'navigation' : 'page';
-        $model['theme'] = [
-            'name' => (string) $themeInfo['name'],
-            'version' => (string) $themeInfo['version'],
-            'slug' => (string) $themeInfo['slug'],
-            'key' => $themeKey,
-            'asset_url' => $assetUrl,
-            'styles' => $this->themes->themeStyles($themeKey),
-            'scripts' => $this->themes->themeScripts($themeKey),
-            'external_styles' => $this->themes->externalStyles($themeKey),
-            'external_scripts' => $this->themes->externalScripts($themeKey),
-            'is_child' => (bool) $themeInfo['is_child'],
-            'parent_name' => (string) $themeInfo['parent_name'],
-            'parent_version' => (string) $themeInfo['parent_version'],
+        $model['identity_placement'] = ($view['theme']['slug'] ?? '') === 'gilded-noir' ? 'navigation' : 'page';
+        // The identity band's own words and ways in (CattoPHP's page head draws the band, CattoPHP Phase 3): the profile the
+        // account reference opens, and for a reader signed out the greeting, what signing in gives them and the ways in.
+        $model['identity_profile_href'] = '/account/profile';
+        $model['identity_welcome'] = 'Welcome to ' . $appName;
+        $model['identity_invitation'] = 'Sign in to see your courses, or register to start one.';
+        $model['identity_actions'] = [
+            ['label' => 'Sign in', 'variant' => 'primary', 'href' => '/login', 'icon' => 'nav-signin'],
+            ['label' => 'Register', 'variant' => 'secondary', 'href' => '/register', 'icon' => 'action-register'],
         ];
+        $model['theme'] = $view['theme'];
         // The page canvas carries the slanted texture on every theme. It is added here rather than
         // asked of each theme's body rule, because the texture is a named platform element and a
         // theme that painted its own would fork it. A theme re-colours it through the three
@@ -467,7 +452,7 @@ final class ThemeRenderer
         ];
         $model['navigation'] = $navigation;
         $model['footer_navigation'] = $this->footerNavigation();
-        $model['footer_social'] = $this->footerSocial($data);
+        $model['footer_social'] = $this->footerSocial();
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
         // A public page's head completed (the SEO brief, 2026-11-09; PageMetadata::complete): its own description, its
@@ -475,7 +460,7 @@ final class ThemeRenderer
         // titled as such. Every other page (signing in, the cart, checkout, a lesson's preview, Administration) asks not to
         // be indexed, so only the public pages are found.
         $pageMeta = (array) ($data['page_meta'] ?? []);
-        $public = \CattoLearning\Search\StructuredData::isPublicPage($page);
+        $public = \CattoLearning\Search\CatalogueStructuredData::isPublicPage($page);
         if ($public && $this->metadata !== null) {
             $pageMeta = $this->metadata->complete($page, $pageMeta, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'), $_GET, $model['page']['title']);
         } elseif (!$public && trim((string) ($pageMeta['robots'] ?? '')) === '') {
@@ -486,14 +471,14 @@ final class ThemeRenderer
         // The trail every theme draws above a public page, as structured data (owner, 2026-11-06): never on a page that is
         // not public or asks not to be indexed (an ADMIN preview), and never on a demo site's word alone, which follows.
         if ($public && !str_contains($model['meta']['robots'], 'noindex')) {
-            $base = \CattoLearning\Search\StructuredData::base($appUrl);
-            $trail = $base === null ? null : \CattoLearning\Search\StructuredData::breadcrumbs($model['breadcrumbs'], $base, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'));
-            if ($trail !== null) $model['meta']['structured_data'][] = \CattoLearning\Search\StructuredData::encode($trail);
+            $base = \CattoPHP\Search\StructuredData::base($appUrl);
+            $trail = $base === null ? null : \CattoPHP\Search\StructuredData::breadcrumbs($model['breadcrumbs'], $base, (string) (parse_url($model['current_uri'], PHP_URL_PATH) ?: '/'));
+            if ($trail !== null) $model['meta']['structured_data'][] = \CattoPHP\Search\StructuredData::encode($trail);
         } else {
             $model['meta']['structured_data'] = [];
             $model['meta']['verification'] = [];
         }
-        // A demo site asks search engines not to list any page (PlatformResponseHeadersListener says so too).
+        // A demo site asks search engines not to list any page (CattoPHP's security headers say so too).
         if ($model['site_demo']) $model['meta']['robots'] = 'noindex, nofollow';
         $model['sidebar'] = '';
 
@@ -507,14 +492,18 @@ final class ThemeRenderer
      */
     public function render(string $page, array $data = [], int $status = 200): string
     {
-        if (preg_match('/^[a-zA-Z0-9_\/-]+$/', $page) !== 1) {
-            throw new RuntimeException('Invalid page template.');
-        }
-        $this->assertTemplateData($data);
+        return $this->pages->render($page, $data);
+    }
 
-        [$themeKey, $previewActive] = $this->resolveTheme($data);
-        $family = $this->pageFamily($page);
-
+    /**
+     * The sections drawn before the page: Administration's, and the Account's or the Company's, which a theme's wrapper may
+     * rearrange but never replace.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    public function prepare(string $page, string $family, array $data): array
+    {
         if ($family === 'admin') {
             $data = $this->materialiseAdministrationSections($data);
         }
@@ -525,16 +514,15 @@ final class ThemeRenderer
             $data = $this->materialiseGenericSections($data, 'company');
         }
 
-        $context = $this->viewModel($page, $data, $themeKey, $previewActive);
-        // The layout a page extends: the theme's optional wrapper for this family, or its base.
-        // Resolved here so no platform page template has to know which themes ship wrappers.
-        $context['layout'] = in_array($family, ['course-player', 'assessment'], true)
-            ? '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/layout/course-presentation.html.twig'
-            : $this->templates->layoutFor($family);
+        return $data;
+    }
 
-        return $this->stampGenerator(
-            $this->twig->render($this->templates->pageTemplate($page), $context)
-        );
+    /** The reader's own frame for a course being taken and its assessments; every other family is the theme's. */
+    public function layout(string $family): ?string
+    {
+        return in_array($family, ['course-player', 'assessment'], true)
+            ? '@' . Templates::PLATFORM_NAMESPACE . '/layout/course-presentation.html.twig'
+            : null;
     }
 
     /**
@@ -722,7 +710,9 @@ final class ThemeRenderer
                     continue;
                 }
                 $section = $visibleSections[$sectionKey];
-                $grandchildren[] = $child('admin-' . $sectionKey, $section['label'], $section['route'], $section['icon']);
+                // Courses says how many published courses have no price on sale (owner, 2026-11-11: "(X expired prices)").
+                $unpriced = $sectionKey === 'courses' && isset($this->attentionRecords) ? $this->attentionRecords->coursesWithoutAPriceCount() : 0;
+                $grandchildren[] = $child('admin-' . $sectionKey, $section['label'] . ($unpriced > 0 ? ' (' . $unpriced . ' expired ' . ($unpriced === 1 ? 'price' : 'prices') . ')' : ''), $section['route'], $section['icon']);
 
                 // The layouts of course pages, straight under Courses (owner, 2026-11-01: "a menu item for Course page
                 // layouts in Administration>Courses, and put the menu-item under Courses").
@@ -770,11 +760,8 @@ final class ThemeRenderer
                 if ($sectionKey === 'companies' && isset($visibleSections['company_creators'])) {
                     $grandchildren[] = $child('admin-company-creators', 'Course Creators', '/admin/companies/creators', 'companies');
                 }
-                // Messages sent through the contact form (owner, 2026-10-20), those not answered counted in
-                // the label, as Course Reviews counts its queue.
+                // Messages sent through the contact form are in the Inbox, a menu of its own (owner, 2026-11-11).
                 if ($sectionKey === 'companies' && $this->can($data, 'PLATFORM.PERSON.VIEW')) {
-                    $unanswered = isset($this->contactMessages) ? $this->contactMessages->unansweredCount() : 0;
-                    $grandchildren[] = $child('admin-contact-messages', 'Contact Messages' . ($unanswered > 0 ? ' (' . $unanswered . ' new)' : ''), '/admin/messages', 'people');
                     // Every registration attempt with its risk (owner, 2026-10-26).
                     $grandchildren[] = $child('admin-signup-attempts', 'Sign-up Attempts', '/admin/people/signup-attempts', 'people');
                 }
@@ -805,6 +792,8 @@ final class ThemeRenderer
                 $grandchildren[] = $child('admin-money-ledger', 'Money Ledger', '/admin/commerce/ledger', 'credits');
                 // Each month's money in one report, on the page, as a PDF and as an Excel file (owner, 2026-11-06).
                 $grandchildren[] = $child('admin-money-reports', 'Money Reports', '/admin/commerce/reports', 'reports');
+                // The Stitch account and its records, matched to this site's orders (owner, 2026-11-11).
+                $grandchildren[] = $child('admin-stitch', 'Stitch', '/admin/commerce/stitch', 'credits');
             }
             // Refunds asked for in the LMS, every wallet, and the commerce settings (owner, 2026-10-17).
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.REFUND.VIEW')) {
@@ -857,6 +846,21 @@ final class ThemeRenderer
                 $child('mailing-reports', 'Reports', '/mailing/reports', 'reports'),
             ];
             $items[] = $item('mailing', 'Mailing', '/mailing', 'contact', $active === 'mailing', children: $mailingChildren);
+        }
+
+        // The Inbox, a menu of its own (owner, 2026-11-11: "create a new top menu called Inbox and have all it's menu-items
+        // come off it"; approved mockup): what is new counted in the labels, as the mockup shows it.
+        if ($this->can($data, 'PLATFORM.INBOX.VIEW')) {
+            $counts = isset($this->inbox) ? $this->inbox->counts() : ['new' => 0, 'drafts' => 0, 'spam' => 0, 'trash' => 0];
+            $inboxChildren = [
+                $child('inbox-inbox', 'Inbox' . ($counts['new'] > 0 ? ' (' . $counts['new'] . ' new)' : ''), '/inbox', 'inbox'),
+                $child('inbox-sent', 'Sent', '/inbox/sent', 'inbox-sent'),
+                $child('inbox-drafts', 'Drafts' . ($counts['drafts'] > 0 ? ' (' . $counts['drafts'] . ')' : ''), '/inbox/drafts', 'inbox-drafts'),
+                $child('inbox-spam', 'Spam' . ($counts['spam'] > 0 ? ' (' . $counts['spam'] . ')' : ''), '/inbox/spam', 'inbox-spam'),
+                $child('inbox-trash', 'Trash' . ($counts['trash'] > 0 ? ' (' . $counts['trash'] . ')' : ''), '/inbox/trash', 'inbox-trash'),
+                $child('inbox-settings', 'Settings', '/inbox/settings', 'settings'),
+            ];
+            $items[] = $item('inbox', 'Inbox' . ($counts['new'] > 0 ? ' (' . $counts['new'] . ')' : ''), '/inbox', 'inbox', $active === 'inbox', children: $inboxChildren);
         }
 
         if ((bool) ($data['is_authenticated'] ?? false)) {
@@ -946,23 +950,18 @@ final class ThemeRenderer
     /**
      * The platform's own social marks, for the footer.
      *
-     * Core owns the list and the symbols; where the address comes from is the installation's
-     * business. A mark links to the platform's own home page (SocialPlatform::home) until the
-     * installation's settings supply a profile address in platform_social, which replaces it
-     * (owner, 2026/10/17). So every mark is a link, and never a link to nowhere.
+     * Core owns the list and the symbols; the addresses are the site's own profiles, set at Settings > Footer social media
+     * (Configuration\FooterSocial, owner 2026-11-09). With none set, each mark links to its platform's home page
+     * (SocialPlatform::home, owner 2026/10/17), so every mark is a link, and never a link to nowhere.
      *
-     * The keys are SocialPlatform's, so a mark and a link cannot disagree about which service
-     * they name.
+     * The keys are SocialPlatform's, so a mark and a link cannot disagree about which service they name.
      *
-     * @param array<string,mixed> $data
      * @return list<array{key:string,label:string,href:string}>
      */
-    private function footerSocial(array $data): array
+    private function footerSocial(): array
     {
-        $configured = $data['platform_social'] ?? [];
-
-        // The same marks the home page's Organization reads its social profiles from (Search\PageMetadata).
-        return SocialPlatform::footerMarks(is_array($configured) ? $configured : []);
+        // The same profiles the home page's Organization names as its own (Search\PageMetadata).
+        return $this->socialProfiles?->marks() ?? SocialPlatform::footerMarks([]);
     }
 
     /**
@@ -1012,6 +1011,7 @@ final class ThemeRenderer
         'dashboard', 'people', 'companies', 'courses', 'enrolments', 'credits',
         'requests', 'activity', 'reports', 'themes', 'settings', 'roles', 'seed',
         'sessions', 'learning', 'profile', 'social',
+        'inbox', 'inbox-sent', 'inbox-drafts', 'inbox-spam', 'inbox-trash',
     ];
 
     /** The symbol an unknown key resolves to, so a menu item is never iconless. */
@@ -1248,7 +1248,7 @@ final class ThemeRenderer
             'og' => $og,
             'twitter_card' => in_array($card, ['summary', 'summary_large_image'], true) ? $card : '',
             'verification' => $verification,
-            // Each one a JSON-LD node already encoded so it cannot close its script (StructuredData::encode).
+            // Each one a JSON-LD node already encoded so it cannot close its script (CattoPHP\Search\StructuredData::encode).
             'structured_data' => array_values(array_filter((array) ($meta['structured_data'] ?? []), 'is_string')),
         ];
     }
@@ -1265,6 +1265,11 @@ final class ThemeRenderer
             throw new RuntimeException('Unknown page width "' . $width . '" for ' . $page . '. A page is wide, or full for Home and course landing pages.');
         }
         return $width;
+    }
+
+    public function family(string $page): string
+    {
+        return $this->pageFamily($page);
     }
 
     private function pageFamily(string $page): string
@@ -1430,7 +1435,7 @@ final class ThemeRenderer
     private function fragment(string $template, array $data): string
     {
         return $this->twig->render(
-            '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/' . $template,
+            '@' . Templates::PLATFORM_NAMESPACE . '/' . $template,
             array_merge($this->platformScalars(), $data)
         );
     }
@@ -1445,6 +1450,12 @@ final class ThemeRenderer
      *
      * @return array<string,mixed>
      */
+    public function scalars(): array
+    {
+        return $this->platformScalars();
+    }
+
+    /** @return array<string,mixed> */
     private function platformScalars(): array
     {
         return [
@@ -1473,22 +1484,4 @@ final class ThemeRenderer
             'site_simulation' => $this->site !== null ? $this->site->simulation() : \CattoLearning\Configuration\SiteMode::SIMULATION];
     }
 
-    /** @param array<string,mixed> $data */
-    private function assertTemplateData(array $data): void
-    {
-        foreach ($data as $key => $value) {
-            if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $key) !== 1) throw new RuntimeException('Invalid template variable name: ' . $key);
-            $this->assertTemplateValue($value, $key);
-        }
-    }
-
-    private function assertTemplateValue(mixed $value, string $path): void
-    {
-        if ($value === null || is_scalar($value)) return;
-        if (is_array($value)) {
-            foreach ($value as $key => $child) $this->assertTemplateValue($child, $path . '[' . (string) $key . ']');
-            return;
-        }
-        throw new RuntimeException('Template data contains an object at ' . $path . '.');
-    }
 }

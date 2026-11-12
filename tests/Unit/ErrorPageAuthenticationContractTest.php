@@ -17,10 +17,12 @@ final class ErrorPageAuthenticationContractTest extends TestCase
     public function testHtmlErrorRendererUsesCurrentAuthenticationWhenAvailable(): void
     {
         // The error page goes through the ordinary theme renderer rather than a second, plainer
-        // path - which is what keeps a failed request looking like the same site.
-        $listener = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Symfony/Listener/ErrorPageListener.php');
+        // path - which is what keeps a failed request looking like the same site. CattoPHP decides what it says and
+        // ThemedErrorPage draws it (CattoPHP Phase 2, step 7a).
+        $listener = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/ThemedErrorPage.php');
         self::assertStringContainsString('ThemeRenderer $view', $listener);
         self::assertStringContainsString("view->render('error'", $listener);
+        self::assertStringContainsString('CattoLearning\\Http\\ThemedErrorPage', (string) file_get_contents(dirname(__DIR__, 2) . '/config/packages/cattophp.yaml'));
 
         // Every flag the chrome reads is derived from the identity of the request that failed, so
         // an error page shows the navigation the reader actually has rather than the public one: the

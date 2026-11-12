@@ -39,12 +39,16 @@ final class FormSpacingContractTest extends TestCase
 {
     private static function css(): string
     {
-        $path = dirname(__DIR__, 2) . '/public_html/css/catto-platform.css';
-        self::assertFileExists($path);
+        // Core CSS is CattoPHP's components' stylesheet and cattolms's own, loaded in that order (CattoPHP Phase 3, step 8b).
+        $css = '';
+        foreach ([dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css', dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'] as $path) {
+            self::assertFileExists($path);
+            $css .= (string) file_get_contents($path) . "\n";
+        }
 
         // Comments are stripped, or the block explaining a rule keeps the rule passing after the
         // rule itself is deleted.
-        return (string) preg_replace('#/\*.*?\*/#s', '', (string) file_get_contents($path));
+        return (string) preg_replace('#/\*.*?\*/#s', '', $css);
     }
 
     /**
@@ -215,7 +219,7 @@ final class FormSpacingContractTest extends TestCase
 
     private static function stylesheet(): string
     {
-        $css = (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css');
+        $css = ((string) file_get_contents(__DIR__ . '/../../vendor/rrcatto/cattophp/public/css/cattophp.css') . (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css'));
 
         return (string) preg_replace('#/\*.*?\*/#s', '', $css);
     }

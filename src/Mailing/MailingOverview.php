@@ -15,6 +15,8 @@ itself, a message scheduled), the figures, what went out most recently with its 
 digests go, and the lists that grew most in the past 30 days.
 
 Changelog:
+2026/11/12 SAST
+- catto-mail's connection is CattoPHP's (CattoPHP Phase 4, step 9).
 2026/10/28 SAST
 - Created.
 */
@@ -23,6 +25,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Mailing;
 
+use CattoPHP\Mailing\CattoMail\CattoMailConnection;
 use DateTimeImmutable;
 use Symfony\Component\Clock\ClockInterface;
 
@@ -38,7 +41,7 @@ final class MailingOverview
         private readonly UpdateDelivery $delivery,
         private readonly MailingSettings $settings,
         private readonly ClockInterface $clock,
-        private readonly ?CattomailConnection $cattomail = null,
+        private readonly ?CattoMailConnection $cattomail = null,
     ) {
     }
 

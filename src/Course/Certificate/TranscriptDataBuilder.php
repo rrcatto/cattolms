@@ -18,6 +18,9 @@ stored with the transcript exactly as built.
 Changelog:
 2026/10/19 SAST
 - Created.
+2026/11/11 SAST
+- A short course (Course Specification 4.13, section 15): course.short_course says so, its one assessment is listed as
+  Assessment, and its mark is the result, with no module average.
 */
 
 declare(strict_types=1);
@@ -61,6 +64,7 @@ final class TranscriptDataBuilder
             'course.provider' => $optional($this->courses->certificateProviderName((int) $row['course_id'])),
             'course.completion_date' => $completed !== '' ? (new DateTimeImmutable($completed))->format(DATE_ATOM) : $issuedAt->format(DATE_ATOM),
             'course.accreditation' => $optional($row['certificate_accreditation'] ?? null),
+            'course.short_course' => $this->items->courseType((int) $row['course_id']) === 'short' ? 'Short course' : null,
             'result.module_average' => $hasModules ? self::percent($row['module_percentage'] ?? 0) : null,
             'result.final' => self::percent($row['final_percentage'] ?? 0),
             'result.overall' => self::percent($row['overall_percentage'] ?? 0),
@@ -84,12 +88,14 @@ final class TranscriptDataBuilder
         usort($contexts, static fn(array $a, array $b): int => [($order[(int) $a['node_id']] ?? PHP_INT_MAX), $a['assessment_role'] === 'final' ? 1 : 0, (int) $a['course_item_id']]
             <=> [($order[(int) $b['node_id']] ?? PHP_INT_MAX), $b['assessment_role'] === 'final' ? 1 : 0, (int) $b['course_item_id']]);
         $marks = [];
+        $short = $this->items->courseType($courseId) === 'short';
         foreach ($contexts as $context) {
             $scores = $this->assessments->completedPercentages($enrolmentId, (int) $context['course_item_id'], (int) $context['node_id']);
             if ($scores === []) continue;
             $marks[] = [
                 'title' => mb_substr((string) ($context['item_title'] ?? $context['item_key']), 0, 240),
-                'kind' => $context['assessment_role'] === 'final' ? 'Final assessment' : 'Module assessment',
+                // A short course's one assessment is neither a module's nor a final (specification 4.13, section 15.5).
+                'kind' => $short ? 'Assessment' : ($context['assessment_role'] === 'final' ? 'Final assessment' : 'Module assessment'),
                 'mark' => self::percent(ScorePolicy::aggregate($scores, (string) $context['score_policy'])),
             ];
         }

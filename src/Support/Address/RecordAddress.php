@@ -71,12 +71,12 @@ final class RecordAddress
     }
 
     /**
-     * A contact message in Administration: /admin/messages/MSG-000043.
+     * A conversation in the Inbox: /inbox/MSG-000043 (owner, 2026-11-11: the Inbox replaced Contact Messages).
      *
      * @param array<string,mixed>|string $message
      */
     public static function message(array|string $message, string $rest = ''): string
     {
-        return '/admin/messages/' . AddressKey::read($message, ['message_reference', 'reference'], self::MESSAGE, 'a contact message') . $rest;
+        return '/inbox/' . AddressKey::read($message, ['message_reference', 'reference'], self::MESSAGE, 'a contact message') . $rest;
     }
 }

@@ -11,6 +11,10 @@ Description:
 Handles web requests for auth operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): Sign in and Register are guarded by its FormGuard, the same rules.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/11/05 SAST
 - Telegram sign-in and two-step sign-in (owner, 2026-11-05, the approved mockup): /login offers Email address or Telegram
   account as feature cards while Settings offers Telegram, and reads only the chosen one; /login/telegram takes the code in
@@ -36,8 +40,9 @@ use CattoLearning\Auth\TwoStep\PendingSignIn;
 use CattoLearning\Auth\UnknownLoginEmailException;
 use CattoLearning\Support\ClientFingerprint;
 use CattoLearning\Support\Countries;
-use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\View\ThemeRenderer;
+use CattoPHP\Network\GeoIp;
+use CattoPHP\Signup\SignupChecks;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -52,7 +57,7 @@ final class AuthController extends BaseController
     /** What a refused registration keeps to fill the form in again: never the ID number. */
     private const DRAFT = ['account_type', 'first_name', 'middle_names', 'last_name', 'company_name', 'country', 'news'];
 
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly GeoIpLocator $geoIp, private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null, private readonly ?\CattoLearning\SiteAnalytics\FormGuard $forms = null)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly GeoIp $geoIp, private readonly SignupChecks $signupChecks, private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null, private readonly ?\CattoPHP\Protection\FormGuard $forms = null)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -86,7 +91,7 @@ final class AuthController extends BaseController
         return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')),
             'draft' => $draft, 'country' => $country, 'countries' => Countries::options(),
             // The sign-up check's signed opening time, and the demo site's notice that the account will be held (owner, 2026-10-26).
-            'signup_opened' => \CattoLearning\Auth\Signup\SignupChecks::formStamp(),
+            'signup_opened' => $this->signupChecks->stamp(),
             'hold_notice' => $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : ''] + $this->followAsked($_GET['follow'] ?? ''));
     }
 
@@ -95,7 +100,7 @@ final class AuthController extends BaseController
     {
         $this->requireCsrf();
         // On the refused list: the usual page, and nothing sent or kept (site analytics, owner 2026-11-04).
-        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::REGISTER, $_POST, (string) ($_POST['email'] ?? '')) === true) $this->redirect('/login/sent?registered=1');
+        if ($this->forms?->refuses(\CattoPHP\Protection\FormGuard::REGISTER, $_POST, (string) ($_POST['email'] ?? '')) === true) $this->redirect('/login/sent?registered=1');
         try {
             $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses')));
         } catch (\Throwable $e) {
@@ -127,7 +132,7 @@ final class AuthController extends BaseController
         if ($how === 'email' && trim($email) === '' && $typed !== '') $how = 'telegram';
         if ($how === 'telegram' && $this->auth->telegramSignInOffered()) $this->requestTelegram($typed, $returnPath, $follow?->text() ?? '', false);
         // A bot's form, or an address on the refused list: the usual page, and nothing sent (site analytics, owner 2026-11-04).
-        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::SIGN_IN, $_POST, $email) === true) $this->redirect('/login/sent');
+        if ($this->forms?->refuses(\CattoPHP\Protection\FormGuard::SIGN_IN, $_POST, $email) === true) $this->redirect('/login/sent');
         try {
             $this->auth->requestLogin($email, $returnPath, $follow?->text() ?? '');
         } catch (UnknownLoginEmailException $e) {
@@ -174,7 +179,7 @@ final class AuthController extends BaseController
             'hold_notice' => isset($_GET['registered']) && $this->auth->demoHoldsRegistrations() ? \CattoLearning\Auth\AuthService::DEMO_HOLD_NOTICE : '',
             // A sign-in link's own words while Telegram is offered too (the approved mockup).
             'sign_in_words' => !isset($_GET['registered']) && $this->auth->telegramSignInOffered(),
-            'link_lasts' => \CattoLearning\Support\Duration::ofSeconds(\CattoLearning\Support\Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'))->words()]);
+            'link_lasts' => \CattoPHP\Foundation\Duration::ofSeconds($this->auth->linkLifetime())->words()]);
     }
 
     /**
@@ -191,7 +196,7 @@ final class AuthController extends BaseController
         }
         $row = null;
         // A bot's form, or an address on the refused list: the usual page, and nothing sent (site analytics, owner 2026-11-04).
-        if ($this->forms?->refuses(\CattoLearning\SiteAnalytics\FormGuard::SIGN_IN, $_POST, $typed) !== true) {
+        if ($this->forms?->refuses(\CattoPHP\Protection\FormGuard::SIGN_IN, $_POST, $typed) !== true) {
             try {
                 $row = $this->auth->requestTelegramLogin($typed, $returnPath, $follow);
             } catch (\Throwable $fault) {

@@ -18,7 +18,7 @@
 			{% if course.cover_media_public_id %}
 				<img src="/course-media/{{ course.cover_media_public_id }}" class="cl-course-cover" alt="">
 			{% elseif course.cover_svg is defined and course.cover_svg starts with '<svg' %}
-				{{ course.cover_svg|raw }}
+				{{ course.cover_svg|authored }}
 			{% else %}
 				<div class="cl-course-cover-placeholder">
 					<span>{{ course.cover_initial|default(course.title|slice(0, 1)|upper) }}</span>
@@ -57,7 +57,9 @@
 			</div>
 		{% endif %}
 		{# A marked-down course is flagged as a special (owner, 2026-10-20), its was price struck through in the Price row. A bundle says what it saves under its price instead. #}
-		{% if course.saving_percent|default(null) %}<p class="cl-course-card-special">{{ ui('feedback.badge', {label: 'Special: save ' ~ course.saving_percent ~ '%', tone: 'success'}) }}</p>{% endif %}
+		{# A short course says so with its time in minutes (Course Specification 4.13, section 15; owner, 2026-11-11). #}
+		{% set card_short = course.course_type|default('full') == 'short' %}
+		{% if course.saving_percent|default(null) or card_short %}<p class="cl-course-card-special">{% if card_short %}{{ ui('feedback.badge', {label: 'Short course' ~ (course.estimated_minutes|default(0) ? ' · about ' ~ ((course.estimated_minutes / 5)|round * 5) ~ ' minutes' : ''), tone: 'info'}) }}{% endif %}{% if course.saving_percent|default(null) %} {{ ui('feedback.badge', {label: 'Special: save ' ~ course.saving_percent ~ '%', tone: 'success'}) }}{% endif %}</p>{% endif %}
 		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label), was: course.default_was_label|default(null)}]}) }}
 		{# A bundle says what it saves under its price (owner, 2026-11-06, the approved mockup), and its percentage (2026-11-09). #}
 		{# One whose sale starts later says when (owner, 2026-11-06: "show me WHEN the bundle will be available to purchase"). #}

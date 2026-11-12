@@ -6,7 +6,7 @@
 	<section class="cl-page-head cl-course-head">
 		<div class="cl-container py-12">
 			<div class="cl-bundle-head">
-				{% if bundle.cover_svg|default('') starts with '<svg' %}<div class="cl-bundle-head-art" aria-hidden="true">{{ bundle.cover_svg|raw }}</div>{% endif %}
+				{% if bundle.cover_svg|default('') starts with '<svg' %}<div class="cl-bundle-head-art" aria-hidden="true">{{ bundle.cover_svg|authored }}</div>{% endif %}
 				<div class="cl-bundle-head-band">
 					<p class="cl-bundle-head-kind"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg><span>Course bundle · {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }}</span></p>
 					{# The same star as its card's and a course's (owner, 2026-11-06), beside the title. #}
@@ -31,7 +31,7 @@
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			<h2 class="h4">About this bundle</h2>
-			{% if bundle.description_html %}<div class="cl-prose mb-12">{{ bundle.description_html|raw }}</div>{% endif %}
+			{% if bundle.description_html %}<div class="cl-prose mb-12">{{ bundle.description_html|authored }}</div>{% endif %}
 			<h3 class="h4 mb-5" id="bundle-courses-heading">Courses in this bundle</h3>
 			<ol aria-labelledby="bundle-courses-heading">{% for course in bundle.courses %}<li>{{ course.title }}</li>{% endfor %}</ol>
 			{{ ui('catalogue.course-grid', {courses: bundle.course_cards}) }}
@@ -54,6 +54,12 @@
 				{{ ui('feedback.notice', {tone: 'info', heading: bundle.on_sale_from_label}) }}
 			{% elseif bundle.unavailable %}
 				{{ ui('feedback.notice', {tone: 'warning', heading: bundle.unavailable}) }}
+			{% elseif company_buy_href|default('') %}
+				{# A Company Administrator buys bundle credits for the company (owner, 2026-11-11). #}
+				<p class="cl-course-purchase-note">{{ bundle_rule }}</p>
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+					{{ ui('action.link', {label: 'Buy for my company', variant: 'primary', size: 'normal', href: company_buy_href, icon: 'action-buy'}) }}
+				{% endblock %}{% endembed %}
 			{% elseif company_note %}
 				<p class="cl-course-purchase-note">{{ company_note }}</p>
 			{% else %}
@@ -67,6 +73,8 @@
 					{% endblock %}{% endembed %}
 				</form>
 			{% endif %}
+			{# Share this bundle (owner, 2026-11-09: "free organic marketing"), by its canonical address. #}
+			{% include '@platform/partials/share-page.html.twig' with {sh_url: meta.canonical|default('') ?: app.base_url|trim('/', 'right') ~ '/bundles/' ~ bundle.slug, sh_title: bundle.title, sh_what: 'bundle'} %}
 		{% endblock %}{% endembed %}
 	</section>
 {% endblock %}

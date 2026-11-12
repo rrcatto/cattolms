@@ -14,7 +14,7 @@
 		{% if campaign.status in ['draft', 'cancelled'] and figures.total == 0 %}<form action="/mailing/messages/{{ campaign.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove', confirm: 'Delete ' ~ campaign.name ~ '? It cannot be undone.'}) }}</form>{% endif %}
 	{% endset %}
 	{% endif %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{# A list's welcome email can be changed at any time: each copy is drawn when it is sent. #}
 	{% set mc_open = campaign.status in ['draft', 'awaiting_approval', 'paused'] or campaign.kind == 'welcome' %}
 
@@ -230,13 +230,13 @@
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'copies'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Copies', summary: 'Each person\'s copy and what became of it.'}) }}
 		<form class="cl-mailing-filter" method="get" action="/mailing/messages/{{ campaign.id }}#copies">
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', for: 'mc-copies-status'})} %}{% block control %}<select class="cl-input" id="mc-copies-status" name="copies_status" onchange="this.form.submit()" {{ ui_field_attrs(props) }}><option value="">Every copy</option>{% for key, status in delivery_statuses %}<option value="{{ key }}"{{ key == copies_status ? ' selected' : '' }}>{{ status[0] }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', for: 'mc-copies-status'})} %}{% block control %}<select class="cl-input" id="mc-copies-status" name="copies_status" data-submit-on-change {{ ui_field_attrs(props) }}><option value="">Every copy</option>{% for key, status in delivery_statuses %}<option value="{{ key }}"{{ key == copies_status ? ' selected' : '' }}>{{ status[0] }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 		</form>
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'copies', pagination: copies_pagination})} %}{% block results %}
 			{% if copies %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'What became of it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Clicked'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Detail'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Person'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'What became of it'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Opened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Clicked'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Detail'}} %}</tr>{% endblock %}
 			{% block body %}{% for copy in copies %}<tr>
 				<td class="cell-text">{% if copy.user_id %}{{ ui('data.person', {name: copy.name, href: person_url(copy.account_reference)}) }}{% else %}{{ copy.email }}{% endif %}</td>
 				<td>{{ ui('feedback.badge', {label: delivery_statuses[copy.status][0], tone: delivery_statuses[copy.status][1]}) }}{% if copy.unsubscribed_at %} {{ ui('feedback.badge', {label: 'Unsubscribed', tone: 'neutral'}) }}{% endif %}</td>
@@ -256,7 +256,7 @@
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'links'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Links', summary: 'Each link in the email and how often it was clicked, most first.'}) }}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Link'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Clicks'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'People'}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Link'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Clicks'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'People'}} %}</tr>{% endblock %}
 		{% block body %}{% for link in links %}<tr><td class="cell-text"><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.url }}</a></td><td>{{ link.clicks }}</td><td>{{ link.people }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
 	{% endblock %}{% endembed %}</section>

@@ -41,7 +41,7 @@ use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
-use CattoLearning\Support\GeoIpLocator;
+use CattoPHP\Network\GeoIp;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\FakeMailer;
 use InvalidArgumentException;
@@ -62,9 +62,9 @@ final class CourseAccessLifecycleTest extends TestCase
         $administration = new PlatformAdministrationService(
             $container->get(TransactionManager::class), $container->get(AdministrationRepository::class),
             $container->get(UserRepository::class), $container->get(RoleRepository::class),
-            $container->get(CompanyRepository::class), $repository, $container->get(OptionRepository::class),
+            $container->get(CompanyRepository::class), $repository,
             $container->get(RuntimeSettings::class), $container->get(AuditRepository::class), $mailer,
-            $container->get(GeoIpLocator::class), $container->get(EntityLookupRepository::class),
+            $container->get(GeoIp::class), $container->get(EntityLookupRepository::class),
             $container->get(AuthSessionRepository::class)
         );
         $fixture = new DevelopmentFixture($db);

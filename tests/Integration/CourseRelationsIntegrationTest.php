@@ -71,7 +71,7 @@ final class CourseRelationsIntegrationTest extends TestCase
         $this->relate('C', ['A']);
         self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_relations WHERE course_low_id = :low AND course_high_id = :high',
             ['low' => min($this->id['A'], $this->id['C']), 'high' => max($this->id['A'], $this->id['C'])]));
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'course.updated' AND user_id = :user AND metadata->'related_course_ids' IS NOT NULL AND metadata->>'course_id' = :course",
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'course.updated' AND actor_id = CAST(:user AS TEXT) AND details->'related_course_ids' IS NOT NULL AND details->>'course_id' = :course",
             ['user' => $this->user, 'course' => (string) $this->id['C']]));
     }
 

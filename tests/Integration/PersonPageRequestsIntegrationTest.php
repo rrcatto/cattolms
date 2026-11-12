@@ -82,7 +82,7 @@ final class PersonPageRequestsIntegrationTest extends TestCase
         $this->db->executeStatement("UPDATE users SET first_name = 'Zandile', middle_names = :middle, last_name = 'Mokoena' WHERE id = :id", ['middle' => 'Nomsa' . $suffix, 'id' => $person]);
         (new \CattoLearning\Infrastructure\Persistence\UserRepository($this->db))->addVerifiedSecondaryEmail($person, 'second-' . $suffix . '@elsewhere.test');
         $this->signIn($admin);
-        $reference = \CattoLearning\Support\AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $person]));
+        $reference = \CattoPHP\Foundation\AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $person]));
         foreach (['Nomsa' . $suffix => 'a middle name', 'Zandile Nomsa' . $suffix . ' Mokoena' => 'the whole name', 'second-' . $suffix . '@elsewhere' => 'a second email address', $reference => 'the account reference typed as shown'] as $term => $what) {
             $page = (string) $this->response('/admin/people?people_q=' . rawurlencode($term))->getContent();
             self::assertStringContainsString('href="/admin/people/' . $this->reference($person) . '"', $page, 'The People search finds ' . $what . '.');
@@ -141,7 +141,7 @@ final class PersonPageRequestsIntegrationTest extends TestCase
         $this->html('/admin/wallets/company/' . $companyReference);
         $this->html('/mailing/subscribers/' . $personReference);
 
-        $shown = \CattoLearning\Support\AccountReference::format($personReference);
+        $shown = \CattoPHP\Foundation\AccountReference::format($personReference);
         $offByOne = substr($personReference, 0, -1) . (substr($personReference, -1) === 'A' ? 'B' : 'A');
         foreach (['/admin/people/' . $person => 'the row id', '/admin/people/' . strtolower($personReference) => 'lower case', '/admin/people/' . $shown => 'hyphens as shown',
             '/admin/people/' . $offByOne => 'one character off', '/admin/companies/' . $company => 'a company\'s row id', '/admin/companies/' . $personReference => 'a person\'s reference for a company',

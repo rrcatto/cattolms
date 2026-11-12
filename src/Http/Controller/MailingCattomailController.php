@@ -13,10 +13,15 @@ page 9): the four steps of setting up sending (catto-mail's address, Connect thi
 to yourself), the connection (Check the connection, Connect again, Disconnect, Forget it here), the sendings at catto-mail
 and what catto-mail reported. Connect sends the administrator's browser to catto-mail's connect page with a PKCE code
 challenge; the state and code verifier wait in their session until catto-mail sends them back to the callback, which
-exchanges the code. CattomailConnection does the work. Seeing needs PLATFORM.MAILING.VIEW and every change
+exchanges the code. CattoPHP's CattoMailConnection does the work. Seeing needs PLATFORM.MAILING.VIEW and every change
 PLATFORM.MAILING.MANAGE.
 
 Changelog:
+2026/11/12 SAST
+- The connection and the events are CattoPHP's (CattoMailConnection, CattoMailEvents; CattoPHP Phase 4, step 9).
+2026/11/09 SAST
+- CattoPHP's security headers (CattoPHP Phase 2, step 7c): Connect leads to catto-mail's own page, so this page alone allows a form to go to another
+  site over https (a browser holds the redirect to the policy of the page the form is on).
 2026/10/28 SAST
 - Created.
 */
@@ -27,7 +32,8 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Mailing\CampaignRepository;
-use CattoLearning\Mailing\CattomailConnection;
+use CattoPHP\Mailing\CattoMail\CattoMailConnection;
+use CattoPHP\Mailing\CattoMail\CattoMailEvents;
 use CattoLearning\Mailing\MailingSettings;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
@@ -47,9 +53,11 @@ final class MailingCattomailController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly CattomailConnection $connection,
+        private readonly CattoMailConnection $connection,
+        private readonly CattoMailEvents $events,
         private readonly CampaignRepository $campaigns,
         private readonly MailingSettings $settings,
+        private readonly \CattoPHP\Http\ContentSecurityPolicy $policy,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -58,13 +66,15 @@ final class MailingCattomailController extends BaseController
     public function index(): Response
     {
         $user = $this->requirePermission('PLATFORM.MAILING.VIEW');
+        // Connect sends the administrator on to catto-mail's page, at the address Settings names.
+        $this->policy->allow('form-action', 'https:');
         $type = isset(self::EVENTS[(string) ($_GET['events'] ?? '')]) ? (string) $_GET['events'] : '';
 
         return $this->render('mailing-cattomail', $this->view() + [
             'title' => 'catto-mail · Mailing',
             'active_nav' => 'mailing',
             'jobs' => $this->campaigns->cattomailJobs(25),
-            'events' => $this->campaigns->transportEvents($type, 50),
+            'events' => $this->events->recent($type, 50),
             'event_type' => $type,
             'event_labels' => self::EVENTS,
             'test_to' => $user->primaryEmail,
@@ -117,7 +127,7 @@ final class MailingCattomailController extends BaseController
         }
 
         return $this->handle(function () use ($kept, $user): void {
-            $this->connection->finish((string) ($_GET['code'] ?? ''), (string) $kept['verifier'], (string) $kept['redirect_uri'], $user->id, $this->campaigns->firstName($user->id) ?: 'an administrator');
+            $this->connection->finish((string) ($_GET['code'] ?? ''), (string) $kept['verifier'], (string) $kept['redirect_uri'], (string) $user->id, $this->campaigns->firstName($user->id) ?: 'an administrator');
             $this->flash('success', 'This site is connected to catto-mail. News goes through it once the sending domain is ready.');
             $this->redirect(self::BASE . '#domain');
         }, self::BASE . '#connect');
@@ -133,12 +143,12 @@ final class MailingCattomailController extends BaseController
 
         return $this->handle(function () use ($user, $action, $anchor): void {
             switch ($action) {
-                case 'address': $this->connection->saveAddress((string) ($_POST['address'] ?? ''), $user->id); $done = 'catto-mail\'s address is kept.'; break;
+                case 'address': $this->connection->saveAddress((string) ($_POST['address'] ?? ''), (string) $user->id); $done = 'catto-mail\'s address is kept.'; break;
                 case 'domains': $this->connection->checkDomains(); $done = $this->connection->ready() ? 'catto-mail can send from ' . $this->connection->sendingDomain() . '.' : 'catto-mail cannot send from ' . $this->connection->sendingDomain() . ' yet.'; break;
                 case 'check': $done = $this->connection->check() ? 'catto-mail can be reached and takes the key.' : 'The check found a problem: ' . (string) $this->connection->state()['last_problem']; break;
-                case 'test': $this->connection->test((string) ($_POST['email'] ?? ''), $user->id); $done = 'The test is on its way through catto-mail.'; break;
-                case 'disconnect': $this->connection->disconnect($user->id); $done = 'The connection is ended at catto-mail and forgotten here. News waits until you connect again or choose a mail server in Sending settings.'; break;
-                default: $this->connection->forget($user->id); $done = 'The connection is forgotten here. It still stands at catto-mail until it is ended there.';
+                case 'test': $this->connection->test((string) ($_POST['email'] ?? ''), (string) $user->id); $done = 'The test is on its way through catto-mail.'; break;
+                case 'disconnect': $this->connection->disconnect((string) $user->id); $done = 'The connection is ended at catto-mail and forgotten here. News waits until you connect again or choose a mail server in Sending settings.'; break;
+                default: $this->connection->forget((string) $user->id); $done = 'The connection is forgotten here. It still stands at catto-mail until it is ended there.';
             }
             $this->flash('success', $done);
             $this->redirect(self::BASE . $anchor);
@@ -156,7 +166,7 @@ final class MailingCattomailController extends BaseController
             $this->flash('success', 'catto-mail is asked about it again within a minute.');
             $this->redirect(self::BASE . '#jobs');
         }
-        if (!ctype_digit($this->param('id')) || !$this->campaigns->retryTransportEvent((int) $this->param('id'))) throw $this->notFound('That report is not known.');
+        if (!ctype_digit($this->param('id')) || !$this->events->retry((int) $this->param('id'))) throw $this->notFound('That report is not known.');
         $this->flash('success', 'It is taken again within a minute.');
         $this->redirect(self::BASE . '#events');
     }

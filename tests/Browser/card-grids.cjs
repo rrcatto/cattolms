@@ -49,7 +49,8 @@ const facts = () => {
   const wide = grid ? cards.filter(c => c.getBoundingClientRect().right > grid.getBoundingClientRect().right + 1).length : 0;
   // A card's foot, with the line above it, sits at the bottom of the card (owner, 2026-11-03: "It looks ugly being displayed at different places on cards").
   const footLoose = cards.filter(c => { const foot = c.querySelector(':scope > .cl-ui-card-actions, .cl-course-card-foot'); if (!foot) return false; const style = getComputedStyle(c); return c.getBoundingClientRect().bottom - foot.getBoundingClientRect().bottom - parseFloat(style.borderBottomWidth) > (c.classList.contains('cl-course-card') ? parseFloat(getComputedStyle(foot.parentElement).paddingBottom) + 1 : 1); }).length;
-  const shown = [...document.querySelectorAll('.cl-view-switch a')].find(a => /shown now/.test(a.getAttribute('aria-label') || ''));
+  // The list's own switch, not the catalogue's bundles' above it (they have their own view, as their own cards).
+  const shown = [...document.querySelectorAll('.cl-view-switch a')].find(a => !a.closest('#catalogue-bundles') && /shown now/.test(a.getAttribute('aria-label') || ''));
   const select = document.querySelector('.pagination-row select');
   return {
     cards: cards.length,
@@ -197,30 +198,33 @@ async function cardMenus(page, label, failures) {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    const shown = (area) => page.evaluate((area) => {
-      const link = [...document.querySelectorAll(`${area} .cl-view-switch a`)].find(a => /shown now/.test(a.getAttribute('aria-label') || ''));
+    // links: the switch's own links, for a page with more than one list (the catalogue's Course bundles and Courses).
+    const shown = (links) => page.evaluate((links) => {
+      const link = [...document.querySelectorAll(links)].find(a => /shown now/.test(a.getAttribute('aria-label') || ''));
       return link ? link.textContent.trim().toLowerCase() : '';
-    }, area);
-    const inPlace = async (route, area, optional = false) => {
-      const label = `in place ${route}`;
+    }, links);
+    const inPlace = async (route, area, optional = false, links = `${area} .cl-view-switch a`) => {
+      const label = `in place ${route}${links.includes('[id^=') ? ' ' + links.replace(/.*\[id\^="([^"]+)-show-"\].*/, '$1') : ''}`;
       await open(page, `${base}${route}${route.includes('?') ? '&' : '?'}theme_preview=${key}`);
       views++;
-      const from = await shown(area);
+      const from = await shown(links);
       if (!from) { if (!optional) failures.push(`${label}: no view switch in ${area}`); return; }
       for (const to of from === 'list' ? ['grid', 'list'] : ['list', 'grid']) {
         await page.evaluate(() => { window.__samePage = true; });
-        const link = page.locator(`${area} .cl-view-switch a`, {hasText: to === 'grid' ? 'Grid' : 'List'});
+        const link = page.locator(links, {hasText: to === 'grid' ? 'Grid' : 'List'});
         const id = await link.getAttribute('id');
         await link.click();
         try {
-          await page.waitForFunction(([area, to]) => [...document.querySelectorAll(`${area} .cl-view-switch a`)].some(a => /shown now/.test(a.getAttribute('aria-label') || '') && a.textContent.trim().toLowerCase() === to), [area, to], {timeout: 10000});
+          await page.waitForFunction(([links, to]) => [...document.querySelectorAll(links)].some(a => /shown now/.test(a.getAttribute('aria-label') || '') && a.textContent.trim().toLowerCase() === to), [links, to], {timeout: 10000});
         } catch { failures.push(`${label}: ${to} was not shown`); return; }
         if (!(await page.evaluate(() => window.__samePage === true))) failures.push(`${label}: showing the ${to} loaded the page again`);
         if (await page.evaluate(() => document.activeElement && document.activeElement.id) !== id) failures.push(`${label}: the focus left the ${to} button`);
       }
     };
     for (const list of lists) await inPlace(list.route, `#${list.name}-view`);
-    await inPlace('/courses', '#catalogue-region');
+    // The catalogue has two lists, each with its own switch (since 2026-11-10): Course bundles, then Courses.
+    await inPlace('/courses', '#catalogue-region', false, '#catalogue-region a[id^="catalogue_bundles-show-"]');
+    await inPlace('/courses', '#catalogue-region', false, '#catalogue-region a[id^="catalogue-show-"]');
     await inPlace('/company/people', '#people-view');
     await inPlace('/mailing/subscribers', '#subscribers-view');
     const listing = await context.newPage();

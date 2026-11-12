@@ -8,7 +8,7 @@
 {% if course.summary|default('') %}<p class="course-summary">{{ course.summary }}</p>{% endif %}
 </header>
 {# The course's introduction, as a learner reads it (owner, 2026-11-05): a visitor was shown only this one line, so what a course says about itself before its modules reached nobody until they had bought it. #}
-<div class="course-introduction-copy">{% if course.introduction_html|default('') %}{{ course.introduction_html|raw }}{% else %}<p>These Course Items are available before enrolment.</p>{% endif %}</div>
+<div class="course-introduction-copy">{% if course.introduction_html|default('') %}{{ course.introduction_html|authored }}{% else %}<p>These Course Items are available before enrolment.</p>{% endif %}</div>
 {% if course.structure %}{{ ui('action.link', {label: 'Start public preview →', variant: 'primary', size: 'normal', href: stop_url('preview', course, course.structure[0], course.public_preview_query|default('')), icon: 'action-preview'}) }}{% endif %}
 </section>
 {% endblock %}

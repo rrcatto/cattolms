@@ -1,0 +1,210 @@
+# CattoPHP: the foundations cattolms shares with the other Catto projects. Its records are kept in cattolms's own
+# database, through the same connection. A foundation's switch is on once cattolms has moved onto CattoPHP's version
+# of it.
+cattophp:
+    application_key: '%env(APP_KEY)%'
+    storage:
+        type: database
+        connection: doctrine.dbal.default_connection
+    # Demo or live, and the installation's name and mail, are CattoPHP's settings since step 3 (Configuration\SiteMode
+    # and RuntimeSettings read them); the words are cattolms's own standard words, used when .env and Settings give none.
+    site_mode: true
+    defaults:
+        APP_NAME: Catto Learning
+        APP_DEMO_HEADING: !php/const CattoLearning\Configuration\SiteMode::HEADING
+        APP_DEMO_NOTICE: !php/const CattoLearning\Configuration\SiteMode::NOTICE
+        APP_DEMO_EMAIL_NOTICE: !php/const CattoLearning\Configuration\SiteMode::EMAIL_NOTICE
+    # CattoPHP's sign-in, with cattolms's accounts (step 6): its settings name who may sign in, two-step sign-in, how long a
+    # link and a sign-in last and the limits on asking for links. cattolms keeps its own sign-in pages, so CattoPHP's
+    # routes are not imported.
+    sign_in:
+        accounts: CattoLearning\Auth\CattolmsAccounts
+        after: /account/courses
+        recovery_codes: true
+    # CattoPHP's security headers (step 7c). Scripts come only from the site's own files or carry the page's nonce
+    # (csp_nonce()); nothing compiles code. Styles stay allowed inline, because the owner's courses are authored HTML and
+    # SVG full of their own styles and the rich-text editor writes them too; no template of the site's own has one.
+    # Pictures may come from anywhere on https (authored content), videos from YouTube's privacy-enhanced address, and the
+    # site frames only its own previews and PDFs. A page may allow one more source for itself (ContentSecurityPolicy::
+    # allow(): the identity check's and catto-mail's forms lead to another site). The microphone is the site's own, for
+    # recording a slide's narration.
+    security_headers:
+        policy:
+            style-src: "'self' 'unsafe-inline' https://fonts.googleapis.com"
+            img-src: "'self' data: blob: https:"
+            font-src: "'self' data: https://fonts.gstatic.com"
+            media-src: "'self' blob:"
+            frame-src: "'self' https://www.youtube-nocookie.com"
+            object-src: "'self'"
+            frame-ancestors: "'self'"
+        permissions_policy: 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()'
+    # The served page is laid out by CattoPHP's HtmlLayout (Phase 3, 2026-11-09; View\ThemeRenderer::served). A course's own
+    # HTML, in the reader and the public preview, is in an element of this class and is served byte for byte, as is anything
+    # a template marks |authored.
+    ui:
+        icon_sprite: !php/const CattoLearning\View\Ui\ProjectComponents::ICON_SPRITE
+        public_root: '%catto.public_root%'
+        icon_subjects: !php/const CattoLearning\View\Artwork\CourseIcons::SUBJECTS
+        icon_name_stop_words: !php/const CattoLearning\View\Artwork\CourseIcons::NAME_STOP_WORDS
+    html_layout:
+        verbatim_classes: [cl-course-presentation]
+        # The component classes Core's CSS always lays out as flex or grid: whitespace between and around their children is
+        # never drawn, so each child goes on a line of its own. tests/Browser/every-page.cjs fails a page where an element of
+        # one of them is drawn otherwise; take a class out here before its CSS stops being flex or grid.
+        flex_classes: [
+            cl-header-inner, cl-navigation, cl-nav-group, cl-nav-subpanel, cl-page-context-inner, cl-ui-breadcrumb,
+            cl-flash-stack, cl-ui-notice, cl-ui-notice-icon, cl-identity-meta, cl-identity-roles, cl-ui-action-group,
+            cl-ui-section-head, cl-ui-section-actions, cl-course-cards, cl-course-card, cl-course-card-header,
+            cl-course-card-headline, cl-course-card-body, cl-course-card-tags, cl-course-card-foot, cl-tag-chip,
+            cl-ui-key-value-list, cl-footer-grid, cl-footer-social, cl-page-head-actions, cl-ui-field,
+            cl-ui-tree-select-row, cl-ui-picture-choice-grid, cl-ui-picture-choice-item, cl-ui-picture-choice-text,
+            cl-list-toolbar, cl-view-switch, cl-bundle-cards, cl-bundle-card, cl-bundle-card-top,
+            cl-bundle-card-foot, cl-bundle-card-badges, cl-ui-accordion-summary, cl-ui-accordion-label,
+            cl-ui-accordion-actions, cl-ui-form-grid, cl-ui-form-actions, cl-ui-stat-grid, cl-ui-section-grid,
+            cl-ui-list, cl-ui-list-item, cl-ui-list-actions, cl-ui-row-trigger, cl-ui-row-actions, cl-ui-modal-head,
+            cl-ui-modal-foot, cl-ui-toolbar, cl-group-nav, cl-tag-cloud, cl-tree-row, cl-tree-handle, cl-tree-label,
+            cl-settings-row, cl-search-fields, cl-chart-row, cl-column-chart-columns
+        ]
+    # The scheduler (CattoPHP Phase 4, step 1, 2026-11-12): cattolms's jobs are the services implementing ScheduledTask
+    # (src/Maintenance/Tasks/), run by schedule:run as before (the worker container's --watch, install.sh's cron line), and
+    # the log archive is CattoPHP's, over storage/logs.
+    scheduler:
+        enabled: true
+        command_alias: 'schedule:run'
+        log_archive:
+            enabled: true
+            folder: '%catto.instance_root%/storage/logs'
+    # What an address says about a visitor (CattoPHP Phase 4, step 8, 2026-11-12): its country from the GeoLite2 database
+    # GEOIP_DATABASE names, its network from GeoLite2-ASN.mmdb beside it, and the Tor, VPN, hosting and throwaway email
+    # lists in storage/signup-lists, for site protection, the sign-up check and the Inbox's spam check.
+    network:
+        country_database: '%env(string:default::GEOIP_DATABASE)%'
+        lists_folder: '%catto.instance_root%/storage/signup-lists'
+    # Site protection (CattoPHP Phase 4, step 3, 2026-11-12): the Site Log, flags, time-outs and lockouts, the rules every
+    # minute (the site_protection task, in its old place among the jobs), the form guard on Sign in, Register and Contact,
+    # and the two-file link to the server's firewall in storage/server-firewall. App::run calls the gate itself, before
+    # the session starts; who is asking comes from cattolms's sign-in, and an address's network from the lookup above.
+    protection:
+        enabled: true
+        secret_paths: !php/const CattoLearning\SiteAnalytics\SiteAnalyticsWords::SECRET_PATHS
+        firewall_folder: '%catto.instance_root%/storage/server-firewall'
+        visitors: CattoLearning\SiteAnalytics\ProtectionVisitors
+        gate_listener: false
+        task_priority: -30
+    # Telegram (CattoPHP Phase 4, step 4, 2026-11-12): the bot connected at Settings > Connect to Telegram bot, the owner's
+    # messages (what each says and when is cattolms's OwnerMessages, its ticks these choices) sent every minute by the
+    # owner_messages task in its old place, people's connected accounts and the Telegram log.
+    telegram:
+        enabled: true
+        choices: [on_register, on_order, on_sale]
+        task_priority: -40
+    # The sign-up check (CattoPHP Phase 4, step 8, 2026-11-12): each registration judged against the allowed and blocked
+    # countries (Settings > Sign-up checks) and recorded among the Sign-up Attempts; the signup_lists task fetches the lists
+    # every day in its old place among the jobs.
+    signup:
+        enabled: true
+        task_priority: 20
+    # Identity verification (CattoPHP Phase 4, step 8, 2026-11-12): Didit's hosted page, its keys in .env; the person comes
+    # back to /account/verification/return and Didit's webhooks arrive at /webhooks/didit (IdentityController). Didit is
+    # told the account reference; an adult's approval issues the certificates that waited for it.
+    identity:
+        enabled: true
+        return_path: /account/verification/return
+        webhook_path: /webhooks/didit
+        accounts: CattoLearning\Identity\IdentityVerificationRepository
+        approved: CattoLearning\Identity\CertificatesOnIdentity
+        account_detail: user_id
+        minimum_age: !php/const CattoLearning\Auth\AdultAge::YEARS
+    # The Inbox (CattoPHP Phase 4, step 8, 2026-11-12): the contact form's messages as conversations, the spam check and its
+    # filter, the folders, replies (with a person's invoices, receipts and credit notes, sent as every cattolms email is) and
+    # answers read from the mailbox by the inbox_mailbox task in its old place. Reply files stay in storage/inbox/.
+    inbox:
+        enabled: true
+        files_folder: '%catto.instance_root%/storage'
+        documents: CattoLearning\Inbox\InboxDocumentAttachments
+        sender: CattoLearning\Inbox\InboxReplySender
+        task_priority: -60
+    # Mailing, part 1 (CattoPHP Phase 4, step 9, 2026-11-12): Settings > Mailing (MAILING_*, CATTOMAIL_*), catto-mail's
+    # connection (its connect page returns to /mailing/cattomail/callback), the events its webhook reports to
+    # /webhooks/cattomail (CattoPHP applies each to its copy), and the two transports; a made-up address is delivered where
+    # the development site's router says. Part 2: the lists, answers and addresses never emailed. Part 3: campaigns, copies,
+    # links and the sender, given cattolms's side (who a campaign goes to, who it is from, how a copy is drawn, the sending
+    # rules) by Mailing\CattolmsCampaigns.
+    mailing:
+        enabled: true
+        project: cattolms
+        callback_path: /mailing/cattomail/callback
+        webhook_path: /webhooks/cattomail
+        recipient_addresses: CattoLearning\Infrastructure\Mail\GeneratedDomainRouter
+        campaign_project: CattoLearning\Mailing\CattolmsCampaigns
+    # The API (CattoPHP Phase 4, step 7, 2026-11-12): tokens issued to accounts with cattolms's scopes (Api\ApiScope), the
+    # Bearer authenticator the API firewall uses (config/packages/security.yaml), the scope voter and the error document
+    # under /api/; an account may use it while it is active with a verified primary address (Api\ApiAccountRepository).
+    api:
+        enabled: true
+        path: /api/
+        token_prefix: clpat_
+        scopes: !php/const CattoLearning\Api\ApiScope::DESCRIPTIONS
+        all_scopes: !php/const CattoLearning\Api\ApiScope::SYSTEM_ADMIN
+        accounts: CattoLearning\Api\ApiAccountRepository
+    # Documents and PDFs (CattoPHP Phase 4, step 6, 2026-11-12): the template language and its rules, the renderer and PDFs
+    # through Dompdf are CattoPHP's; cattolms's document types, placeholders, versioned templates and designs stay here, its
+    # stored pictures embedded through Document\DocumentAssetRepository, its fonts from resources/documents/fonts (the font
+    # cache where it always was, the system's temporary folder).
+    documents:
+        enabled: true
+        fonts: '%catto.code_root%/resources/documents/fonts'
+        families: { Cormorant: Cormorant, Playfair: Playfair, 'Plex Sans': PlexSans, 'Plex Serif': PlexSerif }
+        font_cache: ''
+        images: CattoLearning\Document\DocumentAssetRepository
+    # Search engines and AI (CattoPHP Phase 4, step 5, 2026-11-12): robots.txt with these private paths, the sitemap from
+    # cattolms's sources (Search\PublicPagesSitemap, then Course\SitemapRepository), /llms.txt in cattolms's words
+    # (Search\SiteSummary), share pictures in their old folder, the public pages (Search\PublicPages) with ADMIN's own words
+    # for them, and the site picture for a page without its own. Settings > Search engines and AI keeps its form.
+    search:
+        enabled: true
+        private_paths:
+            - { why: 'Single-use sign-in links: a crawler that follows one uses it up.', paths: [/auth/] }
+            - { why: 'Signing in carries nothing to index.', paths: [/login, /login/, /logout] }
+            - { why: 'Signed-in workspaces.', paths: [/admin/, /account/, /company/, /learn/, /mailing/] }
+            - { why: "Each email's own links and a person's own pages, by a token: nobody else's to read.", paths: [/m/, /leaving/, /join/] }
+            - { why: 'Machine interfaces, not documents.', paths: [/api/, /theme/, /webhooks/] }
+            - { why: 'Certificates and transcripts name a learner, and course media is served by opaque id.', paths: [/certificates/, /transcripts/, /course-media/] }
+        share_pictures: '%catto.instance_root%/storage/share-pictures'
+        llms_txt: CattoLearning\Search\SiteSummary
+        site_picture: CattoLearning\Search\SiteSharePicture
+    # The setup checklist (CattoPHP Phase 4, step 2, 2026-11-12): Administration > System > Setup lists cattolms's steps
+    # (src/Setup/SetupSteps.php), and what ADMIN marks is kept by CattoPHP.
+    setup:
+        enabled: true
+    # Card payments through Stitch Express, by the Omnipay gateway rrcatto/omnipay-stitch-express (owner, 2026-11-11): its keys are
+    # settings, so Settings > Card payments (Stitch) overrides .env, with a Reset; the secrets are stored encrypted. The webhook's
+    # signing secret is filled in when the site registers its webhook with Stitch.
+    payments:
+        gateways:
+            stitch:
+                omnipay: StitchExpress
+                label: Card payments (Stitch)
+                description: The client ID and secret from Stitch Express's developer settings, and the webhook's signing secret.
+                parameters:
+                    clientId: { name: STITCH_CLIENT_ID, label: Client ID }
+                    clientSecret: { name: STITCH_CLIENT_SECRET, label: Client secret, secret: true }
+                    webhookSecret: { name: STITCH_WEBHOOK_SECRET, label: Webhook signing secret, secret: true, optional: true }
+    # The theme system is CattoPHP's (Phase 3, step 9): Saharan Sunset is bundled in the code and the default, installed themes
+    # are in the instance's themes/ folder, their browser files in the web root's themes/; the packages keep cattolms's format
+    # name and page families (View\ProjectTheme), the chosen theme the option it was always kept in, the index its table.
+    theme:
+        default: !php/const CattoLearning\View\ProjectTheme::DEFAULT_SLUG
+        package_format: !php/const CattoLearning\View\ProjectTheme::PACKAGE_FORMAT
+        page_families: !php/const CattoLearning\View\ProjectTheme::PAGE_FAMILIES
+        bundled: '%catto.code_root%/themes'
+        installed: '%catto.instance_root%/themes'
+        staging: '%catto.instance_root%/storage/tmp/theme-imports'
+        public_root: '%catto.public_root%'
+        choice: CattoLearning\View\OptionThemeChoice
+        registry: CattoLearning\Infrastructure\Persistence\ThemeRegistryRepository
+    # The error page is CattoPHP's (step 7a): it decides what the page says, the theme draws it (Http\ThemedErrorPage). The
+    # API answers its own errors.
+    error_pages:
+        drawer: CattoLearning\Http\ThemedErrorPage
+        skip_paths: [/api/]

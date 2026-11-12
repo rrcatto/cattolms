@@ -17,6 +17,8 @@ them off every list and puts the address on Addresses never emailed. Seeing need
 PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/12 SAST
+- Stop all email adds the address to CattoPHP's addresses never emailed (Suppressions, CattoPHP Phase 4, step 9, part 2).
 2026/11/07 SAST
 - A subscriber's page is at their account reference (/mailing/subscribers/CL2026…, owner 2026-11-06).
 2026/10/28 SAST
@@ -31,13 +33,12 @@ use CattoLearning\Support\Address\PersonAddress;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
-use CattoLearning\Mailing\CampaignRepository;
 use CattoLearning\Mailing\MailingConsents;
 use CattoLearning\Mailing\MailingLists;
 use CattoLearning\Mailing\SubscriberRepository;
 use CattoLearning\Mailing\UpdateDelivery;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -55,10 +56,10 @@ final class MailingSubscriberController extends BaseController
         private readonly SubscriberRepository $subscribers,
         private readonly MailingConsents $consents,
         private readonly MailingLists $lists,
-        private readonly CampaignRepository $campaigns,
         private readonly AuditRepository $audit,
         private readonly \CattoLearning\Application\ProfilePictures $pictures,
         private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys,
+        private readonly \CattoPHP\Mailing\Suppressions $suppressions,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -141,7 +142,7 @@ final class MailingSubscriberController extends BaseController
             // Stop all email: off every list, and the address never emailed news again.
             $stopped = $this->consents->unsubscribeAll($id, 'admin');
             $email = mb_strtolower((string) $person['email']);
-            if (!$this->campaigns->suppress($email, 'manual', 'Stopped by an administrator on their subscriber page.', null, $user->id) && $stopped === 0) {
+            if (!$this->suppressions->suppress($email, 'manual', 'Stopped by an administrator on their subscriber page.', null, (string) $user->id) && $stopped === 0) {
                 throw new InvalidArgumentException('Nothing is sent to them already.');
             }
             $this->audit->record($user->id, 'mailing.stopped_all', ['user_id' => $id]);

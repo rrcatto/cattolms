@@ -30,13 +30,14 @@ use CattoLearning\Commerce\Document\FinancialDocumentDesign;
 use CattoLearning\Commerce\Document\FinancialDocumentDesignCompiler;
 use CattoLearning\Commerce\Document\FinancialDocumentSamples;
 use CattoLearning\Course\Certificate\CertificateImage;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\DocumentRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentTemplateRepository;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\Template\DocumentValueFormatter;
+use CattoPHP\Document\ValueFormatter;
 use CattoLearning\Document\Template\PlaceholderRegistry;
-use CattoLearning\Document\Template\TemplateValidator;
+use CattoPHP\Document\TemplateValidator;
 use CattoLearning\Infrastructure\Persistence\Database;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
@@ -52,8 +53,7 @@ final class FinancialDocumentsTest extends TestCase
     protected function setUp(): void
     {
         $registry = new PlaceholderRegistry();
-        $this->renderer = new DocumentTemplateRenderer(new DocumentTemplateRepository($this->createStub(Database::class)), $registry, new TemplateValidator($registry),
-            new DocumentValueFormatter(new DateTimeZone('Africa/Johannesburg')));
+        $this->renderer = new DocumentTemplateRenderer(new DocumentTemplateRepository($this->createStub(Database::class)), $registry, new DocumentRenderer(new TemplateValidator(), new ValueFormatter(new DateTimeZone('Africa/Johannesburg'))));
         $this->compiler = new FinancialDocumentDesignCompiler();
         date_default_timezone_set('Africa/Johannesburg');
     }
@@ -69,7 +69,7 @@ final class FinancialDocumentsTest extends TestCase
         self::assertSame(['Lerato Dlamini', 'Dlamini & Associates', '4000000001', null, 'Lerato Dlamini', 'lerato@example.test'],
             [$data['customer.billing_name'], $data['customer.organisation'], $data['customer.tax_number'], $data['customer.company_name'], $data['customer.purchaser_name'], $data['customer.email']]);
         self::assertSame(['12 Kéré Street', 'Suite 4', 'Brooklyn', 'Pretoria 0181', 'Gauteng', 'South Africa'], $data['customer.billing_address']);
-        self::assertSame(self::BANK, array_intersect_key($data, self::BANK), 'An invoice with something to pay says how to pay by EFT.');
+        self::assertSame(self::BANK, array_intersect_key($data, self::BANK), 'An invoice with something to pay, whose buyer chose EFT, says how to pay by EFT.');
         self::assertSame([
             'description' => 'Bundle: Workplace Safety Essentials',
             'detail' => 'Includes: First Aid Level 1, Incident Reporting, Fire Marshal Basics',
@@ -94,6 +94,20 @@ final class FinancialDocumentsTest extends TestCase
         self::assertStringNotContainsString('Promotion', $html);
         self::assertStringNotContainsString('Subtotal', $html);
         self::assertStringContainsString('Purchased for Mokoena Logistics by Sipho Mokoena', $html);
+    }
+
+    /** Owner, 2026-11-11: "EFT details only when EFT is chosen." */
+    public function testAnInvoiceNamesTheBankAccountOnlyWhenTheBuyerChoseEft(): void
+    {
+        self::assertArrayNotHasKey('bank.account_number', $this->data('company', DocumentType::Invoice), 'The company paid by card: no bank account.');
+        $example = FinancialDocumentSamples::for('learner', DocumentType::Invoice);
+        foreach (['card', 'wallet', 'dummy', null] as $method) {
+            $snapshot = ['payment_method' => $method] + $example['snapshot'];
+            $data = FinancialDocumentDataBuilder::assemble(DocumentType::Invoice, $example['order'], $snapshot, $example['number'], $example['issued_at'], $example['context'], self::BUSINESS, self::BANK);
+            self::assertArrayNotHasKey('bank.account_number', $data, ($method ?? 'no method') . ': no bank account on the invoice.');
+            self::assertStringNotContainsString('62000000000', $this->html(DocumentType::Invoice, $data));
+        }
+        self::assertStringContainsString('62000000000', $this->html(DocumentType::Invoice, $this->data('learner', DocumentType::Invoice)), 'EFT: the bank account is printed.');
     }
 
     public function testAnOrderAPromotionMadeFreeHasAnInvoiceForNothingWithNoDueDateOrBankDetails(): void
@@ -153,7 +167,7 @@ final class FinancialDocumentsTest extends TestCase
     public function testEverySampleDocumentOfTheStandardDesignIsValidAndBecomesAPdf(): void
     {
         $design = FinancialDocumentDesign::standard();
-        $pdf = new DocumentPdfRenderer();
+        $pdf = new PdfRenderer();
         foreach (array_keys(FinancialDocumentSamples::SAMPLES) as $sample) {
             foreach (FinancialDocumentSamples::documents($sample) as $type) {
                 $compiled = $this->compiler->compile($design, $type);
@@ -199,10 +213,10 @@ final class FinancialDocumentsTest extends TestCase
         self::assertStringContainsString('<p class="note">Credited.</p>', $this->compiler->compile($design, DocumentType::CreditNote)['html']);
         $tall = new FinancialDocumentDesign(new CertificateImage(str_repeat('b', 64), 200, 400), 'dejavu', '#000000', []);
         self::assertStringContainsString('style="width:8.0mm;height:16.0mm"', $this->compiler->compile($tall, DocumentType::Invoice)['html'], 'A tall logo is fitted to its height.');
-        $validator = new TemplateValidator(new PlaceholderRegistry());
+        $validator = new TemplateValidator();
         foreach (FinancialDocumentDesign::types() as $type) {
             $compiled = $this->compiler->compile($design, $type);
-            self::assertNotSame([], $validator->validate($type, $compiled['html'], $compiled['css']), $type->value . ' with a logo, a note and a colour is a valid template.');
+            self::assertNotSame([], $validator->validate((new PlaceholderRegistry())->forType($type), $type->label(), $compiled['html'], $compiled['css']), $type->value . ' with a logo, a note and a colour is a valid template.');
         }
     }
 
@@ -221,11 +235,11 @@ final class FinancialDocumentsTest extends TestCase
         self::assertFileDoesNotExist($root . '/src/Commerce/Infrastructure/InvoicePdfRenderer.php');
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/src', \FilesystemIterator::SKIP_DOTS));
         foreach ($iterator as $file) {
-            if (!$file->isFile() || $file->getExtension() !== 'php' || str_ends_with($file->getPathname(), '/src/Document/DocumentPdfRenderer.php')) {
+            if (!$file->isFile() || $file->getExtension() !== 'php' || str_ends_with($file->getPathname(), '/src/Document/PdfRenderer.php')) {
                 continue;
             }
             $source = (string) file_get_contents($file->getPathname());
-            self::assertDoesNotMatchRegularExpression('/\bnew\s+\\\\?(?:Dompdf\\\\)?Dompdf\s*\(|use\s+Dompdf\\\\/', $source, $file->getPathname() . ' must draw PDFs through DocumentPdfRenderer.');
+            self::assertDoesNotMatchRegularExpression('/\bnew\s+\\\\?(?:Dompdf\\\\)?Dompdf\s*\(|use\s+Dompdf\\\\/', $source, $file->getPathname() . ' must draw PDFs through PdfRenderer.');
         }
         foreach (glob($root . '/src/Commerce/**/*.php') ?: [] as $path) {
             self::assertStringNotContainsString('<h2>Billed to</h2>', (string) file_get_contents($path), 'No financial document is written as HTML in code.');

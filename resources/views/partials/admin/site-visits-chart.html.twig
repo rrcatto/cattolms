@@ -9,8 +9,8 @@
 		{% for sv in sv_columns %}
 			<li class="cl-site-chart-column" title="{{ sv.title }}">
 				<span class="visually-hidden">{{ sv.title }}</span>
-				<span class="cl-site-chart-bar cl-site-chart-bar--automated" style="height:{{ sv.automated_share }}%"></span>
-				<span class="cl-site-chart-bar cl-site-chart-bar--people" style="height:{{ sv.people_share }}%"></span>
+				<span class="cl-site-chart-bar cl-site-chart-bar--automated {{ sv.automated_share|share }}"></span>
+				<span class="cl-site-chart-bar cl-site-chart-bar--people {{ sv.people_share|share }}"></span>
 				{% if sv.labelled %}<span class="cl-site-chart-label" aria-hidden="true">{{ sv.label }}</span>{% endif %}
 			</li>
 		{% endfor %}

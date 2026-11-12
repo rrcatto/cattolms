@@ -36,7 +36,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Mailing\EmailRenderer;
 use CattoLearning\Mailing\MailingTemplates;
 use CattoLearning\Support\Env;
-use CattoLearning\Support\SvgRaster;
+use CattoPHP\Foundation\SvgRaster;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -74,7 +74,7 @@ final class SiteLogoIntegrationTest extends TestCase
         self::assertSame('https://site.example/site-logo/' . $version . '.png', $logo->url('https://site.example/'));
         self::assertStringStartsWith("\x89PNG", (string) ($logo->picture($version)['bytes'] ?? ''), 'It is served at its version.');
         self::assertNull($logo->picture('0123456789abcdef'), 'Nothing else is served there.');
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'site_owner.logo_changed' AND user_id = :admin AND created_at >= NOW() - INTERVAL '1 minute'", ['admin' => $admin]));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'site_owner.logo_changed' AND actor_id = CAST(:admin AS TEXT) AND happened_at >= NOW() - INTERVAL '1 minute'", ['admin' => $admin]));
 
         self::assertSame(['invoice', 'receipt', 'credit_note'], $followed['documents'], 'All three documents print it from now on.');
         foreach ($documents->summary()['versions'] as $type => $number) {
@@ -225,6 +225,6 @@ final class SiteLogoIntegrationTest extends TestCase
 
     private function admin(): int
     {
-        return (int) $this->db->fetchOne("SELECT ur.user_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.role_key = 'ADMIN' ORDER BY ur.user_id LIMIT 1");
+        return (int) $this->db->fetchOne("SELECT MIN(account_person(account_id)) FROM cattophp_account_roles WHERE role_key = 'ADMIN'");
     }
 }

@@ -65,6 +65,9 @@ final class BundleRulesTest extends TestCase
         self::assertSame('BDL-POS-2', BundleRules::suggestCode('Professional Office Skills', static fn(string $code): bool => $code === 'BDL-POS'), 'Taken: the next free one.');
         self::assertSame('BDL-GDP', BundleRules::suggestCode('Garden Design: All the Parts', static fn(string $code): bool => false), 'Small words are left out.');
         self::assertSame('BDL-BUNDLE', BundleRules::suggestCode('—', static fn(string $code): bool => false));
+        // The prefix its courses share (owner, 2026-11-12), which places it in that prefix's band.
+        self::assertSame('FIN-BB', BundleRules::suggestCode('Baobab Books', static fn(string $code): bool => false, 'FIN'));
+        self::assertSame('BDL-BB', BundleRules::suggestCode('Baobab Books', static fn(string $code): bool => false, 'not a prefix'), 'Anything but a prefix: BDL.');
     }
 
     public function testASlugIsMadeFromTheTitle(): void

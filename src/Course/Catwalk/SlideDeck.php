@@ -167,7 +167,7 @@ final class SlideDeck
      * @param array<string,mixed> $deck
      * @return array{kind:string,theme:string,slides:list<array<string,mixed>>}
      */
-    public static function validate(array $deck): array
+    public static function validate(array $deck, string $courseType = 'full'): array
     {
         $deck = self::normalise($deck);
         if (!isset(SlideLayouts::KINDS[$deck['kind']])) { throw new InvalidArgumentException('Choose what the presentation is for: a module opening, a review, an overview, a trailer or introducing the site.'); }
@@ -194,6 +194,10 @@ final class SlideDeck
                 throw new InvalidArgumentException($where . ': choose which option is right.');
             }
             if ($layout === 'cta' && ($slide['actions'] ?? []) === []) { throw new InvalidArgumentException($where . ': choose at least one button.'); }
+            // A short course has no module open to the public, so its preview offers getting the course alone (specification 4.13, 15.4).
+            if ($layout === 'cta' && $courseType === 'short' && $deck['kind'] === 'trailer' && array_values(array_unique((array) $slide['actions'])) !== ['enrol']) {
+                throw new InvalidArgumentException($where . ': a short course\'s preview offers getting the course alone, so its only button is ' . SlideLayouts::ACTIONS['enrol'] . '.');
+            }
             $last = $index === $count - 1;
             if ($layout === 'cta' && !in_array($deck['kind'], ['trailer', 'site'], true)) { throw new InvalidArgumentException($where . ': a call to action belongs only in a trailer or the presentation that introduces the site.'); }
             if ($layout === 'next' && $deck['kind'] === 'site') { throw new InvalidArgumentException($where . ': an Up next slide hands back to a course, and this presentation is in none.'); }
@@ -292,13 +296,15 @@ final class SlideDeck
      * @param array{kind:string,theme:string,slides:list<array<string,mixed>>} $deck
      * @return list<string>
      */
-    public static function warnings(array $deck): array
+    public static function warnings(array $deck, string $courseType = 'full'): array
     {
         $warnings = [];
         $slides = $deck['slides'];
         $kind = SlideLayouts::KINDS[$deck['kind']] ?? null;
-        if ($kind !== null && (count($slides) < $kind['slides'][0] || count($slides) > $kind['slides'][1])) {
-            $warnings[] = 'A ' . strtolower($kind['label']) . ' usually has ' . $kind['slides'][0] . ' to ' . $kind['slides'][1] . ' slides. This one has ' . count($slides) . '.';
+        [$fewest, $most] = SlideLayouts::slides((string) $deck['kind'], $courseType);
+        if ($kind !== null && (count($slides) < $fewest || count($slides) > $most)) {
+            $short = $courseType === 'short' && isset(SlideLayouts::SHORT_SLIDES[$deck['kind']]) ? ' in a short course' : '';
+            $warnings[] = 'A ' . strtolower($kind['label']) . $short . ' usually has ' . $fewest . ' to ' . $most . ' slides. This one has ' . count($slides) . '.';
         }
         $layouts = array_column($slides, 'layout');
         if ($deck['kind'] === 'intro') {

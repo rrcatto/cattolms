@@ -7,7 +7,7 @@
 	{% set ph_kicker = 'Email from us' %}
 	{% set ph_title = done ? 'We will never email you' : 'Never email me' %}
 	{% set ph_lead = done ? email ~ ' will never get news from us, even if someone forwards an email to it.' : 'A friend forwarded one of our emails to ' ~ email ~ '. You are on none of our lists.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{% if done %}
 			{{ ui('layout.section-head', {heading: 'Done', summary: 'Nothing more is needed.'}) }}

@@ -6,7 +6,7 @@
 	{% set ph_kicker = 'Your account' %}
 	{% set ph_title = step == 'id_number' ? 'Before you continue' : 'This site is for adults' %}
 	{% set ph_lead = step == 'id_number' ? 'Please give your South African ID number once. It shows that you are 18 or older, and each person has one account.' : 'Your identity document shows that you are under 18.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{% if step == 'id_number' %}

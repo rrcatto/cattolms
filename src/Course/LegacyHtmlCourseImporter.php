@@ -31,7 +31,7 @@ Changelog:
   block headed "Practical Exercises"), practical tasks without their answers or the reverse, worked solutions hidden in
   tasks, wording about submitting work or having it marked, and grading weights other than 50% and 50% each give a
   warning naming the module and the specification's section.
-- The one HTML file carries every part of a module (owner, 2026-11-01: one specification, docs/COURSE-SPECIFICATION.md,
+- The one HTML file carries every part of a module (owner, 2026-11-01: one specification, docs/COURSE-SPECIFICATION-v<version>.md,
   in place of the zip package): each module's presentation from PRESENTATIONS and flash cards from FLASHCARDS, read as
   data like QUIZ and checked as CatWalk and the flash cards check them (a presentation or set of cards that fails is
   left out with the reason as a warning), and the course's cover from an SVG drawing in the masthead's .course-cover.
@@ -60,7 +60,7 @@ use CattoLearning\Support\Address\CoursePartAddress;
 use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Slug;
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use Dom\HTMLDocument as DOMDocument;
 use Dom\Element as DOMElement;
 use Dom\Node as DOMNode;
@@ -172,6 +172,10 @@ final class LegacyHtmlCourseImporter
 
         $modules = [];
         $warnings = [];
+        // A full course or a short course (Course Specification 4.13, section 15; owner, 2026-11-11): one module of 60 to 120
+        // minutes, marked in the head by <meta name="cattolms:course-type" content="short">, whose one assessment makes the mark.
+        $courseType = $this->courseType($xpath, $warnings);
+        $short = $courseType === 'short';
         $position = 1;
 
         // The file's grading scale becomes the course's grade bands, and the introduction's static
@@ -184,7 +188,7 @@ final class LegacyHtmlCourseImporter
             $warnings[] = 'The grading scale shown in the file does not match its grading script. The shown scale was used; check it on the Grades tab.';
         }
         [$introductionHtml, $standalone] = $this->withoutStandaloneParts($introductionHtml, $gradeScale['source'] !== 'default');
-        foreach (self::wordingDrift($introductionHtml, 'The introduction', true) as $warning) $warnings[] = $warning;
+        foreach (self::wordingDrift($introductionHtml, 'The introduction', true, $short) as $warning) $warnings[] = $warning;
         foreach ($moduleNodes as $node) {
             if (!$node instanceof DOMElement) {
                 continue;
@@ -267,7 +271,7 @@ final class LegacyHtmlCourseImporter
                 'content_html' => $contentHtml,
                 'summary_html' => $summaryHtml,
                 'content_blocks' => $contentBlocks,
-                'presentation' => $this->presentation($presentations[$moduleKey] ?? null, $moduleTitle, false, $warnings),
+                'presentation' => $this->presentation($presentations[$moduleKey] ?? null, $moduleTitle, false, $warnings, $courseType),
                 'flashcards' => $this->flashcards($flashcards[$moduleKey] ?? null, $moduleTitle, $warnings),
                 'is_review' => false,
                 'assessment_required' => $assessmentRequired,
@@ -295,7 +299,10 @@ final class LegacyHtmlCourseImporter
         }
 
         $reviewNode = $xpath->query('//*[(self::section or self::details) and @id="mod-review"]')->item(0);
-        if ($reviewNode instanceof DOMElement) {
+        if ($short && $reviewNode instanceof DOMElement) {
+            $warnings[] = 'A short course has no review module, so the review was left out (specification, section 15.2).';
+        }
+        if ($reviewNode instanceof DOMElement && !$short) {
             $reviewTitle = $this->relativeText($xpath, $reviewNode, './/*[contains(concat(" ", normalize-space(@class), " "), " m-name ")][1]') ?: 'Review Study Aid';
             $reviewSubtitle = $this->relativeText($xpath, $reviewNode, './/small[1]');
             $reviewInner = $this->relativeElement($xpath, $reviewNode, './/*[contains(concat(" ", normalize-space(@class), " "), " review-inner ")][1]');
@@ -325,7 +332,7 @@ final class LegacyHtmlCourseImporter
                     'content_html' => $reviewHtml,
                     'settings' => [],
                 ]],
-                'presentation' => $this->presentation($presentations['review'] ?? null, $reviewTitle, true, $warnings),
+                'presentation' => $this->presentation($presentations['review'] ?? null, $reviewTitle, true, $warnings, $courseType),
                 'flashcards' => null,
                 'is_review' => true,
                 'assessment_required' => $reviewAssessmentRequired,
@@ -365,6 +372,10 @@ final class LegacyHtmlCourseImporter
             if (isset($knownQuestionBanks[$questionBankKey])) {
                 continue;
             }
+            // A short course's QUIZ holds m1 only: anything else is named once by shortCourseDrift and left out.
+            if ($short) {
+                continue;
+            }
             if (!in_array($questionBankKey, ['diag', 'diagnostic', 'prereq', 'prerequisite', 'readiness'], true)) {
                 $warnings[] = 'Question bank "' . $questionBankKey . '" is not attached to a detected module, final assessment or recognised course diagnostic and was not imported.';
                 continue;
@@ -388,9 +399,13 @@ final class LegacyHtmlCourseImporter
             );
         }
 
-        $finalQuestions = $this->convertQuestions($quiz['final'] ?? []);
-        if ($finalQuestions === []) {
+        // A short course has no final assessment: its module's assessment makes the whole mark (specification, section 15.5).
+        $finalQuestions = $short ? [] : $this->convertQuestions($quiz['final'] ?? []);
+        if ($finalQuestions === [] && !$short) {
             $warnings[] = 'No final assessment was detected.';
+        }
+        if ($short) {
+            foreach ($this->shortCourseDrift($xpath, $modules, $quiz, $presentations) as $warning) $warnings[] = $warning;
         }
 
 
@@ -433,11 +448,13 @@ final class LegacyHtmlCourseImporter
                 'level' => $this->detectLevel($xpath),
                 // A course whose first module is mod-m0, one that only sets the learner up, numbers its modules from 0
                 // (specification 4.4, section 8; owner, 2026-10-29).
-                'first_module_number' => (($modules[0]['module_key'] ?? '') === 'm0') ? 0 : 1,
-                'estimated_minutes' => $this->studyMinutes($xpath),
+                'first_module_number' => !$short && (($modules[0]['module_key'] ?? '') === 'm0') ? 0 : 1,
+                // A short course's time is in minutes, a full course's in hours (specification, sections 6.5 and 15.1).
+                'course_type' => $courseType,
+                'estimated_minutes' => $this->studyMinutes($xpath, $short),
                 'default_access_period_seconds' => 31536000,
-                'module_weight' => 0.5,
-                'final_weight' => 0.5,
+                'module_weight' => $short ? 1.0 : 0.5,
+                'final_weight' => $short ? 0.0 : 0.5,
                 'certificate_enabled' => true,
                 'course_style_key' => str_contains(mb_strtolower($title), 'linux') ? 'linux' : 'standard',
                 'presentation_css' => $this->presentationCss($html),
@@ -449,7 +466,7 @@ final class LegacyHtmlCourseImporter
             // The names of the parts whose places would not give them those names (specification 6.6), so a course replaced
             // from its own file keeps its parts' addresses.
             'part_names' => $this->partNames($xpath),
-            'trailer' => $this->presentation(is_array($presentations['trailer'] ?? null) ? ['kind' => 'trailer'] + $presentations['trailer'] : null, 'The course preview', false, $warnings),
+            'trailer' => $this->presentation(is_array($presentations['trailer'] ?? null) ? ['kind' => 'trailer'] + $presentations['trailer'] : null, 'The course preview', false, $warnings, $courseType),
             // The course's cover, an SVG drawing in the masthead's .course-cover (owner, 2026-11-01), set after import.
             'catalogue' => ($cover = $this->cover($xpath, $title, $warnings)) === null ? null : ['cover' => $cover],
             // The file's own build, which the course file keeps (2026-11-03). A file written to the specification has none.
@@ -602,12 +619,79 @@ final class LegacyHtmlCourseImporter
         return $names;
     }
 
-    /** The whole course's study time, in hours in the file's head (specification 6.5), or null: the page adds up its parts. */
-    private function studyMinutes(DOMXPath $xpath): ?int
+    /**
+     * The whole course's study time in minutes, or null: the page adds up its parts. A full course states it in hours
+     * (cattolms:study-hours, specification 6.5), a short course in minutes (cattolms:study-minutes, section 15.1).
+     */
+    private function studyMinutes(DOMXPath $xpath, bool $short = false): ?int
     {
-        $nodes = $xpath->query('//meta[@name="cattolms:study-hours"]/@content');
-        $hours = $nodes->length > 0 ? (int) $nodes->item(0)?->nodeValue : 0;
+        if ($short) {
+            $minutes = self::metaNumber($xpath, 'cattolms:study-minutes');
+            return $minutes >= 1 && $minutes <= 10000 ? $minutes : null;
+        }
+        $hours = self::metaNumber($xpath, 'cattolms:study-hours');
         return $hours >= 1 && $hours <= 10000 ? $hours * 60 : null;
+    }
+
+    /** A head meta's content as a whole number, or 0 when it is missing. */
+    private static function metaNumber(DOMXPath $xpath, string $name): int
+    {
+        $nodes = $xpath->query('//meta[@name="' . $name . '"]/@content');
+        return $nodes->length > 0 ? (int) trim((string) $nodes->item(0)?->nodeValue) : 0;
+    }
+
+    /** Whether the head carries this meta at all. */
+    private static function hasMeta(DOMXPath $xpath, string $name): bool
+    {
+        $nodes = $xpath->query('//meta[@name="' . $name . '"]');
+        return $nodes->length > 0;
+    }
+
+    /**
+     * The course's type from its head (Course Specification 4.13, section 15.1): 'short' for a short course; a file without
+     * the line, or with "full", is a full course.
+     *
+     * @param list<string> $warnings
+     */
+    private function courseType(DOMXPath $xpath, array &$warnings): string
+    {
+        $nodes = $xpath->query('//meta[@name="cattolms:course-type"]/@content');
+        $type = $nodes->length > 0 ? strtolower(trim((string) $nodes->item(0)?->nodeValue)) : 'full';
+        if (in_array($type, ['full', 'short'], true)) return $type;
+        $warnings[] = 'The course type "' . mb_substr($type, 0, 20) . '" is neither short nor full, so it was imported as a full course (specification, section 15.1).';
+        return 'full';
+    }
+
+    /**
+     * What a short course's file has that a short course does not (Course Specification 4.13, section 15.7), each a warning:
+     * a second module, a module 0, a readiness check, QUIZ keys other than m1, study-hours beside study-minutes, a final time
+     * limit, minutes outside 60 to 120 and a missing course preview. The review and the grading wording are checked where
+     * they are read; practical work with one block and not the other, as for every module, by partDrift.
+     *
+     * @param list<array<string,mixed>> $modules
+     * @param array<mixed> $quiz
+     * @param array<mixed> $presentations
+     * @return list<string>
+     */
+    private function shortCourseDrift(DOMXPath $xpath, array $modules, array $quiz, array $presentations): array
+    {
+        $warnings = [];
+        $keys = array_map(static fn(array $module): string => (string) $module['module_key'], array_values(array_filter($modules, static fn(array $module): bool => !$module['is_review'])));
+        if (count($keys) > 1) $warnings[] = 'A short course has one module, mod-m1. This file has ' . count($keys) . ': ' . implode(', ', array_map(static fn(string $key): string => 'mod-' . $key, $keys)) . ' (specification, section 15.2).';
+        if (in_array('m0', $keys, true)) $warnings[] = 'A short course has no module 0 (specification, section 15.2).';
+        if ($keys !== [] && $keys[0] !== 'm1' && $keys[0] !== 'm0') $warnings[] = 'A short course\'s module is mod-m1, key m1. This file\'s is mod-' . $keys[0] . ' (specification, section 15.2).';
+        $readinessKeys = array_values(array_intersect(array_map('strval', array_keys($quiz)), ['diag', 'diagnostic', 'prereq', 'prerequisite', 'readiness']));
+        $readinessPanel = $xpath->query('//*[@id="diagnostic" or contains(concat(" ", normalize-space(@class), " "), " diag ")]');
+        if ($readinessKeys !== [] || $readinessPanel->length > 0) $warnings[] = 'A short course has no readiness check, so it was left out (specification, section 15.2).';
+        $others = array_values(array_diff(array_map('strval', array_keys($quiz)), ['m1'], $readinessKeys));
+        if ($others !== []) $warnings[] = 'A short course\'s QUIZ holds m1 only (specification, section 15.5). It also has ' . implode(', ', array_map(static fn(string $key): string => 'QUIZ.' . $key, $others)) . (in_array('final', $others, true) ? ': a short course has no final assessment, so its module\'s assessment makes the whole mark and the rest was left out.' : ', which was left out.');
+        if (self::hasMeta($xpath, 'cattolms:study-hours')) $warnings[] = 'A short course states its time in cattolms:study-minutes and never also has cattolms:study-hours (specification, section 15.1). The minutes were used.';
+        if (self::hasMeta($xpath, 'cattolms:final-time-limit')) $warnings[] = 'A short course has no final assessment, so it has no cattolms:final-time-limit (specification, section 15.2).';
+        $minutes = self::metaNumber($xpath, 'cattolms:study-minutes');
+        if (!self::hasMeta($xpath, 'cattolms:study-minutes')) $warnings[] = 'A short course states how long it takes in cattolms:study-minutes, 60 to 120 (specification, section 15.1).';
+        elseif ($minutes < 60 || $minutes > 120) $warnings[] = 'cattolms:study-minutes says ' . $minutes . ' minutes. A short course takes 60 to 120 (specification, section 15.1).';
+        if (!is_array($presentations['trailer'] ?? null)) $warnings[] = 'A short course must have a course preview, PRESENTATIONS.trailer, with 5 to 8 slides ending on a call to action (specification, section 15.4).';
+        return $warnings;
     }
 
     /**
@@ -1274,6 +1358,9 @@ final class LegacyHtmlCourseImporter
         return CourseHtml::innerHtml($element);
     }
 
+    /** How a short course's introduction states its grading (Course Specification 4.13, section 15.5), word for word. */
+    public const SHORT_GRADING = 'Your mark is your score in the assessment at the end of the course.';
+
     /** Class names a writer has used for a part instead of the specification's names (2026-11-01). */
     private const DRIFTED_CLASSES = ['workshop', 'exercise', 'exercises', 'activity', 'activities', 'lab', 'practice', 'solutions', 'stock-answers'];
 
@@ -1323,7 +1410,7 @@ final class LegacyHtmlCourseImporter
      *
      * @return list<string>
      */
-    private static function wordingDrift(string $html, string $where, bool $grading): array
+    private static function wordingDrift(string $html, string $where, bool $grading, bool $short = false): array
     {
         $text = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5)));
         $warnings = [];
@@ -1332,6 +1419,19 @@ final class LegacyHtmlCourseImporter
         }
         // Grading is stated in prose: a table of exam domains and their weights is course content, not the course's grading.
         $prose = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string) preg_replace('#<table\b.*?</table>#is', ' ', $html)), ENT_QUOTES | ENT_HTML5)));
+        // A short course's one assessment makes the whole mark, said in one sentence and nothing else about weights
+        // (Course Specification 4.13, section 15.5), so the 50% check is for full courses only.
+        if ($grading && $short) {
+            if (!str_contains($prose, self::SHORT_GRADING)) $warnings[] = $where . ' does not say how a short course is graded in the specification\'s words: "' . self::SHORT_GRADING . '" (section 15.5).';
+            foreach (preg_split('/(?<=[.!?])\s+/u', $prose) ?: [] as $sentence) {
+                if ($sentence === self::SHORT_GRADING) continue;
+                if (preg_match('/\b(final assessment|module assessments|half (?:of )?(?:your|the)|weight(?:ed|ing)?|counts? for)\b/i', $sentence) === 1 || (preg_match('/\b(grade|mark|result)/i', $sentence) === 1 && preg_match('/\d{1,3}\s?%/', $sentence) === 1)) {
+                    $warnings[] = $where . ' says "' . mb_substr($sentence, 0, 140) . '". A short course\'s one assessment makes the whole mark: say only "' . self::SHORT_GRADING . '" (specification, section 15.5).';
+                    break;
+                }
+            }
+            return $warnings;
+        }
         foreach ($grading ? (preg_split('/(?<=[.!?])\s+/u', $prose) ?: []) : [] as $sentence) {
             if (preg_match('/\b(weight(?:ed|ing)?|carries|counts? for|worth)\b/i', $sentence) === 1 && preg_match('/\b(grade|mark|result|assessment)/i', $sentence) === 1 && preg_match_all('/(\d{1,3})\s?%/', $sentence, $numbers) > 0 && array_diff(array_map('intval', $numbers[1]), [50, 100]) !== []) {
                 $warnings[] = $where . ' gives grading weights other than 50% for the module assessments and 50% for the final assessment: "' . mb_substr($sentence, 0, 140) . '" (specification, section 7).';
@@ -1347,7 +1447,7 @@ final class LegacyHtmlCourseImporter
      * @param list<string> $warnings
      * @return array{title:string,minutes:int|null,type_config:array<string,mixed>}|null
      */
-    private function presentation(mixed $deck, string $moduleTitle, bool $review, array &$warnings): ?array
+    private function presentation(mixed $deck, string $moduleTitle, bool $review, array &$warnings, string $courseType = 'full'): ?array
     {
         if ($deck === null) return null;
         if (!is_array($deck) || !is_array($deck['slides'] ?? null)) {
@@ -1356,12 +1456,12 @@ final class LegacyHtmlCourseImporter
         }
         $config = ['kind' => (string) ($deck['kind'] ?? ($review ? 'review' : 'intro')), 'theme' => (string) ($deck['theme'] ?? 'light'), 'slides' => array_values($deck['slides'])];
         try {
-            $config = SlideDeck::validate($config);
+            $config = SlideDeck::validate($config, $courseType);
         } catch (InvalidArgumentException $refused) {
             $warnings[] = $moduleTitle . ': its presentation was left out. ' . $refused->getMessage();
             return null;
         }
-        foreach (SlideDeck::warnings($config) as $warning) $warnings[] = $moduleTitle . ': ' . $warning;
+        foreach (SlideDeck::warnings($config, $courseType) as $warning) $warnings[] = $moduleTitle . ': ' . $warning;
         $title = trim((string) ($deck['title'] ?? ''));
         return ['title' => $title !== '' ? $title : 'What you will learn', 'minutes' => is_numeric($deck['minutes'] ?? null) ? max(1, (int) $deck['minutes']) : null, 'type_config' => $config];
     }
@@ -1393,7 +1493,7 @@ final class LegacyHtmlCourseImporter
         $svg = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " masthead ")]//*[contains(concat(" ", normalize-space(@class), " "), " course-cover ")]//svg[1]')->item(0);
         if (!$svg instanceof DOMElement) return null;
         try {
-            return UploadedSvg::validate(CourseHtml::html($svg), UploadedSvg::COVER_BYTES, 'cover of "' . $title . '"');
+            return UploadedSvg::validate(CourseHtml::html($svg), UploadedSvg::PICTURE_BYTES, 'cover of "' . $title . '"');
         } catch (InvalidArgumentException $refused) {
             $warnings[] = 'The cover picture was left out. ' . $refused->getMessage();
             return null;

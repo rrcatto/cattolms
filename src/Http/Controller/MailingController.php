@@ -33,7 +33,7 @@ use CattoLearning\Mailing\MailingConsents;
 use CattoLearning\Mailing\MailingRepository;
 use CattoLearning\Mailing\MailingSettings;
 use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;

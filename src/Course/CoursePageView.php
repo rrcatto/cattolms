@@ -36,11 +36,11 @@ namespace CattoLearning\Course;
 use CattoLearning\Course\Catwalk\DeckRenderer;
 use CattoLearning\Course\Catwalk\Narrations;
 use CattoLearning\Course\Catwalk\SlideDeck;
-use CattoLearning\View\Artwork\IconLibrary;
+use CattoPHP\Ui\IconLibrary;
 
 final class CoursePageView
 {
-    /** Each part's picture in the strip of a module's parts (Lucide, resources/icons). */
+    /** Each part's picture in the strip of a module's parts (Lucide, CattoPHP's icon library). */
     private const PART_ICONS = ['presentation' => 'presentation', 'video' => 'video', 'lesson' => 'book-open', 'summary' => 'file-text', 'flashcards' => 'layers', 'practical' => 'pencil-line', 'review' => 'list-checks', 'assessment' => 'circle-help'];
 
     private const NUMBER_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -55,7 +55,7 @@ final class CoursePageView
     /**
      * @param array<string,mixed> $course A public course with its structure (CourseService::publicCourse).
      * @param bool $withTrailer Whether to draw the trailer (a landing page's contents need none).
-     * @return array{modules:list<array{number:int,title:string,time:string,preview:bool}>,parts:list<array{part:string,label:string,icon:string}>,paragraph:string,after:string,total:string,minutes:int,figures:list<array{n:string,label:string}>,free:string,trailer:array<string,mixed>|null}
+     * @return array{modules:list<array{number:int|null,title:string,time:string,preview:bool}>,parts:list<array{part:string,label:string,icon:string}>,paragraph:string,after:string,total:string,minutes:int,figures:list<array{n:string,label:string}>,free:string,trailer:array<string,mixed>|null,short:bool}
      */
     public function view(array $course, bool $withTrailer = true): array
     {
@@ -85,25 +85,29 @@ final class CoursePageView
             if ($with === $count) { $common[] = $part; } else { $some[$part] = $with; }
         }
         $free = '';
-        foreach ($modules as $module) { if ($module['preview']) { $free = 'Module ' . $module['number']; break; } }
+        foreach ($modules as $module) { if ($module['preview']) { $free = $module['number'] === null ? $module['title'] : 'Module ' . $module['number']; break; } }
 
+        // A short course (Course Specification 4.13, section 15): one module of 60 to 120 minutes, whose one assessment makes
+        // the mark, worded as one piece, its time in minutes (owner, 2026-11-11: "its time in minutes ... never hours").
+        $short = ($course['course_type'] ?? 'full') === 'short';
         $figures = array_values(array_filter([
-            $presentations > 0 ? ['n' => (string) $presentations, 'label' => $presentations === $count && in_array('presentation', $common, true) ? 'presentations, one opening each module' : 'presentations'] : null,
+            $presentations > 0 ? ['n' => (string) $presentations, 'label' => $presentations === 1 ? 'presentation' : ($presentations === $count && in_array('presentation', $common, true) ? 'presentations, one opening each module' : 'presentations')] : null,
             $videos > 0 ? ['n' => (string) $videos, 'label' => $videos === 1 ? 'video' : 'videos'] : null,
             $cards > 0 ? ['n' => number_format($cards, 0, '.', ','), 'label' => 'flash cards'] : null,
             $tasks > 0 ? ['n' => (string) $tasks, 'label' => 'practical tasks with model answers'] : null,
-            $moduleQuestions > 0 ? ['n' => number_format($moduleQuestions, 0, '.', ','), 'label' => 'questions in the module assessments'] : null,
+            $moduleQuestions > 0 ? ['n' => number_format($moduleQuestions, 0, '.', ','), 'label' => $short ? 'questions in the assessment' : 'questions in the module assessments'] : null,
             $finalQuestions > 0 ? ['n' => number_format($finalQuestions, 0, '.', ','), 'label' => 'questions in the final assessment'] : null,
         ]));
 
         return [
             'modules' => array_map(static fn(array $module): array => ['number' => $module['number'], 'title' => $module['title'], 'time' => self::time($module['minutes']), 'preview' => $module['preview']], $modules),
             'parts' => array_map(fn(string $part): array => ['part' => $part, 'label' => $part === 'assessment' ? 'Self assessment' : CourseItemService::PART_LABELS[$part], 'icon' => (string) $this->icons->svg(self::PART_ICONS[$part] ?? 'circle')], array_values(array_intersect(array_keys(CourseItemService::PART_LABELS), array_merge($common, array_keys($some))))),
-            'paragraph' => $count > 0 ? self::paragraph($common, $some, $count, $narrated, (int) round($total / $count)) : '',
-            'after' => $this->after($rows, $moduleOf, $moduleQuestions > 0, $finalQuestions > 0),
+            'paragraph' => $count > 0 ? ($short ? self::shortParagraph($common, $narrated) : self::paragraph($common, $some, $count, $narrated, (int) round($total / $count))) : '',
+            'after' => $short ? ($moduleQuestions > 0 ? 'Your mark is your score in the assessment at the end of the course.' : '') : $this->after($rows, $moduleOf, $moduleQuestions > 0, $finalQuestions > 0),
             // The whole course's study time, the review and the final with it; the trailer is for visitors.
-            'total' => $courseMinutes > 0 ? self::roughly($courseMinutes) : '',
-            // The same in minutes, for the course's structured data (Search\StructuredData::duration words it as total does).
+            'total' => $courseMinutes > 0 ? ($short ? self::minutes($courseMinutes) : self::roughly($courseMinutes)) : '',
+            'short' => $short,
+            // The same in minutes, for the course's structured data (CattoPHP\Search\StructuredData::duration words it as total does).
             'minutes' => max(0, $courseMinutes),
             'figures' => $figures,
             'free' => $free,
@@ -150,7 +154,7 @@ final class CoursePageView
      * The course's modules and parts counted: what view() draws and facts() reports.
      *
      * @param list<array<string,mixed>> $rows
-     * @return array{modules:list<array{number:int,title:string,minutes:int,preview:bool,parts:array<string,bool>}>,moduleOf:array<int,int>,presentations:int,videos:int,cards:int,tasks:int,moduleQuestions:int,finalQuestions:int,courseMinutes:int,trailer:array<string,mixed>|null,presentationItems:list<int>}
+     * @return array{modules:list<array{number:int|null,title:string,minutes:int,preview:bool,parts:array<string,bool>}>,moduleOf:array<int,int>,presentations:int,videos:int,cards:int,tasks:int,moduleQuestions:int,finalQuestions:int,courseMinutes:int,trailer:array<string,mixed>|null,presentationItems:list<int>}
      */
     private static function tally(array $rows): array
     {
@@ -159,7 +163,7 @@ final class CoursePageView
         foreach ($rows as $row) {
             if ((string) $row['node_type'] === 'section' && !empty($row['numbered']) && ($row['section_number'] ?? null) !== null) {
                 $moduleOf[(int) $row['id']] = count($modules);
-                $modules[] = ['number' => (int) $row['section_number'], 'title' => (string) $row['section_title'], 'minutes' => 0, 'preview' => !empty($row['public_preview']), 'parts' => []];
+                $modules[] = ['number' => array_key_exists('label_number', $row) && $row['label_number'] === null ? null : (int) $row['section_number'], 'title' => (string) $row['section_title'], 'minutes' => 0, 'preview' => !empty($row['public_preview']), 'parts' => []];
             }
         }
         $presentations = 0; $videos = 0; $cards = 0; $tasks = 0; $moduleQuestions = 0; $finalQuestions = 0; $courseMinutes = 0; $presentationItems = [];
@@ -231,6 +235,40 @@ final class CoursePageView
         if ($most !== []) { $sentences[] = 'Most modules also have ' . self::series($most) . '.'; }
         if ($several !== []) { $sentences[] = 'Some modules also have ' . self::series($several) . '.'; }
         if ($minutes > 0) { $sentences[] = 'A module takes ' . self::roughly($minutes) . '.'; }
+        return implode(' ', $sentences);
+    }
+
+    /** A short course's time, always in minutes (specification 4.13, section 15.1): "about 90 minutes". */
+    public static function minutes(int $minutes): string
+    {
+        return 'about ' . max(5, (int) (round($minutes / 5) * 5)) . ' minutes';
+    }
+
+    /**
+     * What a short course holds, in the order its one module gives it: "It opens with a presentation, a short slide show you
+     * can play on any screen, followed by a video. Then comes the lesson, with a summary and flash cards to fix what matters.
+     * Practical work with model answers lets you apply it, and it ends with an assessment."
+     *
+     * @param list<string> $common
+     */
+    public static function shortParagraph(array $common, bool $narrated): string
+    {
+        $has = static fn(string $part): bool => in_array($part, $common, true);
+        $sentences = [];
+        if ($has('presentation')) {
+            $sentences[] = 'It opens with a presentation, a short ' . ($narrated ? 'narrated ' : '') . 'slide show you can play on any screen' . ($has('video') ? ', followed by a video.' : '.');
+        } elseif ($has('video')) {
+            $sentences[] = 'It opens with a video.';
+        }
+        if ($has('lesson')) {
+            $aids = array_values(array_filter([$has('summary') ? 'a summary' : '', $has('flashcards') ? 'flash cards' : '']));
+            $sentences[] = ($sentences === [] ? 'It has a lesson' : 'Then comes the lesson') . ($aids === [] ? '.' : ', with ' . implode(' and ', $aids) . ' to fix what matters.');
+        }
+        $closing = array_values(array_filter([
+            $has('practical') ? 'practical work with model answers lets you apply it' : '',
+            $has('assessment') ? 'it ends with an assessment' : '',
+        ]));
+        if ($closing !== []) { $sentences[] = ucfirst(self::series($closing)) . '.'; }
         return implode(' ', $sentences);
     }
 

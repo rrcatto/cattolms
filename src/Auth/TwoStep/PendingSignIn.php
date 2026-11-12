@@ -23,7 +23,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Auth\TwoStep;
 
-use CattoLearning\Configuration\SecretCipher;
+use CattoPHP\Security\SecretCipher;
 use Symfony\Component\Clock\ClockInterface;
 use Throwable;
 

@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
     {% set ph_kicker = 'Administration' %}{% set ph_title = 'Refund Requests' %}{% set ph_lead = 'Refunds learners and Company Administrators asked for, oldest first. The Refund Policy’s verdict is as it stood when they asked.' %}
-    {% include '@platform/partials/page-head.html.twig' %}
+    {% include '@CattoPHP/page/head.html.twig' %}
     <section class="cl-page-section">
     {% if requests %}
         {% for request in requests %}

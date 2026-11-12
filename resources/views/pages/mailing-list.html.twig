@@ -16,7 +16,7 @@
 		{% if welcome and welcome.status == 'sending' %}{{ ui('feedback.badge', {label: 'Welcome email on', tone: 'success'}) }}{% endif %}
 		{{ ui('feedback.badge', {label: 'Made ' ~ list.created_at|date('j F Y'), tone: 'neutral'}) }}
 	{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% if can_manage %}
 	<section class="cl-page-section">
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}
@@ -87,7 +87,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'followers', pagination: followers_pagination})} %}{% block results %}
 			{% if followers %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 36, label: 'Person'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Said yes'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'When'}} %}{% if can_manage %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}{% endif %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 36, label: 'Person'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Said yes'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'When'}} %}{% if can_manage %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: ''}} %}{% endif %}</tr>{% endblock %}
 			{% block body %}{% for follower in followers %}<tr>
 				<td class="cell-text">{{ ui('data.person', {name: follower.name, href: person_url(follower.account_reference)}) }}</td>
 				<td>{{ sources[follower.source]|default(follower.source) }}</td>

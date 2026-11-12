@@ -263,6 +263,36 @@ final class CourseItemRepository
         return (int) ($this->db->fetchOne('SELECT first_module_number FROM courses WHERE id = :id', ['id' => $courseId]) ?? 1);
     }
 
+    /** A course's type, 'full' or 'short' (Course Specification 4.13, section 15). */
+    public function courseType(int $courseId): string
+    {
+        return $this->db->fetchOne('SELECT course_type FROM courses WHERE id = :id', ['id' => $courseId]) === 'short' ? 'short' : 'full';
+    }
+
+    /**
+     * The graded assessment that closes the course and gives its result: its final, or in a short course, which has none
+     * (Course Specification 4.13, section 15.5; owner, 2026-11-11), its last graded assessment, whose score is the whole mark.
+     * Null when the course has neither. For a learner's attempts and a visitor's in the public preview alike.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function closingAssessment(int $courseId, ?int $enrolmentId = null): ?array
+    {
+        $contexts = $this->assessmentContexts($courseId, $enrolmentId);
+        foreach ($contexts as $context) { if ($context['assessment_role'] === 'final') { return $context; } }
+        if ($contexts === [] || $this->courseType($courseId) !== 'short') { return null; }
+        $order = [];
+        foreach ($this->structure($courseId) as $position => $node) { $order[(int) $node['id']] = $position; }
+        usort($contexts, static fn(array $a, array $b): int => ($order[(int) $a['node_id']] ?? 0) <=> ($order[(int) $b['node_id']] ?? 0));
+        return $contexts[count($contexts) - 1];
+    }
+
+    /** 'short' when the item is placed in a short course, so its presentation takes a short course's sizes; else 'full'. */
+    public function itemCourseType(int $itemId): string
+    {
+        return $this->db->fetchOne("SELECT 1 FROM course_item_placements p JOIN courses c ON c.id = p.course_id WHERE p.course_item_id = :id AND c.course_type = 'short' LIMIT 1", ['id' => $itemId]) !== false ? 'short' : 'full';
+    }
+
     /**
      * A course's whole outline, every row in course order with its section, placement, item and assessment.
      *

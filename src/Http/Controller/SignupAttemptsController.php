@@ -29,15 +29,14 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Auth\Signup\NetworkLookup;
-use CattoLearning\Auth\Signup\RiskAssessment;
-use CattoLearning\Auth\Signup\SignupCountries;
-use CattoLearning\Auth\Signup\SignupRisk;
 use CattoLearning\Infrastructure\Persistence\SignupAttemptRepository;
-use CattoLearning\Support\GeoIpLocator;
-use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\View\ThemeRenderer;
+use CattoPHP\Network\GeoIp;
+use CattoPHP\Signup\RiskAssessment;
+use CattoPHP\Signup\SignupCountries;
+use CattoPHP\Signup\SignupRisk;
+use CattoPHP\Ui\Pagination;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -54,7 +53,7 @@ final class SignupAttemptsController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly SignupAttemptRepository $attempts,
-        private readonly NetworkLookup $network
+        private readonly GeoIp $geo
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -94,7 +93,7 @@ final class SignupAttemptsController extends BaseController
         $attempt = $this->attempts->find((int) $this->request()->attributes->get('id'));
         if ($attempt === null) throw $this->notFound('That sign-up attempt could not be found.');
         $row = self::row($attempt);
-        $row['place'] = $attempt['ip_address'] !== '' ? $this->network->place((string) $attempt['ip_address']) : 'No IP address';
+        $row['place'] = $attempt['ip_address'] !== '' ? $this->geo->place((string) $attempt['ip_address']) : 'No IP address';
         $row['hold_words'] = array_map([SignupRisk::class, 'holdWords'], (array) $attempt['hold_reasons']);
 
         return $this->render('admin-signup-attempt', [
@@ -119,7 +118,7 @@ final class SignupAttemptsController extends BaseController
         return $attempt + [
             'href' => self::BASE . '/' . (int) $attempt['id'],
             'name' => trim($attempt['first_name'] . ' ' . $attempt['last_name']),
-            'country' => $country === '' ? 'Unknown' : trim(GeoIpLocator::flagForCountryCode($country) . ' ' . SignupCountries::name($country)),
+            'country' => $country === '' ? 'Unknown' : trim(GeoIp::flag($country) . ' ' . SignupCountries::name($country)),
             // The country they say they live in (owner, 2026-10-27), which may differ from where they were.
             'home_country' => (string) ($attempt['home_country'] ?? '') === '' ? 'Not asked' : \CattoLearning\Support\Countries::name((string) $attempt['home_country']),
             'risk_label' => RiskAssessment::label((string) $attempt['band']),

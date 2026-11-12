@@ -43,8 +43,8 @@ use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseService;
-use CattoLearning\Support\Pagination;
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\Pagination;
+use CattoPHP\Ui\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -56,7 +56,7 @@ final class AdminCourseTagController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly \CattoLearning\View\Artwork\IconLibrary $icons,
+        private readonly \CattoPHP\Ui\IconLibrary $icons,
         private readonly \CattoLearning\Mailing\MailingRepository $mailingLists,
         private readonly \CattoLearning\Infrastructure\Persistence\AddressKeyRepository $keys
     ) {

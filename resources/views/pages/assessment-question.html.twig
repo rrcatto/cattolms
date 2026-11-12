@@ -23,7 +23,7 @@
 					{{ ui('feedback.badge', {label: 'Question ' ~ (question.sequence) ~ ' of ' ~ (session.counts.total), tone: 'neutral'}) }}<span>{{ question.points }} point{{ question.points == 1 ? '' : 's' }}</span>
 				</div>
 				<div class="cl-question-text">
-					{{ question.question_html|raw }}
+					{{ question.question_html|authored }}
 				</div>
 				<form action="{{ respond_action }}" method="post" class="mt-7">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -32,7 +32,7 @@
 						{% for option in question.options %}
 							<label class="cl-option">
 							<input type="radio" name="option_id" value="{{ option.id }}">
-							<span>{{ option.option_html|raw }}</span></label>
+							<span>{{ option.option_html|authored }}</span></label>
 						{% endfor %}
 					</div>
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
@@ -46,7 +46,7 @@
 
 {% endblock %}
 {% endembed %}</div>
-		<form id="assessment-finish-form" action="{{ finish_action }}" method="post" class="mt-5" onsubmit="return confirm('Finish now? Any skipped or unanswered questions will receive zero.');">
+		<form id="assessment-finish-form" action="{{ finish_action }}" method="post" class="mt-5" data-confirm-submit="Finish now? Any skipped or unanswered questions will receive zero.">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{{ ui('action.button', {label: 'Finish assessment now', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-finish'}) }}
 		</form>

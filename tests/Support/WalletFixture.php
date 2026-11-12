@@ -8,7 +8,6 @@ use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Commerce\Wallet\WalletRepository;
 use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Infrastructure\Persistence\Database;
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use Symfony\Component\Clock\ClockInterface;
 
 /** The commerce settings and wallet service on a test's own connection and clock. */
@@ -23,13 +22,14 @@ final class WalletFixture
     public static function defaults(Database $db): void
     {
         if (!$db->isTransactionActive()) throw new \LogicException('Clear the commerce settings only inside the test\'s own transaction.');
-        $db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'commerce.%'");
+        $db->executeStatement("DELETE FROM cattophp_settings WHERE name LIKE 'COMMERCE\\_%'");
+        IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)->refresh();
         $db->executeStatement('UPDATE promotions SET active = FALSE WHERE applies_automatically AND active');
     }
 
     public static function settings(Database $db): CommerceSettings
     {
-        return new CommerceSettings(new OptionRepository($db));
+        return new CommerceSettings(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class));
     }
 
     public static function wallets(Database $db, ClockInterface $clock): WalletService

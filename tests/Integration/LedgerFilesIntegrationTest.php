@@ -33,7 +33,7 @@ use CattoLearning\Commerce\Wallet\WalletRepository;
 use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteOwner;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\IntegrationContainer;
@@ -69,7 +69,7 @@ final class LedgerFilesIntegrationTest extends TestCase
         $this->wallets = WalletFixture::wallets($this->db, $this->clock);
         $this->money = new MoneyRecords(new MoneyRecordsRepository($this->db), $this->clock);
         $container = IntegrationContainer::get();
-        $this->files = new LedgerFiles($this->money, new WalletRepository($this->db), $container->get(DocumentPdfRenderer::class), $container->get(ThemeRenderer::class),
+        $this->files = new LedgerFiles($this->money, new WalletRepository($this->db), $container->get(PdfRenderer::class), $container->get(ThemeRenderer::class),
             $container->get(SiteOwner::class), $container->get(SiteMode::class), $this->clock);
     }
 

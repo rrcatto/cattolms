@@ -32,7 +32,7 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Token;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\DevelopmentFixture;
@@ -75,8 +75,8 @@ if ($action === 'create') {
     $admin = $fixture->person('ADMIN');
     // The check runs on the commerce settings' defaults; the owner's saved settings (such as a 3% Stitch
     // fee) are kept in the state and put back by cleanup.
-    $saved = $db->fetchAllAssociative("SELECT option_key, option_value, updated_at, updated_by_user_id FROM app_options WHERE option_key LIKE 'commerce.%'");
-    $db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'commerce.%'");
+    $saved = $db->fetchAllAssociative("SELECT name, value, secret, updated_at, updated_by FROM cattophp_settings WHERE name LIKE 'COMMERCE\\_%'");
+    $db->executeStatement("DELETE FROM cattophp_settings WHERE name LIKE 'COMMERCE\\_%'");
     $writeState(['company' => $provider['id'], 'courses' => $courses, 'users' => ['provider' => $provider['founder']['id'], 'admin' => $admin['id']], 'saved_settings' => $saved, 'scrub' => $fixture->seeds(),
         'learners' => [], 'admin_token' => $session($admin['id'], $admin['email'])]);
     echo "Created the commerce wallets fixture.\n";
@@ -123,7 +123,7 @@ if ($action === 'create') {
 } elseif ($action === 'follows') {
     // What the learner agreed to be emailed about (mailing, step 1): [kind, subject id, source] of each yes.
     $learner = (int) ($argv[3] ?? 0);
-    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, l.subject_id, s.source FROM mailing_subscriptions s JOIN mailing_lists l ON l.id = s.list_id WHERE s.user_id = :u AND s.status = 'subscribed' ORDER BY l.kind, l.subject_id", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
+    echo json_encode(array_map(static fn(array $r): array => [$r['kind'], $r['subject_id'] === null ? null : (int) $r['subject_id'], $r['source']], $db->fetchAllAssociative("SELECT l.kind, CAST(l.subject AS BIGINT) AS subject_id, s.source FROM cattophp_mailing_subscriptions s JOIN cattophp_mailing_lists l ON l.id = s.list_id WHERE s.account = CAST(:u AS TEXT) AND s.status = 'subscribed' ORDER BY l.kind, CAST(l.subject AS BIGINT)", ['u' => $learner])), JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'order') {
     $learner = (int) ($argv[3] ?? 0);
     $records = $container->get(CommerceRepository::class);
@@ -136,10 +136,10 @@ if ($action === 'create') {
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = $readState();
-    $db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'commerce.%'");
+    $db->executeStatement("DELETE FROM cattophp_settings WHERE name LIKE 'COMMERCE\\_%'");
     foreach ($state['saved_settings'] ?? [] as $row) {
-        $db->executeStatement('INSERT INTO app_options (option_key, option_value, updated_at, updated_by_user_id) VALUES (:k, :v, :at, :by)',
-            ['k' => $row['option_key'], 'v' => $row['option_value'], 'at' => $row['updated_at'], 'by' => $row['updated_by_user_id']]);
+        $db->executeStatement('INSERT INTO cattophp_settings (name, value, secret, updated_at, updated_by) VALUES (:name, :value, :secret, :at, :by)',
+            ['name' => $row['name'], 'value' => $row['value'], 'secret' => $row['secret'] ? 'true' : 'false', 'at' => $row['updated_at'], 'by' => $row['updated_by']]);
     }
     // Everything the check made, its orders, ledger, wallets and requests included (owner, 2026-10-27).
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);

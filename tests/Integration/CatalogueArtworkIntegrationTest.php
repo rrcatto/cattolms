@@ -37,7 +37,7 @@ final class CatalogueArtworkIntegrationTest extends TestCase
         $this->db->beginTransaction();
         $this->fixture = new DevelopmentFixture($this->db);
         $this->courses = IntegrationContainer::get()->get(CourseService::class);
-        $roles = new RoleRepository($this->db);
+        $roles = IntegrationContainer::get()->get(RoleRepository::class);
         $this->admin = $roles->firstUserWithRole('ADMIN') ?? (function () use ($roles): int {
             $id = $this->fixture->createUser('Catalogue administrator');
             $roles->assign($id, 'ADMIN');
@@ -157,7 +157,7 @@ final class CatalogueArtworkIntegrationTest extends TestCase
      */
     public function testANewCategoryOrTagTakesTheLibrarysIconThatFitsItsName(): void
     {
-        $library = new \CattoLearning\View\Artwork\IconLibrary();
+        $library = new \CattoPHP\Ui\IconLibrary(\CattoLearning\View\Artwork\CourseIcons::SUBJECTS, \CattoLearning\View\Artwork\CourseIcons::NAME_STOP_WORDS);
         $category = $this->courses->createCategory(['name' => 'Law ' . $this->suffix, 'slug' => 'law-' . $this->suffix], $this->admin);
         self::assertSame($library->svg('scale'), (string) $category['icon_svg'], 'Law is pictured by the scales.');
         $tag = $this->courses->createTag(['name' => 'Physics ' . $this->suffix], $this->admin);

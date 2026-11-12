@@ -24,7 +24,7 @@ use Throwable;
 /**
  * Persists only theme metadata. It never stores or reconstructs theme source.
  */
-final class ThemeRegistryRepository
+final class ThemeRegistryRepository implements \CattoPHP\Theme\ThemeRegistry
 {
     public function __construct(private readonly Database $db)
     {

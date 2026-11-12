@@ -13,6 +13,8 @@ value comes from (saved here, or .env), the secrets only as saved or not, the se
 webhook address to give cattomail, the sending rules, the email design's logo, and whether cattomail answers.
 
 Changelog:
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/26 SAST
 - Created.
 */
@@ -57,7 +59,7 @@ class MailingSettingsView
             'days' => MailingSettings::DAYS,
             'recorded' => MailingSettings::RECORDED,
             'digest_days' => $this->settings->digestSummary(),
-            'duration_how' => \CattoLearning\Support\Duration::HOW,
+            'duration_how' => \CattoPHP\Foundation\Duration::HOW,
             'logo' => $asset === null ? '' : '/m/i/' . $logo . EmailRenderer::extension($asset['media_type']),
             'source' => array_filter(array_map(fn(string $key): bool => $this->settings->source($key) === 'database', array_keys(MailingSettings::FIELDS))) !== [] ? 'database' : 'environment',
         ];

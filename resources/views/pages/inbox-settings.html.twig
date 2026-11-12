@@ -1,0 +1,99 @@
+{#
+	Inbox settings (owner, 2026-11-11: the Trash "emptied every 30d (which needs to be a setting)", "a plain text and an
+	html" signature; approved mockup's Settings; InboxController::settings, InboxSettings). One form and one Save, as the
+	mockup: keeping messages, the spam check, replies, receiving answers and telling you about new messages (the form
+	itself empty in the first row, every field and button joined to it by form=, so each part is a page row). As every
+	setting, .env gives the starting values (INBOX_*) and Reset to the standard settings goes back to them. Each field is
+	named as its setting in small letters.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Inbox' %}
+	{% set ph_title = 'Settings' %}
+	{% set ph_lead = 'How long messages are kept, how the spam check judges them, how replies are sent and how answers come back.' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
+	{% set s = settings %}
+	{% set typed = typed_for('/inbox/settings') %}
+	{% set v = {} %}{% for name, setting in s %}{% set v = v|merge({(name): typed[name|lower]|default(setting.value)}) %}{% endfor %}
+	{% set disabled = can_manage ? '' : 'disabled' %}
+		<section class="cl-page-section"><form method="post" action="/inbox/settings" id="inbox-settings"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Keeping messages', summary: 'Lengths are written as everywhere in Settings: 30d, 4w, 1y.'}) }}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Empty the Trash after', for: 'inbox_trash_kept_for', help: 'A message in the Trash for longer is deleted for good by the daily clean-up. Standard: 30d. The Trash also has Empty Trash now.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_trash_kept_for" name="inbox_trash_kept_for" value="{{ v.INBOX_TRASH_KEPT_FOR }}" maxlength="12" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Empty Spam after', for: 'inbox_spam_kept_for', help: 'Standard: 30d.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_spam_kept_for" name="inbox_spam_kept_for" value="{{ v.INBOX_SPAM_KEPT_FOR }}" maxlength="12" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Keep conversations for', for: 'inbox_kept_for', help: 'As the Privacy Policy says. Standard: 5y.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_kept_for" name="inbox_kept_for" value="{{ v.INBOX_KEPT_FOR }}" maxlength="12" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</section>
+
+		<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Spam check', summary: 'Each message is scored out of 100 when it arrives.'}) }}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Send a message to Spam when it scores', for: 'inbox_spam_line', help: 'or more. Lower catches more spam, and more real messages with it. Standard: 60.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_spam_line" name="inbox_spam_line" type="number" min="1" max="100" value="{{ v.INBOX_SPAM_LINE }}" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{% set ticked = [] %}
+			{% for name in ['INBOX_HOLD_BLOCKED_COUNTRIES', 'INBOX_LEARN'] %}{% if v[name]|trim != 'off' %}{% set ticked = ticked|merge([name|lower]) %}{% endif %}{% endfor %}
+			{{ ui('form.picture-choice', {form: 'inbox-settings', multiple: true, tick_value: 'on', legend: 'What the spam check reads', id: 'inbox-spam-ticks', size: 'small', selected: ticked, items: [
+				{value: 'inbox_hold_blocked_countries', label: 'Hold messages from the blocked countries', icon: lucide('shield-alert'), note: 'The countries on Settings > Sign-up checks. Untick it and a blocked country adds nothing.'},
+				{value: 'inbox_learn', label: 'Learn from what I mark', icon: lucide('brain'), note: 'A Bayesian word filter learns from every message you mark as spam or not spam. Untick it and only the fixed signs count.'}
+			]}) }}
+			<p>The filter has learnt from {{ trained.spam }} spam and {{ trained.ham }} genuine {{ trained.ham == 1 ? 'message' : 'messages' }}.{% if can_manage and (trained.spam or trained.ham) %} {{ ui('action.button', {form: 'inbox-settings', label: 'Forget what it has learnt', variant: 'quiet', size: 'small', name: 'action', value: 'forget', icon: 'action-reset', skip_validation: true, confirm: 'Forget everything the word filter has learnt? Only the fixed signs count until you mark messages again.'}) }}{% endif %}</p>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Never send to Spam: these addresses and domains', for: 'inbox_never_spam', full_width: true, help: 'Separated by commas or new lines, such as accounts@example.com, example.org.'})} %}{% block control %}<textarea form="inbox-settings" class="cl-input" id="inbox_never_spam" name="inbox_never_spam" rows="3" maxlength="5000" {{ disabled }} {{ ui_field_attrs(props) }}>{{ v.INBOX_NEVER_SPAM }}</textarea>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</section>
+
+		<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Replies', summary: 'How a reply from the Inbox is sent. The sender\'s answer goes to the reply-to address, and comes into its conversation once a mailbox is set below.'}) }}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From name', for: 'inbox_from_name', help: 'Empty: the site\'s own From name.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_from_name" name="inbox_from_name" value="{{ v.INBOX_FROM_NAME }}" maxlength="120" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From address', for: 'inbox_from_address', help: 'Empty: the site\'s own From address.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_from_address" name="inbox_from_address" type="email" value="{{ v.INBOX_FROM_ADDRESS }}" maxlength="254" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reply-to address', for: 'inbox_reply_to', help: 'The mailbox answers come to. Empty: the site\'s own reply-to.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_reply_to" name="inbox_reply_to" type="email" value="{{ v.INBOX_REPLY_TO }}" maxlength="254" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{{ ui('form.picture-choice', {form: 'inbox-settings', name: 'inbox_reply_format', legend: 'Write replies as', id: 'inbox-reply-format', size: 'small', selected: v.INBOX_REPLY_FORMAT|trim ?: 'html', help: 'Each reply can still choose the other.', items: [
+				{value: 'html', label: 'HTML', icon: lucide('code'), note: 'Written in the editor, with a plain text copy.'},
+				{value: 'plain', label: 'Plain text', icon: lucide('type'), note: 'Words only.'}
+			]}) }}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signature for plain text replies', for: 'inbox_signature_text', full_width: true})} %}{% block control %}<textarea form="inbox-settings" class="cl-input" id="inbox_signature_text" name="inbox_signature_text" rows="4" maxlength="2000" {{ disabled }} {{ ui_field_attrs(props) }}>{{ v.INBOX_SIGNATURE_TEXT }}</textarea>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signature for HTML replies', for: 'inbox_signature_html', full_width: true, help: 'Each reply takes the signature for the way it is sent.'})} %}{% block control %}<textarea form="inbox-settings" class="cl-input" id="inbox_signature_html" name="inbox_signature_html" rows="4" maxlength="10000" data-inbox-rich="signature" {{ disabled }} {{ ui_field_attrs(props) }}>{{ v.INBOX_SIGNATURE_HTML }}</textarea>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</section>
+
+		<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Receiving answers', summary: 'The mailbox your replies\' reply-to address delivers to. Every minute CattoLMS fetches what is new there and puts each answer into its conversation, matched by the reference in its subject (MSG-000047) or the email it answers; anything else in the mailbox is left alone.'}) }}
+			<p>{{ ui('feedback.badge', {label: not mailbox_set ? 'No mailbox set' : (mailbox_status.error ? 'Not reading' : 'Connected'), tone: not mailbox_set ? 'neutral' : (mailbox_status.error ? 'danger' : 'success')}) }}{% if mailbox_set and mailbox_status.checked_at %} Last read {{ mailbox_status.checked_at|date('j M Y H:i') }}.{% endif %}{% if mailbox_set and mailbox_status.error %} {{ mailbox_status.error }}{% endif %}</p>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mail server (IMAP)', for: 'inbox_imap_host', help: 'Such as mail.example.com.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_imap_host" name="inbox_imap_host" value="{{ v.INBOX_IMAP_HOST }}" maxlength="255" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Port', for: 'inbox_imap_port', help: '993 with SSL, 143 with STARTTLS.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_imap_port" name="inbox_imap_port" type="number" min="1" max="65535" value="{{ v.INBOX_IMAP_PORT ?: '993' }}" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Security', for: 'inbox_imap_security'})} %}{% block control %}<select form="inbox-settings" class="cl-select" id="inbox_imap_security" name="inbox_imap_security" {{ disabled }} {{ ui_field_attrs(props) }}>{% for key, label in {ssl: 'SSL', tls: 'STARTTLS', none: 'None'} %}<option value="{{ key }}" {{ (v.INBOX_IMAP_SECURITY|trim ?: 'ssl') == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mailbox user', for: 'inbox_imap_user'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_imap_user" name="inbox_imap_user" value="{{ v.INBOX_IMAP_USER }}" maxlength="255" autocomplete="off" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Password', for: 'inbox_imap_password', help: s.INBOX_IMAP_PASSWORD.secret_set ? 'Saved encrypted and never shown again. Leave it empty to keep it.' : 'Saved encrypted and never shown again.'})} %}{% block control %}<input form="inbox-settings" class="cl-input" id="inbox_imap_password" name="inbox_imap_password" type="password" value="" maxlength="500" autocomplete="new-password" {{ disabled }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{% if can_manage %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+				{% block primary_actions %}{{ ui('action.button', {form: 'inbox-settings', label: 'Check the connection', variant: 'secondary', type: 'submit', name: 'action', value: 'check', icon: 'action-connect'}) }}{% endblock %}
+				{% block secondary_actions %}{% if mailbox_set %}{{ ui('action.button', {form: 'inbox-settings', label: 'Disconnect', variant: 'quiet', type: 'submit', name: 'action', value: 'disconnect', icon: 'action-disconnect', skip_validation: true, confirm: 'Disconnect the mailbox? Its user and password are forgotten and nothing more is fetched.'}) }}{% endif %}{% endblock %}
+			{% endembed %}
+			{% endif %}
+		{% endblock %}{% endembed %}</section>
+
+		<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Telling you about new messages', summary: 'Messages held in Spam never tell you or their sender.'}) }}
+			{% set ticked = [] %}
+			{% for name in ['INBOX_NOTIFY_EMAIL', 'INBOX_NOTIFY_TELEGRAM', 'INBOX_ACKNOWLEDGE'] %}{% if v[name]|trim == 'on' %}{% set ticked = ticked|merge([name|lower]) %}{% endif %}{% endfor %}
+			{{ ui('form.picture-choice', {form: 'inbox-settings', multiple: true, tick_value: 'on', legend: 'When a message comes in', id: 'inbox-telling', size: 'small', selected: ticked, items: [
+				{value: 'inbox_notify_email', label: 'Email me each new message', icon: lucide('mail'), note: 'To the site\'s own address, as before. Untick it and nothing is emailed.'},
+				{value: 'inbox_notify_telegram', label: 'Send me a Telegram message', icon: lucide('send'), note: 'Through the bot on Settings > Connect to Telegram bot.'},
+				{value: 'inbox_acknowledge', label: 'Acknowledge each message to its sender', icon: lucide('check-check'), note: 'The fixed words with its reference. Never for a message held in Spam.'}
+			]}) }}
+		{% endblock %}{% endembed %}</section>
+
+		{% if can_manage %}
+		<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+				{% block primary_actions %}{{ ui('action.button', {form: 'inbox-settings', label: 'Save Inbox settings', variant: 'primary', type: 'submit', name: 'action', value: 'save', icon: 'action-save-changes'}) }}{% endblock %}
+				{% block secondary_actions %}{{ ui('action.button', {form: 'inbox-settings', label: 'Reset to the standard settings', variant: 'secondary', type: 'submit', name: 'action', value: 'reset', icon: 'action-reset', skip_validation: true, confirm: 'Put every Inbox setting back to the standard one? The mailbox password is forgotten too.'}) }}{% endblock %}
+			{% endembed %}
+		{% endblock %}{% endembed %}</section>
+		{% endif %}
+{% endblock %}

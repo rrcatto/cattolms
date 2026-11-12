@@ -41,8 +41,8 @@ class CompanyOverviewRepository
                     (SELECT COUNT(*) FROM course_enrolments e WHERE e.course_id = c.id AND e.is_preview = FALSE AND e.status IN ('assigned', 'active', 'completed'))::int AS learner_count
              FROM courses c
              LEFT JOIN course_categories cat ON cat.id = c.category_id
-             LEFT JOIN LATERAL (SELECT v.price_minor_units, v.was_price_minor_units, v.currency_code FROM course_price_variants v
-                                WHERE v.course_id = c.id AND v.is_active ORDER BY v.is_default DESC, v.price_minor_units, v.position LIMIT 1) p ON TRUE
+             LEFT JOIN LATERAL (SELECT v.price_minor_units, v.was_price_minor_units, v.currency_code FROM course_prices_on_sale v
+                                WHERE v.course_id = c.id ORDER BY v.is_default DESC, v.price_minor_units, v.position LIMIT 1) p ON TRUE
              WHERE c.owner_company_id = :c
              ORDER BY c.catalogue_position NULLS LAST, lower(c.title), c.id LIMIT :limit",
             ['c' => $companyId, 'limit' => $limit]

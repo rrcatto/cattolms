@@ -50,7 +50,7 @@ final class SharedControlContractTest extends TestCase
     }
 
     /** The one search control. Everything else includes it. */
-    private const SEARCH_CONTROL = 'resources/views/partials/dataset-search.html.twig';
+    private const SEARCH_CONTROL = 'vendor/rrcatto/cattophp/templates/ui/data/dataset-search.html.twig';
 
     /**
      * The one legitimate other search input, and why.

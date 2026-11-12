@@ -47,7 +47,6 @@ use CattoLearning\Auth\AclService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Auth\Signup\SignupChecks;
 use CattoLearning\Auth\SignInRestriction;
 use CattoLearning\Auth\SouthAfricanIdNumber;
 use CattoLearning\Commerce\Application\BankPayments;
@@ -70,10 +69,11 @@ use CattoLearning\Infrastructure\Mail\GeneratedDomainMailer;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\SeedRepository;
 use CattoLearning\Mailing\MailingConsents;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Countries;
 use CattoLearning\Support\Uuid;
 use DateTimeImmutable;
+use CattoPHP\Signup\SignupChecks;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Log\DebugLoggerInterface;
 use Throwable;
@@ -169,6 +169,7 @@ final class SeedRun
         private readonly RefundRequestService $refunds,
         private readonly ContactService $contact,
         private readonly MailingConsents $mailing,
+        private readonly SignupChecks $signupChecks,
         private readonly ?LoggerInterface $logger = null,
     ) {
     }
@@ -378,7 +379,7 @@ final class SeedRun
         $this->auth->requestRegistration($extra + ['account_type' => 'individual', 'first_name' => $person['first'], 'last_name' => $person['last'], 'email' => $email,
             'country' => Countries::SOUTH_AFRICA, 'id_number' => SouthAfricanIdNumber::make($born, random_int(0, 9999), $this->chance(0.95)),
             'news' => $this->chance(0.35) ? '1' : '',
-            SignupChecks::STAMP_FIELD => SignupChecks::formStamp(time() - random_int(30, 140)), SignupChecks::ZONE_FIELD => 'Africa/Johannesburg']);
+            SignupChecks::STAMP_FIELD => $this->signupChecks->stamp(time() - random_int(30, 140)), SignupChecks::ZONE_FIELD => 'Africa/Johannesburg']);
 
         return true;
     }

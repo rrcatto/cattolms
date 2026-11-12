@@ -10,11 +10,11 @@
 	{% set ph_kicker = 'Site Analytics' %}{% set ph_title = 'Telegram log' %}
 	{% set ph_lead = 'Every message the site sends by Telegram, newest first, and who it went to.' %}
 	{% if can_manage_settings %}{% set ph_actions %}{{ ui('action.link', {label: 'Telegram settings', variant: 'secondary', size: 'small', href: '/admin/settings?section=owner-messages#settings-owner-messages', icon: 'nav-settings'}) }}{% endset %}{% endif %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{% include '@platform/partials/live-status.html.twig' with {live_seconds: 15} %}
-		<form class="cl-library-lists" method="get" action="/admin/site-analytics/telegram-log" data-choose-submits {% include '@platform/partials/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics/telegram-log'} only %}>
+		{% include '@CattoPHP/page/live-status.html.twig' with {live_seconds: 15} %}
+		<form class="cl-library-lists" method="get" action="/admin/site-analytics/telegram-log" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: '/admin/site-analytics/telegram-log'} only %}>
 			{{ ui('form.picture-choice', {name: 'list', legend: 'Which messages', id: 'telegram-log-lists', size: 'small', selected: list, items: [
 				{value: 'all', label: 'All', icon: '<svg ' ~ a ~ '><path d="M4 6h16M4 12h16M4 18h16"/></svg>', note: counts.all|number_format},
 				{value: 'sign_in', label: 'Sign-ins', icon: '<svg ' ~ a ~ '><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>', note: counts.sign_in|number_format},

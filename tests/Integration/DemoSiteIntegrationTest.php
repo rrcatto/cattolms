@@ -11,17 +11,19 @@ use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Configuration\RuntimeSettings;
-use CattoLearning\Configuration\SecretCipher;
+use CattoPHP\Security\SecretCipher;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Infrastructure\Persistence\{Database,OptionRepository,TransactionManager};
 use CattoLearning\Kernel;
-use CattoLearning\Support\{AccountReference,Uuid};
+use CattoLearning\Support\Uuid;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,IntegrationContainer,PromotionFixture,WalletFixture};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpFoundation\Request;
+use CattoPHP\Settings\Settings;
 
 /**
  * A demo site (APP_SITE_MODE=demo, owner 2026-10-18) says so on every page and keeps out of search
@@ -51,7 +53,7 @@ final class DemoSiteIntegrationTest extends TestCase
     public function testTheSettingsOverrideBeatsTheEnvironmentAndResetReturnsToIt(): void
     {
         $_ENV['APP_SITE_MODE'] = 'live';
-        $site = new SiteMode(new OptionRepository($this->db));
+        $site = IntegrationContainer::get()->get(SiteMode::class);
         $site->reset();
         self::assertSame(['live', 'environment'], [$site->mode(), $site->source()]);
         $site->save('demo', (new DevelopmentFixture($this->db))->createUser('Site mode fixture'));
@@ -62,7 +64,7 @@ final class DemoSiteIntegrationTest extends TestCase
 
     public function testAnAdministratorWordsWhatADemoSiteSaysAndCanGoBackToTheStandardWords(): void
     {
-        $site = new SiteMode(new OptionRepository($this->db));
+        $site = IntegrationContainer::get()->get(SiteMode::class);
         $admin = (new DevelopmentFixture($this->db))->createUser('Notice fixture');
         $site->resetWords();
         self::assertSame(['Demo mode', SiteMode::NOTICE, SiteMode::EMAIL_NOTICE, SiteMode::SIMULATION, false], [$site->heading(), $site->notice(), $site->emailNotice(), $site->simulation(), $site->ownWords()]);
@@ -88,10 +90,10 @@ final class DemoSiteIntegrationTest extends TestCase
     public function testCustomersSeeFakeBankDetailsOnADemoSiteAndTheSiteOwnersWhenLive(): void
     {
         $owner = SiteOwner::fixed(['trading_name' => 'Placeholder', 'legal_name' => 'Placeholder', 'bank_name' => 'Real Bank', 'bank_account_name' => 'Placeholder', 'bank_account_number' => '62000000001', 'bank_branch_code' => '250655']);
-        $cipher = IntegrationContainer::get()->get(SecretCipher::class);
-        $live = new RuntimeSettings(new OptionRepository($this->db), $cipher, SiteMode::fixed('live'), $owner);
+        $settings = IntegrationContainer::get()->get(Settings::class);
+        $live = new RuntimeSettings($settings, SiteMode::fixed('live'), $owner);
         self::assertSame(['Real Bank', false], [$live->payableBankDetails()['bank_name'], $live->payableBankDetails()['fake']]);
-        $demo = (new RuntimeSettings(new OptionRepository($this->db), $cipher, SiteMode::fixed('demo'), $owner))->payableBankDetails();
+        $demo = (new RuntimeSettings($settings, SiteMode::fixed('demo'), $owner))->payableBankDetails();
         self::assertSame(SiteMode::FAKE_BANK_DETAILS + ['configured' => true, 'fake' => true], $demo, 'never the real account on a demo site');
         self::assertSame('62000000001', $live->bankDetails()['account_number'], 'the Site Owner keeps the real details');
     }
@@ -107,7 +109,7 @@ final class DemoSiteIntegrationTest extends TestCase
         $documents = IntegrationContainer::get()->get(FinancialDocuments::class);
         $invoice = (new CommerceRepository($this->db))->documents($order)[0];
         $html = $documents->render($invoice)->html;
-        self::assertStringContainsString((new SiteMode(new OptionRepository($this->db)))->simulation(), $html);
+        self::assertStringContainsString((IntegrationContainer::get()->get(SiteMode::class))->simulation(), $html);
         self::assertStringContainsString('Use your account reference ' . AccountReference::format($reference) . ' as the payment reference.', $html);
         self::assertStringContainsString('FAKE BANK (demo site, do not pay)', $html);
 
@@ -137,10 +139,10 @@ final class DemoSiteIntegrationTest extends TestCase
     public function testEveryPageOfADemoSiteSaysSoAndKeepsOutOfSearchEngines(): void
     {
         $this->db->rollBack();
-        self::assertNull((new OptionRepository($this->db))->find(SiteMode::OPTION), 'the development database has no saved site mode');
+        self::assertFalse(IntegrationContainer::get()->get(Settings::class)->isOverridden(SiteMode::SETTING), 'the development database has no saved site mode');
         $_ENV['APP_SITE_MODE'] = 'demo';
         // The words are ADMIN's to choose, so this reads what this site's say.
-        $notice = htmlspecialchars((new SiteMode(new OptionRepository($this->db)))->notice(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $notice = htmlspecialchars((IntegrationContainer::get()->get(SiteMode::class))->notice(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         foreach (['/', '/courses', '/terms'] as $path) {
             $response = $this->send($path);
             $html = (string) $response->getContent();

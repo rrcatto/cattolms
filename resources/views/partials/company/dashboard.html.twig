@@ -37,11 +37,11 @@
 {% block header %}
 
 					<tr>
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Company'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Domain', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'People'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses', wide: true}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Enrolments'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Company'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Domain', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'People'}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses', wide: true}} %}
+						{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Enrolments'}} %}
 					</tr>
 
 {% endblock %}

@@ -250,7 +250,7 @@ async function visitorAssessment(page, at) {
     check(`${at}: the readiness check ends Ready and ticks its part`, await page.getByText('Diagnostic result').count() === 1 && (await page.locator('.cl-result-score span').innerText()).trim() === 'Ready' && await ticked(page, state.readiness_node) === 1);
 }
 
-/* A readiness check's wrong answers name the modules to study first (COURSE-SPECIFICATION.md section 11, 2026-11-07):
+/* A readiness check's wrong answers name the modules to study first (COURSE-SPECIFICATION-v<version>.md section 11, 2026-11-07):
    each module the answers name, in course order, with its study parts opening where the reader is; the public preview
    names a module it does not show as part of the full course. */
 async function studyFirst(page, at, where) {

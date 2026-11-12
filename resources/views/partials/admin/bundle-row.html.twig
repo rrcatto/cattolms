@@ -1,9 +1,15 @@
 {#
 	One bundle's row in Administration > Bundles (shown in the list, and drawn again after it is edited in place, owner
 	2026-11-06). Variables: bundle (the list's row, AdminBundleController::row), can_manage (the pencil), bundles_list_href
-	(the list's address, to add edit= to); bundle_saved marks a row just saved.
+	(the list's address, to add edit= to), arrange (dragged into order, owner 2026-11-12), csrf; bundle_saved marks a row
+	just saved.
 #}
-<tr id="{{ bundle_anchor(bundle) }}" data-bundle-id="{{ bundle.id }}"{% if bundle_saved|default(false) %} data-bundle-saved{% endif %}>
+{% set arrange = arrange|default(false) %}
+<tr id="{{ bundle_anchor(bundle) }}" data-bundle-id="{{ bundle.id }}" data-order-code="{{ bundle.code }}" data-order-url="{{ bundle_admin_url(bundle, '/move') }}" data-order-title="{{ bundle.title }}"{% if bundle_saved|default(false) %} data-bundle-saved{% endif %}>
+	<td class="cl-course-position">
+		{% if arrange %}<button type="button" class="cl-row-handle" aria-label="Move {{ bundle.title }}" aria-describedby="bundle-order-keys" data-list-order-target="handle" data-action="pointerdown->list-order#arm keydown->list-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
+		<span data-position>{{ bundle.catalogue_position|default('') }}</span>
+	</td>
 	<td><code class="cl-course-code">{{ bundle.code }}</code></td>
 	<td class="cell-text"><a href="{{ bundle_admin_url(bundle) }}"><strong>{{ bundle.title }}</strong></a>{% if bundle_saved|default(false) %}<span class="visually-hidden" role="status">Saved</span>{% endif %}<br><small>/bundles/{{ bundle.slug }}</small></td>
 	<td>{% include '@platform/partials/bundle-status.html.twig' with {status: bundle.status, on_sale: bundle.offer_active} %}</td>
@@ -15,7 +21,22 @@
 	<td>{{ bundle.sales }}</td>
 	<td class="cell-actions">
 		{# Edited in place (owner, 2026-11-06): the row becomes its form; without JavaScript the list again with the row open. #}
-		{% if can_manage %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ bundle.title ~ ' here', title: 'Edit the code, title, status, price, sale dates and access here', icon: 'action-edit', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href ~ 'edit=' ~ bundle.code|url_encode ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?mode=edit&view=list'), target: 'closest tr', swap: 'outerHTML'}) }}
+		{% if can_manage %}{{ ui('action.link', {label: 'Edit', aria_label: 'Edit ' ~ bundle.title ~ ' here', title: 'Edit the position, code, title, status, price, sale dates and access here', icon: 'action-edit', icon_only: true, variant: 'quiet', size: 'small', href: bundles_list_href ~ 'edit=' ~ bundle.code|url_encode ~ '#' ~ bundle_anchor(bundle), get: bundle_admin_url(bundle, '/row?mode=edit&view=list') ~ (arrange ? '&arrange=1' : ''), target: 'closest tr', swap: 'outerHTML'}) }}
 		{% else %}{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: bundle_admin_url(bundle), icon: 'action-view'}) }}{% endif %}
+		{# The moves without JavaScript, in the ⋯ menu, while the list is in its order (owner, 2026-11-12). #}
+		{% if arrange %}
+		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more', aria_label: 'More for ' ~ bundle.title})} %}
+{% block body %}
+			{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: bundle_admin_url(bundle), icon: 'action-manage'}) }}
+			{% for move in [['up', 'Move up', 'action-move-up'], ['down', 'Move down', 'action-move-down'], ['top', 'Move to the top', 'action-move-top']] %}
+			<form action="{{ bundle_admin_url(bundle, '/move') }}" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<input type="hidden" name="direction" value="{{ move[0] }}">
+				{{ ui('action.button', {label: move[1], variant: 'secondary', size: 'small', type: 'submit', icon: move[2]}) }}
+			</form>
+			{% endfor %}
+{% endblock %}
+{% endembed %}
+		{% endif %}
 	</td>
 </tr>

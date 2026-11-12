@@ -8,7 +8,7 @@
 	{% set ph_kicker = 'Mailing' %}
 	{% set ph_title = 'Sending settings' %}
 	{% set ph_lead = 'Who news comes from, how it leaves, and the discipline that keeps your sending trusted. Each value starts from .env, and what you save here overrides it, with a Reset back to .env.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set ms = mailing_settings %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sending'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'How news is sent', summary: 'News from ' ~ ms.sender ~ ', through ' ~ ms.transports[ms.transport] ~ '.'}) }}

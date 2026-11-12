@@ -1,0 +1,78 @@
+{#
+	Administration > Credits & Orders > Stitch (owner, 2026-11-11: "So I can see all tests done and can match them with the real stitch
+	dashboard"): the Stitch account as Stitch's API gives it when the page opens, and one list for a period, newest first, a page
+	at a time, each record with what this site holds of it. The list and the period change the page in place, the address
+	following (UX rule 8.6a); without JavaScript Show does. Older pages follow Stitch's cursor.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set st = stitch %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Stitch' %}
+	{% set ph_lead = 'Your Stitch Express account as Stitch\'s own records give it, and which of them belong to this site\'s orders.' %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Card payment settings', variant: 'secondary', size: 'small', href: '/admin/settings?section=card-payments#settings-card-payments', icon: 'nav-settings'}) }}{% endset %}
+	{% include '@CattoPHP/page/head.html.twig' %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'stitch-account'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Account', summary: 'Read from Stitch when this page opens.'}) }}
+		{% if st.problem and not st.account.balance is defined %}
+			{{ ui('feedback.notice', {tone: 'warning', heading: st.problem}) }}
+		{% elseif st.error and not st.account.balance is defined %}
+			{{ ui('feedback.notice', {tone: 'danger', heading: st.error}) }}
+		{% else %}
+			{% if st.problem %}{{ ui('feedback.notice', {tone: 'danger', heading: st.problem}) }}{% endif %}
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
+				{{ ui('data.stat-card', {value: st.account.balance ?: 'R0.00', label: 'Balance', note: st.account.kind == 'test' ? 'Test money only' : 'Waiting to be paid out', icon: 'figure-money-in', size: 'large'}) }}
+				{{ ui('data.stat-card', {value: st.account.kind == 'test' ? 'Test' : 'Live', label: 'Keys', note: st.account.kind == 'test' ? 'No real money moves' : 'Real money', icon: 'figure-chart', size: 'small'}) }}
+				{{ ui('data.stat-card', {value: st.account.return_registered ? 'Registered' : 'Not registered', label: 'This site\'s return address', note: st.account.return_address, icon: st.account.return_registered ? 'figure-completed' : 'figure-awaiting', size: 'small'}) }}
+				{{ ui('data.stat-card', {value: st.account.webhook_secret ? 'Secret saved' : 'Not set', label: 'Webhook', note: st.account.webhook_secret ? 'Stitch tells this site each payment' : 'This site asks Stitch every minute', icon: st.account.webhook_secret ? 'figure-completed' : 'figure-awaiting', size: 'small'}) }}
+			{% endblock %}{% endembed %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Bank account', value: st.account.bank ? (st.account.bank.bank ~ ', account ending ' ~ st.account.bank.ending ~ ', ' ~ st.account.bank.name) : 'Not verified by Stitch yet'},
+				{label: 'Return addresses Stitch accepts', value: st.account.addresses ? st.account.addresses|join(', ') : 'None yet'},
+			]}) }}
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	{% if st.account and st.account.balance is defined %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'stitch-records'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: st.lists[st.list], summary: st.periods[st.period] ~ ', newest first, as Stitch lists them. "This site" names the order each belongs to.'}) }}
+		{% set a = 'viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+		<form class="cl-stitch-choice" method="get" action="/admin/commerce/stitch" data-choose-submits {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: '/admin/commerce/stitch'} only %}>
+			{{ ui('form.picture-choice', {name: 'list', legend: 'Which records', id: 'stitch-lists', size: 'small', columns: 4, selected: st.list, items: [
+				{value: 'links', label: 'Payment links', icon: '<svg ' ~ a ~ '><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'},
+				{value: 'payments', label: 'Payments', icon: '<svg ' ~ a ~ '><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>'},
+				{value: 'refunds', label: 'Refunds', icon: '<svg ' ~ a ~ '><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>'},
+				{value: 'fees', label: 'Fees', icon: '<svg ' ~ a ~ '><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>'},
+			]}) }}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'stitch-period'})} %}{% block control %}<select id="stitch-period" name="period" data-submit-on-change {{ ui_field_attrs(props) }}>{% for key, label in st.periods %}<option value="{{ key }}"{{ key == st.period ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
+		</form>
+		{% if st.error %}
+			{{ ui('feedback.notice', {tone: 'danger', heading: st.error}) }}
+		{% elseif st.rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}
+				{% if st.list == 'links' %}<tr><th>Made</th><th data-phone="hide">Stitch link</th><th data-phone="hide">Reference</th><th data-phone="hide">Payer</th><th class="text-end">Amount</th><th>Status</th><th>This site</th></tr>
+				{% elseif st.list == 'payments' %}<tr><th>Paid</th><th data-phone="hide">Stitch payment</th><th data-phone="hide">Reference</th><th class="text-end">Amount</th><th class="text-end" data-phone="hide">Fee</th><th data-phone="hide">Card</th><th>Status</th><th>This site</th></tr>
+				{% elseif st.list == 'refunds' %}<tr><th>Made</th><th data-phone="hide">Stitch refund</th><th data-phone="hide">Stitch payment</th><th class="text-end">Amount</th><th>Status</th><th>This site</th></tr>
+				{% else %}<tr><th>Charged</th><th data-phone="hide">Fee</th><th data-phone="hide">Kind</th><th data-phone="hide">Stitch payment</th><th class="text-end">Amount</th><th>This site</th></tr>{% endif %}
+			{% endblock %}
+			{% block body %}{% for row in st.rows %}{% set site %}{% if row.match %}<a href="{{ row.match.href }}">{{ row.match.label }}</a><br><span class="small">{{ row.match.note }}</span>{% else %}<span class="small">Not on this site</span>{% endif %}{% endset %}
+				{% if st.list == 'links' %}<tr data-stitch-link="{{ row.id }}"><td class="cell-text">{{ row.when }}{% if row.paid %}<br><span class="small">Paid {{ row.paid }}</span>{% elseif row.expires %}<br><span class="small">Until {{ row.expires }}</span>{% endif %}</td><td class="cell-text mono">{{ row.id }}</td><td class="cell-text">{{ row.reference }}</td><td class="cell-text">{{ row.payer }}</td><td class="text-end">{{ row.amount }}</td><td>{{ ui('feedback.badge', {label: row.status|capitalize, tone: row.tone, size: 'small'}) }}</td><td class="cell-text">{{ site }}</td></tr>
+				{% elseif st.list == 'payments' %}<tr data-stitch-payment="{{ row.id }}"><td class="cell-text">{{ row.when }}</td><td class="cell-text mono">{{ row.id }}</td><td class="cell-text">{{ row.reference }}</td><td class="text-end">{{ row.amount }}</td><td class="text-end">{{ row.fee }}</td><td>{{ row.card }}</td><td>{{ ui('feedback.badge', {label: row.status|capitalize, tone: row.tone, size: 'small'}) }}</td><td class="cell-text">{{ site }}</td></tr>
+				{% elseif st.list == 'refunds' %}<tr data-stitch-refund="{{ row.id }}"><td class="cell-text">{{ row.when }}</td><td class="cell-text mono">{{ row.id }}</td><td class="cell-text mono">{{ row.payment }}</td><td class="text-end">{{ row.amount }}</td><td>{{ ui('feedback.badge', {label: row.status|capitalize, tone: row.tone, size: 'small'}) }}</td><td class="cell-text">{{ site }}</td></tr>
+				{% else %}<tr data-stitch-fee="{{ row.id }}"><td class="cell-text">{{ row.when }}</td><td class="cell-text mono">{{ row.id }}</td><td>{{ row.type == 'WITHDRAWAL' ? 'Withdrawal' : 'Payment links' }}</td><td class="cell-text mono">{{ row.payment }}</td><td class="text-end">{{ row.amount }}</td><td class="cell-text">{{ site }}</td></tr>{% endif %}
+			{% endfor %}{% endblock %}
+			{% endembed %}
+			{% if st.next or st.cursor %}
+			<div class="cl-stitch-pages">
+				{% if st.cursor %}{{ ui('action.link', {label: 'Newest', variant: 'secondary', size: 'small', href: '/admin/commerce/stitch?list=' ~ st.list ~ '&period=' ~ st.period, icon: 'action-first'}) }}{% endif %}
+				{% if st.next %}{{ ui('action.link', {label: 'Older', variant: 'secondary', size: 'small', href: '/admin/commerce/stitch?list=' ~ st.list ~ '&period=' ~ st.period ~ '&cursor=' ~ st.next|url_encode, icon: 'action-next'}) }}{% endif %}
+			</div>
+			{% endif %}
+		{% else %}
+			{{ ui('feedback.empty', {summary: 'Stitch has no ' ~ st.lists[st.list]|lower ~ ' for the ' ~ st.periods[st.period]|lower ~ '.'}) }}
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

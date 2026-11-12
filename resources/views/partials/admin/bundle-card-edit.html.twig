@@ -7,7 +7,7 @@
 {% set bq = bundle_edit %}
 {% set bq_form = 'bundle-quick-' ~ bundle.id %}
 {% embed ui_template('data.card') with {props: ui_props('data.card', {title: bundle.title, picture: 'wide'})} %}
-{% block picture %}{% if bundle.cover_svg|default('') starts with '<svg' %}{{ bundle.cover_svg|raw }}{% endif %}{% endblock %}
+{% block picture %}{% if bundle.cover_svg|default('') starts with '<svg' %}{{ bundle.cover_svg|authored }}{% endif %}{% endblock %}
 {% block title %}Editing <code class="cl-course-code">{{ bundle.code }}</code>{% endblock %}
 {% block details %}
 	<span id="{{ bundle_anchor(bundle) }}" class="cl-course-anchor"></span>

@@ -49,7 +49,7 @@ if ($action === 'create') {
     $started = (string) $db->fetchOne('SELECT NOW()');
     // The owner's sending discipline, automatic emails' words and catto-mail's address, put back afterwards.
     $options = [];
-    foreach (['mailing.rules', 'mailing.automatic', 'mailing.cattomail_url', 'mailing.cattomail_connection'] as $key) {
+    foreach (['mailing.rules', 'mailing.automatic'] as $key) {
         $value = $db->fetchOne('SELECT option_value FROM app_options WHERE option_key = :k', ['k' => $key]);
         $options[$key] = $value === false ? null : (string) $value;
     }
@@ -57,7 +57,11 @@ if ($action === 'create') {
     $learner = $fixture->person('STUDENT');
     $provider = $fixture->company();
     $course = $fixture->course($provider['founder']['id'], $provider['id'], 'published');
-    file_put_contents($statePath, json_encode(['started' => $started, 'options' => $options, 'course' => $course, 'scrub' => $fixture->seeds(),
+    // catto-mail's address is a CattoPHP setting: its own row is kept and put back.
+    $cattomailUrl = $db->fetchAssociative("SELECT name, value, updated_at, updated_by FROM cattophp_settings WHERE name = 'CATTOMAIL_API_BASE_URL'") ?: null;
+    // What is known of the connection to catto-mail (CattoPHP's, one row) is kept and put back too.
+    $connection = $db->fetchOne('SELECT state::text FROM cattophp_cattomail_connection WHERE id = 1');
+    file_put_contents($statePath, json_encode(['started' => $started, 'options' => $options, 'cattomail_url' => $cattomailUrl, 'cattomail_connection' => $connection === false ? null : (string) $connection, 'course' => $course, 'scrub' => $fixture->seeds(),
         'admin' => $admin + ['token' => $session($admin['id'], $admin['email'])], 'learner' => $learner + ['token' => $session($learner['id'], $learner['email'])]], JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created the mailing updates fixture.\n";
@@ -65,14 +69,23 @@ if ($action === 'create') {
     if (!is_file($statePath)) exit(0);
     $state = $readState();
     // The friends the learner forwarded to, who asked never to be emailed: their addresses go too.
-    $friends = $db->fetchFirstColumn('SELECT f.to_email FROM mailing_forwards f WHERE f.user_id = :u', ['u' => $state['learner']['id']]);
+    $friends = $db->fetchFirstColumn('SELECT f.to_email FROM cattophp_mailing_forwards f WHERE f.account = CAST(:u AS TEXT)', ['u' => $state['learner']['id']]);
     (new \CattoLearning\Tests\Support\CheckScrub($db))->remove($state['scrub']);
-    foreach ($friends as $friend) $db->executeStatement("DELETE FROM mailing_suppressions WHERE email = :e AND reason = 'manual' AND created_by_user_id IS NULL AND created_at >= :started", ['e' => $friend, 'started' => $state['started']]);
+    foreach ($friends as $friend) $db->executeStatement("DELETE FROM cattophp_mailing_suppressions WHERE email = :e AND reason = 'manual' AND created_by IS NULL AND created_at >= :started", ['e' => $friend, 'started' => $state['started']]);
     // The emails of updates as they happen and digests are made by the site, by nobody: those made for the check hold no
     // copy once its people are gone.
-    $db->executeStatement("DELETE FROM mailing_campaigns c WHERE c.kind IN ('updates', 'digest') AND c.created_by_user_id IS NULL AND c.created_at >= :started
-        AND NOT EXISTS (SELECT 1 FROM mailing_deliveries d WHERE d.campaign_id = c.id)", ['started' => $state['started']]);
+    $db->executeStatement("DELETE FROM cattophp_mailing_campaigns c WHERE c.kind IN ('updates', 'digest') AND c.created_by IS NULL AND c.created_at >= :started
+        AND NOT EXISTS (SELECT 1 FROM cattophp_mailing_copies d WHERE d.campaign_id = c.id)", ['started' => $state['started']]);
     // The sending discipline and the automatic emails' words as they were before the check.
+    $db->executeStatement("DELETE FROM cattophp_settings WHERE name = 'CATTOMAIL_API_BASE_URL'");
+    if (is_array($state['cattomail_url'] ?? null)) {
+        $db->executeStatement('INSERT INTO cattophp_settings (name, value, secret, updated_at, updated_by) VALUES (:name, :value, FALSE, :at, :by)',
+            ['name' => $state['cattomail_url']['name'], 'value' => $state['cattomail_url']['value'], 'at' => $state['cattomail_url']['updated_at'], 'by' => $state['cattomail_url']['updated_by']]);
+    }
+    $db->executeStatement('DELETE FROM cattophp_cattomail_connection WHERE id = 1');
+    if (is_string($state['cattomail_connection'] ?? null)) {
+        $db->executeStatement('INSERT INTO cattophp_cattomail_connection (id, state, updated_at) VALUES (1, CAST(:state AS JSONB), NOW())', ['state' => $state['cattomail_connection']]);
+    }
     foreach ($state['options'] as $key => $value) {
         if ($value === null) $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => $key]);
         else $db->executeStatement('INSERT INTO app_options (option_key, option_value) VALUES (:k, :v) ON CONFLICT (option_key) DO UPDATE SET option_value = EXCLUDED.option_value', ['k' => $key, 'v' => $value]);

@@ -28,8 +28,8 @@ use CattoLearning\Course\CourseItemRepository;
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\TreeArrangement;
-use CattoLearning\Support\TreeMoveRefused;
+use CattoPHP\Ui\TreeArrangement;
+use CattoPHP\Ui\TreeMoveRefused;
 use InvalidArgumentException;
 
 final class PresentationEditor
@@ -244,7 +244,7 @@ final class PresentationEditor
             $this->records->lockItem($itemId);
             $deck = self::deckOf($this->items->item($itemId));
             [$changed, $details] = $change($deck);
-            $this->records->saveDeck($itemId, SlideDeck::validate($changed), $userId);
+            $this->records->saveDeck($itemId, SlideDeck::validate($changed, $this->records->itemCourseType($itemId)), $userId);
             $this->audit->record($userId, $event, ['course_item_id' => $itemId] + $details);
         });
     }

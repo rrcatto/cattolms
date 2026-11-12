@@ -11,7 +11,8 @@
  *     settles back when left; with motion turned off it only lights up (owner, 2026-11-08, the approved mockup);
  *   - every bundled theme at 1440 and 390: nothing out of its card or its grid, no sideways scrolling, no inline style,
  *     and the shared page checks (page-construction.cjs);
- *   - a company account sees no note and no row;
+ *   - a company's staff member sees no note and no row; its Company Administrator, who buys bundles for the company as
+ *     bundle credits (owner, 2026-11-11), sees the notes and Buy for my company;
  *   - without JavaScript the notes, the section, its pages and See the bundle work, and a search or a later page of
  *     courses keeps the bundles; with it, a search, a page of courses, a page of bundles and List or Grid each change
  *     their own section in place and leave the other exactly as it was, the address naming both, the page never
@@ -260,8 +261,28 @@ function expectNoRow(found, label, line = true) {
             }
         }
 
-        await scenario(`${browserName}: a company account sees no note and no row`, async () => {
+        await scenario(`${browserName}: a Company Administrator sees the notes and buys a bundle for the company`, async () => {
             const {ctx, page} = await open(browser, {token: state.company_token});
+            await visit(page, coursePath);
+            assert.ok(await page.locator('.cl-course-bundle').count() > 0, 'the notes show to the one who buys for the company');
+            // A bundle on sale now offers Buy for my company with the rule; one whose sale starts later says when, as to anyone.
+            let onSale = null;
+            for (const note of state.course.notes) {
+                await visit(page, note.href);
+                if (!(await page.locator('main').innerText()).includes('On sale from')) { onSale = note; break; }
+            }
+            if (onSale) {
+                assert.equal(await page.getByRole('link', {name: 'Buy for my company'}).count(), 1, 'the bundle page offers Buy for my company');
+                assert.match(await page.locator('main').innerText(), /Each bundle credit is for one person\. That person gets every course in the bundle, and a bundle is never split between people\./);
+            } else {
+                assert.equal(await page.getByRole('link', {name: 'Buy for my company'}).count(), 0, 'not before its sale starts');
+            }
+            assert.equal(await page.getByRole('button', {name: 'Add bundle to cart'}).count(), 0, 'and no cart');
+            await ctx.close();
+        });
+
+        await scenario(`${browserName}: a company's staff member sees no note and no row`, async () => {
+            const {ctx, page} = await open(browser, {token: state.staff_token});
             await visit(page, coursePath);
             assert.equal(await page.locator('.cl-course-bundle').count(), 0, 'no note');
             assert.equal(await page.getByRole('button', {name: 'Add to cart'}).count(), 0, 'and no buy button');

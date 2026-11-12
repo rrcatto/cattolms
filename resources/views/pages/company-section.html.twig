@@ -4,8 +4,8 @@
 	{% set ph_title = company_section.label %}
 	{% set ph_lead = company_section.description %}
 	{# The section's own actions belong to the page here, so they sit in the page head. #}
-	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: company_section.actions|default([])} %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% set ph_actions %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: company_section.actions|default([])} %}{% endset %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{# The company banner is a row of its own, above the section it applies to. #}
 	<section class="cl-page-section" aria-label="Company">
 		{% include '@platform/partials/company-context.html.twig' %}

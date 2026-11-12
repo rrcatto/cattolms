@@ -27,7 +27,7 @@ namespace CattoLearning\Course\Catwalk;
 
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Support\ListView;
-use CattoLearning\View\Artwork\IconLibrary;
+use CattoPHP\Ui\IconLibrary;
 
 final class PresentationPages
 {
@@ -101,10 +101,12 @@ final class PresentationPages
             ];
         }
         $recorded = count(array_filter($slides, static fn(array $slide): bool => $slide['recorded']));
-        $checks = array_map(static fn(string $warning): array => ['ok' => false, 'text' => $warning], SlideDeck::warnings($deck));
+        $courseType = $this->items->itemCourseType($id);
+        $checks = array_map(static fn(string $warning): array => ['ok' => false, 'text' => $warning], SlideDeck::warnings($deck, $courseType));
         if ($checks === []) {
             $kind = SlideLayouts::KINDS[$deck['kind']] ?? null;
-            $checks[] = ['ok' => true, 'text' => $count . ' slides' . ($kind === null ? '.' : ', which suits a ' . strtolower($kind['label']) . ' (' . $kind['slides'][0] . ' to ' . $kind['slides'][1] . ').')];
+            [$fewest, $most] = SlideLayouts::slides((string) $deck['kind'], $courseType);
+            $checks[] = ['ok' => true, 'text' => $count . ' slides' . ($kind === null ? '.' : ', which suits a ' . strtolower($kind['label']) . ($courseType === 'short' && isset(SlideLayouts::SHORT_SLIDES[$deck['kind']]) ? ' in a short course' : '') . ' (' . $fewest . ' to ' . $most . ').')];
         }
         $checks[] = $recorded === $count
             ? ['ok' => true, 'text' => 'Every slide has a recording.']
@@ -161,7 +163,8 @@ final class PresentationPages
             'tones' => array_map(fn(string $tone, string $label): array => ['value' => $tone, 'label' => $label, 'drawing' => $this->decks->thumbnail(array_diff_key($slide, ['tone' => true]) + ($tone === '' ? [] : ['tone' => $tone]), $deck['theme'], 'small')],
                 array_keys(self::TONES), array_values(self::TONES)),
             'clip' => $clips[(string) ($slide['id'] ?? '')] ?? null,
-            'slide_actions' => SlideLayouts::ACTIONS,
+            // A short course's preview offers getting the course alone (specification 4.13, 15.4).
+            'slide_actions' => $deck['kind'] === 'trailer' && $this->items->itemCourseType((int) $item['id']) === 'short' ? array_intersect_key(SlideLayouts::ACTIONS, ['enrol' => true]) : SlideLayouts::ACTIONS,
         ];
     }
 
@@ -234,11 +237,12 @@ final class PresentationPages
             $module = '';
             $rows = $this->items->availability((int) $course['id'], null, false);
             $sections = [];
-            foreach ($rows as $row) { if ($row['node_type'] === 'section') { $sections[(int) $row['id']] = (string) $row['section_title']; } }
+            $numbers = [];
+            foreach ($rows as $row) { if ($row['node_type'] === 'section') { $sections[(int) $row['id']] = (string) $row['section_title']; $numbers[(int) $row['id']] = $row['label_number'] ?? null; } }
             foreach ($rows as $row) {
                 if ((int) ($row['course_item_id'] ?? 0) !== (int) $item['id']) { continue; }
                 $parent = (int) ($row['parent_node_id'] ?? 0);
-                $module = $row['module_of'] !== null && isset($sections[$parent]) ? 'Module ' . $row['module_of'] . ': ' . $sections[$parent] : ($sections[$parent] ?? '');
+                $module = $row['module_of'] !== null && isset($sections[$parent]) && ($numbers[$parent] ?? null) !== null ? 'Module ' . $row['module_of'] . ': ' . $sections[$parent] : ($sections[$parent] ?? '');
                 break;
             }
             $placements[] = ['course_id' => (int) $course['id'], 'course_code' => (string) ($course['code'] ?? ''), 'course_title' => (string) $course['title'], 'module' => $module];

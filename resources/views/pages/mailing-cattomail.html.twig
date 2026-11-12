@@ -9,7 +9,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'catto-mail' %}
 	{% set ph_lead = 'catto-mail carries the news: it signs every email for your domain, reports bounces and spam complaints back, and keeps your sending reputation. Account and order emails go through this server\'s own mail.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set cm_done = steps.done %}
 
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'setup'})} %}{% block surface_body %}
@@ -79,7 +79,7 @@
 		{{ ui('layout.section-head', {heading: 'Sendings at catto-mail', heading_level: 2, summary: 'Each digest or message is one sending for each list. Anything catto-mail has not finished after 15 minutes is asked about again by itself.'}) }}
 		{% if jobs %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Sendings at catto-mail'})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Handed over'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'What became of it'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: ''}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Handed over'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'What became of it'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: ''}} %}</tr>{% endblock %}
 		{% block body %}{% for job in jobs %}<tr>
 			<td class="cell-text"><a href="/mailing/messages/{{ job.campaign_id }}">{{ job.campaign }}</a></td>
 			<td>{{ job.handed_at ? job.handed_at|date('j M Y, H:i') : '' }}</td>
@@ -98,7 +98,7 @@
 		</form>
 		{% if events %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'What catto-mail reported'})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Here'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: ''}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'What happened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Here'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: ''}} %}</tr>{% endblock %}
 		{% block body %}{% for event in events %}<tr>
 			<td>{{ event.received_at|date('j M Y, H:i') }}</td>
 			<td>{{ event_labels[event.event_type]|default(event.event_type) }}</td>

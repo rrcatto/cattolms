@@ -15,6 +15,12 @@ payments, the money ledger and financial documents are never touched: the law re
 kept.
 
 Changelog:
+2026/11/12 SAST
+- Telegram is CattoPHP's (CattoPHP Phase 4, step 4): the sent messages are cleared from its Telegram log, as before.
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): the Site Log, flags and ended lockouts are cleaned by its ProtectionRetention, as before.
+2026/11/09 SAST
+- Lengths of time from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/10/20 SAST
 - Contact messages older than 5 years.
 2026/10/19 SAST
@@ -26,7 +32,6 @@ declare(strict_types=1);
 namespace CattoLearning\Maintenance;
 
 use CattoLearning\Analytics\AnalyticsEventRepository;
-use CattoLearning\Contact\ContactMessageRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use DateTimeImmutable;
 use Symfony\Component\Clock\ClockInterface;
@@ -41,14 +46,11 @@ final class RetentionCleanup
         private readonly AnalyticsEventRepository $analytics,
         private readonly MaintenanceService $maintenance,
         private readonly ClockInterface $clock,
-        private readonly ContactMessageRepository $contactMessages,
-        private readonly ?\CattoLearning\Infrastructure\Persistence\SignupAttemptRepository $signupAttempts = null,
+        private readonly \CattoPHP\Inbox\Inbox $inbox,
+        private readonly ?\CattoPHP\Signup\SignupAttempts $signupAttempts = null,
         private readonly ?\CattoLearning\Mailing\CampaignRepository $mailingCopies = null,
-        private readonly ?\CattoLearning\SiteAnalytics\SiteProtectionSettings $siteProtection = null,
-        private readonly ?\CattoLearning\SiteAnalytics\SiteLogRepository $siteLog = null,
-        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null,
-        private readonly ?\CattoLearning\SiteAnalytics\LockoutRepository $siteLockouts = null,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageRepository $ownerMessages = null
+        private readonly ?\CattoPHP\Protection\ProtectionRetention $siteProtection = null,
+        private readonly ?\CattoPHP\Telegram\TelegramLog $ownerMessages = null
     ) {}
 
     /** The oldest moment kept: anything recorded before it is deleted. */
@@ -57,12 +59,13 @@ final class RetentionCleanup
         return DateTimeImmutable::createFromInterface($this->clock->now())->modify('-' . self::YEARS . ' years');
     }
 
-    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,signup_attempts:int,mailing_copies:int,owner_messages:int,site_requests:int,site_flags:int,site_lockouts:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
+    /** @return array{activity_log:int,analytics_events:int,contact_messages:int,inbox_trash:int,inbox_spam:int,signup_attempts:int,mailing_copies:int,owner_messages:int,site_requests:int,site_flags:int,site_lockouts:int,login_tokens:int,auth_sessions:int,web_sessions:int} what was deleted */
     public function run(): array
     {
         $before = $this->cutoff();
         return ['activity_log' => $this->audit->deleteBefore($before), 'analytics_events' => $this->analytics->deleteBefore($before),
-            'contact_messages' => $this->contactMessages->deleteBefore($before),
+            // The Inbox (owner, 2026-11-11): conversations past Settings' keeping, the Trash and Spam emptied after theirs.
+            ...$this->inbox(),
             // Sign-up attempts that never became an account (owner, 2026-10-26); an account's goes with the account.
             'signup_attempts' => $this->signupAttempts?->deleteUnclaimedBefore($before) ?? 0,
             // The record of each news email a person was sent, opened or clicked (mailing, step 2; owner, 2026-10-26).
@@ -73,15 +76,16 @@ final class RetentionCleanup
             + $this->maintenance->prune();
     }
 
-    /** @return array{site_requests:int,site_flags:int,site_lockouts:int} the Site Log, flags and ended lockouts past what Settings keep (owner, 2026-11-04) */
+    /** @return array{contact_messages:int,inbox_trash:int,inbox_spam:int} */
+    private function inbox(): array
+    {
+        $gone = $this->inbox->cleanUp(DateTimeImmutable::createFromInterface($this->clock->now()));
+        return ['contact_messages' => $gone['old'], 'inbox_trash' => $gone['trash'], 'inbox_spam' => $gone['spam']];
+    }
+
+    /** @return array{site_requests:int,site_flags:int,site_lockouts:int} the Site Log, flags and ended lockouts past what Settings keep (owner, 2026-11-04; CattoPHP's since 2026-11-12) */
     private function siteRecords(): array
     {
-        if ($this->siteProtection === null || $this->siteLog === null || $this->siteFlags === null || $this->siteLockouts === null) return ['site_requests' => 0, 'site_flags' => 0, 'site_lockouts' => 0];
-        $values = $this->siteProtection->values();
-        $now = DateTimeImmutable::createFromInterface($this->clock->now());
-        $flags = \CattoLearning\Support\Duration::parse((string) $values['flags_kept_for'])->before($now);
-
-        return ['site_requests' => $this->siteLog->deleteBefore(\CattoLearning\Support\Duration::parse((string) $values['log_kept_for'])->before($now)),
-            'site_flags' => $this->siteFlags->deleteBefore($flags), 'site_lockouts' => $this->siteLockouts->deleteEndedBefore($flags)];
+        return $this->siteProtection?->run(DateTimeImmutable::createFromInterface($this->clock->now())) ?? ['site_requests' => 0, 'site_flags' => 0, 'site_lockouts' => 0];
     }
 }

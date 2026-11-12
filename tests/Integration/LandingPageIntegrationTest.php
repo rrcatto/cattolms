@@ -145,7 +145,7 @@ final class LandingPageIntegrationTest extends TestCase
         $page = $this->landing->page($this->course);
         self::assertSame('conveyancing-masterclass-' . $this->suffix, $page['slug']);
         self::assertSame('Master conveyancing', $page['meta_title']);
-        $audit = (string) $this->db->fetchOne("SELECT metadata::text FROM audit_log WHERE event_key='landing_page.settings_updated' AND metadata->>'course_id'=:c ORDER BY id DESC LIMIT 1", ['c' => (string) $this->course]);
+        $audit = (string) $this->db->fetchOne("SELECT details::text FROM cattophp_activity WHERE action='landing_page.settings_updated' AND details->>'course_id'=:c ORDER BY id DESC LIMIT 1", ['c' => (string) $this->course]);
         self::assertStringContainsString('meta_description', $audit);
         self::assertStringNotContainsString('A private sentence', $audit, 'The audit names the changed field, never its copy.');
     }
@@ -203,7 +203,7 @@ final class LandingPageIntegrationTest extends TestCase
         foreach (['landing_page.section_added', 'landing_page.section_updated', 'landing_page.section_hidden', 'landing_page.section_removed'] as $event) {
             self::assertGreaterThan(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_edit_history WHERE course_id=:c AND event_key=:e', ['c' => $this->course, 'e' => $event]), $event);
         }
-        $edited = (string) $this->db->fetchOne("SELECT metadata::text FROM audit_log WHERE event_key='landing_page.section_updated' AND metadata->>'course_id'=:c ORDER BY id DESC LIMIT 1", ['c' => (string) $this->course]);
+        $edited = (string) $this->db->fetchOne("SELECT details::text FROM cattophp_activity WHERE action='landing_page.section_updated' AND details->>'course_id'=:c ORDER BY id DESC LIMIT 1", ['c' => (string) $this->course]);
         self::assertStringContainsString('"changed"', $edited);
         self::assertStringNotContainsString('Is there an exam', $edited, 'Copy is never written to the audit log.');
     }
@@ -226,7 +226,7 @@ final class LandingPageIntegrationTest extends TestCase
         $this->refused(fn() => $this->landing->step($this->course, $contents, 'sideways', $this->owner), 'valid move');
         $positions = array_map(static fn(array $s): int => $s['position'], $this->landing->page($this->course)['sections']);
         self::assertSame(range(0, count($ids)), $positions);
-        self::assertGreaterThan(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key='landing_page.sections_reordered' AND metadata->>'course_id'=:c", ['c' => (string) $this->course]));
+        self::assertGreaterThan(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action='landing_page.sections_reordered' AND details->>'course_id'=:c", ['c' => (string) $this->course]));
 
         $this->signIn($this->owner);
         $order = array_map('strval', $this->order());

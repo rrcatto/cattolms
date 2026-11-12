@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 use CattoLearning\Tests\Support\ComponentHarness;
 use CattoLearning\Tests\Support\RenderHarness;
-use CattoLearning\View\Ui\PlatformUi;
 use PHPUnit\Framework\TestCase;
 
 /** Guards the canonical ComponentGallery presentation contract. */
@@ -12,7 +11,7 @@ final class ComponentGalleryContractTest extends TestCase
 {
     public function testGalleryRendersAllFamiliesAndAllSemanticStatesWithoutLiveData(): void
     {
-        $html = RenderHarness::render('partials/admin/ui-components', ['gallery_pagination' => \CattoLearning\Application\PlatformAdministrationService::paginationPayload('gallery', \CattoLearning\Support\Pagination::create(2, 25, 75), '/admin/system/ui-components', 'Sample records')]);
+        $html = RenderHarness::render('partials/admin/ui-components', ['gallery_pagination' => \CattoLearning\Application\PlatformAdministrationService::paginationPayload('gallery', \CattoPHP\Ui\Pagination::create(2, 25, 75), '/admin/system/ui-components', 'Sample records')]);
         foreach (['cl-ui-surface', 'cl-ui-section-head', 'cl-ui-action', 'cl-ui-badge', 'cl-ui-notice', 'cl-ui-field', 'cl-ui-form-actions', 'cl-ui-toolbar', 'cl-ui-table', 'cl-ui-empty-state', 'cl-ui-stat-card', 'cl-ui-list', 'cl-ui-progress', 'cl-ui-modal', 'cl-ui-accordion-section', 'cl-ui-breadcrumb', 'cl-ui-tree-select', 'cl-ui-picture-choice', 'cl-course-card', 'cl-tag-browser'] as $class) self::assertStringContainsString($class, $html);
         foreach (['neutral', 'info', 'success', 'warning', 'danger', 'permanent'] as $tone) self::assertStringContainsString('cl-ui-badge--' . $tone, $html);
         $document = new \DOMDocument();

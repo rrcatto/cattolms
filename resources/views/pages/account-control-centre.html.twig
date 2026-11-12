@@ -4,7 +4,7 @@
 	{% set ph_title = 'All sections' %}
 	{% set ph_lead = 'Every part of your account in one place. Each one also has a page of its own.' %}
 	{# The page head brings the identity band with it. #}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section cl-account-workspace" data-account-workspace>
 		{% for section in account_sections %}
 			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (section.label), summary: (section.description), open: section.key == 'dashboard', workspace: 'account', section_key: (section.key)})} %}

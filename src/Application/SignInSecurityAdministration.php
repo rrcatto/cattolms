@@ -14,6 +14,8 @@ account, their two-step, and Reset two-step for someone who lost their phone and
 change is in the activity log.
 
 Change log:
+2026/11/12 SAST
+- A person's Telegram account comes from CattoPHP's TelegramAccounts (CattoPHP Phase 4, step 4).
 2026/11/05 SAST
 - Created.
 */
@@ -25,14 +27,14 @@ namespace CattoLearning\Application;
 use CattoLearning\Auth\TwoStep\TwoStep;
 use CattoLearning\Auth\TwoStepPolicy;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
-use CattoLearning\OwnerMessages\TelegramAccountRepository;
+use CattoPHP\Telegram\TelegramAccounts;
 
 class SignInSecurityAdministration
 {
     public function __construct(
         private readonly TwoStepPolicy $policy,
         private readonly TwoStep $twoStep,
-        private readonly TelegramAccountRepository $telegram,
+        private readonly TelegramAccounts $telegram,
         private readonly AuditRepository $audit,
     ) {
     }
@@ -67,7 +69,7 @@ class SignInSecurityAdministration
      */
     public function personView(int $userId): array
     {
-        $telegram = $this->telegram->forUser($userId);
+        $telegram = $this->telegram->forAccount((string) $userId);
 
         return ['telegram' => $telegram === null ? null : ['username' => $telegram['username'], 'connected_on' => (new \DateTimeImmutable($telegram['connected_at']))->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('j F Y')],
             'two_step' => $this->twoStep->state($userId)];

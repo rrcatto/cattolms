@@ -1121,6 +1121,14 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   opacity: 1;
 }
 .ss-body .cl-footer-social a:hover { background: var(--ss-apricot); border-color: var(--ss-apricot); color: var(--ss-night); }
+/* Seven marks on one row on a phone (Telegram joined the footer, 2026-11-09): closer together below 416px, and a little
+   smaller below 384px, so none is left alone on a second row down to 320px. */
+@media (max-width: 26rem) { .ss-body .cl-footer-social { gap: 6px; } }
+@media (max-width: 24rem) {
+  .ss-body .cl-footer-social { gap: 5px; }
+  .ss-body .cl-footer-social a,
+  .ss-body .cl-footer-social > li > span { width: 34px; height: 34px; }
+}
 .ss-body .cl-footer-section-contact .cl-ui-action { margin-top: 22px; }
 .ss-body .cl-footer .cl-ui-action--primary { background: var(--ss-ivory); border-color: var(--ss-ivory); color: var(--ss-ink); }
 .ss-body .cl-footer .cl-ui-action--primary:hover { background: var(--ss-peach); border-color: var(--ss-peach); color: var(--ss-ink); }

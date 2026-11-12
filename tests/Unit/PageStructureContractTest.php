@@ -141,7 +141,7 @@ final class PageStructureContractTest extends TestCase
         foreach (['admin-section', 'account-section', 'company-section'] as $page) {
             $source = (string) file_get_contents($views . $page . '.html.twig');
             self::assertMatchesRegularExpression('/<section class="cl-page-section" data-(admin|account|company)-section=/', $source, $page);
-            self::assertStringContainsString("{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig'", $source, $page . ' puts the section\'s own actions in its page head.');
+            self::assertStringContainsString("{% set ph_actions %}{% include '@CattoPHP/page/section-actions.html.twig'", $source, $page . ' puts the section\'s own actions in its page head.');
             self::assertStringNotContainsString('ph_action_href', $source, $page . ' has no "All … sections" button: the breadcrumb and the menu lead there.');
         }
         foreach (['admin-control-centre' => 'cl-admin-workspace', 'account-control-centre' => 'cl-account-workspace', 'company-control-centre' => 'cl-company-workspace'] as $page => $workspace) {
@@ -200,7 +200,7 @@ final class PageStructureContractTest extends TestCase
                     }
                 }
                 if ($registry->actions($section['key']) !== []) {
-                    self::assertStringContainsString("{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}", $partial, $section['template'] . ' shows its actions in its card head on the "All sections" page.');
+                    self::assertStringContainsString("{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}", $partial, $section['template'] . ' shows its actions in its card head on the "All sections" page.');
                 }
             }
         }

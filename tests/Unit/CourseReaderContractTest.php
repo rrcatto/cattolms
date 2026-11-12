@@ -89,7 +89,8 @@ final class CourseReaderContractTest extends TestCase
         $layout = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/layout/course-presentation.html.twig');
         self::assertStringContainsString("{% if node.node_type == 'section' %} cl-course-outline-section{% endif %}", $layout);
         // A module's section is numbered by the site, any other section is a "Section:" (owner, 2026-10-28, decision 4A).
-        self::assertStringContainsString("{% set node_label = node.node_type == 'section' ? (node.section_number|default(null) is not null ? 'Module ' ~ node.section_number ~ ': ' ~ node_title : 'Section: ' ~ node_title) : (", $layout);
+        // A numbered module reads "Module N: title"; a short course's one module its title alone (owner, 2026-11-11, "Title alone").
+        self::assertStringContainsString("{% set node_label = node.node_type == 'section' ? (node.label_number|default(null) is not null ? 'Module ' ~ node.label_number ~ ': ' ~ node_title : (node.section_number|default(null) is not null ? node_title : 'Section: ' ~ node_title)) : (", $layout);
         self::assertStringContainsString('cl-course-depth-{{ node.depth }}', $layout, 'Depth classes remain.');
         self::assertSame(1, preg_match('/\.cl-course-outline-item\.cl-course-outline-section>:is\(a,strong,span\)\{([^}]*)\}/', $this->css(), $rule), 'Linked, plain and locked section entries share one rule.');
         self::assertStringContainsString('font-weight:700', $rule[1]);
@@ -121,7 +122,7 @@ final class CourseReaderContractTest extends TestCase
 
     private function css(): string
     {
-        return (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        return (string) (file_get_contents(dirname(__DIR__, 2) . '/vendor/rrcatto/cattophp/public/css/cattophp.css') . file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
     }
 
     /** Specificity of a simple selector as one comparable number: ids, classes and pseudo-classes, elements. */

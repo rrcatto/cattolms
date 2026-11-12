@@ -169,7 +169,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $hive = self::baseHive();
         $hive['pg'] = self::pagination('people', '/admin/people');
 
-        self::assertNull(self::renderError('partials/pagination.html.twig', $hive));
+        self::assertNull(self::renderError('@CattoPHP/ui/data/pagination.html.twig', $hive));
     }
 
     public function testEntityLookupRendersWithAndWithoutASelection(): void

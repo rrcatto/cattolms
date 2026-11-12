@@ -5,7 +5,7 @@
 	{% set ph_kicker = 'Import preview' %}
 	{% set ph_title = analysis.course.title %}
 	{% set ph_lead = analysis.course.summary %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
 {% block body %}
@@ -114,10 +114,10 @@
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Label'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Code'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Range'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Passing'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Label'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Code'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Range'}} %}
+							{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Passing'}} %}
 						</tr>
 {% endblock %}
 {% block body %}

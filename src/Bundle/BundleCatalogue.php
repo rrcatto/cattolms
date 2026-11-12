@@ -28,11 +28,19 @@ dates and address, each a difference the review lists in words and ADMIN may kee
 is kept. A published status still needs every course published here and a price on sale. Each bundle is imported on its
 own: one that fails is reported and the rest go on. The same package again changes nothing.
 
+A bundle's position travels too (owner, 2026-11-12): a new bundle takes the file's, else the next free number in its code's
+band; one already here takes the file's as a listed difference, unless kept.
+
 Changelog:
+2026/11/12 SAST
+- A bundle with fewer than two courses is imported as the site keeps one: a draft may have them, and one marked
+  published comes in as a draft, saying why. The site's own export of a bundle that lost a course imports back.
 2026/11/06 SAST
 - Created.
 - The import is canonical: a bundle already here takes the file's words, courses, price, status, sale dates and address,
   each difference listed and kept as this site's only when chosen (owner, 2026-11-06).
+2026/11/12 SAST
+- The bundle's position: exported, imported, and a difference of its own.
 */
 
 declare(strict_types=1);
@@ -59,6 +67,7 @@ final class BundleCatalogue
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         private readonly ClockInterface $clock,
+        private readonly ?BundlePositions $positions = null,
     ) {}
 
     /**
@@ -85,6 +94,8 @@ final class BundleCatalogue
                 'on_sale' => $bundle['offer_id'] === null ? null : (bool) $bundle['offer_active'],
                 'status' => (string) $bundle['status'],
                 'available_from' => self::moment($bundle['available_from']), 'available_until' => self::moment($bundle['available_until']),
+                // Where it is listed (owner, 2026-11-12), as a course's catalogue position travels.
+                'position' => ($bundle['catalogue_position'] ?? null) === null ? null : (int) $bundle['catalogue_position'],
             ];
         }
         return $entries;
@@ -205,6 +216,10 @@ final class BundleCatalogue
                 'available_from' => self::moment($entry['available_from'] ?? null), 'available_until' => self::moment($entry['available_until'] ?? null)], $userId, $now);
             $this->bundles->replaceCourses($id, array_column($courseIds, 'id'));
             $details = ['Courses: ' . count($courseIds)];
+            // The file's position, or the next free number in its code's band (owner, 2026-11-12).
+            $position = self::filePosition($entry);
+            if ($position !== null) $this->bundles->setPosition($id, $position, false); else $position = $this->positions?->fill($id);
+            if ($position !== null) $details[] = 'Position: ' . $position;
             if (($entry['price_minor_units'] ?? null) !== null) {
                 $this->bundles->saveOffer($id, (int) $entry['price_minor_units'], (string) ($entry['currency'] ?? Money::platformCurrency()), (int) $entry['access_period_seconds'],
                     (bool) ($entry['on_sale'] ?? true), $userId, $now, ($entry['was_price_minor_units'] ?? null) === null ? null : (int) $entry['was_price_minor_units']);
@@ -214,7 +229,9 @@ final class BundleCatalogue
             $status = (string) ($entry['status'] ?? 'draft');
             if ($status === 'published') {
                 $unpublished = array_values(array_filter($courseIds, static fn(array $course): bool => $course['status'] !== 'published'));
-                if ($unpublished !== []) {
+                if (count($courseIds) < BundleRules::MINIMUM_COURSES) {
+                    $details[] = 'Left as a draft: a published bundle needs at least two courses';
+                } elseif ($unpublished !== []) {
                     $details[] = 'Left as a draft: ' . implode(', ', array_column($unpublished, 'code')) . (count($unpublished) === 1 ? ' is' : ' are') . ' not published here';
                 } elseif (($entry['price_minor_units'] ?? null) === null) {
                     $details[] = 'Left as a draft: it has no price';
@@ -279,6 +296,12 @@ final class BundleCatalogue
                     $done[] = 'Price: ' . self::priceWords(self::filePrice($entry));
                 }
             }
+            if (in_array('position', $take, true)) {
+                $position = self::filePosition($entry);
+                $this->bundles->setPosition($id, $position, false);
+                if ($position === null) $position = $this->positions?->fill($id);
+                $done[] = 'Position: ' . ($position ?? 'none');
+            }
             if (in_array('status', $take, true)) {
                 $status = (string) ($entry['status'] ?? 'draft');
                 $after = $this->bundles->find($id) ?? $bundle;
@@ -339,12 +362,29 @@ final class BundleCatalogue
         if ([$from, $until] !== [self::moment($bundle['available_from']), self::moment($bundle['available_until'])]) {
             $found[] = ['kind' => 'sale_dates', 'words' => 'On sale: ' . self::saleWords(self::moment($bundle['available_from']), self::moment($bundle['available_until'])) . ' → ' . self::saleWords($from, $until), 'problem' => null];
         }
+        // A file from before positions says nothing about one, and changes nothing (owner, 2026-11-12).
+        if (array_key_exists('position', $entry)) {
+            $here = ($bundle['catalogue_position'] ?? null) === null ? null : (int) $bundle['catalogue_position'];
+            $file = self::filePosition($entry);
+            if ($here !== $file) $found[] = ['kind' => 'position', 'words' => 'Position: ' . ($here ?? 'none') . ' → ' . ($file ?? 'none'), 'problem' => null];
+        }
         $slug = (string) ($entry['slug'] ?? '');
         if ($slug !== (string) $bundle['slug']) {
             $found[] = ['kind' => 'address', 'words' => 'Address: /bundles/' . $bundle['slug'] . ' → /bundles/' . $slug,
                 'problem' => $this->bundles->slugTaken($slug, (int) $bundle['id']) ? 'Another bundle here has the address /bundles/' . $slug . '.' : null];
         }
         return $found;
+    }
+
+    /**
+     * The file's position for a bundle, or null when it has none or none that can be used (a whole number from 1).
+     *
+     * @param array<string,mixed> $entry
+     */
+    private static function filePosition(array $entry): ?int
+    {
+        $value = $entry['position'] ?? null;
+        return is_int($value) && $value >= 1 && $value <= \CattoLearning\Support\PositionBands::HIGHEST ? $value : null;
     }
 
     /**
@@ -395,8 +435,10 @@ final class BundleCatalogue
         $cover = trim((string) ($entry['cover_svg'] ?? ''));
         if ($cover !== '' && !str_starts_with($cover, '<svg')) return 'Its cover is not SVG.';
         if (!in_array((string) ($entry['status'] ?? 'draft'), BundleRules::STATUSES, true)) return 'Its status is not draft, published or retired.';
+        // A bundle with fewer than two courses comes in as the site keeps one: a draft may have them, and only publishing
+        // needs two (create() and update() leave it a draft and say why). Refusing it would make a site's own export,
+        // one of whose bundles lost a course, impossible to import back (2026-11-12).
         $courses = (array) ($entry['courses'] ?? []);
-        if (count($courses) < BundleRules::MINIMUM_COURSES) return 'It has fewer than two courses.';
         foreach ($courses as $courseCode) {
             $courseCode = CourseCode::normalise((string) $courseCode);
             if (!isset($packageCourses[$courseCode]) && $this->courses->findByCode($courseCode) === null) return 'Its course ' . $courseCode . ' is neither in this package nor on this site.';

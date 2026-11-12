@@ -208,6 +208,7 @@ final class OrderStory
             $lines[] = match ((string) $item['product_type']) {
                 'bundle' => 'the bundle ' . ($details['bundle_title'] ?? ''),
                 'company_credit' => (int) $item['quantity'] . ' course credits for ' . ($details['course_title'] ?? 'a course'),
+                'bundle_credit' => (int) $item['quantity'] . ' bundle credits for ' . ($details['bundle_title'] ?? 'a bundle') . ', one person each',
                 default => (string) ($details['course_title'] ?? 'a course'),
             };
         }

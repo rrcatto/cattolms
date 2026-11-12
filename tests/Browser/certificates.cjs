@@ -151,11 +151,17 @@ async function defaultDesign(page) {
     assert.equal(await rows.count(), 1, 'one design is the default for new courses');
     return (await rows.first().getByRole('link').first().innerText()).trim();
 }
-/* Types at the end of a CKEditor, on a new line. */
+/* Types at the end of a CKEditor, on a new line. The caret is put at the end of the last line by the editor itself
+   (CKEditor hangs its editor on the editing element): a click lands on whichever line is in the editor's middle, and
+   Control+End cannot move the editor's caret past the field the wording ends with, so the new line had gone wherever the
+   middle fell, after the learner's name taking its large style on 2026-11-10, and the edited design no longer fitted. */
 async function typeAtEnd(page, editor, text) {
-    await editor.click();
-    await page.keyboard.press('Control+End');
-    await page.keyboard.press('End');
+    await editor.evaluate(element => {
+        const ck = element.ckeditorInstance;
+        const root = ck.model.document.getRoot();
+        ck.model.change(writer => writer.setSelection(writer.createPositionAt(root.getChild(root.childCount - 1), 'end')));
+        ck.editing.view.focus();
+    });
     await page.keyboard.press('Enter');
     await page.keyboard.type(text);
 }

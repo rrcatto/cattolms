@@ -11,7 +11,7 @@ use CattoLearning\Commerce\Wallet\WalletOwner;
 use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Support\AccessPeriod;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Money;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
@@ -31,11 +31,14 @@ final class CommerceMaintenance
         private readonly AccessService $access, private readonly FinancialDocuments $documents,
         private readonly MailerInterface $mailer, private readonly TransactionManager $transactions,
         private readonly ClockInterface $clock, private readonly WalletService $wallets,
-        private readonly CommerceSettings $settings, private readonly RuntimeSettings $runtime) {}
+        private readonly CommerceSettings $settings, private readonly RuntimeSettings $runtime, private readonly ?PaymentService $payments = null) {}
 
     public function run(): void
     {
         $now = $this->clock->now()->format(DATE_ATOM);
+        // Card payments still waiting are asked about at Stitch first (the webhook may not reach this site), so one paid
+        // just before its order's day to pay by is recorded before the order is cancelled.
+        $this->payments?->checkWaitingCards();
         foreach ($this->records->dueOrders($now, 200) as $id) $this->orders->cancelDue($id);
         foreach ($this->records->dueEntitlements($now, 200) as $id) $this->access->reconcile($id);
         $this->deliverInvoices();
@@ -179,6 +182,8 @@ final class CommerceMaintenance
             $lines[] = match ((string) $item['product_type']) {
                 'bundle' => ['title' => 'Bundle: ' . ($details['bundle_title'] ?? ''), 'detail' => count((array) ($details['courses'] ?? [])) . ' courses, ' . $period . ' of access each'],
                 'company_credit' => ['title' => (int) $item['quantity'] . ' course credits: ' . ($details['course_title'] ?? ''), 'detail' => $period . ' of access each'],
+                // One bundle credit is one whole bundle for one person (owner, 2026-11-11).
+                'bundle_credit' => ['title' => (int) $item['quantity'] . ' bundle credits: ' . ($details['bundle_title'] ?? ''), 'detail' => count((array) ($details['courses'] ?? [])) . ' courses, ' . $period . ' of access each. Each credit is for one person, who gets every course in the bundle.'],
                 default => ['title' => (string) ($details['course_title'] ?? ''), 'detail' => $period . ' of access'],
             } + ['amount' => Money::ofMinorUnits((int) $item['amount_minor'] - (int) ($item['discount_minor'] ?? 0), (string) $order['currency'])->format()];
         }

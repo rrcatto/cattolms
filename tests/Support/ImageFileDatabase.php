@@ -13,7 +13,7 @@ row DocumentAssetRepository asks for, by SHA-256, is the file registered under t
 other query finds nothing and every write does nothing.
 
 It lets the certificate design tests draw real PDFs through DocumentTemplateRenderer and
-DocumentPdfRenderer, with the installed looks' backgrounds embedded, without PostgreSQL.
+PdfRenderer, with the installed looks' backgrounds embedded, without PostgreSQL.
 
 This is a test collaborator rather than a TestCase, which is why it may declare a constructor:
 tools/check-test-suite.php forbids that inside a TestCase file.

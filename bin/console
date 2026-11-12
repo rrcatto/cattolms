@@ -31,7 +31,7 @@ Changelog:
 declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\Configuration\RunMode;
+use CattoPHP\Runtime\RunMode;
 use CattoLearning\Kernel;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Input\ArgvInput;
@@ -49,5 +49,5 @@ $instanceRoot = (string) $boot['instance_root'];
 $_SERVER['CATTO_INSTANCE_ROOT'] = $_ENV['CATTO_INSTANCE_ROOT'] = $instanceRoot;
 
 // How the program runs, as the web request reads it: APP_ENV alone, debugging following it.
-$kernel = new Kernel(RunMode::environment(), RunMode::debug(), $instanceRoot);
+$kernel = new Kernel(RunMode::environment(\CattoLearning\Support\Env::string('APP_ENV')), RunMode::debug(\CattoLearning\Support\Env::string('APP_ENV')), $instanceRoot);
 exit((new Application($kernel))->run(new ArgvInput()));

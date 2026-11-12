@@ -156,7 +156,7 @@ final class CategoryHierarchyIntegrationTest extends TestCase
         $this->service->moveCategory($this->ids['A1x'], 'out', $this->userId);
         self::assertSame([2, ['A1', 'A1x', 'A2']], [$this->level('A1x'), $this->children('A')], 'Out puts it just after its former parent.');
         $this->assertCompact();
-        $audit = $this->db->fetchAssociative("SELECT metadata FROM audit_log WHERE event_key = 'course_category.moved' AND user_id = :user ORDER BY id DESC LIMIT 1", ['user' => $this->userId]);
+        $audit = $this->db->fetchAssociative("SELECT details AS metadata FROM cattophp_activity WHERE action = 'course_category.moved' AND actor_id = CAST(:user AS TEXT) ORDER BY id DESC LIMIT 1", ['user' => $this->userId]);
         self::assertNotFalse($audit);
         self::assertSame($this->ids['A1x'], json_decode((string) $audit['metadata'], true)['category_id']);
     }

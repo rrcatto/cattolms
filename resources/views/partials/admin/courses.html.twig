@@ -2,11 +2,11 @@
 {% block surface_body %}
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Courses', eyebrow: 'Courses', summary: 'One canonical list for creating, importing, reviewing and maintaining courses.'})} %}
-{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}
+{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@CattoPHP/page/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}
 {% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'courses', pagination: courses_pagination, search: {ds_name: 'courses', ds_label: 'Search courses', ds_value: courses_search, ds_action: '/admin/courses'}})} %}
-{% block toolbar %}{% if courses_view_switch is defined and courses_pagination %}<div class="cl-list-toolbar">{% include '@platform/partials/view-switch.html.twig' with {vs: courses_view_switch} %}{% if courses_view == 'grid' %}{% include '@platform/partials/grid-sort.html.twig' with {gs_name: 'courses', gs_headers: courses_sort_headers, gs_pager: courses_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
+{% block toolbar %}{% if courses_view_switch is defined and courses_pagination %}<div class="cl-list-toolbar">{% include '@CattoPHP/ui/data/view-switch.html.twig' with {vs: courses_view_switch} %}{# Renumber, straight after List and Grid (owner, 2026-11-12): every course back in its code's band, 100 apart, in this order (Settings > Course positions). #}{% if courses_can_renumber|default(false) %}<form class="cl-renumber-form" action="/admin/settings/course-positions/renumber" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="courses">{{ ui('action.button', {label: 'Renumber positions', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-sort', title: 'Every course back in its code\'s band, 100 apart, in this order', confirm: 'Renumber every course in its band, keeping their order?'}) }}</form>{% endif %}{% if courses_view == 'grid' %}{% include '@CattoPHP/ui/data/grid-sort.html.twig' with {gs_name: 'courses', gs_headers: courses_sort_headers, gs_pager: courses_pagination} %}{% endif %}</div>{% endif %}{% endblock %}
 {% block results %}
 
 				{% if courses %}
@@ -24,16 +24,16 @@
 {% endembed %}
 					{% else %}
 					{% set arrange = courses_can_arrange|default(false) %}
-					{% if arrange %}<div class="cl-course-order" data-controller="course-order" data-course-order-csrf-value="{{ csrf }}" data-course-order-before-value="{{ courses_before_page|default('') }}" data-action="dragstart->course-order#start dragover->course-order#over drop->course-order#drop dragend->course-order#end">
+					{% if arrange %}<div class="cl-course-order" data-controller="list-order" data-list-order-thing-value="course" data-list-order-csrf-value="{{ csrf }}" data-list-order-before-value="{{ courses_before_page|default('') }}" data-action="dragstart->list-order#start dragover->list-order#over drop->list-order#drop dragend->list-order#end">
 						<p class="visually-hidden" id="course-order-keys">Drag the handle, or press the up or down arrow, Home or End on it, to move the course in the catalogue.</p>
-						<p class="cl-course-order-status" data-course-order-target="status" role="status" aria-live="polite"></p>{% endif %}
+						<p class="cl-course-order-status" data-list-order-target="status" role="status" aria-live="polite"></p>{% endif %}
 
 						{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
 
 								<tr>
 									{% for sh in courses_sort_headers %}
-										{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}
+										{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}
 									{% endfor %}
 								</tr>
 

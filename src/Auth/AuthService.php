@@ -11,6 +11,12 @@ Description:
 Implements Catto Learning business and application logic for auth operations.
 
 Changelog:
+2026/11/12 SAST
+- Sign-in by Telegram uses CattoPHP's Telegram module (CattoPHP Phase 4, step 4): its bot, messenger and accounts (found by
+  username or email by TelegramSignInAccounts); the sign-in itself stays here with cattolms's sign-in.
+2026/11/09 SAST
+- How long a link and a sign-in last and the limits on asking for links are CattoPHP's sign-in settings (CattoPHP
+  Phase 2, step 6a), under their .env names: .env gives them, the Settings page may override them.
 2026/11/07 SAST
 - The notice of an account waiting for approval links the person's page by their account reference (owner, 2026-11-06).
 2026/11/05 SAST
@@ -93,17 +99,36 @@ final class AuthService
         private readonly ?CompanyService $companies = null,
         private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
         private readonly ?SignInRestriction $signIn = null,
-        private readonly ?Signup\SignupChecks $signups = null,
+        private readonly ?\CattoPHP\Signup\SignupChecks $signups = null,
         private readonly ?\CattoLearning\Mailing\MailingConsents $mailing = null,
         private readonly ?IdNumbers $idNumbers = null,
         private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null,
         private readonly ?TwoStep\TwoStep $twoStep = null,
         private readonly ?TwoStepPolicy $twoStepPolicy = null,
         private readonly ?TwoStep\PendingSignIn $pending = null,
-        private readonly ?\CattoLearning\OwnerMessages\TelegramAccountRepository $telegramAccounts = null,
-        private readonly ?\CattoLearning\OwnerMessages\TelegramMessenger $telegram = null,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessageSettings $telegramSettings = null
+        private readonly ?\CattoLearning\OwnerMessages\TelegramSignInAccounts $telegramAccounts = null,
+        private readonly ?\CattoPHP\Telegram\TelegramMessenger $telegram = null,
+        private readonly ?\CattoPHP\Telegram\TelegramBot $telegramSettings = null,
+        private readonly ?\CattoPHP\Settings\Settings $foundationSettings = null
     ) {
+    }
+
+    /** How long a sign-in link works, in seconds: AUTH_MAGIC_LINK_TTL, which the Settings page may override. */
+    public function linkLifetime(): int
+    {
+        return $this->lengthOf('AUTH_MAGIC_LINK_TTL', '30m');
+    }
+
+    /** A length of time among CattoPHP's sign-in settings, in seconds: .env's unless Settings overrides it. */
+    private function lengthOf(string $name, string $default): int
+    {
+        return $this->foundationSettings?->duration($name)->lengthInSeconds() ?? Env::seconds($name, $default);
+    }
+
+    /** A limit among CattoPHP's sign-in settings: .env's unless Settings overrides it. */
+    private function limitOf(string $name, int $default): int
+    {
+        return $this->foundationSettings?->int($name) ?? Env::int($name, $default);
     }
 
     /** What an unusable sign-in link says, whichever way it came. */
@@ -150,6 +175,18 @@ final class AuthService
      * ... I don't want to promise that the account will be allowed - if it looks spammy, I will reject it."
      */
     public const DEMO_HOLD_NOTICE = 'After completing your registration, your account will be held pending approval because the site is currently in DEMO mode. Once the site has gone LIVE, your account status will be processed.';
+
+    /**
+     * The sign-up check (CattoPHP's) on a registration form: where the person says they live and their account type are
+     * kept with the attempt.
+     *
+     * @param array<string,mixed> $data
+     * @return array{id:int,risk:\CattoPHP\Signup\RiskAssessment}|null
+     */
+    private function signupCheck(array $data, string $email, ?string $refusal = null): ?array
+    {
+        return $this->signups?->check($data, $email, $refusal, Countries::code($data['country'] ?? '') ?? '', ['account_type' => (string) ($data['account_type'] ?? 'individual')]);
+    }
 
     /**
      * On a demo site every account registered through the site waits for ADMIN's approval before it can sign in (owner,
@@ -242,13 +279,13 @@ final class AuthService
             'login',
             null,
             ['return_path' => $this->safeReturnPath($returnPath)] + (($intent = \CattoLearning\Mailing\FollowIntent::fromText($follow)) !== null ? ['follow' => $intent->text()] : []),
-            Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'),
+            $this->linkLifetime(),
             ClientFingerprint::ipHash()
         );
 
         $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($rawToken);
         try {
-            $this->mailer->sendMagicLink($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'));
+            $this->mailer->sendMagicLink($email, $url, $this->linkLifetime());
         } catch (\Throwable $e) {
             $this->tokens->deleteByHash($tokenHash);
             throw new RuntimeException('The sign-in email could not be sent.', 0, $e);
@@ -322,7 +359,7 @@ final class AuthService
         $text = ($this->ownerMessages?->demo() ?? '') . 'Sign in to ' . $domain . "\n\nYour code is\n" . $code . "\n\nOr open this link:\n" . $url
             . "\n\nIt lasts 10 minutes and works once. If you did not ask for this, ignore it. Nothing happens without the code or the link.";
         // The log keeps what it was, never what it said.
-        $this->telegram->hold('sign_in', $account['chat_id'], $account['user_id'], $account['username'], $text, 'Sign-in code and link for ' . $domain . ' (not kept)',
+        $this->telegram->hold('sign_in', $account['chat_id'], (string) $account['user_id'], $account['username'], $text, 'Sign-in code and link for ' . $domain . ' (not kept)',
             [$code, $rawToken, rawurlencode($rawToken), $url]);
         $this->audit->record(null, 'auth.telegram_sign_in_requested', ['email_hash' => hash('sha256', $email)]);
 
@@ -457,7 +494,7 @@ final class AuthService
         $sessionPublicId = $this->sessions->create(
             $userId,
             Token::hash($sessionToken),
-            Env::seconds('AUTH_SESSION_TTL', '1d'),
+            $this->lengthOf('AUTH_SESSION_TTL', '1d'),
             ClientFingerprint::ipHash(),
             ClientFingerprint::userAgent(),
             $email
@@ -607,7 +644,7 @@ final class AuthService
 
         $lastSeen = strtotime((string) $session['last_seen_at']) ?: 0;
         if ($lastSeen < time() - Env::seconds('AUTH_SESSION_TOUCH_INTERVAL', '5m')) {
-            $this->sessions->touch((int) $session['id'], Env::seconds('AUTH_SESSION_TTL', '1d'));
+            $this->sessions->touch((int) $session['id'], $this->lengthOf('AUTH_SESSION_TTL', '1d'));
             $this->setSessionCookie($rawToken);
         }
 
@@ -785,12 +822,12 @@ final class AuthService
             'secondary_email',
             $userId,
             [],
-            Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'),
+            $this->linkLifetime(),
             ClientFingerprint::ipHash()
         );
         $url = rtrim(Env::string('APP_URL'), '/') . '/account/email/verify?token=' . rawurlencode($rawToken);
         try {
-            $this->mailer->sendSecondaryEmailVerification($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'));
+            $this->mailer->sendSecondaryEmailVerification($email, $url, $this->linkLifetime());
         } catch (\Throwable $e) {
             $this->tokens->deleteByHash($tokenHash);
             throw new RuntimeException('The verification email could not be sent.', 0, $e);
@@ -863,7 +900,7 @@ final class AuthService
             $this->assertMaySignIn($email, null);
         } catch (RuntimeException $refused) {
             // Kept among the sign-up attempts, so the administrator sees who tried (owner, 2026-10-26).
-            $this->signups?->check($data, $email, $refused->getMessage());
+            $this->signupCheck($data, $email, $refused->getMessage());
             throw $refused;
         }
         $type = (string) ($data['account_type'] ?? 'individual');
@@ -879,7 +916,7 @@ final class AuthService
             if ($country !== Countries::SOUTH_AFRICA) throw new InvalidArgumentException(self::SOUTH_AFRICA_ONLY);
             $number = ($this->idNumbers ?? throw new RuntimeException('Registration is not available here.'))->check($data['id_number'] ?? '');
         } catch (InvalidArgumentException $refused) {
-            if ($refused->getMessage() !== AdultAge::REFUSED) $this->signups?->check($data, $email, $refused->getMessage());
+            if ($refused->getMessage() !== AdultAge::REFUSED) $this->signupCheck($data, $email, $refused->getMessage());
             throw $refused;
         }
         $born = $number->birthdate;
@@ -889,18 +926,18 @@ final class AuthService
         $this->companies?->assertMayRegister($email, $type === 'company');
         // The sign-up check (owner, 2026-10-26): a throwaway address is refused, a bot caught by the hidden field is shown the
         // usual page and sent nothing, and everyone else's attempt is recorded with what the check found.
-        $signup = $this->signups?->check($data, $email);
+        $signup = $this->signupCheck($data, $email);
         if ($signup !== null && $signup['risk']->refusal !== null) throw new RuntimeException($signup['risk']->refusal);
         if ($signup !== null && $signup['risk']->trapped) return;
         $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['news'=>(($data['news'] ?? '') === '1') ? '1' : '','account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company,'birthdate'=>$born,'id_number'=>$this->idNumbers->seal($number),'residence_country'=>$country], 'signup' => $signup === null ? [] : ['attempt_id' => $signup['id'], 'hold' => $signup['risk']->holds()]];
         // A follow asked for before an account existed (owner, 2026-10-28), carried out when the account is made.
         if (($intent = \CattoLearning\Mailing\FollowIntent::fromText($data['follow'] ?? '')) !== null) $context['follow'] = $intent->text();
         $raw = Token::generate(); $hash = Token::hash($raw);
-        $this->tokens->create($hash, $email, 'registration', null, $context, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'), ClientFingerprint::ipHash());
+        $this->tokens->create($hash, $email, 'registration', null, $context, $this->linkLifetime(), ClientFingerprint::ipHash());
         $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($raw);
         // Its own email, which on a demo site says the account will be held (owner, 2026-10-26). A live site's hold is not said.
         $notice = $this->demoHoldsRegistrations() && $this->needsApproval($email) ? self::DEMO_HOLD_NOTICE : '';
-        try { $this->mailer->sendRegistrationLink($email, $url, Env::seconds('AUTH_MAGIC_LINK_TTL', '30m'), $notice); }
+        try { $this->mailer->sendRegistrationLink($email, $url, $this->linkLifetime(), $notice); }
         catch (\Throwable $e) { $this->tokens->deleteByHash($hash); throw new RuntimeException('The registration email could not be sent.', 0, $e); }
     }
 
@@ -935,7 +972,7 @@ final class AuthService
             $this->ownerMessages?->registered((int)$user['id'], $email, trim(((string)($reg['first_name'] ?? '')) . ' ' . ((string)($reg['last_name'] ?? ''))), is_string($reg['residence_country'] ?? null) ? $reg['residence_country'] : null);
             $signup = is_array($context['signup'] ?? null) ? $context['signup'] : [];
             $held = $this->needsApproval($email, $signup);
-            if (isset($signup['attempt_id'])) $this->signups?->complete((int) $signup['attempt_id'], (int) $user['id'], $held);
+            if (isset($signup['attempt_id'])) $this->signups?->complete((int) $signup['attempt_id'], (string) $user['id'], $held);
             if ($held) {
                 // A demo site, or a live site's held sign-up: the account waits for ADMIN, with no session, and ADMIN is told.
                 $this->users->setStatus((int)$user['id'], 'awaiting_approval');
@@ -950,7 +987,7 @@ final class AuthService
             }
             $this->tokens->markUsed((int)$row['id']); $this->users->markLogin((int)$user['id']);
             $sessionToken = Token::generate();
-            $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::seconds('AUTH_SESSION_TTL', '1d'), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
+            $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), $this->lengthOf('AUTH_SESSION_TTL', '1d'), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
             return ['user'=>$user,'token'=>$sessionToken,'session'=>$sessionId,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/courses'))];
         });
         if (($state['awaiting'] ?? false) === true) {
@@ -1011,9 +1048,9 @@ final class AuthService
 
     private function withinRateLimits(string $email): bool
     {
-        $window = Env::seconds('AUTH_REQUEST_WINDOW', '15m');
-        return $this->tokens->recentEmailCount($email, $window) < Env::int('AUTH_REQUEST_LIMIT_EMAIL', 5)
-            && $this->tokens->recentIpCount(ClientFingerprint::ipHash(), $window) < Env::int('AUTH_REQUEST_LIMIT_IP', 20);
+        $window = $this->lengthOf('AUTH_REQUEST_WINDOW', '15m');
+        return $this->tokens->recentEmailCount($email, $window) < $this->limitOf('AUTH_REQUEST_LIMIT_EMAIL', 5)
+            && $this->tokens->recentIpCount(ClientFingerprint::ipHash(), $window) < $this->limitOf('AUTH_REQUEST_LIMIT_IP', 20);
     }
 
     private function safeReturnPath(string $path): string
@@ -1024,7 +1061,7 @@ final class AuthService
     private function setSessionCookie(string $token): void
     {
         setcookie(Env::string('AUTH_SESSION_COOKIE', 'catto_learning_session'), $token, [
-            'expires' => time() + Env::seconds('AUTH_SESSION_TTL', '1d'),
+            'expires' => time() + $this->lengthOf('AUTH_SESSION_TTL', '1d'),
             'path' => '/',
             'domain' => '',
             'secure' => Env::bool('AUTH_COOKIE_SECURE', true),

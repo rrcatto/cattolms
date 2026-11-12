@@ -5,7 +5,7 @@
 <div class="cl-category-field" data-category-field data-field-id="{{ cf_id }}" data-field-name="{{ cf_name }}" data-refresh-url="/admin/courses/categories/field">
 	<div class="cl-category-field-row">
 		{{ ui('form.tree-select', {id: cf_id, name: cf_name, mode: 'field', items: cf_picker.items, selected: cf_picker.selected, placeholder: 'Uncategorised', list_label: 'Course categories'}) }}
-		{% if can_manage_categories %}<span class="cl-category-field-new" data-category-create-enhanced hidden>{{ ui('action.button', {label: 'New', variant: 'secondary', type: 'button', icon: 'action-add', category_create_toggle: true, expanded: false, controls: cf_id ~ '-new', aria_label: 'Create a new category'}) }}</span>{% endif %}
+		{% if can_manage_categories %}<span class="cl-category-field-new" data-category-create-enhanced hidden>{{ ui('action.button', {label: 'New', variant: 'secondary', type: 'button', icon: 'action-add', hook: 'category-create-toggle', expanded: false, controls: cf_id ~ '-new', aria_label: 'Create a new category'}) }}</span>{% endif %}
 	</div>
 	{% if can_manage_categories %}
 		<div class="cl-category-create-panel" id="{{ cf_id }}-new" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}" hidden>
@@ -15,7 +15,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (optional)', for: cf_id ~ '-new-description', full_width: true})} %}{% block control %}<textarea class="cl-input" id="{{ props.for }}" data-category-description rows="2" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 			<p class="cl-category-create-result" aria-live="polite">It will be created as <strong data-category-create-path>the new category</strong>.</p>
 			<p class="cl-category-create-error" role="alert" data-category-error hidden></p>
-			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true, icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', hook: 'category-create'}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', hook: 'category-create-cancel', icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
 		</div>
 	{% endif %}
 </div>

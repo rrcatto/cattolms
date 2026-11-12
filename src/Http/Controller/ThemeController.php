@@ -17,7 +17,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -46,17 +46,8 @@ final class ThemeController extends BaseController
     #[Route('/theme/palette', name: 'theme_palette', methods: ['GET'])]
     public function palette(): Response
     {
-        $key = $this->themes->activeTheme();
-        $preview = trim((string) ($_GET['theme_preview'] ?? ''));
         $user = $this->currentUser();
-        if ($preview !== '' && $user !== null && $user->hasPermission('SYSTEM.THEME.VIEW')) {
-            try {
-                $this->themes->theme($preview);
-                $key = $preview;
-            } catch (\RuntimeException) {
-                // Invalid preview identifiers never affect the live theme.
-            }
-        }
+        [$key] = $this->themes->resolve((string) ($_GET['theme_preview'] ?? ''), $user !== null && $user->hasPermission('SYSTEM.THEME.VIEW'));
 
         header('Content-Type: application/json; charset=UTF-8');
         header('Cache-Control: private, no-store');

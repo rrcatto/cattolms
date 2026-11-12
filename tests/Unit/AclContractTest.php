@@ -32,6 +32,9 @@ use RuntimeException;
 
 final class AclContractTest extends TestCase
 {
+    /** Permissions added after the permissions table was dropped (migration 20261109180000_roles_to_cattophp). */
+    private const ADDED_SINCE_PERMISSIONS_BECAME_CODE = ['PLATFORM.INBOX.VIEW', 'PLATFORM.INBOX.MANAGE'];
+
     /**
      * The single baseline migration, discovered rather than named.
      *
@@ -69,8 +72,9 @@ final class AclContractTest extends TestCase
         // with COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW and PLATFORM.WALLET.VIEW/MANAGE.
         // 91 with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE (owner, 2026-10-19). 93 with
         // PLATFORM.MAILING.VIEW/MANAGE for mailing lists and campaigns (owner, 2026-10-26). 95 with
-        // PLATFORM.SITEANALYTICS.VIEW/MANAGE for the Site Log, flagged activity and lockouts (owner, 2026-11-04).
-        self::assertCount(95, $catalog->businessKeys());
+        // PLATFORM.SITEANALYTICS.VIEW/MANAGE for the Site Log, flagged activity and lockouts (owner, 2026-11-04). 97 with
+        // PLATFORM.INBOX.VIEW/MANAGE for the Inbox (owner, 2026-11-11), the first added since permissions became code.
+        self::assertCount(97, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {
@@ -81,7 +85,9 @@ final class AclContractTest extends TestCase
             self::assertFalse(str_starts_with($key, 'API.'), 'API transport scopes must not be duplicated in the ACL catalogue.');
         }
 
-        $migrationPermissions = $this->migrationPermissionKeys($migration);
+        // The baseline's list is a record: since 2026-11-09 permissions are code (CattolmsPermissions) and the table is gone,
+        // so the catalogue is the baseline's keys and those added since.
+        $migrationPermissions = [...$this->migrationPermissionKeys($migration), ...self::ADDED_SINCE_PERMISSIONS_BECAME_CODE];
         sort($keys);
         sort($migrationPermissions);
         self::assertSame($keys, $migrationPermissions, 'PermissionCatalog and the baseline migration must contain exactly the same permission keys.');
@@ -138,14 +144,14 @@ final class AclContractTest extends TestCase
         $roles = (string) file_get_contents($root . '/src/Infrastructure/Persistence/RoleRepository.php');
         $acl = (string) file_get_contents($root . '/src/Auth/AclService.php');
         $auth = (string) file_get_contents($root . '/src/Auth/AuthService.php');
-        self::assertStringContainsString("VALUES ('ADMIN','Administrator','System Administrator')", $roles);
+        self::assertStringContainsString("VALUES ('ADMIN', 'Administrator', 'Holds every permission, now and as new ones are added.', NOW(), NOW())", $roles);
         self::assertStringContainsString('in_array(RoleCatalog::ADMIN, $roleKeys, true)', $acl);
         self::assertStringContainsString('return $this->catalog->keys();', $acl);
         self::assertStringContainsString("Env::string('APP_ADMIN_EMAIL')", $auth);
         self::assertStringContainsString('RoleCatalog::STUDENT', $auth);
     }
 
-    public function testRoleAdministrationUsesExplicitSaveAndStructuredAuditChanges(): void
+    public function testRoleAdministrationUsesExplicitSaveAndCattoPhpsRoles(): void
     {
         $root = dirname(__DIR__, 2);
         $edit = (string) file_get_contents($root . '/resources/views/pages/admin-role-edit.html.twig');
@@ -154,10 +160,10 @@ final class AclContractTest extends TestCase
         self::assertStringContainsString('name="permissions[]"', $edit);
         self::assertStringContainsString('Save permissions', $edit);
         self::assertStringNotContainsString('autosave', strtolower($edit));
-        self::assertStringContainsString("'changes' => \$changes", $service);
-        self::assertStringContainsString('acl.role_permissions_updated', $service);
+        // CattoPHP's roles record each change, with what it was before (RolesIntegrationTest).
+        self::assertStringContainsString('$this->roles->replaceRolePermissions($roleKey, $new, $actorUserId)', $service);
         self::assertStringContainsString('groupedForRole', $service);
-        foreach (['GET /admin/roles','POST /admin/roles/{id}/permissions'] as $route) {
+        foreach (['GET /admin/roles','POST /admin/roles/{key}/permissions'] as $route) {
             self::assertStringContainsString($route, $app);
         }
     }

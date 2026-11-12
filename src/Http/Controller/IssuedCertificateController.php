@@ -36,7 +36,7 @@ use CattoLearning\Course\Certificate\CertificateDocuments;
 use CattoLearning\Course\Certificate\CertificateRepository;
 use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
 use CattoLearning\Support\Address\RecordAddress;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;

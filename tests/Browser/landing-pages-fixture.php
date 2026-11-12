@@ -23,7 +23,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Token;
 use CattoLearning\Support\Uuid;
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
@@ -88,7 +88,7 @@ if ($action === 'create') {
     $a['id'] = $fixture->createCourse($owner['id'], $company, $a['slug'], $a['title'], 'published');
     $db->executeStatement("UPDATE courses SET published_at=NOW(), subtitle='Property transfers from offer to registration', summary='A practical course on transferring property in South Africa.', certificate_accreditation='LPC CPD: 4 points', level='Intermediate' WHERE id=:id", ['id' => $a['id']]);
     // Its cover, set as on the course's Details tab: the hero picture fills the landing page's head (owner, 2026-10-30).
-    $container->get(CourseService::class)->setCourseCover($a['id'], UploadedSvg::validate('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A title deed beside a house key"><rect width="640" height="360" fill="#2f2a3a"/><rect x="380" y="70" width="170" height="220" rx="6" fill="#f2ead8"/><path d="M405 110h120M405 140h120M405 170h90" stroke="#8a7f68" stroke-width="8"/><circle cx="250" cy="200" r="46" fill="none" stroke="#d6b45a" stroke-width="16"/><path d="M290 200h120v26h-24v-14" fill="none" stroke="#d6b45a" stroke-width="16"/></svg>', UploadedSvg::COVER_BYTES, 'cover'), $owner['id']);
+    $container->get(CourseService::class)->setCourseCover($a['id'], UploadedSvg::validate('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" role="img" aria-label="A title deed beside a house key"><rect width="640" height="360" fill="#2f2a3a"/><rect x="380" y="70" width="170" height="220" rx="6" fill="#f2ead8"/><path d="M405 110h120M405 140h120M405 170h90" stroke="#8a7f68" stroke-width="8"/><circle cx="250" cy="200" r="46" fill="none" stroke="#d6b45a" stroke-width="16"/><path d="M290 200h120v26h-24v-14" fill="none" stroke="#d6b45a" stroke-width="16"/></svg>', UploadedSvg::PICTURE_BYTES, 'cover'), $owner['id']);
     $price($a['id'], $owner['id'], 1, 31536000, 150000, true);
     $price($a['id'], $owner['id'], 2, 15552000, 90000, false); // 6 months: 180 days (a month is 30 days)
     $deeds = $node($a['id'], null, 1, 'section');

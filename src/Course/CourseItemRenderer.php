@@ -9,7 +9,7 @@ use CattoLearning\Course\Catwalk\SlideDeck;
 use CattoLearning\Course\Catwalk\NarrationRepository;
 use CattoLearning\Course\Parts\FlashCards;
 use CattoLearning\Support\Address\CoursePartAddress;
-use CattoLearning\View\Ui\PlatformUi;
+use CattoPHP\Ui\Components;
 
 /** Resolves stored Course Item source at display time and delegates output to bounded type renderers. */
 final class CourseItemRenderer
@@ -18,11 +18,11 @@ final class CourseItemRenderer
     public const DOWNLOAD_ACTION_CLASSES = 'cl-ui-action cl-ui-action--primary cl-ui-action--normal cl-course-item-download-link';
 
     /**
-     * @param PlatformUi|null $ui The platform UI, for the icon sprite's fingerprinted address.
+     * @param Components|null $ui The component registry, for the icon sprite's fingerprinted address.
      * @param DeckRenderer|null $decks CatWalk's markup for a Presentation.
      * @param NarrationRepository|null $narrations A Presentation's recorded narration, by slide.
      */
-    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources, private readonly ?PlatformUi $ui = null, private readonly ?DeckRenderer $decks = null, private readonly ?NarrationRepository $narrations = null)
+    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources, private readonly ?Components $ui = null, private readonly ?DeckRenderer $decks = null, private readonly ?NarrationRepository $narrations = null)
     {
     }
 

@@ -3,10 +3,11 @@
 	owner 2026-11-01). Variables as course-row.html.twig.
 #}
 							{% embed ui_template('data.card') with {props: ui_props('data.card', {title: course.title, href: course_admin_url(course), picture: 'wide'})} %}
-{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|raw }}{% endif %}{% endblock %}
+{% block picture %}{% if course.cover_svg|default('') starts with '<svg' %}{{ course.cover_svg|authored }}{% endif %}{% endblock %}
 {% block details %}
 								<span id="{{ course_anchor(course) }}" class="cl-course-anchor"{% if course_saved|default(false) %} data-course-saved{% endif %}></span>
 								<p class="cl-ui-card-line"><code class="cl-course-code">{{ course.code }}</code></p>
+								{% if course.course_type|default('full') == 'short' %}<p class="cl-ui-card-line">{{ ui('feedback.badge', {label: 'Short course' ~ (course.estimated_minutes|default(0) ? ' · about ' ~ ((course.estimated_minutes / 5)|round * 5) ~ ' minutes' : ''), tone: 'info', size: 'small'}) }}</p>{% endif %}
 								{% if course.price %}<p class="cl-ui-card-line"><strong class="cl-price-now">{{ course.price.price_label }}</strong>{% if course.price.was_label %} <s class="cl-price-was"><span class="visually-hidden">Was </span>{{ course.price.was_label }}</s>{% endif %} <span class="cl-ui-card-quiet">· {{ course.price.period_label }}</span></p>{% endif %}
 								<div class="role-list">
 									{{ ui('feedback.badge', {label: course.status|ucfirst, tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}

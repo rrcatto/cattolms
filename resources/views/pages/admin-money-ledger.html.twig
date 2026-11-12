@@ -10,7 +10,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Money Ledger' %}
 	{% set ph_lead = 'The money book: every rand that came into or went out of the business, and every change to a customer’s wallet credit, one line each, newest first. A line is never changed: a mistake is put right by a new line.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Find lines', summary: 'Search by account reference, name, email, order number or bank reference. Both dates are included.'}) }}
 		<form action="/admin/commerce/ledger" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -51,7 +51,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'ledger', pagination: ledger_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% for sh in ledger_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: ledger_region, sort_results: ledger_results} %}{% endfor %}</tr>{% endblock %}
+			{% block header %}<tr>{% for sh in ledger_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: ledger_region, sort_results: ledger_results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}
 				{% for row in rows %}
 					<tr data-ledger-id="{{ row.id }}" data-ledger-kind="{{ row.kind }}">

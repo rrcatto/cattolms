@@ -21,11 +21,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Auth\TwoStep\Base32;
-use CattoLearning\Auth\TwoStep\OneTimeCode;
-use CattoLearning\Auth\TwoStep\QrPicture;
-use CattoLearning\Auth\TwoStep\RecoveryCodes;
+use CattoPHP\Foundation\Base32;
+use CattoPHP\Security\TwoStep\OneTimeCode;
+use CattoPHP\Security\TwoStep\QrPicture;
+use CattoPHP\Security\TwoStep\RecoveryCodes;
 use CattoLearning\Auth\TwoStepPolicy;
+use CattoPHP\Security\KeyedHash;
 use PHPUnit\Framework\TestCase;
 
 final class TwoStepTest extends TestCase
@@ -121,9 +122,9 @@ final class TwoStepTest extends TestCase
         foreach (['', 'ABCD-234', 'ABCD-23450', 'OBCD-2345', 'ABCD-1234'] as $wrong) {
             self::assertNull(RecoveryCodes::normalise($wrong), $wrong);
         }
-        self::assertNotSame(RecoveryCodes::hash(1, 'ABCD-2345'), RecoveryCodes::hash(2, 'ABCD-2345'), 'A code is tied to its account.');
-        self::assertSame(64, strlen(RecoveryCodes::hash(1, 'ABCD-2345')));
-        self::assertNotSame(hash('sha256', '1:ABCD-2345'), RecoveryCodes::hash(1, 'ABCD-2345'), 'The hash is keyed.');
+        self::assertNotSame(RecoveryCodes::hash(new KeyedHash('a key'), 1, 'ABCD-2345'), RecoveryCodes::hash(new KeyedHash('a key'), 2, 'ABCD-2345'), 'A code is tied to its account.');
+        self::assertSame(64, strlen(RecoveryCodes::hash(new KeyedHash('a key'), 1, 'ABCD-2345')));
+        self::assertNotSame(hash('sha256', '1:ABCD-2345'), RecoveryCodes::hash(new KeyedHash('a key'), 1, 'ABCD-2345'), 'The hash is keyed.');
     }
 
     public function testWhoMustUseItFollowsTheEnvironment(): void

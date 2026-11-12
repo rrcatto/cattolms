@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for login token records.
 
 Changelog:
+2026/11/09 SAST
+- Kept by CattoPHP's links that work once (CattoPHP Phase 2, step 6d): each only as a hash, with its purpose, address,
+  account, what it carries and where it was asked for from; its calls and the row its callers read are as they were.
 2026/11/05 SAST
 - create() gives the new row's id; a row found by its id or its hash, its context changed, the open ones of a purpose
   finished or deleted: for the Telegram sign-in code (kept only in the browser that asked, by its row) and for connecting
@@ -29,10 +32,16 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
+use CattoPHP\Links\Link;
+use CattoPHP\Links\LinkStore;
+use Symfony\Component\Clock\ClockInterface;
 
 final class LoginTokenRepository
 {
-    public function __construct(private readonly Database $db)
+    /** Purposes that are not a request to sign in, so they do not count towards the limits on asking for links. */
+    private const NOT_COUNTED = ['telegram_connect'];
+
+    public function __construct(private readonly LinkStore $links, private readonly ClockInterface $clock)
     {
     }
 
@@ -46,118 +55,87 @@ final class LoginTokenRepository
         int $ttlSeconds,
         string $ipHash
     ): int {
-        return (int) $this->db->fetchOne(
-            'INSERT INTO auth_login_tokens
-                (user_id, email, purpose, token_hash, context, expires_at, requested_ip_hash, created_at)
-             VALUES
-                (:user_id, :email, :purpose, :token_hash, :context, :expires_at, :requested_ip_hash, :created_at)
-             RETURNING id',
-            [
-                'user_id' => $userId,
-                'email' => $email,
-                'purpose' => $purpose,
-                'token_hash' => $tokenHash,
-                'context' => json_encode($context, JSON_THROW_ON_ERROR),
-                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
-                'requested_ip_hash' => $ipHash,
-                'created_at' => gmdate('Y-m-d H:i:sP'),
-            ]
-        );
+        $now = $this->clock->now();
+
+        return (int) $this->links->add($tokenHash, $purpose, $email, $userId === null ? null : (string) $userId, $context, $ipHash, $now, $now->modify('+' . $ttlSeconds . ' seconds'));
     }
 
-    /** @return array<string,mixed>|null */
+    /** @return array<string,mixed>|null the usable link with this hash and purpose, held for the transaction */
     public function findUsableForUpdate(string $tokenHash, string $purpose): ?array
     {
-        // SQL is required for the row lock that makes token consumption atomic.
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM auth_login_tokens
-             WHERE token_hash = :token_hash AND purpose = :purpose AND used_at IS NULL AND expires_at > NOW()
-             FOR UPDATE',
-            ['token_hash' => $tokenHash, 'purpose' => $purpose]
-        );
-
-        return $row === false ? null : $row;
+        return self::row($this->links->usable($tokenHash, $purpose, $this->clock->now(), true));
     }
 
-    /** @return array<string,mixed>|null the usable row with this id and purpose, locked */
+    /** @return array<string,mixed>|null the usable link with this number and purpose, held for the transaction */
     public function findUsableByIdForUpdate(int $id, string $purpose): ?array
     {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM auth_login_tokens WHERE id = :id AND purpose = :purpose AND used_at IS NULL AND expires_at > NOW() FOR UPDATE',
-            ['id' => $id, 'purpose' => $purpose]
-        );
-
-        return $row === false ? null : $row;
+        return self::row($this->links->usableById((string) $id, $purpose, $this->clock->now(), true));
     }
 
-    /** @return array<string,mixed>|null the row with this hash and purpose, used or not, expired or not */
+    /** @return array<string,mixed>|null the link with this hash and purpose, used or not, expired or not */
     public function findByHash(string $tokenHash, string $purpose): ?array
     {
-        $row = $this->db->fetchAssociative('SELECT * FROM auth_login_tokens WHERE token_hash = :token_hash AND purpose = :purpose', ['token_hash' => $tokenHash, 'purpose' => $purpose]);
-
-        return $row === false ? null : $row;
+        return self::row($this->links->find($tokenHash, $purpose));
     }
 
     /** @param array<string,mixed> $context */
     public function updateContext(int $id, array $context): void
     {
-        $this->db->executeStatement('UPDATE auth_login_tokens SET context = :context WHERE id = :id', ['id' => $id, 'context' => json_encode($context, JSON_THROW_ON_ERROR)]);
+        $this->links->changeContext((string) $id, $context);
     }
 
-    /** Finishes every open row of a purpose for an address: a new request replaces the old one, which still counts towards the limits. */
+    /** Finishes every open link of a purpose for an address: a new request replaces the old one, which still counts towards the limits. */
     public function finishOpen(string $email, string $purpose): void
     {
-        $this->db->executeStatement(
-            'UPDATE auth_login_tokens SET used_at = :used_at WHERE email = :email AND purpose = :purpose AND used_at IS NULL',
-            ['used_at' => gmdate('Y-m-d H:i:sP'), 'email' => $email, 'purpose' => $purpose]
-        );
+        $this->links->finishOpen($email, $purpose, $this->clock->now());
     }
 
-    /** Deletes a person's open rows of a purpose that is not a sign-in request (connecting Telegram). */
+    /** Deletes a person's open links of a purpose that is not a sign-in request (connecting Telegram). */
     public function deleteOpenFor(int $userId, string $purpose): void
     {
-        $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE user_id = :user AND purpose = :purpose AND used_at IS NULL', ['user' => $userId, 'purpose' => $purpose]);
+        $this->links->forgetOpen((string) $userId, $purpose);
     }
 
     public function markUsed(int $id): void
     {
-        $this->db->executeStatement(
-            'UPDATE auth_login_tokens SET used_at = :used_at WHERE id = :id',
-            ['used_at' => gmdate('Y-m-d H:i:sP'), 'id' => $id]
-        );
+        $this->links->use((string) $id, $this->clock->now());
     }
 
     public function deleteByHash(string $tokenHash): void
     {
-        $this->db->executeStatement(
-            'DELETE FROM auth_login_tokens WHERE token_hash = :token_hash AND used_at IS NULL',
-            ['token_hash' => $tokenHash]
-        );
+        $this->links->forget($tokenHash);
     }
 
     public function recentEmailCount(string $email, int $windowSeconds): int
     {
-        return (int) $this->db->fetchOne(
-            "SELECT COUNT(*)::int FROM auth_login_tokens WHERE email = :email AND created_at > :since AND purpose <> 'telegram_connect'",
-            ['email' => $email, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
-        );
+        return $this->links->countForEmail($email, $this->clock->now()->modify('-' . $windowSeconds . ' seconds'), self::NOT_COUNTED);
     }
 
     public function recentIpCount(string $ipHash, int $windowSeconds): int
     {
-        return (int) $this->db->fetchOne(
-            "SELECT COUNT(*)::int FROM auth_login_tokens WHERE requested_ip_hash = :ip_hash AND created_at > :since AND purpose <> 'telegram_connect'",
-            ['ip_hash' => $ipHash, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
-        );
+        return $this->links->countFrom($ipHash, $this->clock->now()->modify('-' . $windowSeconds . ' seconds'), self::NOT_COUNTED);
     }
 
+    /** Removes links that ran out or were used over a week ago. */
     public function prune(): int
     {
-        // SQL is used because PostgreSQL interval arithmetic is clearer here.
-        return $this->db->executeStatement(
-            "DELETE FROM auth_login_tokens
-             WHERE expires_at < NOW() - INTERVAL '7 days'
-                OR used_at < NOW() - INTERVAL '7 days'"
-        );
+        return $this->links->forgetOld($this->clock->now()->modify('-7 days'));
+    }
+
+    /** @return array<string,mixed>|null a link as its callers have always read it */
+    private static function row(?Link $link): ?array
+    {
+        return $link === null ? null : [
+            'id' => (int) $link->id,
+            'user_id' => $link->accountId === null ? null : (int) $link->accountId,
+            'email' => (string) $link->email,
+            'purpose' => $link->purpose,
+            'token_hash' => $link->hash,
+            'context' => json_encode($link->context === [] ? new \stdClass() : $link->context, JSON_THROW_ON_ERROR),
+            'requested_ip_hash' => (string) $link->requestedFrom,
+            'created_at' => $link->createdAt->format('Y-m-d H:i:sP'),
+            'expires_at' => $link->expiresAt->format('Y-m-d H:i:sP'),
+            'used_at' => $link->usedAt?->format('Y-m-d H:i:sP'),
+        ];
     }
 }

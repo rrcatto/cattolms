@@ -9,7 +9,7 @@
 {% endif %}
 {% if eft_match.orders %}
 	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-	{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Order'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'What was bought', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Still due'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: ''}} %}</tr>{% endblock %}
+	{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Order'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'What was bought', wide: true}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Still due'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: ''}} %}</tr>{% endblock %}
 	{% block body %}{% for order in eft_match.orders %}
 		<tr data-eft-order="{{ order.id }}">
 			<td class="cell-text"><a href="{{ order.href }}">{{ order.number }}</a><br><span class="small">Placed {{ order.placed }}</span></td>

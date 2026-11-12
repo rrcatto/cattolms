@@ -8,7 +8,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Orders & Payments' %}
 	{% set ph_lead = 'Every order, newest first. Each row is one order: whose it is, what was bought, how much, and whether it has been paid. Open an order to see what happened and what, if anything, you need to do.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Find orders', summary: 'Search by account reference, name, email or order number. Both dates are included.'}) }}
 		<form action="/admin/commerce/orders" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
@@ -25,7 +25,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'orders', pagination: orders_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% for sh in orders_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: orders_region, sort_results: orders_results} %}{% endfor %}</tr>{% endblock %}
+			{% block header %}<tr>{% for sh in orders_sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: orders_region, sort_results: orders_results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}
 				{% for order in rows %}
 					<tr data-order-id="{{ order.id }}">

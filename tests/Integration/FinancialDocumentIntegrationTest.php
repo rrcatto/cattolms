@@ -154,7 +154,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $this->db->executeStatement('DELETE FROM bundle_courses WHERE bundle_id=:id AND course_id=:course', ['id' => $bundle['id'], 'course' => $this->course['Notarial Practice']['id']]);
         $this->db->executeStatement("UPDATE promotions SET name='Renamed offer', discount_value=5000, active=FALSE WHERE code=:code", ['code' => $code]);
         // The seller is the Site Owner (owner, 2026-10-18): a new trading name reaches documents issued from then on only.
-        $this->db->executeStatement("INSERT INTO app_options (option_key, option_value) VALUES ('site_owner.trading_name', 'Renamed Seller') ON CONFLICT (option_key) DO UPDATE SET option_value = EXCLUDED.option_value");
+        IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)->set('SITE_OWNER_TRADING_NAME', 'Renamed Seller');
 
         $again = $this->only($orderId, 'invoice');
         self::assertSame($invoice, $again, 'The stored document is untouched.');

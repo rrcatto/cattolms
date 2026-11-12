@@ -22,7 +22,7 @@
 
 								<tr>
 									{% for sh in company_performance_sort_headers %}
-										{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_performance_region, sort_results: company_performance_results} %}
+										{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: company_performance_region, sort_results: company_performance_results} %}
 									{% endfor %}
 								</tr>
 

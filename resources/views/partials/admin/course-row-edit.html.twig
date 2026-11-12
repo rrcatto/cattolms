@@ -11,7 +11,7 @@
 #}
 {% set cq = course_edit %}
 {% set cq_form = 'course-quick-' ~ course.id %}
-<tr id="{{ course_anchor(course) }}" class="cl-course-quick" data-course-code="{{ course.code }}" data-course-url="{{ course_admin_url(course) }}" data-course-title="{{ course.title }}">
+<tr id="{{ course_anchor(course) }}" data-order-code="{{ course.code }}" data-order-url="{{ course_admin_url(course, '/catalogue-move') }}" data-order-title="{{ course.title }}" class="cl-course-quick" data-course-code="{{ course.code }}" data-course-url="{{ course_admin_url(course) }}" data-course-title="{{ course.title }}">
 	<td class="cl-course-position"><input class="cl-input" form="{{ cq_form }}" type="number" min="1" step="1" name="catalogue_position" value="{{ cq.position }}" autocomplete="off" aria-label="Position in the catalogue"></td>
 	<td><input class="cl-input" form="{{ cq_form }}" name="code" value="{{ cq.code }}" required maxlength="20" autocomplete="off" aria-label="Course code" autofocus></td>
 	<td class="cell-text">

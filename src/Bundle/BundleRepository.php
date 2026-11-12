@@ -15,6 +15,8 @@ final class BundleRepository
 {
     private const WITH_OFFER = 'SELECT b.*, o.id AS offer_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active
         FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id = b.id';
+    /** The order bundles are listed in (owner, 2026-11-12): those with a position first, lowest first, then the newest. */
+    public const LISTED_ORDER = 'b.catalogue_position ASC NULLS LAST, b.published_at DESC NULLS LAST, b.title, b.id';
 
     public function __construct(private readonly Database $db) {}
 
@@ -117,7 +119,7 @@ final class BundleRepository
                     v.price_minor_units AS default_price_minor_units, v.currency_code AS default_currency_code
                FROM bundle_courses bc
                JOIN courses c ON c.id = bc.course_id
-               LEFT JOIN course_price_variants v ON v.course_id = c.id AND v.is_active AND v.is_default
+               LEFT JOIN course_prices_on_sale v ON v.course_id = c.id AND v.is_default
               WHERE bc.bundle_id = :id ORDER BY bc.position",
             ['id' => $bundleId]
         );
@@ -222,6 +224,7 @@ final class BundleRepository
     public const LIST_SORTS = [
         'code' => 'b.code', 'title' => 'b.title', 'status' => 'b.status', 'price' => 'o.price_minor_units', 'from' => 'b.available_from',
         'until' => 'b.available_until', 'access' => 'o.access_period_seconds', 'courses' => 'course_count', 'sales' => 'sales', 'updated' => 'b.updated_at',
+        'position' => 'b.catalogue_position',
     ];
 
     /**
@@ -234,7 +237,12 @@ final class BundleRepository
     public function list(array $filters, int $limit, int $offset, ?\CattoLearning\Support\SortOrder $sort = null): array
     {
         [$where, $params] = self::where($filters);
-        $order = $sort === null ? 'b.updated_at DESC, b.id DESC' : (self::LIST_SORTS[$sort->key] ?? 'b.updated_at') . ' ' . $sort->sql() . ' NULLS LAST, b.id ' . $sort->sql();
+        $order = match (true) {
+            $sort === null => 'b.updated_at DESC, b.id DESC',
+            // In their listed order, as the public pages show them, and the other way round.
+            $sort->key === 'position' => $sort->direction === \CattoLearning\Support\SortOrder::ASCENDING ? self::LISTED_ORDER : 'b.catalogue_position DESC NULLS FIRST, b.published_at ASC NULLS FIRST, b.title DESC, b.id DESC',
+            default => (self::LIST_SORTS[$sort->key] ?? 'b.updated_at') . ' ' . $sort->sql() . ' NULLS LAST, b.id ' . $sort->sql(),
+        };
         return $this->db->fetchAllAssociative(
             'SELECT b.*, o.id AS offer_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
                     (SELECT COUNT(*) FROM bundle_courses bc WHERE bc.bundle_id=b.id) AS course_count,
@@ -242,6 +250,40 @@ final class BundleRepository
                FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id=b.id' . $where . ' ORDER BY ' . $order . ' LIMIT :limit OFFSET :offset',
             $params + ['limit' => $limit, 'offset' => $offset]
         );
+    }
+
+    /**
+     * Every bundle with its code and position in the listed order, locked, for a move or Renumber (BundlePositions).
+     *
+     * @return list<array{id:int,code:string,position:?int}>
+     */
+    public function orderForUpdate(): array
+    {
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'position' => $row['catalogue_position'] === null ? null : (int) $row['catalogue_position']],
+            $this->db->fetchAllAssociative('SELECT b.id, b.code, b.catalogue_position FROM bundles b ORDER BY ' . self::LISTED_ORDER . ' FOR UPDATE'));
+    }
+
+    /** @return list<int> every position bundles have now, for the next free number in a band */
+    public function positions(): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT catalogue_position FROM bundles WHERE catalogue_position IS NOT NULL'));
+    }
+
+    /** The code of the bundle listed just before this one (empty for the first), which a dragged first row goes after. */
+    public function codeBefore(int $id): string
+    {
+        $previous = '';
+        foreach ($this->db->fetchAllAssociative('SELECT b.id, b.code FROM bundles b ORDER BY ' . self::LISTED_ORDER) as $row) {
+            if ((int) $row['id'] === $id) return $previous;
+            $previous = (string) $row['code'];
+        }
+        return '';
+    }
+
+    /** A bundle's position; $changed says whether its date of change moves with it (a move or a typed number), which Renumber leaves alone. */
+    public function setPosition(int $id, ?int $position, bool $changed = true): void
+    {
+        $this->db->executeStatement('UPDATE bundles SET catalogue_position = :position' . ($changed ? ', updated_at = NOW()' : '') . ' WHERE id = :id', ['position' => $position, 'id' => $id]);
     }
 
     /**
@@ -330,7 +372,7 @@ final class BundleRepository
             "SELECT b.*, o.id AS offer_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
                     (SELECT COUNT(*) FROM bundle_courses bc WHERE bc.bundle_id=b.id) AS course_count
                FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id=b.id
-              WHERE b.status='published' ORDER BY b.published_at DESC NULLS LAST, b.title, b.id LIMIT :limit OFFSET :offset",
+              WHERE b.status='published' ORDER BY " . self::LISTED_ORDER . ' LIMIT :limit OFFSET :offset',
             ['limit' => $limit, 'offset' => $offset]
         );
     }
@@ -356,7 +398,7 @@ final class BundleRepository
                 . \CattoLearning\Course\CourseRepository::inBranchOf('c', ':category') . ')';
             $params['category'] = $holding['category'];
         }
-        return $this->db->fetchAllAssociative(self::WITH_OFFER . ' WHERE ' . $where . ' ORDER BY b.published_at DESC NULLS LAST, b.title, b.id', $params);
+        return $this->db->fetchAllAssociative(self::WITH_OFFER . ' WHERE ' . $where . ' ORDER BY ' . self::LISTED_ORDER, $params);
     }
 
     /**
@@ -394,7 +436,7 @@ final class BundleRepository
                     v.price_minor_units AS default_price_minor_units, v.currency_code AS default_currency_code
                FROM bundle_courses bc
                JOIN courses c ON c.id = bc.course_id
-               LEFT JOIN course_price_variants v ON v.course_id = c.id AND v.is_active AND v.is_default
+               LEFT JOIN course_prices_on_sale v ON v.course_id = c.id AND v.is_default
               WHERE bc.bundle_id = ANY(CAST(:ids AS BIGINT[])) ORDER BY bc.bundle_id, bc.position",
             ['ids' => '{' . implode(',', array_map('intval', $bundleIds)) . '}']
         ) as $row) {

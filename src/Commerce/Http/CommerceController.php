@@ -12,7 +12,8 @@ use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Infrastructure\Persistence\AddressKeyRepository;
 use CattoLearning\Support\Address\OrderAddress;
-use CattoLearning\Support\{Csrf,Money,Pagination,Uuid};
+use CattoLearning\Support\{Csrf,Money,Uuid};
+use CattoPHP\Ui\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\{RequestStack,Response};
 use Symfony\Component\Routing\Attribute\Route;
@@ -34,8 +35,24 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
         private readonly \CattoLearning\Commerce\Application\RefundRequestService $refundRequests,
         private readonly \CattoLearning\Mailing\MailingConsents $mailing,
-        private readonly AddressKeyRepository $keys)
+        private readonly AddressKeyRepository $keys,
+        private readonly \CattoLearning\Commerce\Application\PaymentService $payments)
     { parent::__construct($auth,$view,$requests); }
+
+    /**
+     * A card order on its way to Stitch's page (owner, 2026-11-11): the buyer is sent to the payment link. A link Stitch will not
+     * make leaves the order placed and waiting, with why, on the order's page, where the buyer can try again or choose EFT.
+     */
+    private function toCardCheckout(\CattoLearning\Auth\CurrentUser $actor, int $orderId, string $key): ?Response
+    {
+        if ($this->records->paymentMethod($orderId) !== \CattoLearning\Commerce\Settings\PaymentMethods::CARD || $this->records->order($orderId)['state'] !== 'awaiting_payment') return null;
+        try {
+            return new \Symfony\Component\HttpFoundation\RedirectResponse($this->payments->startCard($actor, $orderId, $key), 303);
+        } catch (\RuntimeException $failed) {
+            $this->flash('warning', 'Your order ' . \CattoLearning\Commerce\Domain\OrderNumber::format($orderId) . ' is placed and waiting for payment. ' . $failed->getMessage());
+            return null;
+        }
+    }
 
     /**
      * The order an address names by its number (CL-00000689, owner 2026-11-06: no row id in an address): its row id, or
@@ -217,7 +234,7 @@ final class CommerceController extends BaseController
     public function place(): Response
     {
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
-        return $this->handle(function () use ($actor): void {
+        return $this->handle(function () use ($actor): ?Response {
             try {
                 $id = $this->checkout->place($actor, (int) $this->posted('cart_id'), $this->posted('quote'), $this->posted('accept_terms') === 'yes', $this->posted('accept_start') === 'yes');
             } catch (PromotionRejected $rejected) {
@@ -225,12 +242,16 @@ final class CommerceController extends BaseController
                 // review shows the corrected total, and nothing is placed until the purchaser confirms it.
                 $this->promotions->remove($actor);
                 $this->flash('warning', 'Promo code '.$rejected->promoCode.' was removed from your order. '.$rejected->getMessage().' Check your new total before placing your order.');
-                return;
+                return null;
             }
             // What they ticked under Keep me informed, recorded once the order is placed (mailing, step 1).
             if ($this->posted('news') === '1') $this->mailing->subscribe($actor->id, 'news', null, 'checkout');
-            foreach (array_unique(array_map('intval', (array) ($_POST['follow_course'] ?? []))) as $courseId) if ($courseId > 0) $this->mailing->subscribe($actor->id, 'course', $courseId, 'checkout');
+            // One box, "Send me updates about these courses" (owner, 2026-11-11), covers every course of the order not followed yet,
+            // which the review lists as follow_course[].
+            if ($this->posted('follow_courses') === '1') foreach (array_unique(array_map('intval', (array) ($_POST['follow_course'] ?? []))) as $courseId) if ($courseId > 0) $this->mailing->subscribe($actor->id, 'course', $courseId, 'checkout');
             $this->maintenance->deliverInvoices(1);
+            // A card order goes straight to Stitch's page to be paid.
+            if ($id !== null && ($toStitch = $this->toCardCheckout($actor, $id, (string) ($_SESSION['checkout'][$actor->id]['payment_key'] ?? ''))) !== null) return $toStitch;
             $this->redirect($id === null ? '/account/courses' : OrderAddress::buyer($id));
         }, '/checkout/review');
     }
@@ -290,8 +311,8 @@ final class CommerceController extends BaseController
         unset($line);
         $reference=$order['company_id']!==null ? $this->records->companyAccountReference((int)$order['company_id']) : $this->records->userAccountReference($actor->id);
         $due=$this->records->dueAmount($id);
-        return $this->render('commerce-order',['title'=>'Order '.OrderAddress::number($id),'account_reference'=>\CattoLearning\Support\AccountReference::format($reference),
-            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
+        return $this->render('commerce-order',['title'=>'Order '.OrderAddress::number($id),'account_reference'=>\CattoPHP\Foundation\AccountReference::format($reference),
+            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'card_checkout'=>$canPay ? $this->payments->cardCheckout($id) : null,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'payment_options'=>$this->orders->paymentMethods()->checkoutOptions()]);
     }
 
@@ -327,8 +348,9 @@ final class CommerceController extends BaseController
     public function pay(): Response
     {
         $actor=$this->requirePermission('COMMERCE.CHECKOUT.START');$this->csrf();$id=$this->orderFromAddress();
-        return $this->handle(function() use($actor,$id): void {
+        return $this->handle(function() use($actor,$id): Response {
             $this->checkout->retry($actor,$id,$this->posted('payment_key'),$this->posted('payment_method'),$this->posted('method_token'));
+            if (($toStitch=$this->toCardCheckout($actor,$id,$this->posted('payment_key')))!==null) return $toStitch;
             $this->redirect(OrderAddress::buyer($id));
         },OrderAddress::buyer($id));
     }

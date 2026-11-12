@@ -22,7 +22,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Support;
 
 use CattoLearning\Auth\SouthAfricanIdNumber;
-use CattoLearning\Configuration\SecretCipher;
+use CattoPHP\Security\SecretCipher;
 use CattoLearning\Infrastructure\Persistence\Database;
 use DateTimeImmutable;
 
@@ -50,7 +50,7 @@ final class CheckIdNumbers
             if ($db->fetchOne('SELECT 1 FROM users WHERE id_number_hash = :h', ['h' => $fingerprint]) !== false) continue;
             $db->executeStatement(
                 "UPDATE users SET id_number_encrypted = :e, id_number_hash = :h, birthdate = CAST(:b AS DATE), residence_country = 'ZA' WHERE id = :id",
-                ['e' => (new SecretCipher())->encrypt($digits), 'h' => $fingerprint, 'b' => $birthdate, 'id' => $userId]
+                ['e' => (new SecretCipher(\CattoLearning\Support\Env::string('APP_KEY')))->encrypt($digits), 'h' => $fingerprint, 'b' => $birthdate, 'id' => $userId]
             );
 
             return $digits;

@@ -13,7 +13,7 @@ A course on the site written out as one HTML file: everything the site holds now
 original build keeps that file's frame (CourseFileFrame): its head, stylesheet, progress strip, masthead, panels, results panel
 and script, with every panel a <details>, and the site's content is poured into it, whatever has changed since: its words,
 its parts, its modules added or removed. Any other course is written in the course specification's own form
-(docs/COURSE-SPECIFICATION.md, owner 2026-11-01: "export all courses as html files using the canonical method for
+(docs/COURSE-SPECIFICATION-v<version>.md, owner 2026-11-01: "export all courses as html files using the canonical method for
 accordions, so I don't try to re-import files which use both methods"), the form the HTML importer reads: the code, masthead and cover, the
 introduction with its grading scale, the readiness check, every module with its parts in their panels (every panel a
 <details> with its <summary>), the review and the final assessment, and the presentations, flash cards, questions and
@@ -50,6 +50,9 @@ final class CourseFile
     private const STANDARD_FINAL_LIMIT = 7200;
     private const FINAL_LIMIT_META = 'cattolms:final-time-limit';
     private const STUDY_HOURS_META = 'cattolms:study-hours';
+    /** A short course's two head lines (Course Specification 4.13, section 15.1): its type and its time in minutes. */
+    private const COURSE_TYPE_META = 'cattolms:course-type';
+    private const STUDY_MINUTES_META = 'cattolms:study-minutes';
     /** The parts whose names their places would not give them (specification 6.6): "module-1=module-3 module-3=module-1". */
     private const PART_NAMES_META = 'cattolms:part-names';
 
@@ -70,6 +73,8 @@ final class CourseFile
 
     /** Whether the course's own stylesheet draws the arrow on its blocks' headings, as the original files' did. */
     private bool $ownBlockArrow = false;
+    /** Whether the course being written is a short course (section 15): its head, and its one module's heading. */
+    private bool $short = false;
 
     /** Whether the original's script writes an answer key: some courses give the answers with the marks instead. */
     private bool $frameWritesKeys = false;
@@ -140,6 +145,7 @@ final class CourseFile
             $framed = $this->framed($package, $frame, $children, $items, $leftOut);
             return ['html' => self::noted($framed, $leftOut), 'left_out' => $leftOut];
         }
+        $this->short = ($course['course_type'] ?? 'full') === 'short';
         $this->ownBlockArrow = preg_match('/\.block\s*>\s*summary::?(?:before|after)\s*\{[^}]*content/', (string) ($course['presentation_css'] ?? '')) === 1;
         $data = ['QUIZ' => [], 'PRESENTATIONS' => [], 'FLASHCARDS' => [], 'REVIEW' => []];
         $diagnostic = $review = $final = $preview = $filesPanel = '';
@@ -184,8 +190,12 @@ final class CourseFile
         $html = '<!doctype html>' . "\n" . '<html lang="en-ZA">' . "\n" . '<head>' . "\n" . '<meta charset="utf-8">' . "\n"
             . '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n"
             . '<meta name="cattolms:course-code" content="' . self::e((string) ($course['code'] ?? '')) . '">' . "\n"
-            . ($finalLimit === self::STANDARD_FINAL_LIMIT ? '' : '<meta name="' . self::FINAL_LIMIT_META . '" content="' . (int) round($finalLimit / 60) . '">' . "\n")
-            . ((int) ($course['estimated_minutes'] ?? 0) > 0 ? '<meta name="' . self::STUDY_HOURS_META . '" content="' . (int) round((int) $course['estimated_minutes'] / 60) . '">' . "\n" : '')
+            // A short course says so and gives its time in minutes, with no hours and no final time limit (section 15.1).
+            . ($this->short ? '<meta name="' . self::COURSE_TYPE_META . '" content="short">' . "\n" : '')
+            . ($this->short || $finalLimit === self::STANDARD_FINAL_LIMIT ? '' : '<meta name="' . self::FINAL_LIMIT_META . '" content="' . (int) round($finalLimit / 60) . '">' . "\n")
+            . ((int) ($course['estimated_minutes'] ?? 0) > 0 ? ($this->short
+                ? '<meta name="' . self::STUDY_MINUTES_META . '" content="' . (int) $course['estimated_minutes'] . '">' . "\n"
+                : '<meta name="' . self::STUDY_HOURS_META . '" content="' . (int) round((int) $course['estimated_minutes'] / 60) . '">' . "\n") : '')
             . (self::partNames($package) === '' ? '' : '<meta name="' . self::PART_NAMES_META . '" content="' . self::e(self::partNames($package)) . '">' . "\n")
             . '<title>' . self::e((string) ($course['title'] ?? '')) . '</title>' . "\n"
             . "<style>\n" . $this->stylesheet((string) ($course['presentation_css'] ?? '')) . "\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n"
@@ -300,12 +310,18 @@ final class CourseFile
         $document->querySelector('body')?->appendChild($document->createComment('cl:parts'));
 
         $stated = (int) ($course['estimated_minutes'] ?? 0);
-        foreach ([self::FINAL_LIMIT_META => $finalLimit === self::STANDARD_FINAL_LIMIT ? 0 : $finalLimit / 60, self::STUDY_HOURS_META => $stated / 60] as $name => $value) {
+        $short = ($course['course_type'] ?? 'full') === 'short';
+        $document->querySelector('meta[name="' . self::COURSE_TYPE_META . '"]')?->remove();
+        $metas = $short
+            ? [self::FINAL_LIMIT_META => 0, self::STUDY_HOURS_META => 0, self::STUDY_MINUTES_META => $stated, self::COURSE_TYPE_META => 'short']
+            : [self::FINAL_LIMIT_META => $finalLimit === self::STANDARD_FINAL_LIMIT ? 0 : $finalLimit / 60, self::STUDY_HOURS_META => $stated / 60, self::STUDY_MINUTES_META => 0];
+        foreach ($metas as $name => $value) {
             $document->querySelector('meta[name="' . $name . '"]')?->remove();
-            if ($value <= 0 || !$document->head instanceof \Dom\Element) { continue; }
+            $content = is_string($value) ? $value : ($value > 0 ? (string) (int) round($value) : '');
+            if ($content === '' || !$document->head instanceof \Dom\Element) { continue; }
             $meta = $document->createElement('meta');
             $meta->setAttribute('name', $name);
-            $meta->setAttribute('content', (string) (int) round($value));
+            $meta->setAttribute('content', $content);
             $document->head->prepend($meta);
         }
         $document->querySelector('meta[name="' . self::PART_NAMES_META . '"]')?->remove();
@@ -984,7 +1000,7 @@ final class CourseFile
         return '    <section class="module" id="mod-' . $key . '" data-assessment-required="' . ($required ? 'true' : 'false') . '">' . "\n"
             . '      <details class="panel">' . "\n" . '        <summary class="panel-head">' . "\n"
             . '          <span class="node"><span class="num">' . $pad . '</span><span class="check">&#10003;</span></span>' . "\n"
-            . '          <span class="m-titles"><span class="eyebrow">Module ' . $pad . '</span><span class="m-name">' . self::e($title) . '</span>' . ($subtitle !== '' ? '<small>' . $subtitle . '</small>' : '') . "</span>\n"
+            . '          <span class="m-titles"><span class="eyebrow">' . ($this->short ? 'Short course' : 'Module ' . $pad) . '</span><span class="m-name">' . self::e($title) . '</span>' . ($subtitle !== '' ? '<small>' . $subtitle . '</small>' : '') . "</span>\n"
             . '          <span class="m-grade" data-grade></span>' . "\n" . '          <span class="chev">&#8250;</span>' . "\n" . "        </summary>\n"
             . '        <div class="module-body">' . "\n\n" . $body . "        </div>\n      </details>\n    </section>\n";
     }

@@ -4,15 +4,15 @@
 	can_delete_courses, courses_quick_edit (the reader may edit it here), courses_list_href (the list's address, to add
 	edit= to), csrf; course_saved marks a row just saved.
 #}
-									<tr id="{{ course_anchor(course) }}" data-course-code="{{ course.code }}" data-course-url="{{ course_admin_url(course) }}" data-course-title="{{ course.title }}"{% if course_saved|default(false) %} data-course-saved{% endif %}>
+									<tr id="{{ course_anchor(course) }}" data-order-code="{{ course.code }}" data-order-url="{{ course_admin_url(course, '/catalogue-move') }}" data-order-title="{{ course.title }}" data-course-code="{{ course.code }}" data-course-url="{{ course_admin_url(course) }}" data-course-title="{{ course.title }}"{% if course_saved|default(false) %} data-course-saved{% endif %}>
 										<td class="cl-course-position">
-											{% if arrange %}<button type="button" class="cl-row-handle" aria-label="Move {{ course.title }}" aria-describedby="course-order-keys" data-course-order-target="handle" data-action="pointerdown->course-order#arm keydown->course-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
+											{% if arrange %}<button type="button" class="cl-row-handle" aria-label="Move {{ course.title }}" aria-describedby="course-order-keys" data-list-order-target="handle" data-action="pointerdown->list-order#arm keydown->list-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
 											<span data-position>{{ course.catalogue_position|default('') }}</span>
 										</td>
 										<td><code class="cl-course-code">{{ course.code }}</code></td>
 										{# The whole title wraps (owner, 2026-10-20): two courses that differ only at the end, such as the parts of a series, stay told apart. #}
 										<td class="cell-text">
-											<strong><a href="{{ course_admin_url(course) }}">{{ course.title }}</a></strong>{% if course_saved|default(false) %}<span class="visually-hidden" role="status">Saved</span>{% endif %}
+											<strong><a href="{{ course_admin_url(course) }}">{{ course.title }}</a></strong>{% if course.course_type|default('full') == 'short' %} {{ ui('feedback.badge', {label: 'Short course', tone: 'info', size: 'small'}) }}{% endif %}{% if course_saved|default(false) %}<span class="visually-hidden" role="status">Saved</span>{% endif %}
 										</td>
 										<td>
 											{# What the course is sold at now, first, then its was price struck through and its period; blank when no price is set (owner, 2026-10-20). #}

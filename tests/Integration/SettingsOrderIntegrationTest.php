@@ -62,7 +62,7 @@ final class SettingsOrderIntegrationTest extends TestCase
         self::assertSame(['maintenance', 'site-mode', 'site-notification'], array_slice($now, 0, 3));
         self::assertSame($now, $this->order->order(), 'It is saved.');
         self::assertTrue($this->order->arranged());
-        $log = json_decode((string) $this->db->fetchOne("SELECT metadata FROM audit_log WHERE event_key = 'settings.order_changed' AND user_id = :admin ORDER BY id DESC LIMIT 1", ['admin' => $admin]), true);
+        $log = json_decode((string) $this->db->fetchOne("SELECT details AS metadata FROM cattophp_activity WHERE action = 'settings.order_changed' AND actor_id = CAST(:admin AS TEXT) ORDER BY id DESC LIMIT 1", ['admin' => $admin]), true);
         self::assertSame([SettingsOrder::STANDARD, $now], [$log['from'], $log['to']]);
 
         $end = $this->order->place('site-owner', '', $now, $admin);
@@ -103,19 +103,19 @@ final class SettingsOrderIntegrationTest extends TestCase
 
     public function testASectionTheSavedOrderDoesNotNameTakesItsStandardPlace(): void
     {
-        // An order saved before Course positions and Maintenance existed, with a name no longer used.
-        $saved = array_values(array_diff(array_reverse(SettingsOrder::STANDARD), ['course-positions', 'maintenance']));
+        // An order saved before Course positions, Bundle positions and Maintenance existed, with a name no longer used.
+        $saved = array_values(array_diff(array_reverse(SettingsOrder::STANDARD), ['course-positions', 'bundle-positions', 'maintenance']));
         $saved[] = 'old-section';
         (new OptionRepository($this->db))->set(SettingsOrder::OPTION, (string) json_encode($saved), $this->admin());
         $order = $this->order->order();
         self::assertNotContains('old-section', $order);
         self::assertSame(count(SettingsOrder::STANDARD), count($order));
         $at = array_search('configuration', $order, true);
-        self::assertSame(['configuration', 'course-positions', 'maintenance'], array_slice($order, (int) $at, 3), 'Each goes after the one before it in the standard order.');
+        self::assertSame(['configuration', 'course-positions', 'bundle-positions', 'maintenance'], array_slice($order, (int) $at, 4), 'Each goes after the one before it in the standard order.');
     }
 
     private function admin(): int
     {
-        return (int) $this->db->fetchOne("SELECT ur.user_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.role_key = 'ADMIN' ORDER BY ur.user_id LIMIT 1");
+        return (int) $this->db->fetchOne("SELECT MIN(account_person(account_id)) FROM cattophp_account_roles WHERE role_key = 'ADMIN'");
     }
 }

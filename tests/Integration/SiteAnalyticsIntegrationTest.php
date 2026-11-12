@@ -9,19 +9,25 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Maintenance\RetentionCleanup;
-use CattoLearning\SiteAnalytics\FlagRepository;
-use CattoLearning\SiteAnalytics\FormGuard;
-use CattoLearning\SiteAnalytics\LockoutGate;
-use CattoLearning\SiteAnalytics\LockoutRepository;
-use CattoLearning\SiteAnalytics\LockoutService;
-use CattoLearning\SiteAnalytics\RefusedEmailRepository;
-use CattoLearning\SiteAnalytics\RequestFacts;
-use CattoLearning\SiteAnalytics\ServerLink;
+use CattoLearning\SiteAnalytics\SiteAnalyticsWords;
 use CattoLearning\SiteAnalytics\SiteLogRepository;
 use CattoLearning\SiteAnalytics\SitePeriod;
-use CattoLearning\SiteAnalytics\SiteProtectionJob;
-use CattoLearning\SiteAnalytics\SiteProtectionSettings;
-use CattoLearning\SiteAnalytics\VisitorAgent;
+use CattoPHP\Activity\Actor;
+use CattoPHP\Protection\Addresses;
+use CattoPHP\Protection\Flags;
+use CattoPHP\Protection\FormGuard;
+use CattoPHP\Protection\LockoutGate;
+use CattoPHP\Protection\Lockouts;
+use CattoPHP\Protection\LockoutService;
+use CattoPHP\Protection\LockoutTarget;
+use CattoPHP\Protection\NetworkLookup;
+use CattoPHP\Protection\PathMask;
+use CattoPHP\Protection\ProtectionRules;
+use CattoPHP\Protection\ProtectionSettings;
+use CattoPHP\Protection\RefusedEmails;
+use CattoPHP\Protection\ServerLink;
+use CattoPHP\Protection\SiteLog;
+use CattoPHP\Http\VisitorAgent;
 use CattoLearning\Tests\Support\{DevelopmentFixture, IntegrationContainer};
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -29,15 +35,16 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
-/** The Site Log, the rules, lockouts and the forms' checks (owner, 2026-11-04), on documentation addresses, every test in a transaction. */
+/** The Site Log, the rules, lockouts and the forms' checks (owner, 2026-11-04; CattoPHP's site protection since 2026-11-12, with cattolms's lookup, sign-in and pages), on documentation addresses, every test in a transaction. */
 final class SiteAnalyticsIntegrationTest extends TestCase
 {
     private Database $db;
     private SiteLogRepository $log;
-    private SiteProtectionSettings $settings;
-    private FlagRepository $flags;
-    private LockoutRepository $lockouts;
-    private SiteProtectionJob $job;
+    private SiteLog $siteLog;
+    private ProtectionSettings $settings;
+    private Flags $flags;
+    private Lockouts $lockouts;
+    private ProtectionRules $job;
 
     protected function setUp(): void
     {
@@ -45,21 +52,24 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $this->db->beginTransaction();
         $container = IntegrationContainer::get();
         $this->log = $container->get(SiteLogRepository::class);
-        $this->settings = $container->get(SiteProtectionSettings::class);
-        $this->flags = $container->get(FlagRepository::class);
-        $this->lockouts = $container->get(LockoutRepository::class);
-        $this->job = $container->get(SiteProtectionJob::class);
+        $this->siteLog = $container->get(SiteLog::class);
+        $this->settings = $container->get(ProtectionSettings::class);
+        $this->flags = $container->get(Flags::class);
+        $this->lockouts = $container->get(Lockouts::class);
+        $this->job = $container->get(ProtectionRules::class);
         $this->settings->reset();
         // Whatever a browser check left on these addresses is out of the way, inside this test's transaction.
-        foreach (['site_requests', 'site_flags'] as $table) {
+        foreach (['cattophp_site_requests', 'cattophp_site_flags'] as $table) {
             $this->db->executeStatement("DELETE FROM $table WHERE subject <<= '192.0.2.0/24' OR subject <<= '198.51.100.0/24' OR subject <<= '203.0.113.0/24'");
         }
-        $this->db->executeStatement("DELETE FROM site_lockouts WHERE network <<= '192.0.2.0/24' OR network <<= '198.51.100.0/24' OR network <<= '203.0.113.0/24'");
+        $this->db->executeStatement("DELETE FROM cattophp_site_lockouts WHERE network <<= '192.0.2.0/24' OR network <<= '198.51.100.0/24' OR network <<= '203.0.113.0/24'");
     }
 
     protected function tearDown(): void
     {
         unset($_SERVER['REMOTE_ADDR']);
+        $requests = IntegrationContainer::get()->get('request_stack');
+        while ($requests->pop() !== null);
         if ($this->db->isTransactionActive()) $this->db->rollBack();
     }
 
@@ -67,7 +77,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     private function request(string $address, string $path = '/', int $status = 200, string $method = 'GET', string $agent = 'Go-http-client/1.1', array $extra = []): void
     {
         $reading = VisitorAgent::read($agent);
-        $this->log->record($extra + ['address' => $address, 'subject' => RequestFacts::subject($address), 'user_id' => null, 'by_administrator' => false,
+        $this->siteLog->record($extra + ['address' => $address, 'subject' => Addresses::subject($address), 'account_id' => null, 'by_administrator' => false,
             'visitor' => $reading->isAutomated() ? 'automated' : 'person', 'agent_kind' => $reading->kind, 'agent_label' => $reading->label, 'device' => $reading->device, 'user_agent' => $agent,
             'country_code' => 'NL', 'network_kind' => 'hosting', 'network_asn' => 64511, 'network_name' => 'Example Hosting BV', 'method' => $method, 'path' => $path, 'status' => $status,
             'is_page' => $method === 'GET' && $status < 400, 'came_from' => '', 'source' => 'direct', 'form' => null, 'form_signal' => null, 'form_refused' => false, 'form_email' => null, 'form_email_hash' => null]);
@@ -89,7 +99,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $flag = $this->flags->findBySubject('198.51.100.23');
         self::assertNotNull($flag);
         self::assertSame('high', $flag['level']);
-        self::assertSame('Asked for 20 pages that do not exist in 10 minutes.', FlagRepository::why($flag)[0]['words']);
+        self::assertSame('Asked for 20 pages that do not exist in 10 minutes.', Flags::why($flag)[0]['words']);
         $force = $this->lockouts->inForceFor('198.51.100.23', null);
         self::assertSame('timeout', $force['which'] ?? null);
         self::assertTrue($force['automatic']);
@@ -142,13 +152,13 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     public function testASignedInPersonsAddressIsFlaggedAndNeverTimedOut(): void
     {
         $person = (new DevelopmentFixture($this->db))->person();
-        $this->request('203.0.113.140', '/account', 200, 'GET', 'Mozilla/5.0 (Windows NT 10.0) Chrome/139.0.0.0 Safari/537.36', ['user_id' => $person['id'], 'visitor' => 'signed_in']);
+        $this->request('203.0.113.140', '/account', 200, 'GET', 'Mozilla/5.0 (Windows NT 10.0) Chrome/139.0.0.0 Safari/537.36', ['account_id' => (string) $person['id'], 'visitor' => 'signed_in']);
         $this->missing('203.0.113.140');
         $this->job->run();
         self::assertSame(0, $this->inForce('203.0.113.140'), 'mobile networks share addresses among many people');
         $flag = $this->flags->findBySubject('203.0.113.140');
         self::assertNotNull($flag);
-        self::assertStringContainsString('only flagged, not timed out', FlagRepository::why($flag)[0]['words']);
+        self::assertStringContainsString('only flagged, not timed out', Flags::why($flag)[0]['words']);
     }
 
     public function testAdministratorsNeverLockOutAndProvedSearchEnginesAreLeftAlone(): void
@@ -163,7 +173,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $this->missing('203.0.113.130');
         // A search engine shown to be what it says.
         $this->missing('203.0.113.142');
-        $this->db->executeStatement("UPDATE site_requests SET agent_kind = 'search', agent_label = 'Googlebot', agent_proved = TRUE WHERE address = '203.0.113.142'");
+        $this->db->executeStatement("UPDATE cattophp_site_requests SET agent_kind = 'search', agent_label = 'Googlebot', agent_proved = TRUE WHERE address = '203.0.113.142'");
         // A private address, as a local test site or a proxy not passing addresses on would give.
         $this->missing('10.0.2.100');
         $this->job->run();
@@ -178,9 +188,9 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         for ($i = 0; $i < 3; $i++) $this->request('203.0.113.60', '/register', 302, 'POST', 'Mozilla/5.0 (Windows NT 10.0) Chrome/139.0.0.0 Safari/537.36', ['form' => 'register']);
         $this->job->run();
         self::assertSame(0, $this->inForce('203.0.113.60'));
-        self::assertSame('Tried to register 3 times in 1 hour.', FlagRepository::why((array) $this->flags->findBySubject('203.0.113.60'))[0]['words']);
+        self::assertSame('Tried to register 3 times in 1 hour.', Flags::why((array) $this->flags->findBySubject('203.0.113.60'))[0]['words']);
         $this->job->run();
-        self::assertCount(1, FlagRepository::why((array) $this->flags->findBySubject('203.0.113.60')), 'a rule still firing inside its window adds nothing more');
+        self::assertCount(1, Flags::why((array) $this->flags->findBySubject('203.0.113.60')), 'a rule still firing inside its window adds nothing more');
 
         $form = $this->formFrom($this->settings->values());
         unset($form['rule']['missing']['on']);
@@ -220,15 +230,15 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $this->missing('198.51.100.30');
         $this->job->run();
         $person = (new DevelopmentFixture($this->db))->person();
-        $this->flags->markFine('198.51.100.30', $person['id']);
-        self::assertSame(1, $this->lockouts->liftAutomatic('198.51.100.30', $person['id']));
+        $this->flags->markFine('198.51.100.30', (string) $person['id']);
+        self::assertSame(1, $this->lockouts->liftAutomatic('198.51.100.30', (string) $person['id']));
         self::assertSame('fine', $this->stateOf('198.51.100.30'));
         $this->missing('198.51.100.30');
         $this->job->run();
         self::assertSame(0, $this->inForce('198.51.100.30'));
-        self::assertTrue($this->flags->isFine('198.51.100.30', SiteProtectionSettings::FINE_DAYS));
+        self::assertTrue($this->flags->isFine('198.51.100.30', ProtectionSettings::FINE_DAYS));
         // After the days have passed it can be flagged again.
-        $this->db->executeStatement("UPDATE site_flags SET decided_at = NOW() - INTERVAL '31 days' WHERE subject = '198.51.100.30'");
+        $this->db->executeStatement("UPDATE cattophp_site_flags SET decided_at = NOW() - INTERVAL '31 days' WHERE subject = '198.51.100.30'");
         $this->job->run();
         self::assertSame(1, $this->inForce('198.51.100.30'));
         self::assertNotSame('fine', $this->stateOf('198.51.100.30'));
@@ -236,10 +246,10 @@ final class SiteAnalyticsIntegrationTest extends TestCase
 
     public function testTheGateRefusesEveryPageButNeverAWebhookAndCountsWithoutFillingTheLog(): void
     {
-        $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.40', 'asn' => null, 'label' => '198.51.100.40', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by_user_id' => null, 'until' => null, 'firewall' => 'no']);
-        $range = $this->lockouts->add(['kind' => 'range', 'network' => '203.0.113.0/28', 'asn' => null, 'label' => '203.0.113.0/28', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by_user_id' => null, 'until' => null, 'firewall' => 'no']);
-        $six = $this->lockouts->add(['kind' => 'address', 'network' => '2001:db8:1:2::/64', 'asn' => null, 'label' => '2001:db8:1:2::/64', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by_user_id' => null, 'until' => new DateTimeImmutable('+1 hour'), 'firewall' => 'no']);
-        $gate = new LockoutGate($this->db);
+        $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.40', 'asn' => null, 'label' => '198.51.100.40', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by' => null, 'until' => null, 'firewall' => 'no']);
+        $range = $this->lockouts->add(['kind' => 'range', 'network' => '203.0.113.0/28', 'asn' => null, 'label' => '203.0.113.0/28', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by' => null, 'until' => null, 'firewall' => 'no']);
+        $six = $this->lockouts->add(['kind' => 'address', 'network' => '2001:db8:1:2::/64', 'asn' => null, 'label' => '2001:db8:1:2::/64', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by' => null, 'until' => new DateTimeImmutable('+1 hour'), 'firewall' => 'no']);
+        $gate = IntegrationContainer::get()->get(LockoutGate::class);
 
         self::assertTrue($gate->refuses('198.51.100.40', '/', 'GET', 'curl/8.5.0'));
         self::assertTrue($gate->refuses('198.51.100.40', '/admin', 'POST', ''));
@@ -249,16 +259,16 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         self::assertFalse($gate->refuses('203.0.113.16', '/courses'), 'outside the range');
         self::assertTrue($gate->refuses('2001:db8:1:2:aaaa::1', '/'), 'anywhere in the /64');
         self::assertFalse($gate->refuses('2001:db8:1:3::1', '/'));
-        self::assertSame('1', (string) $this->db->fetchOne('SELECT refused FROM site_lockouts WHERE id = :id', ['id' => $range]));
-        self::assertSame('1', (string) $this->db->fetchOne('SELECT refused FROM site_lockouts WHERE id = :id', ['id' => $six]));
-        self::assertSame('403', (string) $this->db->fetchOne("SELECT status FROM site_requests WHERE address = '203.0.113.9' AND refused"));
+        self::assertSame('1', (string) $this->db->fetchOne('SELECT refused FROM cattophp_site_lockouts WHERE id = :id', ['id' => $range]));
+        self::assertSame('1', (string) $this->db->fetchOne('SELECT refused FROM cattophp_site_lockouts WHERE id = :id', ['id' => $six]));
+        self::assertSame('403', (string) $this->db->fetchOne("SELECT status FROM cattophp_site_requests WHERE address = '203.0.113.9' AND refused"));
 
         // A flood: the counter goes on, the log stops.
-        $this->db->executeStatement('UPDATE site_lockouts SET logged_day = CURRENT_DATE, logged_on_day = :limit WHERE id = :id', ['limit' => LockoutGate::LOGGED_A_DAY, 'id' => $range]);
-        $before = (int) $this->db->fetchOne('SELECT COUNT(*) FROM site_requests');
+        $this->db->executeStatement('UPDATE cattophp_site_lockouts SET logged_day = CURRENT_DATE, logged_on_day = :limit WHERE id = :id', ['limit' => LockoutGate::LOGGED_A_DAY, 'id' => $range]);
+        $before = (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_site_requests');
         self::assertTrue($gate->refuses('203.0.113.9', '/courses'));
-        self::assertSame($before, (int) $this->db->fetchOne('SELECT COUNT(*) FROM site_requests'));
-        self::assertSame('2', (string) $this->db->fetchOne('SELECT refused FROM site_lockouts WHERE id = :id', ['id' => $range]));
+        self::assertSame($before, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_site_requests'));
+        self::assertSame('2', (string) $this->db->fetchOne('SELECT refused FROM cattophp_site_lockouts WHERE id = :id', ['id' => $range]));
 
         // On Never lock out, not refused whatever is in force.
         $form = $this->formFrom($this->settings->values());
@@ -269,8 +279,8 @@ final class SiteAnalyticsIntegrationTest extends TestCase
 
     public function testAnEndedOrLiftedLockoutNoLongerRefuses(): void
     {
-        $gate = new LockoutGate($this->db);
-        $ended = ['kind' => 'address', 'network' => '198.51.100.50', 'asn' => null, 'label' => '198.51.100.50', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by_user_id' => null, 'until' => new DateTimeImmutable('-1 minute'), 'firewall' => 'no'];
+        $gate = IntegrationContainer::get()->get(LockoutGate::class);
+        $ended = ['kind' => 'address', 'network' => '198.51.100.50', 'asn' => null, 'label' => '198.51.100.50', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by' => null, 'until' => new DateTimeImmutable('-1 minute'), 'firewall' => 'no'];
         $this->lockouts->add($ended);
         self::assertFalse($gate->refuses('198.51.100.50', '/'));
         $id = $this->lockouts->add(['until' => null] + $ended);
@@ -284,10 +294,10 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     {
         $service = IntegrationContainer::get()->get(LockoutService::class);
         $person = (new DevelopmentFixture($this->db))->person();
-        $_SERVER['REMOTE_ADDR'] = '198.51.100.60';
+        $this->visitorAt('198.51.100.60');
         foreach (['198.51.100.60', '198.51.100.0/24'] as $own) {
             try {
-                $service->lockOut($service->target($own), '1d', 'Testing', false, $person['id']);
+                $service->lockOut(LockoutTarget::read($own), '1d', 'Testing', false, new Actor((string) $person['id'], (string) $person['id']));
                 self::fail('It locked out the address in use: ' . $own);
             } catch (InvalidArgumentException $refused) {
                 self::assertStringContainsString('You are using', $refused->getMessage());
@@ -298,14 +308,14 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $this->settings->save($form);
         foreach (['203.0.113.5', '203.0.113.0/24'] as $listed) {
             try {
-                $service->lockOut($service->target($listed), '1d', 'Testing', false, $person['id']);
+                $service->lockOut(LockoutTarget::read($listed), '1d', 'Testing', false, new Actor((string) $person['id'], (string) $person['id']));
                 self::fail('It locked out something on Never lock out: ' . $listed);
             } catch (InvalidArgumentException $refused) {
                 self::assertStringContainsString('Never lock out', $refused->getMessage());
             }
         }
         try {
-            $service->lockOut($service->target('198.51.101.1'), '1d', ' ', false, $person['id']);
+            $service->lockOut(LockoutTarget::read('198.51.101.1'), '1d', ' ', false, new Actor((string) $person['id'], (string) $person['id']));
             self::fail('A lockout needs a reason.');
         } catch (InvalidArgumentException $refused) {
             self::assertStringContainsString('why', $refused->getMessage());
@@ -316,26 +326,26 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     {
         $service = IntegrationContainer::get()->get(LockoutService::class);
         $person = (new DevelopmentFixture($this->db))->person();
-        $_SERVER['REMOTE_ADDR'] = '192.0.2.1';
-        $service->lockOut($service->target('198.51.100.70'), '1h', 'Probing', false, $person['id']);
+        $this->visitorAt('192.0.2.1');
+        $service->lockOut(LockoutTarget::read('198.51.100.70'), '1h', 'Probing', false, new Actor((string) $person['id'], (string) $person['id']));
         $force = $this->lockouts->inForceFor('198.51.100.70', null);
         self::assertSame('lockout', $force['which']);
         self::assertFalse($force['automatic']);
         self::assertSame('locked', $this->stateOf('198.51.100.70'));
 
         // A new lockout of the same thing replaces the one in force.
-        $service->lockOut($service->target('198.51.100.70'), 'good', 'For good now', false, $person['id']);
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM site_lockouts l WHERE l.label = '198.51.100.70' AND " . LockoutRepository::IN_FORCE));
-        self::assertNull($this->lockouts->inForceFor('198.51.100.70', null)['until_at']);
+        $service->lockOut(LockoutTarget::read('198.51.100.70'), 'good', 'For good now', false, new Actor((string) $person['id'], (string) $person['id']));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_site_lockouts l WHERE l.label = '198.51.100.70' AND " . Lockouts::IN_FORCE));
+        self::assertNull(((array) $this->lockouts->inForceFor('198.51.100.70', null))['until_at']);
 
-        $target = $service->target('198.51.100.77/24');
-        self::assertSame(['kind' => 'range', 'network' => '198.51.100.0/24', 'asn' => null, 'label' => '198.51.100.0/24'], $target, 'a range starts at its first address');
-        self::assertSame('address', $service->target('2001:db8:1:2::9')['kind']);
-        self::assertSame('2001:db8:1:2::/64', $service->target('2001:db8:1:2::9')['network']);
-        self::assertSame(['kind' => 'owner', 'network' => null, 'asn' => 64500, 'label' => 'AS64500'], $service->target('as64500'));
+        $target = LockoutTarget::read('198.51.100.77/24');
+        self::assertSame(['kind' => 'range', 'network' => '198.51.100.0/24', 'asn' => null, 'label' => '198.51.100.0/24'], $target->toArray(), 'a range starts at its first address');
+        self::assertSame('address', LockoutTarget::read('2001:db8:1:2::9')->kind);
+        self::assertSame('2001:db8:1:2::/64', LockoutTarget::read('2001:db8:1:2::9')->network);
+        self::assertSame(['kind' => 'owner', 'network' => null, 'asn' => 64500, 'label' => 'AS64500'], LockoutTarget::read('as64500')->toArray());
         foreach (['not an address', '198.51.100.1/4', 'AS'] as $wrong) {
             try {
-                $service->target($wrong);
+                LockoutTarget::read($wrong);
                 self::fail('It took ' . $wrong);
             } catch (InvalidArgumentException $refused) {
                 self::assertNotSame('', $refused->getMessage());
@@ -343,7 +353,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         }
 
         // Who a wider lockout would catch is named first.
-        $this->request('198.51.100.90', '/account', 200, 'GET', 'Mozilla/5.0 Chrome/139.0.0.0', ['user_id' => $person['id'], 'visitor' => 'signed_in']);
+        $this->request('198.51.100.90', '/account', 200, 'GET', 'Mozilla/5.0 Chrome/139.0.0.0', ['account_id' => (string) $person['id'], 'visitor' => 'signed_in']);
         self::assertSame([$person['id']], array_column($this->log->peopleOn('198.51.100.0/24', null, 30), 'id'));
         self::assertSame([$person['id']], array_column($this->log->peopleOn(null, 64511, 30), 'id'));
         self::assertSame([], $this->log->peopleOn('203.0.113.0/24', null, 30));
@@ -352,25 +362,25 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     public function testAFirewallTickWritesARequestAndALiftReleasesIt(): void
     {
         $folder = sys_get_temp_dir() . '/site-firewall-' . bin2hex(random_bytes(4));
-        $server = new ServerLink($folder);
+        $server = new ServerLink($folder . '/server-firewall');
         $container = IntegrationContainer::get();
-        $service = new LockoutService($this->lockouts, $this->flags, $this->settings, $server, $container->get(\CattoLearning\Auth\Signup\NetworkLookup::class), $container->get(\CattoLearning\Infrastructure\Persistence\AuditRepository::class));
+        $service = new LockoutService($this->lockouts, $this->flags, $this->settings, $server, $container->get(\CattoPHP\Network\NetworkLookup::class), null, $container->get('request_stack'));
         $person = (new DevelopmentFixture($this->db))->person();
-        $_SERVER['REMOTE_ADDR'] = '192.0.2.1';
+        $this->visitorAt('192.0.2.1');
         $form = $this->formFrom($this->settings->values());
         // Not switched on: the tick does nothing.
-        $service->lockOut($service->target('198.51.100.80'), '1h', 'Testing', true, $person['id']);
+        $service->lockOut(LockoutTarget::read('198.51.100.80'), '1h', 'Testing', true, new Actor((string) $person['id'], (string) $person['id']));
         self::assertFileDoesNotExist($folder . '/server-firewall/requests.log');
         $form['firewall_link'] = '1';
         $this->settings->save($form);
-        $id = $service->lockOut($service->target('198.51.100.81'), '1h', 'Testing', true, $person['id']);
-        $service->lockOut($service->target('AS64512'), '1h', 'Testing', true, $person['id']);
+        $id = $service->lockOut(LockoutTarget::read('198.51.100.81'), '1h', 'Testing', true, new Actor((string) $person['id'], (string) $person['id']));
+        $service->lockOut(LockoutTarget::read('AS64512'), '1h', 'Testing', true, new Actor((string) $person['id'], (string) $person['id']));
         $lines = array_map(static fn(string $line): array => json_decode($line, true), file($folder . '/server-firewall/requests.log', FILE_IGNORE_NEW_LINES) ?: []);
         self::assertSame([['do' => 'ban', 'network' => '198.51.100.81']], array_map(static fn(array $line): array => ['do' => $line['do'], 'network' => $line['network']], $lines), 'a firewall knows nothing of network owners');
-        $service->lift($id, $person['id']);
+        $service->lift($id, new Actor((string) $person['id'], (string) $person['id']));
         $lines = array_map(static fn(string $line): array => json_decode($line, true), file($folder . '/server-firewall/requests.log', FILE_IGNORE_NEW_LINES) ?: []);
         self::assertSame('lift', end($lines)['do']);
-        self::assertSame('released', $this->db->fetchOne('SELECT firewall FROM site_lockouts WHERE id = :id', ['id' => $id]));
+        self::assertSame('released', $this->db->fetchOne('SELECT firewall FROM cattophp_site_lockouts WHERE id = :id', ['id' => $id]));
 
         // What the server says.
         file_put_contents($folder . '/server-firewall/view.json', json_encode(['written_at' => gmdate(DATE_ATOM), 'probes_today' => 47, 'bans' => [['address' => '198.51.100.0/24', 'why' => 'Probing', 'since' => '']], 'probes' => [['at' => gmdate(DATE_ATOM), 'address' => '198.51.100.9', 'path' => '/.env?x=1']]]));
@@ -391,25 +401,25 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     public function testAFormFromABotIsRefusedAndTheListHolds(): void
     {
         $container = IntegrationContainer::get();
-        $emails = $container->get(RefusedEmailRepository::class);
+        $emails = $container->get(RefusedEmails::class);
         $person = (new DevelopmentFixture($this->db))->person();
-        $emails->add('Seo-Offers.Example', 'Selling search engine work', $person['id']);
-        $emails->add('someone@example.net', '', $person['id']);
+        $emails->add('Seo-Offers.Example', 'Selling search engine work', (string) $person['id']);
+        $emails->add('someone@example.net', '', (string) $person['id']);
         foreach (['not an address', 'a@'] as $wrong) {
             try {
-                $emails->add($wrong, '', $person['id']);
+                $emails->add($wrong, '', (string) $person['id']);
                 self::fail('It took ' . $wrong);
             } catch (InvalidArgumentException $refused) {
                 self::assertNotSame('', $refused->getMessage());
             }
         }
         $stack = new RequestStack();
-        $guard = new FormGuard($stack, $emails, $this->settings);
+        // The container's guard, with the request stack this test fills.
+        $guard = new FormGuard($stack, $emails, $this->settings, \CattoLearning\Support\Env::string('APP_KEY'));
         $browser = 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/139.0.0.0 Safari/537.36';
         $form = function (string $name, array $post, string $email, ?string $agent, string $address = '198.51.100.100') use ($stack, $guard): array {
-            $_SERVER['REMOTE_ADDR'] = $address;
             while ($stack->pop() !== null);
-            $request = Request::create('/x', 'POST');
+            $request = Request::create('/x', 'POST', $post, server: ['REMOTE_ADDR' => $address]);
             if ($agent === null) $request->headers->remove('User-Agent'); else $request->headers->set('User-Agent', $agent);
             $stack->push($request);
             $refused = $guard->refuses($name, $post, $email);
@@ -474,7 +484,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         self::assertSame('environment', $this->settings->source());
         self::assertSame(20, $this->settings->values()['rules']['missing']['count']);
         // The starting values the owner chose (decisions 3A and 4A).
-        $values = SiteProtectionSettings::environment();
+        $values = $this->settings->environment();
         self::assertSame('120d', $values['log_kept_for']);
         self::assertSame('1y', $values['flags_kept_for']);
         self::assertSame('timeout', $values['rules']['flood']['then']);
@@ -485,15 +495,15 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     {
         $this->request('198.51.100.110');
         $this->request('198.51.100.111');
-        $this->db->executeStatement("UPDATE site_requests SET at = NOW() - INTERVAL '121 days' WHERE address = '198.51.100.110'");
-        $old = $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.112', 'asn' => null, 'label' => '198.51.100.112', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by_user_id' => null, 'until' => new DateTimeImmutable('-400 days'), 'firewall' => 'no']);
-        $forGood = $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.113', 'asn' => null, 'label' => '198.51.100.113', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by_user_id' => null, 'until' => null, 'firewall' => 'no']);
+        $this->db->executeStatement("UPDATE cattophp_site_requests SET at = NOW() - INTERVAL '121 days' WHERE address = '198.51.100.110'");
+        $old = $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.112', 'asn' => null, 'label' => '198.51.100.112', 'which' => 'timeout', 'why' => 'Testing', 'rule_key' => 'missing', 'automatic' => true, 'created_by' => null, 'until' => new DateTimeImmutable('-400 days'), 'firewall' => 'no']);
+        $forGood = $this->lockouts->add(['kind' => 'address', 'network' => '198.51.100.113', 'asn' => null, 'label' => '198.51.100.113', 'which' => 'lockout', 'why' => 'Testing', 'rule_key' => null, 'automatic' => false, 'created_by' => null, 'until' => null, 'firewall' => 'no']);
         $this->flags->raise('198.51.100.114', 'medium', 'trap', 'Testing', 60);
-        $this->db->executeStatement("UPDATE site_flags SET last_flagged_at = NOW() - INTERVAL '400 days' WHERE subject = '198.51.100.114'");
+        $this->db->executeStatement("UPDATE cattophp_site_flags SET last_flagged_at = NOW() - INTERVAL '400 days' WHERE subject = '198.51.100.114'");
         $deleted = IntegrationContainer::get()->get(RetentionCleanup::class)->run();
         self::assertGreaterThanOrEqual(1, $deleted['site_requests']);
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM site_requests WHERE address = '198.51.100.110'"));
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM site_requests WHERE address = '198.51.100.111'"));
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_site_requests WHERE address = '198.51.100.110'"));
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_site_requests WHERE address = '198.51.100.111'"));
         self::assertNull($this->lockouts->find($old));
         self::assertNotNull($this->lockouts->find($forGood), 'in force, so kept');
         self::assertNull($this->flags->findBySubject('198.51.100.114'));
@@ -508,10 +518,10 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         $this->request('198.51.100.120', '/', 200, 'GET', $browser, ['country_code' => 'ZA', 'came_from' => 'google.com', 'source' => 'search']);
         $this->request('198.51.100.120', '/courses', 200, 'GET', $browser, ['country_code' => 'ZA', 'source' => 'inside']);
         $this->request('198.51.100.121', '/', 200, 'GET', 'curl/8.5.0', ['country_code' => 'US']);
-        $this->request('198.51.100.122', '/account', 200, 'GET', $browser, ['user_id' => $person['id'], 'visitor' => 'signed_in', 'country_code' => 'ZA']);
+        $this->request('198.51.100.122', '/account', 200, 'GET', $browser, ['account_id' => (string) $person['id'], 'visitor' => 'signed_in', 'country_code' => 'ZA']);
         $this->request('198.51.100.123', '/admin', 200, 'GET', $browser, ['by_administrator' => true, 'visitor' => 'signed_in']);
         $this->request('198.51.100.124', '/', 403, 'GET', $browser, ['is_page' => false]);
-        $this->db->executeStatement("UPDATE site_requests SET refused = TRUE WHERE address = '198.51.100.124'");
+        $this->db->executeStatement("UPDATE cattophp_site_requests SET refused = TRUE WHERE address = '198.51.100.124'");
         $figures = $this->log->figures($period, true);
         self::assertSame(3, $figures['visitors'] - $base['visitors'], 'the administrator and the refused are left out');
         self::assertSame(2, $figures['people'] - $base['people']);
@@ -528,9 +538,32 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         self::assertSame(5, $this->log->counts($filters + ['leave_out_administrators' => true])['all']);
         self::assertSame(3, $this->log->counts($filters + ['country' => 'ZA'])['all']);
         self::assertSame(1, count($this->log->page(['subject' => '198.51.100.121'], 25, 0)));
-        self::assertSame(['/m/u/••••'], array_column($this->visit('203.0.113.200', RequestFacts::maskedPath('/m/u/0123456789abcdef0123456789abcdef')), 'path'));
+        self::assertSame(['/m/u/••••'], array_column($this->visit('203.0.113.200', (new PathMask(SiteAnalyticsWords::SECRET_PATHS))->masked('/m/u/0123456789abcdef0123456789abcdef')), 'path'));
         // Nothing with a question mark or a secret reaches the log's own column through the recorder's function.
-        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM site_requests WHERE path LIKE '%?%' AND address <<= '198.51.100.0/24'"));
+        self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_site_requests WHERE path LIKE '%?%' AND address <<= '198.51.100.0/24'"));
+    }
+
+    /** Visitors through shares (owner, 2026-11-09): people who arrived through a shared link, by page and where it was shared. */
+    public function testVisitorsThroughSharesAreCountedByPageAndWhereItWasShared(): void
+    {
+        $period = SitePeriod::of('today', '', '', new DateTimeImmutable('+1 minute'));
+        $base = $this->log->shares($period, true);
+        $browser = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36';
+        $path = '/courses/shared-check-' . bin2hex(random_bytes(3));
+        $this->request('198.51.100.140', $path, 200, 'GET', $browser, ['came_from' => 'whatsapp', 'source' => 'share']);
+        $this->request('198.51.100.140', '/courses', 200, 'GET', $browser, ['source' => 'inside']);
+        $this->request('198.51.100.141', $path, 200, 'GET', $browser, ['came_from' => 'telegram', 'source' => 'share']);
+        $this->request('198.51.100.142', $path, 200, 'GET', 'WhatsApp/2.23.20.0 A', ['came_from' => 'whatsapp', 'source' => 'share']);
+        $this->request('198.51.100.143', $path, 200, 'GET', $browser, ['came_from' => 'facebook', 'source' => 'share', 'by_administrator' => true]);
+        $shares = $this->log->shares($period, true);
+        self::assertSame(2, $shares['visitors'] - $base['visitors'], "two people; WhatsApp's own preview and the administrator are not counted");
+        $page = array_values(array_filter($shares['pages'], static fn(array $row): bool => $row['path'] === $path))[0] ?? null;
+        self::assertSame(['path' => $path, 'visitors' => 2, 'shared_on' => ['telegram', 'whatsapp']], $page);
+        self::assertGreaterThanOrEqual(1, $shares['platforms']['whatsapp'] ?? 0, 'by platform too');
+        self::assertGreaterThanOrEqual(1, $shares['platforms']['telegram'] ?? 0);
+        $sources = array_column(array_filter($this->log->sources($period, true), static fn(array $row): bool => $row['source'] === 'share'), 'visitors', 'came_from');
+        self::assertGreaterThanOrEqual(1, $sources['whatsapp'] ?? 0, 'How they found you names the platform');
+        self::assertGreaterThanOrEqual(1, $sources['telegram'] ?? 0);
     }
 
     public function testAFlaggedAddressWaitsOnNeedsYourAttentionUntilDecided(): void
@@ -545,8 +578,16 @@ final class SiteAnalyticsIntegrationTest extends TestCase
         self::assertCount(1, $rows);
         self::assertStringEndsWith('198.51.100.130', urldecode($rows[0]['href']));
         self::assertStringContainsString('Asked for 20 pages', $rows[0]['summary']);
-        $this->flags->markFine('198.51.100.130', $person['id']);
+        $this->flags->markFine('198.51.100.130', (string) $person['id']);
         self::assertSame([], array_values(array_filter($attention->items($admin), static fn(array $item): bool => $item['kind'] === 'site_flag' && str_contains($item['title'], '198.51.100.130'))));
+    }
+
+    /** The person acting is at this address, as the request Symfony handles says. */
+    private function visitorAt(string $address): void
+    {
+        $requests = IntegrationContainer::get()->get('request_stack');
+        while ($requests->pop() !== null);
+        $requests->push(Request::create('/admin/site-analytics', 'POST', server: ['REMOTE_ADDR' => $address]));
     }
 
     /** @return list<array<string,mixed>> */
@@ -568,7 +609,7 @@ final class SiteAnalyticsIntegrationTest extends TestCase
 
     private function inForce(string $subject): int
     {
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM site_lockouts l WHERE l.network = CAST(:subject AS cidr) AND ' . LockoutRepository::IN_FORCE, ['subject' => $subject]);
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_site_lockouts l WHERE l.network = CAST(:subject AS cidr) AND ' . Lockouts::IN_FORCE, ['subject' => $subject]);
     }
 
     private function lengthOf(string $subject): int
@@ -581,8 +622,8 @@ final class SiteAnalyticsIntegrationTest extends TestCase
     /** Ends a time-out as time would: its end passes, and the requests before it are behind it. */
     private function endEverythingOn(string $subject): void
     {
-        $this->db->executeStatement("UPDATE site_lockouts SET until_at = started_at - INTERVAL '2 seconds', started_at = started_at - (until_at - started_at) - INTERVAL '2 seconds' WHERE network = CAST(:subject AS cidr) AND lifted_at IS NULL", ['subject' => $subject]);
-        $this->db->executeStatement("UPDATE site_requests SET at = at - INTERVAL '3 seconds' WHERE subject = CAST(:subject AS inet)", ['subject' => $subject]);
+        $this->db->executeStatement("UPDATE cattophp_site_lockouts SET until_at = started_at - INTERVAL '2 seconds', started_at = started_at - (until_at - started_at) - INTERVAL '2 seconds' WHERE network = CAST(:subject AS cidr) AND lifted_at IS NULL", ['subject' => $subject]);
+        $this->db->executeStatement("UPDATE cattophp_site_requests SET at = at - INTERVAL '3 seconds' WHERE subject = CAST(:subject AS inet)", ['subject' => $subject]);
     }
 
     /**

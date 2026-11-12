@@ -66,6 +66,10 @@ final class IntegrationContainer
     /** The one database connection, resolved from that container. */
     public static function db(): Database
     {
+        // Every test begins with the database: CattoPHP's settings read it afresh too, so nothing a rolled-back test
+        // saved is still trusted for a few seconds.
+        self::get()->get(\CattoPHP\Settings\Settings::class)->refresh();
+        self::get()->get(\CattoPHP\Access\Roles::class)->refresh();
         /** @var Database $db */
         $db = self::get()->get(Database::class);
 

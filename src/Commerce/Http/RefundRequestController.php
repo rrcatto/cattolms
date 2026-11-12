@@ -7,7 +7,7 @@ namespace CattoLearning\Commerce\Http;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\RefundRequestService;
 use CattoLearning\Http\Controller\BaseController;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\RequestStack;

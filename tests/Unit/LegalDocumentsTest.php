@@ -34,7 +34,7 @@ use CattoLearning\Commerce\Application\RefundAdministrationService;
 use CattoLearning\Commerce\Domain\RefundRule;
 use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Legal\LegalDocuments;
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Tests\Support\ComponentHarness;
 use CattoLearning\Tests\Support\RenderHarness;
 use DateTimeImmutable;

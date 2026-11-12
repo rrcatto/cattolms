@@ -14,6 +14,11 @@ population, so no Administration or Company surface can truncate silently or rep
 that disagrees with the rows beneath it.
 
 Changelog:
+2026/11/09 SAST
+- A person's roles are read from CattoPHP's role holders (CattoPHP Phase 2, step 5).
+2026/11/09 SAST
+- The activity log is CattoPHP's (CattoPHP Phase 2, step 4): cattophp_activity, its person the actor (account_person()
+  turns the actor back into a person's number), action, details and happened_at for event_key, metadata and created_at.
 2026/11/07 SAST
 - People, requests and credits carry the company's account reference for its address (owner, 2026-11-06).
 2026/11/06 SAST
@@ -66,7 +71,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
 
@@ -238,7 +243,7 @@ SQL);
     private const CREDIT_ORDER = 'cc.created_at DESC, cc.id DESC';
 
     /** The Activity log ordering, newest first, made total by the entry's own id. */
-    private const ACTIVITY_ORDER = 'al.created_at DESC, al.id DESC';
+    private const ACTIVITY_ORDER = 'al.happened_at DESC, al.id DESC';
 
     /**
      * The two Reports orderings.
@@ -297,7 +302,7 @@ SQL);
         'created' => 'u.created_at',
         'last_login' => 'u.last_login_at',
         // The score of the sign-up check the account registered with (owner, 2026-10-26); none for an account made here.
-        'risk' => '(SELECT sa.score FROM signup_attempts sa WHERE sa.user_id=u.id ORDER BY sa.completed_at DESC NULLS LAST, sa.id DESC LIMIT 1)',
+        'risk' => '(SELECT sa.score FROM cattophp_signup_attempts sa WHERE sa.account=u.id::text ORDER BY sa.completed_at DESC NULLS LAST, sa.id DESC LIMIT 1)',
     ];
 
     /**
@@ -369,15 +374,14 @@ SELECT
     c.id AS company_id,
     c.name AS company_name,
     c.account_reference AS company_reference,
-    COALESCE(string_agg(DISTINCT r.role_key, ',' ORDER BY r.role_key), '') AS role_keys,
+    COALESCE(string_agg(DISTINCT ur.role_key, ',' ORDER BY ur.role_key), '') AS role_keys,
     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN ('assigned','active','completed'))::int AS course_count
 FROM page
 JOIN users u ON u.id = page.id
 JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
 LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.status = 'active'
 LEFT JOIN companies c ON c.id = cu.company_id
-LEFT JOIN user_roles ur ON ur.user_id = u.id
-LEFT JOIN roles r ON r.id = ur.role_id
+LEFT JOIN cattophp_account_roles ur ON ur.account_id = u.id::text
 LEFT JOIN course_enrolments ce ON ce.user_id = u.id AND ce.is_preview = FALSE
 GROUP BY u.id, ue.email, c.id, c.name, c.account_reference
 SQL;
@@ -671,8 +675,8 @@ SQL;
 
     /** @var array<string,string> */
     public const ACTIVITY_SORTS = [
-        'event' => 'al.event_key',
-        'created' => 'al.created_at',
+        'event' => 'al.action',
+        'created' => 'al.happened_at',
     ];
 
     /**
@@ -944,14 +948,13 @@ SQL;
         $detail = 'SELECT u.id,u.public_id,u.first_name,u.middle_names,u.last_name,u.display_name,u.status,u.last_login_at,u.account_reference,
                     u.mobile_number,
                     ue.email,cu.company_role,
-                    COALESCE(string_agg(DISTINCT r.role_key,\',\' ORDER BY r.role_key),\'\') AS role_keys,
+                    COALESCE(string_agg(DISTINCT ur.role_key,\',\' ORDER BY ur.role_key),\'\') AS role_keys,
                     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN (\'assigned\',\'active\',\'completed\'))::int AS course_count
              FROM page
              JOIN users u ON u.id=page.id
              JOIN company_users cu ON cu.user_id=u.id AND cu.company_id=:company_id AND cu.status=\'active\'
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             LEFT JOIN user_roles ur ON ur.user_id=u.id
-             LEFT JOIN roles r ON r.id=ur.role_id
+             LEFT JOIN cattophp_account_roles ur ON ur.account_id=u.id::text
              LEFT JOIN course_enrolments ce ON ce.user_id=u.id AND ce.is_preview=FALSE
              GROUP BY u.id,ue.email,cu.company_role';
 
@@ -972,13 +975,12 @@ SQL;
         $row = $this->db->fetchAssociative(
             'SELECT u.id,u.public_id,u.first_name,u.middle_names,u.last_name,u.display_name,u.status,u.last_login_at,u.account_reference,
                     u.mobile_number,u.created_at,ue.email,cu.company_role,cu.created_at AS member_since,
-                    COALESCE(string_agg(DISTINCT r.role_key,\',\' ORDER BY r.role_key),\'\') AS role_keys,
+                    COALESCE(string_agg(DISTINCT ur.role_key,\',\' ORDER BY ur.role_key),\'\') AS role_keys,
                     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN (\'assigned\',\'active\',\'completed\'))::int AS course_count
              FROM users u
              JOIN company_users cu ON cu.user_id=u.id AND cu.company_id=:company_id AND cu.status=\'active\'
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             LEFT JOIN user_roles ur ON ur.user_id=u.id
-             LEFT JOIN roles r ON r.id=ur.role_id
+             LEFT JOIN cattophp_account_roles ur ON ur.account_id=u.id::text
              LEFT JOIN course_enrolments ce ON ce.user_id=u.id AND ce.is_preview=FALSE
              WHERE u.id=:user_id
              GROUP BY u.id,ue.email,cu.company_role,cu.created_at',
@@ -1254,19 +1256,19 @@ SQL;
             $params['after_id'] = $afterId;
         }
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) === 1) {
-            $where[] = 'al.created_at >= CAST(:from AS date)';
+            $where[] = 'al.happened_at >= CAST(:from AS date)';
             $params['from'] = $from;
         }
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) === 1) {
-            $where[] = "al.created_at < CAST(:to AS date) + INTERVAL '1 day'";
+            $where[] = "al.happened_at < CAST(:to AS date) + INTERVAL '1 day'";
             $params['to'] = $to;
         }
         if ($family !== '' && preg_match('/^[a-z][a-z0-9_-]*$/', $family) === 1) {
-            $where[] = "split_part(al.event_key,'.',1)=:family";
+            $where[] = "split_part(al.action,'.',1)=:family";
             $params['family'] = $family;
         }
         if ($actorId > 0) {
-            $where[] = 'al.user_id=:actor_id';
+            $where[] = 'al.actor_id=CAST(:actor_id AS TEXT)';
             $params['actor_id'] = $actorId;
         }
         if ($courseId > 0) {
@@ -1276,10 +1278,10 @@ SQL;
             $params['course_assessment'] = $courseText;
             $params['course_request'] = $courseText;
             $where[] = "(
-                al.metadata->>'course_id'=:course_direct
-                OR EXISTS (SELECT 1 FROM course_enrolments ace WHERE ace.id::text=al.metadata->>'enrolment_id' AND ace.course_id::text=:course_enrolment)
-                OR EXISTS (SELECT 1 FROM course_structure_nodes aca WHERE aca.id::text=al.metadata->>'structure_node_id' AND aca.course_id::text=:course_assessment)
-                OR EXISTS (SELECT 1 FROM course_requests acr WHERE acr.id::text=al.metadata->>'request_id' AND acr.course_id::text=:course_request)
+                al.details->>'course_id'=:course_direct
+                OR EXISTS (SELECT 1 FROM course_enrolments ace WHERE ace.id::text=al.details->>'enrolment_id' AND ace.course_id::text=:course_enrolment)
+                OR EXISTS (SELECT 1 FROM course_structure_nodes aca WHERE aca.id::text=al.details->>'structure_node_id' AND aca.course_id::text=:course_assessment)
+                OR EXISTS (SELECT 1 FROM course_requests acr WHERE acr.id::text=al.details->>'request_id' AND acr.course_id::text=:course_request)
             )";
         }
         if ($companyId > 0) {
@@ -1289,14 +1291,14 @@ SQL;
             $params['company_enrolment'] = $companyText;
             $params['company_actor'] = $companyText;
             $where[] = "(
-                al.metadata->>'company_id'=:company_direct
-                OR EXISTS (SELECT 1 FROM course_requests arq WHERE arq.id::text=al.metadata->>'request_id' AND arq.company_id::text=:company_request)
+                al.details->>'company_id'=:company_direct
+                OR EXISTS (SELECT 1 FROM course_requests arq WHERE arq.id::text=al.details->>'request_id' AND arq.company_id::text=:company_request)
                 OR EXISTS (
                     SELECT 1 FROM course_enrolments aen
                     JOIN company_users acu ON acu.user_id=aen.user_id AND acu.status='active'
-                    WHERE aen.id::text=al.metadata->>'enrolment_id' AND acu.company_id::text=:company_enrolment
+                    WHERE aen.id::text=al.details->>'enrolment_id' AND acu.company_id::text=:company_enrolment
                 )
-                OR EXISTS (SELECT 1 FROM company_users acu2 WHERE acu2.user_id=al.user_id AND acu2.status='active' AND acu2.company_id::text=:company_actor)
+                OR EXISTS (SELECT 1 FROM company_users acu2 WHERE acu2.user_id=account_person(al.actor_id) AND acu2.status='active' AND acu2.company_id::text=:company_actor)
             )";
         }
         if ($query !== '') {
@@ -1304,7 +1306,7 @@ SQL;
             $params['query_event'] = $like;
             $params['query_actor'] = $like;
             $params['query_metadata'] = $like;
-            $where[] = "(al.event_key ILIKE :query_event OR COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email,'System') ILIKE :query_actor OR al.metadata::text ILIKE :query_metadata)";
+            $where[] = "(al.action ILIKE :query_event OR COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email,'System') ILIKE :query_actor OR al.details::text ILIKE :query_metadata)";
         }
 
 
@@ -1317,7 +1319,7 @@ SQL;
     }
 
     /** The actor joins the Activity free-text search matches on. */
-    private const ACTIVITY_ACTOR_JOINS = "\nLEFT JOIN users u ON u.id=al.user_id"
+    private const ACTIVITY_ACTOR_JOINS = "\nLEFT JOIN users u ON u.id=account_person(al.actor_id)"
         . "\nLEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE";
 
     /**
@@ -1336,30 +1338,30 @@ SQL;
         // subject a generic audit entry refers to. Evaluated across the whole filtered log in
         // order to display twenty-five entries, that is the single most expensive read on the
         // platform; evaluated for twenty-five ids it is nothing.
-        $keys = 'SELECT al.id' . "\nFROM audit_log al" . ($needsActor ? self::ACTIVITY_ACTOR_JOINS : '');
+        $keys = 'SELECT al.id' . "\nFROM cattophp_activity al" . ($needsActor ? self::ACTIVITY_ACTOR_JOINS : '');
 
         $detail = <<<'SQL'
-SELECT al.id, al.event_key, al.metadata, al.created_at, al.user_id AS actor_user_id,
-       COALESCE(host(al.ip_address), '') AS ip_address,
+SELECT al.id, al.action AS event_key, al.details AS metadata, al.happened_at AS created_at, account_person(al.actor_id) AS actor_user_id,
+       COALESCE(al.ip_address, '') AS ip_address,
        COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email,'System') AS actor_name,
        u.account_reference AS actor_reference,
        COALESCE(
-           (SELECT c.title FROM courses c WHERE c.id::text=al.metadata->>'course_id' LIMIT 1),
-           (SELECT c.title FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1),
-           (SELECT c.title FROM course_structure_nodes ca JOIN courses c ON c.id=ca.course_id WHERE ca.id::text=al.metadata->>'structure_node_id' LIMIT 1),
-           (SELECT c.title FROM course_requests cr JOIN courses c ON c.id=cr.course_id WHERE cr.id::text=al.metadata->>'request_id' LIMIT 1)
+           (SELECT c.title FROM courses c WHERE c.id::text=al.details->>'course_id' LIMIT 1),
+           (SELECT c.title FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id WHERE ce.id::text=al.details->>'enrolment_id' LIMIT 1),
+           (SELECT c.title FROM course_structure_nodes ca JOIN courses c ON c.id=ca.course_id WHERE ca.id::text=al.details->>'structure_node_id' LIMIT 1),
+           (SELECT c.title FROM course_requests cr JOIN courses c ON c.id=cr.course_id WHERE cr.id::text=al.details->>'request_id' LIMIT 1)
        ) AS course_title,
        COALESCE(
-           (SELECT co.name FROM companies co WHERE co.id::text=al.metadata->>'company_id' LIMIT 1),
-           (SELECT co.name FROM course_requests cr JOIN companies co ON co.id=cr.company_id WHERE cr.id::text=al.metadata->>'request_id' LIMIT 1),
-           (SELECT co.name FROM course_enrolments ce JOIN company_users cu ON cu.user_id=ce.user_id AND cu.status='active' JOIN companies co ON co.id=cu.company_id WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1),
-           (SELECT co.name FROM company_users cu JOIN companies co ON co.id=cu.company_id WHERE cu.user_id=al.user_id AND cu.status='active' LIMIT 1)
+           (SELECT co.name FROM companies co WHERE co.id::text=al.details->>'company_id' LIMIT 1),
+           (SELECT co.name FROM course_requests cr JOIN companies co ON co.id=cr.company_id WHERE cr.id::text=al.details->>'request_id' LIMIT 1),
+           (SELECT co.name FROM course_enrolments ce JOIN company_users cu ON cu.user_id=ce.user_id AND cu.status='active' JOIN companies co ON co.id=cu.company_id WHERE ce.id::text=al.details->>'enrolment_id' LIMIT 1),
+           (SELECT co.name FROM company_users cu JOIN companies co ON co.id=cu.company_id WHERE cu.user_id=account_person(al.actor_id) AND cu.status='active' LIMIT 1)
        ) AS company_name,
        subject.name AS subject_user_name, subject.id AS subject_user_id, subject.account_reference AS subject_user_reference,
-       split_part(al.event_key,'.',1) AS event_family
+       split_part(al.action,'.',1) AS event_family
 FROM page
-JOIN audit_log al ON al.id=page.id
-LEFT JOIN users u ON u.id=al.user_id
+JOIN cattophp_activity al ON al.id=page.id
+LEFT JOIN users u ON u.id=account_person(al.actor_id)
 LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
 -- The person an entry is about (owner, 2026-10-21: every person named is linked to their account, with their
 -- account reference): the user the metadata names, else the learner of the enrolment it names.
@@ -1367,8 +1369,8 @@ LEFT JOIN LATERAL (
     SELECT su.id, su.account_reference, COALESCE(NULLIF(trim(concat_ws(' ',su.first_name,su.last_name)),''),su.display_name,se.email) AS name
     FROM users su LEFT JOIN user_emails se ON se.user_id=su.id AND se.is_primary=TRUE
     WHERE su.id = COALESCE(
-        (SELECT tu.id FROM users tu WHERE tu.id::text=al.metadata->>'user_id' LIMIT 1),
-        (SELECT ce.user_id FROM course_enrolments ce WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1)
+        (SELECT tu.id FROM users tu WHERE tu.id::text=al.details->>'user_id' LIMIT 1),
+        (SELECT ce.user_id FROM course_enrolments ce WHERE ce.id::text=al.details->>'enrolment_id' LIMIT 1)
     )
     LIMIT 1
 ) subject ON TRUE
@@ -1400,7 +1402,7 @@ SQL;
     {
         ['where' => $where, 'params' => $params, 'needs_actor' => $needsActor] = $this->activityConditions($filters);
         
-        $sql = 'SELECT COUNT(*)::int AS total FROM audit_log al'
+        $sql = 'SELECT COUNT(*)::int AS total FROM cattophp_activity al'
             . ($needsActor ? self::ACTIVITY_ACTOR_JOINS : '');
         if ($where !== []) $sql .= ' WHERE ' . implode(' AND ', $where);
 
@@ -1413,7 +1415,7 @@ SQL;
     public function activityFamilies(): array
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT DISTINCT split_part(event_key,'.',1) AS family FROM audit_log WHERE event_key<>''"
+            "SELECT DISTINCT split_part(action,'.',1) AS family FROM cattophp_activity WHERE action<>''"
             . '' . ' ORDER BY family'
         );
         return array_values(array_filter(array_map(static fn(array $row): string => (string) ($row['family'] ?? ''), $rows)));
@@ -2145,6 +2147,29 @@ SQL;
                  WHERE enrolment_id=:enrolment_id AND status='assigned'",
                 ['enrolment_id' => $enrolmentId]
             );
+            // A bundle credit stays together (owner, 2026-11-11): removing one of its courses before any is started removes
+            // them all and gives the credit back whole. Once one is started the credit is used, and nothing comes back.
+            $allocation = $this->db->fetchOne(
+                "SELECT a.id FROM bundle_credit_allocations a JOIN bundle_credit_enrolments e ON e.allocation_id = a.id
+                  WHERE e.enrolment_id = :enrolment_id AND a.status = 'assigned'",
+                ['enrolment_id' => $enrolmentId]
+            );
+            if ($allocation !== false && $allocation !== null) {
+                $this->db->executeStatement(
+                    "UPDATE course_enrolments SET status = 'cancelled', access_removed_at = :removed_at, access_removed_by_user_id = :removed_by,
+                            access_removed_reason = :reason, updated_at = :removed_at
+                      WHERE id IN (SELECT enrolment_id FROM bundle_credit_enrolments WHERE allocation_id = :allocation AND NOT extended) AND id <> :enrolment_id
+                        AND is_preview = FALSE AND started_at IS NULL AND status IN ('assigned','active')",
+                    ['removed_at' => gmdate('Y-m-d H:i:sP'), 'removed_by' => $actorUserId, 'reason' => trim($reason), 'allocation' => (int) $allocation, 'enrolment_id' => $enrolmentId]
+                );
+                // A course the person already had keeps their own access: only the bundle's extension of it is taken back.
+                $this->db->executeStatement(
+                    "UPDATE commerce_entitlements SET state = 'revoked'
+                      WHERE id IN (SELECT entitlement_id FROM bundle_credit_enrolments WHERE allocation_id = :allocation AND extended) AND state IN ('awaiting_activation','active')",
+                    ['allocation' => (int) $allocation]
+                );
+                $this->db->executeStatement("UPDATE bundle_credit_allocations SET status = 'returned', returned_at = NOW() WHERE id = :allocation AND status = 'assigned'", ['allocation' => (int) $allocation]);
+            }
         }
     }
 

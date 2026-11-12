@@ -1,0 +1,108 @@
+{#
+	The Inbox, Spam and the Trash (owner, 2026-11-11; approved mockup https://claude.ai/artifact/VzbEagmgjKJdWUww7dv61m;
+	InboxController::folder, InboxService::folder). Each lists its conversations, newest first, a tick on each row for the
+	buttons in the head: Mark answered, Mark as spam and Delete in the Inbox; Not spam, Delete forever, Block the sender and
+	Empty Spam now in Spam; Empty Trash now, Restore and Delete forever in the Trash, which also holds discarded drafts.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Inbox' %}
+	{% set ph_title = {inbox: 'Inbox', spam: 'Spam', trash: 'Trash'}[folder] %}
+	{% set ph_lead = {
+		inbox: 'Messages sent through the contact form. Replies go to the sender by email.',
+		spam: 'Messages the spam check held back, and ones you marked as spam. Nobody is emailed about them, and the sender is never told. Emptied automatically after ' ~ keeping.spam ~ '.',
+		trash: 'Deleted messages and drafts, kept for ' ~ keeping.trash ~ ' and then removed for good. Restore puts each back where it was.'
+	}[folder] %}
+	{% if can_manage %}{% set ph_actions %}
+		{% if folder == 'inbox' %}
+			{{ ui('action.button', {label: 'Mark answered', form: 'inbox-list', name: 'action', value: 'answered', icon: 'action-done'}) }}
+			{{ ui('action.button', {label: 'Mark as spam', form: 'inbox-list', name: 'action', value: 'spam', icon: 'action-report'}) }}
+			{{ ui('action.button', {label: 'Delete', form: 'inbox-list', name: 'action', value: 'trash', icon: 'action-remove'}) }}
+		{% elseif folder == 'spam' %}
+			{{ ui('action.button', {label: 'Not spam, back to the Inbox', variant: 'primary', form: 'inbox-list', name: 'action', value: 'not_spam', icon: 'action-approve'}) }}
+			{{ ui('action.button', {label: 'Block the sender', form: 'inbox-list', name: 'action', value: 'block', icon: 'action-lock-out', confirm: 'Block the senders of the ticked messages? Their later messages go straight to Spam.'}) }}
+			{{ ui('action.button', {label: 'Delete forever', variant: 'danger', form: 'inbox-list', name: 'action', value: 'delete', icon: 'action-remove', confirm: 'Delete the ticked messages for good? They cannot be recovered.'}) }}
+			{% if total %}{{ ui('action.button', {label: 'Empty Spam now', variant: 'danger', form: 'inbox-list', name: 'action', value: 'empty_spam', icon: 'action-clear', confirm: 'Delete every message in Spam for good? They cannot be recovered.'}) }}{% endif %}
+		{% else %}
+			{% if total or drafts %}{{ ui('action.button', {label: 'Empty Trash now', variant: 'danger', form: 'inbox-list', name: 'action', value: 'empty_trash', icon: 'action-clear', confirm: 'Delete everything in the Trash for good? It cannot be recovered.'}) }}{% endif %}
+			{{ ui('action.button', {label: 'Restore', variant: 'primary', form: 'inbox-list', name: 'action', value: 'restore', icon: 'action-restore'}) }}
+			{{ ui('action.button', {label: 'Delete forever', variant: 'danger', form: 'inbox-list', name: 'action', value: 'delete', icon: 'action-remove', confirm: 'Delete the ticked messages for good? They cannot be recovered.'}) }}
+		{% endif %}
+	{% endset %}{% endif %}
+	{% include '@CattoPHP/page/head.html.twig' %}
+
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{% set in_trash = total + drafts|length %}
+		{% set summary = folder == 'inbox' ? (counts.new ? (counts.new == 1 ? '1 new message.' : counts.new ~ ' new messages.') : 'Nothing new.') : (folder == 'spam' ? (total == 1 ? '1 message in Spam.' : total ~ ' messages in Spam.') : (in_trash == 1 ? '1 item in the Trash.' : in_trash ~ ' items in the Trash.')) %}
+		{{ ui('layout.section-head', {heading: folder == 'inbox' ? 'Messages' : 'In ' ~ ph_title|lower, summary: summary}) }}
+		<form class="cl-inbox-filters" method="get" action="{{ path }}" {% include '@CattoPHP/page/in-place-attrs.html.twig' with {in_place_action: path} only %}>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% if folder == 'inbox' %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', for: 'inbox-show'})} %}{% block control %}<select class="cl-select" id="inbox-show" name="show" {{ ui_field_attrs(props) }}>{% for key, label in {all: 'Every message', new: 'New', unanswered: 'Not answered', answered: 'Answered'} %}<option value="{{ key }}" {{ filters.show == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', for: 'inbox-reason'})} %}{% block control %}<select class="cl-select" id="inbox-reason" name="reason" {{ ui_field_attrs(props) }}><option value="">Any</option>{% for key, label in reasons %}<option value="{{ key }}" {{ filters.reason == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% endif %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', for: 'inbox-q'})} %}{% block control %}<input class="cl-input" id="inbox-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Reference, name, email or words" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show', variant: 'secondary', type: 'submit', icon: 'action-filter'}) }}{% if filtered %}{{ ui('action.link', {label: 'Clear', variant: 'quiet', href: path, icon: 'action-clear'}) }}{% endif %}{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		</form>
+
+		<form id="inbox-list" method="post" action="/inbox/act">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="back" value="{{ path }}">
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'messages', pagination: messages_pagination})} %}{% block results %}
+			{% if rows or drafts %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: ph_title ~ ': tick messages for the buttons at the top of the page'})} %}
+			{% block header %}<tr>
+				{% if can_manage %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Tick'}} %}{% endif %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'From'}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: {inbox: 'Reason', spam: 'Score', trash: 'Came from'}[folder]}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 48, label: folder == 'spam' ? 'Message and why it was held' : 'Message', wide: true}} %}
+				{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: folder == 'inbox' ? 'Received' : 'Gone for good'}} %}
+			</tr>{% endblock %}
+			{% block body %}
+				{% for draft in drafts %}
+				<tr data-inbox-draft="{{ draft.id }}">
+					{% if can_manage %}<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Tick'})} %}{% block control %}<input type="checkbox" name="drafts[]" value="{{ draft.id }}" aria-label="Tick the draft to {{ draft.to }}">{% endblock %}{% endembed %}</td>{% endif %}
+					<td class="cell-text">Draft to {{ draft.to }}<br><a class="small" href="{{ draft.href }}">{{ draft.reference }}</a></td>
+					<td>Drafts</td>
+					<td class="cell-text">{{ draft.excerpt ?: '(empty)' }}</td>
+					<td>{{ draft.gone }}</td>
+				</tr>
+				{% endfor %}
+				{% for row in rows %}
+				<tr data-inbox-message="{{ row.reference }}"{% if row.new and folder == 'inbox' %} class="cl-inbox-new"{% endif %}>
+					{% if can_manage %}<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Tick'})} %}{% block control %}<input type="checkbox" name="ids[]" value="{{ row.id }}" aria-label="Tick {{ row.reference }}">{% endblock %}{% endembed %}</td>{% endif %}
+					<td class="cell-text">{{ ui('data.person', row.sender) }}<br><span class="small">{% if row.sender.href %}<a href="{{ row.href }}">{{ row.reference }}</a>{% else %}{{ row.email }} (no account){% endif %}</span></td>
+					{% if folder == 'inbox' %}<td class="cell-text">{{ row.reason }}</td>{% endif %}
+					{% if folder == 'spam' %}<td>{{ ui('feedback.badge', {label: row.spam_score is not null ? row.spam_score ~ '' : 'Marked', tone: 'danger'}) }}</td>{% endif %}
+					{% if folder == 'trash' %}<td>{{ row.from_folder == 'spam' ? 'Spam' : 'Inbox' }}</td>{% endif %}
+					<td class="cell-text">
+						<a href="{{ row.href }}">{% if folder == 'inbox' %}{% if row.items > 1 %}{{ row.items }} in the conversation · {% endif %}{% if row.status.label != 'New' %}{{ ui('feedback.badge', {label: row.status.label, tone: row.status.tone, size: 'small'}) }} {% endif %}{% endif %}{{ row.excerpt }}</a>
+						{% if folder == 'spam' and row.spam_signs %}<br><span class="cl-inbox-signs">{% for sign in row.spam_signs|filter(s => s.points > 0) %}{{ ui('feedback.badge', {label: sign.words, tone: 'neutral', size: 'small'}) }} {% endfor %}</span>{% endif %}
+					</td>
+					<td>{{ folder == 'inbox' ? row.when : row.gone }}</td>
+				</tr>
+				{% endfor %}
+			{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filtered ? 'No message matches.' : {inbox: 'No messages yet.', spam: 'Spam is empty.', trash: 'The Trash is empty.'}[folder]}) }}{% endif %}
+		{% endblock %}{% endembed %}
+		</form>
+		{% if folder == 'inbox' and counts.spam %}<p class="small">{{ counts.spam == 1 ? '1 message is' : counts.spam ~ ' messages are' }} in Spam. {{ ui('action.link', {label: 'Open Spam', variant: 'quiet', size: 'small', href: '/inbox/spam', icon: 'action-open'}) }}</p>{% endif %}
+		{% if folder == 'trash' %}<p class="small">Delete forever and Empty Trash now remove messages for good: they cannot be recovered.</p>{% endif %}
+	{% endblock %}{% endembed %}</section>
+
+	{% if folder == 'spam' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'How the spam check works'}) }}
+		<p>Every message sent through the contact form is scored out of 100 when it arrives, from the same signs the sign-up check reads and from what the message itself shows. A message scoring {{ keeping.line }} or more goes to Spam (Inbox settings). A robot that fills the hidden field is shown the usual thank-you page and its message is never kept.</p>
+		<div class="cl-inbox-explain">{{ ui('data.key-value-list', {items: [
+			{label: 'The message', value: 'Links, words seen in spam, shouting, a request to write elsewhere, the same words sent before'},
+			{label: 'The sender', value: 'A throwaway or mail-less email domain, a made-up name, signed in or not, earlier messages found genuine'},
+			{label: 'Where it came from', value: 'Blocked countries, Tor, VPN and hosting networks, many messages from one address'},
+			{label: 'How it was sent', value: 'Under 3 seconds on the page, a script instead of a browser'}
+		]}) }}</div>
+		<p>It learns from you. Mark as spam moves a message here and teaches the check; Not spam moves it back to the Inbox and teaches it the other way. A Bayesian word filter learns from the words of every message you mark, and its share of the score grows as it learns: until it has seen 20 of each kind, the fixed signs carry most of it. It has learnt from {{ trained.spam }} spam and {{ trained.ham }} genuine {{ trained.ham == 1 ? 'message' : 'messages' }} so far.</p>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

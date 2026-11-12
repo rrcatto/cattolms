@@ -10,6 +10,10 @@ How the Site Analytics pages say things (owner, 2026-11-04): when, who, from whe
 someone is doing, each in plain words.
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): SECRET_PATHS, the paths its PathMask masks, kept here for the config and App::run alike.
+2026/11/09 SAST
+- What a browser says it is from CattoPHP, in place of cattolms's own copy (CattoPHP Phase 2).
 2026/11/07 SAST
 - A signed-in person is linked by their account reference (owner, 2026-11-06).
 2026/11/04 SAST
@@ -20,11 +24,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\SiteAnalytics;
 
-use CattoLearning\Auth\Signup\SignupCountries;
+use CattoPHP\Signup\SignupCountries;
 use DateTimeImmutable;
+use CattoPHP\Http\VisitorAgent;
 
 final class SiteAnalyticsWords
 {
+    /** The paths whose next part is always a secret, masked in the Site Log: email links, join links, a leaving link, a private certificate (CattoPHP's PathMask). */
+    public const SECRET_PATHS = ['/m/[a-z]/', '/join/', '/leaving/', '/certificates/', '/transcripts/'];
+
     public const NETWORKS = ['home' => 'Home or mobile', 'hosting' => 'Hosting', 'vpn' => 'VPN', 'tor' => 'Tor exit', 'private' => 'Local network', '' => 'Unknown'];
 
     public static function when(string $at, bool $seconds = false): string
@@ -113,7 +121,7 @@ final class SiteAnalyticsWords
             'method' => (string) $row['method'],
             'answer' => $answer,
             'browser' => (string) $row['agent_label'] . ($proved ? ', proved' : ''),
-            'lockable' => !$signedIn && !self::truthy($row['refused']) && !$proved && !RequestFacts::isPrivate((string) $row['address']),
+            'lockable' => !$signedIn && !self::truthy($row['refused']) && !$proved && !\CattoPHP\Protection\Addresses::isPrivate((string) $row['address']),
         ];
     }
 

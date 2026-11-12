@@ -35,6 +35,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\View\Twig;
 
+use CattoPHP\Theme\Templates;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
@@ -43,16 +44,20 @@ final class TwigFactory
     public static function loader(string $codeRoot): FilesystemLoader
     {
         // Only @platform is fixed. @theme is pointed at the active theme per request, by
-        // ThemeTemplates, because an administrator may be previewing one.
-        return new FilesystemLoader(
+        // Templates, because an administrator may be previewing one.
+        $loader = new FilesystemLoader(
             [rtrim($codeRoot, '/') . '/resources/views'],
             null
         );
+        // CattoPHP's templates, its components among them, under the name its bundle gives them.
+        $loader->setPaths([rtrim($codeRoot, '/') . '/vendor/rrcatto/cattophp/templates'], 'CattoPHP');
+
+        return $loader;
     }
 
     public static function create(FilesystemLoader $loader, string $codeRoot, string $cacheDir, bool $debug): Environment
     {
-        $loader->setPaths([rtrim($codeRoot, '/') . '/resources/views'], ThemeTemplates::PLATFORM_NAMESPACE);
+        $loader->setPaths([rtrim($codeRoot, '/') . '/resources/views'], Templates::PLATFORM_NAMESPACE);
 
         $twig = new Environment($loader, [
             'cache' => rtrim($cacheDir, '/') . '/twig',
@@ -61,7 +66,7 @@ final class TwigFactory
             'autoescape' => 'html',
         ]);
         $twig->addExtension(new PlatformExtension());
-        $twig->addExtension(new PlatformUiExtension(new \CattoLearning\View\Ui\PlatformUi(rtrim($codeRoot, '/') . '/public_html')));
+        $twig->addExtension(new \CattoPHP\Twig\UiExtension(\CattoLearning\View\Ui\ProjectComponents::registry(rtrim($codeRoot, '/') . '/public_html'), new \CattoPHP\Ui\IconLibrary(\CattoLearning\View\Artwork\CourseIcons::SUBJECTS, \CattoLearning\View\Artwork\CourseIcons::NAME_STOP_WORDS)));
 
         return $twig;
     }

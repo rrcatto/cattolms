@@ -14,6 +14,8 @@ time, pausing, resuming and cancelling, what became of each copy and each link, 
 Seeing needs PLATFORM.MAILING.VIEW and every change PLATFORM.MAILING.MANAGE. Every form works without JavaScript.
 
 Changelog:
+2026/11/12 SAST
+- Addresses never emailed are added and taken off through CattoPHP (Suppressions, CattoPHP Phase 4, step 9, part 2).
 2026/11/07 SAST
 - A refused new email or address never emailed comes back as it was typed (keepTyped); a new email's goes back to its form.
 2026/10/28 SAST
@@ -34,8 +36,8 @@ use CattoLearning\Mailing\CampaignService;
 use CattoLearning\Mailing\EmailBlocks;
 use CattoLearning\Mailing\MailingRepository;
 use CattoLearning\Mailing\MailingSettings;
-use CattoLearning\Support\Pagination;
-use CattoLearning\View\Artwork\IconLibrary;
+use CattoPHP\Ui\Pagination;
+use CattoPHP\Ui\IconLibrary;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -74,6 +76,7 @@ final class MailingCampaignController extends BaseController
         private readonly \CattoLearning\Mailing\MailingTemplates $templates,
         private readonly \CattoLearning\Configuration\RuntimeSettings $runtime,
         private readonly \CattoLearning\Mailing\MailingForwards $forwards,
+        private readonly \CattoPHP\Mailing\Suppressions $suppressions,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -340,7 +343,7 @@ final class MailingCampaignController extends BaseController
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new InvalidArgumentException('Enter the email address in full.');
             $reason = trim((string) ($_POST['detail'] ?? ''));
             if ($reason === '') throw new InvalidArgumentException('Say why, for the record, such as "Asked by phone never to be emailed".');
-            if (!$this->campaigns->suppress($email, 'manual', $reason, null, $user->id)) throw new InvalidArgumentException($email . ' is already on the list.');
+            if (!$this->suppressions->suppress($email, 'manual', $reason, null, (string) $user->id)) throw new InvalidArgumentException($email . ' is already on the list.');
             $this->audit->record($user->id, 'mailing.suppressed', ['email' => $email]);
             $this->flash('success', $email . ' will never be emailed news.');
             $this->redirect('/mailing/never-emailed');
@@ -355,7 +358,7 @@ final class MailingCampaignController extends BaseController
 
         return $this->handle(function () use ($user): void {
             $email = mb_strtolower(trim((string) ($_POST['email'] ?? '')));
-            if (!$this->campaigns->unsuppress($email)) throw new InvalidArgumentException('That address is not on the list.');
+            if (!$this->suppressions->lift($email)) throw new InvalidArgumentException('That address is not on the list.');
             $this->audit->record($user->id, 'mailing.unsuppressed', ['email' => $email]);
             $this->flash('success', $email . ' may be emailed news again, if its person follows something.');
             $this->redirect('/mailing/never-emailed');

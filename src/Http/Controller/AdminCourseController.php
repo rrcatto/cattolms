@@ -76,7 +76,7 @@ use CattoLearning\Course\CoursePortabilityService;
 
 use CattoLearning\Course\CourseService;
 
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
@@ -154,6 +154,7 @@ final class AdminCourseController extends BaseController
         }
         if (is_string($typed['category_id'] ?? null) && ctype_digit($typed['category_id'])) $course['category_id'] = (int) $typed['category_id'];
         if (is_string($typed['study_hours'] ?? null)) $course['study_hours'] = $typed['study_hours'];
+        if (is_string($typed['study_minutes'] ?? null)) $course['study_minutes'] = $typed['study_minutes'];
         return $course;
     }
 
@@ -454,7 +455,7 @@ final class AdminCourseController extends BaseController
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->updateCourse($courseId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['cover'] ?? null, UploadedSvg::COVER_BYTES, 'cover picture'));
+            $this->courses->updateCourse($courseId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['cover'] ?? null, UploadedSvg::PICTURE_BYTES, 'cover picture'));
             $this->flash('success', 'The course details were updated.');
             $this->redirect($this->courseUrl($courseId));
         }, $this->courseUrl($courseId));

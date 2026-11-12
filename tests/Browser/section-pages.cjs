@@ -41,7 +41,7 @@ const pages = [
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
   '/mailing', '/mailing/digest', '/mailing/messages', '/mailing/lists', '/mailing/subscribers', '/mailing/never-emailed', '/mailing/templates', '/mailing/automatic', '/mailing/settings', '/mailing/reports',
 ];
-const {inspect, judge} = require('./page-construction.cjs');
+const {inspect, judge, watchPolicy} = require('./page-construction.cjs');
 const {PAGES, open, pool} = require('./pace.cjs');
 // The company's own page in Administration (owner, 2026-10-26), opened from its name: the fixture's company.
 if (state.company_reference) pages.push(`/admin/companies/${state.company_reference}`);
@@ -58,6 +58,7 @@ if (state.company_reference) pages.push(`/admin/companies/${state.company_refere
       const pageFor = async (worker) => {
         if (!contexts[worker]) {
           const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width, height: 900}, reducedMotion: 'reduce'});
+          await watchPolicy(context);
           await context.addCookies([{name: 'catto_learning_session', value: state.token, url: base, secure: true}]);
           contexts[worker] = {context, page: await context.newPage()};
         }

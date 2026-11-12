@@ -22,6 +22,10 @@ print comes from there. No name, address or legal form of a real business is wri
 Changing a document's text means changing its date here in the same change.
 
 Changelog:
+2026/11/11 SAST
+- Companies buy bundles as bundle credits (owner, 2026-11-11: "companies need to be able to buy bundles. I am changing my rule
+  about this"; one bundle credit is one whole bundle for one person, never split): the Terms say so in place of "Bundles are
+  not sold to companies", and the Refund Policy gives bundle credits the company credits' rules; both dates move to 2026-11-11.
 2026/11/06 SAST
 - The Privacy Policy's messaging service also names an order when it is placed (owner, 2026-11-06: "I would also like to receive
   a notification when an order is placed"); its date moves to 2026-11-06.
@@ -82,11 +86,11 @@ final class LegalDocuments
      * @var array<string,array{title:string,label:string,path:string,text_updated:string,intro:string}>
      */
     private const DOCUMENTS = [
-        self::TERMS => ['title' => 'Terms and Conditions', 'label' => 'Terms', 'path' => '/terms', 'text_updated' => '2026-10-20',
+        self::TERMS => ['title' => 'Terms and Conditions', 'label' => 'Terms', 'path' => '/terms', 'text_updated' => '2026-11-11',
             'intro' => 'These terms apply to everyone who uses this site and to every purchase made on it.'],
-        self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-19',
+        self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-11-11',
             'intro' => 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.'],
-        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-11-07',
+        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-11-11',
             'intro' => 'This policy explains how personal information is handled on this site, as the Protection of Personal Information Act 4 of 2013 (POPIA) requires.'],
     ];
 

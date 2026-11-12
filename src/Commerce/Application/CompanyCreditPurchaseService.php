@@ -47,7 +47,10 @@ final class CompanyCreditPurchaseService
         private readonly FinancialDocuments $documents,
         private readonly WalletService $wallets,
         private readonly OrderService $orders,
-        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null
+        private readonly ?\CattoLearning\OwnerMessages\OwnerMessages $ownerMessages = null,
+        // Bundle credits (owner, 2026-11-11: companies buy bundles, one credit for one person and every course in it).
+        private readonly ?BundleCredits $bundleCredits = null,
+        private readonly ?\CattoLearning\Commerce\Infrastructure\BundleCreditRepository $bundleRecords = null
     ) {}
 
     /**
@@ -60,7 +63,7 @@ final class CompanyCreditPurchaseService
         $basket = $this->review($actor, $companyId);
         if ($basket['items'] !== []) {
             $this->analytics->recordSafely(AnalyticsEventType::CheckoutStarted, AnalyticsSource::Checkout, ['user_id' => $actor->id],
-                ['line_count' => count($basket['items']), 'course_ids' => array_slice(array_values(array_unique(array_map(static fn(array $item): int => (int) $item['course_id'], $basket['items']))), 0, 50), 'total_minor' => (int) $basket['total_minor'], 'currency' => 'ZAR', 'purchaser' => 'company', 'company_id' => $companyId],
+                ['line_count' => count($basket['items']), 'course_ids' => array_slice(array_values(array_unique(array_filter(array_map(static fn(array $item): int => (int) ($item['course_id'] ?? 0), $basket['items'])))), 0, 50), 'total_minor' => (int) $basket['total_minor'], 'currency' => 'ZAR', 'purchaser' => 'company', 'company_id' => $companyId],
                 'checkout_started:company_basket:' . (string) $basket['purchase_key']);
         }
         return $basket;
@@ -85,7 +88,7 @@ final class CompanyCreditPurchaseService
         $this->requireCompanyScope($actor, $companyId);
         $key = $_SESSION['company_credit_basket'][$actor->id][$companyId] ?? null;
         if (!is_array($key)) {
-            $key = ['purchase_key' => Uuid::v4(), 'items' => [], 'request_id' => null];
+            $key = ['purchase_key' => Uuid::v4(), 'items' => [], 'bundles' => [], 'request_id' => null];
             $_SESSION['company_credit_basket'][$actor->id][$companyId] = $key;
         }
         return $key;
@@ -106,6 +109,40 @@ final class CompanyCreditPurchaseService
         $basket = $this->basket($actor, $companyId);
         if (!isset($basket['items'][$variantId]) && count($basket['items']) >= 50) throw new RuntimeException('Place this order before adding more credit types.');
         $basket['items'][$variantId] = $quantity;
+        $this->saveBasket($actor, $companyId, $basket);
+    }
+
+    /**
+     * The bundle offers a company may buy as bundle credits (owner, 2026-11-11).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function bundleOffers(): array
+    {
+        return $this->bundleCredits?->offers() ?? [];
+    }
+
+    /** Bundle credits in the basket: one credit is one bundle for one person. */
+    public function addBundle(CurrentUser $actor, int $companyId, int $offerId, int $quantity): void
+    {
+        OrderService::requireCapability($actor, 'COMPANY.CREDIT.MANAGE');
+        if ($this->bundleCredits === null) throw new RuntimeException('Bundles cannot be bought here.');
+        if ($quantity < 1 || $quantity > 10000) throw new RuntimeException('Choose a quantity between 1 and 10,000.');
+        $this->bundleCredits->requireOffer($offerId);
+        $basket = $this->basket($actor, $companyId);
+        $bundles = (array) ($basket['bundles'] ?? []);
+        if (!isset($bundles[$offerId]) && count($basket['items']) + count($bundles) >= 50) throw new RuntimeException('Place this order before adding more credit types.');
+        $bundles[$offerId] = $quantity;
+        $basket['bundles'] = $bundles;
+        $this->saveBasket($actor, $companyId, $basket);
+    }
+
+    public function removeBundle(CurrentUser $actor, int $companyId, int $offerId): void
+    {
+        $basket = $this->basket($actor, $companyId);
+        $bundles = (array) ($basket['bundles'] ?? []);
+        unset($bundles[$offerId]);
+        $basket['bundles'] = $bundles;
         $this->saveBasket($actor, $companyId, $basket);
     }
 
@@ -172,6 +209,23 @@ final class CompanyCreditPurchaseService
                 // The was price shown beside the unit price when the company chose it (owner, 2026-10-20); never charged.
                 'was_price_minor'=>isset($offer['was_price_minor_units']) ? (int)$offer['was_price_minor_units'] : null];
         }
+        // Bundle credits: one credit is one whole bundle for one person, its courses as sold (owner, 2026-11-11).
+        foreach ((array) ($basket['bundles'] ?? []) as $offerId => $quantity) {
+            if ($this->bundleCredits === null) break;
+            $offer = $this->bundleCredits->requireOffer((int) $offerId);
+            $quantity = (int) $quantity;
+            if ($quantity < 1 || $quantity > 10000) throw new RuntimeException('A credit quantity is invalid.');
+            $unit = Money::strictMinorUnits((int) $offer['price_minor_units'], 'ZAR');
+            $line = $unit->times($quantity);
+            $total = $total->plus($line);
+            $items[] = ['fulfilment_type'=>'bundle_credit','bundle_id'=>(int)$offer['bundle_id'],'bundle_offer_id'=>(int)$offer['id'],
+                'bundle_title'=>(string)$offer['title'],'bundle_slug'=>(string)$offer['slug'],
+                'courses'=>array_map(static fn(array $c): array => ['course_id'=>(int)$c['course_id'],'title'=>(string)$c['title'],'slug'=>(string)$c['slug']], $offer['courses']),
+                'access_period_seconds'=>(int)$offer['access_period_seconds'],
+                'quantity'=>$quantity,'unit_price_minor'=>$unit->minorUnits,'line_total_minor'=>$line->minorUnits,
+                'unit_label'=>$unit->format(),'line_label'=>$line->format(),'currency'=>'ZAR',
+                'was_price_minor'=>isset($offer['was_price_minor_units']) ? (int)$offer['was_price_minor_units'] : null];
+        }
         if ($basket['request_id'] !== null) {
             $needed = $this->records->companyOfferForRequest((int)$basket['request_id'], $companyId);
             if ($needed === null || !isset($basket['items'][(int)$needed['variant_id']])) throw new RuntimeException('The selected course request is no longer purchasable.');
@@ -179,7 +233,8 @@ final class CompanyCreditPurchaseService
         $quote = hash('sha256', json_encode([$companyId,$basket['purchase_key'],$basket['request_id'],$items], JSON_THROW_ON_ERROR));
         return ['company'=>$company,'items'=>$items,'request_id'=>$basket['request_id'],
             'purchase_key'=>$basket['purchase_key'],'quote'=>$quote,'total_minor'=>$total->minorUnits,
-            'total_label'=>$total->format()];
+            'total_label'=>$total->format(),
+            'has_bundles'=>array_filter($items, static fn(array $item): bool => ($item['fulfilment_type'] ?? '') === 'bundle_credit') !== []];
     }
 
     /**
@@ -202,14 +257,14 @@ final class CompanyCreditPurchaseService
      * change) and frozen into the order's snapshot. A replayed placement returns the existing order
      * without touching either.
      */
-    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, BillingDetails $billing, string $method, string $token, bool $emailInvoice, bool $accepted, bool $useWallet = false): int
+    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, BillingDetails $billing, string $method, string $token, bool $emailInvoice, bool $accepted, bool $useWallet = false, bool $bundleUseAccepted = false): int
     {
         OrderService::requireCapability($actor, 'COMPANY.CREDIT.MANAGE');
         OrderService::requireCapability($actor, 'COMMERCE.CHECKOUT.START');
         if ($method !== 'wallet') $this->orders->requirePaymentMethod($method, $token);
         if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing the company order.');
         if (!Uuid::isValid($key)) throw new RuntimeException('Invalid purchase identifier.');
-        [$orderId,$created,$method] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice,$useWallet): array {
+        [$orderId,$created,$method] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice,$useWallet,$bundleUseAccepted): array {
             $this->records->lockPurchaser($actor->id);
             $existing = $this->records->companyOrderForKey($actor->id, $key);
             if ($existing !== null) return [(int) $existing['id'],false,$this->records->paymentMethod((int) $existing['id'])];
@@ -218,6 +273,9 @@ final class CompanyCreditPurchaseService
                 throw new RuntimeException('The selected credits or prices changed. Review the order again.');
             }
             if ($review['items'] === [] || (int)$review['total_minor'] <= 0) throw new RuntimeException('Select at least one paid credit.');
+            // The Company Administrator says they understand how a bundle credit is used (owner, 2026-11-11: "this needs to
+            // be made clear to them when they buy it, so they understand how they must use it").
+            if ($review['has_bundles'] && !$bundleUseAccepted) throw new RuntimeException('Tick that each bundle credit is for one person before placing the order. ' . BundleCredits::RULE);
             $requestId = $review['request_id'] === null ? null : (int)$review['request_id'];
             if ($requestId !== null && $this->records->activeCompanyOrderForRequest($requestId, $companyId) !== null) {
                 throw new RuntimeException('A purchase for this request is already in progress. Open its order instead.');
@@ -236,12 +294,16 @@ final class CompanyCreditPurchaseService
                 'request_id'=>$requestId,'items'=>$items,
                 'total_minor'=>$total,'wallet_applied_minor'=>$walletApplied,'payable_minor'=>$total-$walletApplied,'currency'=>'ZAR','payment_method'=>$method,'invoice_email'=>$emailInvoice,
                 'tax_enabled'=>false,
-                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'documents'=>$legal['documents']],
+                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'documents'=>$legal['documents']]
+                    + ($review['has_bundles'] ? ['bundle_use'=>BundleCredits::ACCEPT] : []),
                 'site_owner'=>$legal['site_owner']]
                 + $this->orders->placementFacts($this->records->companyAccountReference($companyId));
             $id = $this->records->placeCompany($actor->id,$companyId,$requestId,$key,$total,'ZAR',$snapshot,
                 $now->format(DATE_ATOM),$this->settings->paymentDue()->after($now)->format(DATE_ATOM));
-            foreach ($items as $line) $this->records->addCompanyOrderItem($id,$companyId,$line);
+            foreach ($items as $line) {
+                if (($line['fulfilment_type'] ?? '') === 'bundle_credit') { ($this->bundleRecords ?? throw new RuntimeException('Bundles cannot be bought here.'))->addOrderItem($id,$companyId,$line); }
+                else { $this->records->addCompanyOrderItem($id,$companyId,$line); }
+            }
             $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id,$method);
             if ($walletApplied > 0) $this->orders->payFromWallet($this->records->order($id, true), $owner, $walletApplied, $snapshot);

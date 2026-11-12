@@ -315,6 +315,6 @@ final class PromotionAdministrationIntegrationTest extends TestCase
     private function audit(string $event, int $promotionId): array
     {
         return array_map(static fn(string $metadata): array => json_decode($metadata, true, 512, JSON_THROW_ON_ERROR),
-            $this->db->fetchFirstColumn("SELECT metadata FROM audit_log WHERE event_key=:e AND metadata->>'promotion_id'=:p ORDER BY id", ['e' => $event, 'p' => (string) $promotionId]));
+            $this->db->fetchFirstColumn("SELECT details AS metadata FROM cattophp_activity WHERE action=:e AND details->>'promotion_id'=:p ORDER BY id", ['e' => $event, 'p' => (string) $promotionId]));
     }
 }

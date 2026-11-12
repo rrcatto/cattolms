@@ -31,10 +31,8 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\Infrastructure\Persistence\ApiTokenRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
-use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -63,7 +61,7 @@ final class ApiRouteIntegrationTest extends TestCase
         // ADMIN holds every business permission, so the responses under test are shaped by the
         // route rather than by which permission happened to be missing.
         $this->db->executeStatement(
-            "INSERT INTO user_roles (user_id, role_id) SELECT :user_id, id FROM roles WHERE role_key = 'ADMIN'",
+            "INSERT INTO cattophp_account_roles (account_id, role_key, granted_at) VALUES (CAST(:user_id AS TEXT), 'ADMIN', NOW())",
             ['user_id' => $this->userId]
         );
 
@@ -72,23 +70,17 @@ final class ApiRouteIntegrationTest extends TestCase
         $this->courseId = $this->fixture->createCourse($this->userId, $companyId, $this->slug, 'QA API Course', 'published');
         $this->fixture->createPriceVariant($this->courseId, $this->userId);
 
-        $this->token = Token::generate();
-        /** @var ApiTokenRepository $tokens */
-        $tokens = $container->get(ApiTokenRepository::class);
-        $this->tokenPublicId = $tokens->create(
-            $this->userId,
-            'QA route token',
-            Token::hash($this->token),
-            ApiScope::all(),
-            $this->userId,
-            3600
-        );
+        /** @var \CattoPHP\Api\ApiTokens $tokens */
+        $tokens = $container->get(\CattoPHP\Api\ApiTokens::class);
+        $made = $tokens->create((string) $this->userId, 'QA route token', ApiScope::all(), 3600);
+        $this->token = $made['token'];
+        $this->tokenPublicId = $made['public_id'];
     }
 
     protected function tearDown(): void
     {
-        $this->db->executeStatement('DELETE FROM api_tokens WHERE public_id = :id', ['id' => $this->tokenPublicId]);
-        $this->db->executeStatement('DELETE FROM user_roles WHERE user_id = :id', ['id' => $this->userId]);
+        $this->db->executeStatement('DELETE FROM cattophp_api_tokens WHERE CAST(public_id AS text) = :id', ['id' => $this->tokenPublicId]);
+        $this->db->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = CAST(:id AS TEXT)', ['id' => $this->userId]);
         $this->fixture->cleanup();
     }
 

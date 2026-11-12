@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Tests\Support\RenderHarness;
-use CattoLearning\View\Ui\PlatformUi;
-use CattoLearning\View\Ui\UiOwnershipAudit;
+use CattoLearning\View\Ui\ProjectComponents;
+use CattoPHP\Ui\Contract\SourceAudit;
 use DOMDocument;
 use DOMXPath;
 use PHPUnit\Framework\TestCase;
@@ -51,7 +51,7 @@ TWIG;
     public function testFieldHelperRejectsRawAttributes(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new PlatformUi())->fieldAttributes(['label' => 'Name', 'for' => 'name', 'attributes' => ['onclick' => 'bad()']]);
+        ProjectComponents::registry()->fieldAttributes(['label' => 'Name', 'for' => 'name', 'attributes' => ['onclick' => 'bad()']]);
     }
 
     public function testActionElementSpecificPropertiesAreRejected(): void
@@ -59,7 +59,7 @@ TWIG;
         foreach (['action.link' => ['disabled', 'form', 'name', 'value', 'close_modal', 'stimulus_action', 'type'], 'action.button' => ['href', 'new_window', 'rel', 'navigation_key', 'close_disclosure']] as $component => $properties) {
             foreach ($properties as $property) {
                 try {
-                    (new PlatformUi())->properties($component, ['label' => 'Test', $property => true]);
+                    ProjectComponents::registry()->properties($component, ['label' => 'Test', $property => true]);
                     self::fail($component . ' accepted ' . $property);
                 } catch (\InvalidArgumentException $error) {
                     self::assertStringContainsString($component . ': ' . $property, $error->getMessage());
@@ -109,27 +109,16 @@ TWIG;
         self::assertSame(0.0, self::dom($normal)->evaluate('count(//button[@formnovalidate])'));
     }
 
-    public function testJavascriptOwnershipGuardDetectsGeneratedControlsWithoutBanningSelectors(): void
-    {
-        foreach (["node.innerHTML = '<button class=\"btn btn-primary\">Go</button>';", 'node.insertAdjacentHTML("beforeend", `<section class="card"><div class="card-body"></div></section>`);', "node.className = 'cl-ui-action';", "node.classList.add('row-actions');", "node.setAttribute('class', 'badge');"] as $source) {
-            self::assertNotSame([], UiOwnershipAudit::javascript($source, 'example.js'), $source);
-        }
-        self::assertSame([], UiOwnershipAudit::javascript('// node.innerHTML = `<div class="card">`;' . "\n/* card */ document.querySelector('.card'); node.innerHTML = '<strong>Text</strong>';", 'safe.js'));
-        self::assertNotSame([], UiOwnershipAudit::stimulusActions('<input data-action="change-{% if props.help %} aria-describedby="bad"{% endif %}>profile-image#choose">', 'profile.twig'));
-        self::assertNotSame([], UiOwnershipAudit::themeGeometry('@media(max-width:700px){.cl-ui-row-actions{flex-wrap:wrap}}', 'theme.css'));
-        self::assertSame([], UiOwnershipAudit::themeGeometry('.cl-ui-action{color:red;border-radius:5px}', 'theme.css'));
-    }
-
     public function testCurrentJavascriptAndThemesRespectOwnership(): void
     {
         $root = dirname(__DIR__, 2);
         $errors = [];
         foreach (['public_html/js', 'assets/controllers'] as $directory) {
             foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory, \FilesystemIterator::SKIP_DOTS)) as $file) {
-                if ($file->getExtension() === 'js') $errors = array_merge($errors, UiOwnershipAudit::javascript((string) file_get_contents($file->getPathname()), $file->getPathname()));
+                if ($file->getExtension() === 'js') $errors = array_merge($errors, SourceAudit::javascript((string) file_get_contents($file->getPathname()), $file->getPathname()));
             }
         }
-        foreach (glob($root . '/themes/*/public/css/*.css') ?: [] as $file) $errors = array_merge($errors, UiOwnershipAudit::themeGeometry((string) file_get_contents($file), $file));
+        foreach (glob($root . '/themes/*/public/css/*.css') ?: [] as $file) $errors = array_merge($errors, SourceAudit::themeGeometry((string) file_get_contents($file), $file, ProjectComponents::FUNCTIONAL_CLASSES));
         self::assertSame([], $errors);
     }
 }

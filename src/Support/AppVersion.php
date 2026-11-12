@@ -14,6 +14,9 @@ them can disagree with the release or with each other. The page stamp used to ta
 directory's name, which on the development checkout (cattolms-v0.9) printed only "v0.9".
 
 Changelog:
+2026/11/09 SAST
+- foundation(): CattoPHP's version as Composer installed it, which the generator tag names before CattoLMS's (owner,
+  2026-11-09: "add CattoPHP [version number] before CattoLMS [version number] with a comma separator").
 2026/10/20 SAST
 - Created.
 */
@@ -27,6 +30,19 @@ final class AppVersion
     private static ?string $version = null;
 
     /** The full release version, such as 0.9.6. */
+    /** CattoPHP's version as Composer installed it, without its v (0.2.0); a copy from a folder is what Composer calls it (dev-main). */
+    public static function foundation(): string
+    {
+        try {
+            $version = (string) \Composer\InstalledVersions::getPrettyVersion('rrcatto/cattophp');
+        } catch (\OutOfBoundsException) {
+            $version = '';
+        }
+        $version = preg_replace('/^v(?=[0-9])/', '', trim($version)) ?? '';
+
+        return $version !== '' ? $version : 'unknown';
+    }
+
     public static function current(): string
     {
         if (self::$version === null) {

@@ -20,6 +20,9 @@ Digests and updates are made by UpdateDelivery and go by themselves (owner, 2026
 the updates, not each email); a preview of one shows its first copy.
 
 Changelog:
+2026/11/09 SAST
+- Sent through CattoPHP's mailer (CattoPHP Phase 2, step 7b): the sender, the reply-to and a demo site's [DEMO] from
+  its settings, the transport built from the mail server Settings names; this class still checks a real server is set.
 2026/10/28 SAST
 - The new-course digest gone: digests and updates go by themselves.
 2026/10/26 SAST
@@ -37,8 +40,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
 use Symfony\Component\Clock\ClockInterface;
-use Symfony\Component\Mailer\Transport;
-use Symfony\Component\Mime\Address;
+use CattoPHP\Mail\Mailer;
 use Symfony\Component\Mime\Email;
 
 class CampaignService
@@ -64,6 +66,7 @@ class CampaignService
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         private readonly ClockInterface $clock,
+        private readonly Mailer $mailer,
         private readonly ?MailingTemplates $templates = null,
     ) {
     }
@@ -207,9 +210,9 @@ class CampaignService
         $copy = $this->preview($id, $firstName);
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new InvalidArgumentException('Your account has no address to send the test to.');
         if (trim((string) $this->get($id)['subject']) === '') throw new InvalidArgumentException('Write the subject first.');
-        $mail = $this->runtime->mailConfiguration();
-        $message = (new Email())->from(new Address((string) $mail['from_address'], (string) $mail['from_name']))->to($email)->subject('[Proof] ' . $copy['subject'])->html($copy['html'])->text($copy['text']);
-        Transport::fromDsn((string) $mail['dsn'])->send($message);
+        $this->runtime->mailConfiguration();
+        $message = (new Email())->to($email)->subject('[Proof] ' . $copy['subject'])->html($copy['html'])->text($copy['text']);
+        $this->mailer->send($message);
         $this->audit->record($userId, 'mailing.test_sent', ['campaign_id' => $id]);
     }
 

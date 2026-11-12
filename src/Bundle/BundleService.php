@@ -46,7 +46,8 @@ final class BundleService
         private readonly ClockInterface $clock,
         private readonly CourseService $courses,
         private readonly CommerceRepository $commerce,
-        private readonly ?\CattoLearning\Search\SharePictures $sharePictures = null,
+        private readonly ?\CattoPHP\Search\SharePictures $sharePictures = null,
+        private readonly ?BundlePositions $positions = null,
     ) {}
 
     /**
@@ -62,13 +63,16 @@ final class BundleService
         self::require($actor, 'BUNDLE.MANAGE');
         $refused = null;
         $fields = $this->validateDetails($input, null);
+        $position = BundlePositions::typed($input['catalogue_position'] ?? null);
         $status = self::chosenStatus($input);
-        $id = $this->transactions->run(function () use ($actor, $fields): int {
+        $id = $this->transactions->run(function () use ($actor, $fields, $position): int {
             try {
                 $id = $this->bundles->create($fields, $actor->id, $this->now());
             } catch (UniqueConstraintViolationException) {
                 throw $this->taken($fields, null);
             }
+            // The position typed, or the next free number in its code's band (owner, 2026-11-12).
+            $this->place($id, $position);
             $this->audit->record($actor->id, 'bundle.created', ['bundle_id' => $id, 'code' => $fields['code'], 'slug' => $fields['slug'], 'title' => $fields['title']]);
             return $id;
         });
@@ -79,7 +83,7 @@ final class BundleService
                 $refused = $notYet->getMessage();
             }
         }
-        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; Search\SharePictures).
+        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; CattoPHP\Search\SharePictures).
         $this->sharePictures?->make($fields['cover_svg']);
         return $id;
     }
@@ -94,8 +98,11 @@ final class BundleService
     {
         self::require($actor, 'BUNDLE.MANAGE');
         $fields = $this->validateDetails($input, $id);
+        // A form with the position field sets it (owner, 2026-11-12); left empty, the next free number in its band.
+        $askedPosition = array_key_exists('catalogue_position', $input);
+        $position = $askedPosition ? BundlePositions::typed($input['catalogue_position']) : null;
         $status = self::chosenStatus($input);
-        $this->transactions->run(function () use ($actor, $id, $fields, $status): void {
+        $this->transactions->run(function () use ($actor, $id, $fields, $status, $askedPosition, $position): void {
             $before = $this->bundles->find($id, true) ?? throw self::missing();
             // Refused before anything is written, so the details and the status go together or not at all.
             if ($status === 'published' && $before['status'] !== 'published') {
@@ -116,10 +123,15 @@ final class BundleService
             foreach (['short_description', 'description_html', 'cover_svg'] as $field) {
                 if ((string) $before[$field] !== $fields[$field]) $changed[$field] = 'changed';
             }
+            if ($askedPosition) {
+                $old = $before['catalogue_position'] === null ? null : (int) $before['catalogue_position'];
+                $now = $this->place($id, $position, $old);
+                if ($now !== $old) $changed['catalogue_position'] = ['from' => $old, 'to' => $now];
+            }
             if ($changed !== []) $this->audit->record($actor->id, 'bundle.updated', ['bundle_id' => $id, 'changed' => $changed]);
             if ($status !== null) $this->setStatus($actor, $id, $status);
         });
-        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; Search\SharePictures).
+        // Its share picture is drawn as it saves, never on a request (owner, 2026-11-06; CattoPHP\Search\SharePictures).
         $this->sharePictures?->make($fields['cover_svg']);
     }
 
@@ -191,6 +203,7 @@ final class BundleService
             $typed = static fn(string $key): string => is_scalar($input[$key] ?? null) ? trim((string) $input[$key]) : '';
             $details = ['code' => $typed('code'), 'title' => $typed('title'), 'slug' => $form['slug'], 'short_description' => $form['short_description'],
                 'description_html' => $form['description_html'], 'cover_svg' => $form['cover_svg'], 'available_from' => $typed('available_from'), 'available_until' => $typed('available_until')];
+            if (array_key_exists('catalogue_position', $input)) $details['catalogue_position'] = $typed('catalogue_position');
             $offer = $bundle['offer_id'] !== null || $typed('price') !== '' || $typed('was_price') !== '' ? ['price' => $typed('price'), 'was_price' => $typed('was_price'),
                 'access_period_value' => $typed('access_period_value'), 'access_period_unit' => $typed('access_period_unit'), 'is_active' => $form['is_active'] ? '1' : ''] : null;
             $status = self::chosenStatus($input);
@@ -400,10 +413,19 @@ final class BundleService
     }
 
     /**
+     * A company account is shown no bundle, except a Company Administrator, who buys bundles for the company as bundle credits
+     * (owner, 2026-11-11: "companies need to be able to buy bundles"); a private account and a visitor see them all.
+     */
+    private function hidesBundlesFrom(?CurrentUser $viewer): bool
+    {
+        return $viewer !== null && $this->commerce->isCompanyAccount($viewer->id) && !$viewer->hasPermission('COMPANY.CREDIT.MANAGE');
+    }
+
+    /**
      * The bundles a course's page offers under its buy button (owner, 2026-11-06, the approved mockup):
      * each published bundle holding the course that this visitor could buy now, the larger saving
-     * first. A company account is offered none, since a bundle is never sold to one
-     * (OrderService::COMPANY_ACCOUNT), and no visitor is offered one BundleRules would not sell now
+     * first. A company account is offered none (OrderService::COMPANY_ACCOUNT), except a Company Administrator, who buys
+     * bundles for the company as bundle credits (owner, 2026-11-11), and no visitor is offered one BundleRules would not sell now
      * (off sale, outside its dates, no price) or one an order of theirs already holds, which checkout
      * would refuse (OrderService::validateBundle). A visitor who already has some of its courses is
      * offered it at the same price and told how many, as the bundle's own page does. One whose sale starts later is
@@ -414,7 +436,7 @@ final class BundleService
      */
     public function forCourse(int $courseId, ?CurrentUser $viewer): array
     {
-        if ($viewer !== null && $this->commerce->isCompanyAccount($viewer->id)) return [];
+        if ($this->hidesBundlesFrom($viewer)) return [];
         $notes = [];
         foreach ($this->buyable($this->bundles->publishedFor(['course' => $courseId]), $viewer) as $bundle) {
             if ($viewer !== null && $this->commerce->hasPayableBundle($viewer->id, (int) $bundle['id'])) continue;
@@ -435,7 +457,7 @@ final class BundleService
      */
     public function catalogueRow(?int $categoryId, ?CurrentUser $viewer): array
     {
-        if ($viewer !== null && $this->commerce->isCompanyAccount($viewer->id)) return [];
+        if ($this->hidesBundlesFrom($viewer)) return [];
         return $this->markFavourites($viewer?->id, $this->cards($this->buyable($this->bundles->publishedFor($categoryId === null ? [] : ['category' => $categoryId]), null)));
     }
 
@@ -563,6 +585,7 @@ final class BundleService
         $filled = $was === null && $total !== null && ($price === null || $total > $price);
         return [
             'code' => (string) ($bundle['code'] ?? ''), 'status' => (string) ($bundle['status'] ?? 'draft'),
+            'position' => isset($bundle['catalogue_position']) ? (string) $bundle['catalogue_position'] : '',
             'title' => (string) ($bundle['title'] ?? ''), 'slug' => (string) ($bundle['slug'] ?? ''), 'short_description' => (string) ($bundle['short_description'] ?? ''),
             'description_html' => (string) ($bundle['description_html'] ?? ''), 'cover_svg' => (string) ($bundle['cover_svg'] ?? ''),
             'available_from' => $time($bundle['available_from'] ?? null), 'available_until' => $time($bundle['available_until'] ?? null),
@@ -643,6 +666,35 @@ final class BundleService
     }
 
     /**
+     * A bundle's position as a form left it (owner, 2026-11-12): the number typed, or, left empty, the next free number in
+     * its code's band (none when its prefix has no band). Answers the position it now has.
+     */
+    private function place(int $id, ?int $typed, ?int $current = null): ?int
+    {
+        if ($typed !== $current) $this->bundles->setPosition($id, $typed);
+        if ($typed !== null) return $typed;
+        return $this->positions?->fill($id);
+    }
+
+    /**
+     * The prefix a suggested code starts with (owner, 2026-11-12: a bundle prefix system like the courses'): the one most of
+     * its courses' codes share, the first course's on a tie; BDL for a bundle with no courses yet.
+     */
+    private function prefixFromCourses(?int $id): string
+    {
+        if ($id === null) return BundleRules::CODE_PREFIX;
+        $counts = [];
+        foreach ($this->bundles->courses($id) as $course) {
+            $prefix = \CattoLearning\Support\PositionBands::prefixOf((string) ($course['course_code'] ?? ''));
+            if ($prefix !== '') $counts[$prefix] = ($counts[$prefix] ?? 0) + 1;
+        }
+        if ($counts === []) return BundleRules::CODE_PREFIX;
+        $most = max($counts);
+        foreach ($counts as $prefix => $count) if ($count === $most) return $prefix;
+        return BundleRules::CODE_PREFIX;
+    }
+
+    /**
      * The bundle's code (owner, 2026-11-06: "Each bundle needs its own code, like a course code"): the one typed, tidied
      * and checked by a course code's rule, else a suggestion from the title. A code names one thing: no course and no
      * other bundle may have it, so a catalogue import can match a bundle by its code alone.
@@ -651,7 +703,7 @@ final class BundleService
     {
         $taken = fn(string $code): bool => $this->bundles->codeTaken($code, $id) || $this->bundles->courseWithCode($code) !== null;
         try {
-            $code = trim($input) === '' ? BundleRules::suggestCode($title, $taken) : CourseCode::validate($input);
+            $code = trim($input) === '' ? BundleRules::suggestCode($title, $taken, $this->prefixFromCourses($id)) : CourseCode::validate($input);
         } catch (\InvalidArgumentException $invalid) {
             throw new RuntimeException(str_replace('A course code is', 'A bundle code is', $invalid->getMessage()));
         }

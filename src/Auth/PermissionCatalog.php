@@ -105,6 +105,8 @@ final class PermissionCatalog
             $this->p('PLATFORM.MAILING.MANAGE', 'ManageMailing', 'Platform', 'Write, approve, send and stop campaigns, and change the mailing settings.'),
             $this->p('PLATFORM.SITEANALYTICS.VIEW', 'ViewSiteAnalytics', 'Platform', 'See who is on the site, the Site Log, flagged activity and lockouts.'),
             $this->p('PLATFORM.SITEANALYTICS.MANAGE', 'ManageSiteAnalytics', 'Platform', 'Lock out and lift, decide flagged addresses, and change the site protection settings.'),
+            $this->p('PLATFORM.INBOX.VIEW', 'ViewInbox', 'Platform', 'Read the Inbox: messages sent through the contact form, the replies sent and the answers received, and Spam and the Trash.'),
+            $this->p('PLATFORM.INBOX.MANAGE', 'ManageInbox', 'Platform', 'Reply, mark answered or as spam, delete and restore, empty the Trash and Spam, block senders and change the Inbox settings.'),
             $this->p('PLATFORM.ACTIVITY.VIEW', 'ViewPlatformActivity', 'Platform', 'View audit activity platform-wide.'),
             $this->p('PLATFORM.REPORT.VIEW', 'ViewPlatformReports', 'Platform', 'View operational and learning reports platform-wide.'),
             $this->p('COURSE.MANAGEMENT.VIEW', 'ViewCourseManagement', 'Courses', 'Open course-authoring surfaces for courses within resource scope.'),

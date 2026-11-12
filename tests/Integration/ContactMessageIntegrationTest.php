@@ -8,13 +8,13 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Contact\ContactMessageRepository;
 use CattoLearning\Contact\ContactReason;
 use CattoLearning\Contact\ContactService;
-use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Uuid;
-use CattoLearning\Http\Controller\ContactMessagesController;
+use CattoLearning\Http\Controller\InboxController;
+use CattoLearning\Inbox\InboxService;
 use CattoLearning\Tests\Support\{DevelopmentFixture, FakeMailer, InProcessPage, IntegrationContainer};
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use InvalidArgumentException;
@@ -23,7 +23,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * The contact form (owner, 2026-10-20): one form whose fields follow the reason chosen, the account
  * reference from a signed-in account and checked when typed, an order and a course, every message kept,
- * emailed to the site and acknowledged to its sender with fixed words, and Administration's list.
+ * emailed to the site and acknowledged to its sender with fixed words, and the Inbox's list and page (2026-11-11).
  */
 final class ContactMessageIntegrationTest extends TestCase
 {
@@ -37,10 +37,16 @@ final class ContactMessageIntegrationTest extends TestCase
         $this->db->beginTransaction();
         $this->fixture = new DevelopmentFixture($this->db);
         $this->mailer = new FakeMailer();
+        // As a person's browser sends the form (the spam check reads it).
+        $this->agent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0';
     }
+
+    private ?string $agent = null;
 
     protected function tearDown(): void
     {
+        if ($this->agent === null) unset($_SERVER['HTTP_USER_AGENT']); else $_SERVER['HTTP_USER_AGENT'] = $this->agent;
         if ($this->db->isTransactionActive()) $this->db->rollBack();
     }
 
@@ -55,7 +61,7 @@ final class ContactMessageIntegrationTest extends TestCase
         $reference = $service->submit(null, $message);
         self::assertMatchesRegularExpression('/^MSG-\d{6}$/', $reference);
 
-        $row = $this->db->fetchAssociative('SELECT * FROM contact_messages WHERE reference = :r', ['r' => $reference]);
+        $row = $this->db->fetchAssociative('SELECT m.*, CASE WHEN m.account ~ \'^[0-9]+$\' THEN CAST(m.account AS BIGINT) END AS user_id, s.order_number, s.order_id, s.course_id FROM cattophp_inbox_conversations m LEFT JOIN contact_message_subjects s ON s.message_id = m.id WHERE m.reference = :r', ['r' => $reference]);
         self::assertSame(['order', null, AccountReference::format(strtoupper($typed)), 'CL-00000012', null], [$row['reason'], $row['user_id'], $row['account_reference'], $row['order_number'], $row['order_id']]);
         self::assertEquals(['topic' => 'eft', 'eft_paid_on' => '2026-10-19', 'eft_amount' => 'R1 200.00', 'eft_reference' => 'CL-20261017-0001'], json_decode((string) $row['details'], true), 'Only the order reason\'s own answers are kept.');
         self::assertNotNull($row['emailed_at']);
@@ -65,7 +71,7 @@ final class ContactMessageIntegrationTest extends TestCase
         self::assertSame(['contact', $reference, 'Accounting issue', false], [$toSite['type'], $toSite['reference'], $toSite['reason'], $toSite['signed_in']]);
         self::assertContains(['label' => 'EFT amount', 'value' => 'R1 200.00'], $toSite['details']);
         // The notice opens the message at its reference, never its row id (owner, 2026-11-06).
-        self::assertStringEndsWith('/admin/messages/' . $reference, (string) $toSite['admin_url']);
+        self::assertStringEndsWith('/inbox/' . $reference, (string) $toSite['admin_url']);
         self::assertSame(['type' => 'contact_acknowledgement', 'email' => 'sipho@example.test', 'reference' => $reference, 'reason' => 'Accounting issue'], $toSender,
             'The acknowledgement carries nothing the sender typed but the address it goes to.');
     }
@@ -99,7 +105,7 @@ final class ContactMessageIntegrationTest extends TestCase
         $slug = 'contact-course-' . $this->fixture->suffix();
         $course = $this->fixture->createCourse($owner, $company, $slug, 'Contact course', 'published');
         $reference = $service->submit(null, ['reason' => ContactReason::BEFORE_BUYING, 'buying_course_id' => (string) $course, 'course_id' => '', 'for_company' => 'yes', 'company_name' => 'Acme Training', 'learners' => '12'] + $base);
-        $row = $this->db->fetchAssociative('SELECT course_id, details FROM contact_messages WHERE reference = :r', ['r' => $reference]);
+        $row = $this->db->fetchAssociative('SELECT s.course_id, m.details FROM cattophp_inbox_conversations m LEFT JOIN contact_message_subjects s ON s.message_id = m.id WHERE m.reference = :r', ['r' => $reference]);
         self::assertSame($course, (int) $row['course_id'], 'Without JavaScript both course lists arrive: the reason\'s own is read.');
         self::assertEquals(['company_name' => 'Acme Training', 'learners' => '12'], json_decode((string) $row['details'], true));
 
@@ -125,12 +131,12 @@ final class ContactMessageIntegrationTest extends TestCase
         }
         $reference = $service->submit($user, ['reason' => ContactReason::ACCOUNT, 'account_topic' => 'sign_in', 'account_reference' => 'CL-20261017-0001-U',
             'name' => 'Thandi', 'email' => $email, 'message' => 'The link does not arrive.']);
-        $row = $this->db->fetchAssociative('SELECT user_id, account_reference FROM contact_messages WHERE reference = :r', ['r' => $reference]);
+        $row = $this->db->fetchAssociative('SELECT CASE WHEN m.account ~ \'^[0-9]+$\' THEN CAST(m.account AS BIGINT) END AS user_id, m.account_reference FROM cattophp_inbox_conversations m LEFT JOIN contact_message_subjects s ON s.message_id = m.id WHERE m.reference = :r', ['r' => $reference]);
         self::assertSame([$id, AccountReference::format($stored)], [(int) $row['user_id'], $row['account_reference']], 'The account\'s own reference, never the typed one.');
         self::assertTrue($this->mailer->messages[0]['signed_in']);
     }
 
-    public function testAFailedEmailLosesNothingAndAdministrationListsAndAnswersEachMessage(): void
+    public function testAFailedEmailLosesNothingAndTheInboxListsAndAnswersEachMessage(): void
     {
         $this->mailer = new FakeMailer(true);
         $service = $this->service();
@@ -143,34 +149,34 @@ final class ContactMessageIntegrationTest extends TestCase
         } finally {
             ini_set('error_log', $log);
         }
-        $row = $this->db->fetchAssociative('SELECT id, emailed_at, acknowledged_at FROM contact_messages WHERE reference = :r', ['r' => $reference]);
+        $row = $this->db->fetchAssociative('SELECT m.id, m.emailed_at, m.acknowledged_at FROM cattophp_inbox_conversations m LEFT JOIN contact_message_subjects s ON s.message_id = m.id WHERE m.reference = :r', ['r' => $reference]);
         self::assertSame([null, null], [$row['emailed_at'], $row['acknowledged_at']], 'Kept, though neither email went.');
 
         $id = (int) $row['id'];
-        self::assertSame(1, $service->count('new', '', $tag));
-        self::assertSame(0, $service->count('answered', '', $tag));
-        self::assertSame(0, $service->count('all', ContactReason::ORDER, $tag), 'Filtered by reason.');
-        $listed = $service->page('new', '', $reference, 25, 0);
-        self::assertSame([$reference, 'Other', 'New', 'warning', '/admin/messages/' . $reference], [$listed[0]['reference'], $listed[0]['reason_label'], $listed[0]['status_label'], $listed[0]['status_tone'], $listed[0]['href']]);
+        $inbox = IntegrationContainer::get()->get(InboxService::class);
+        $listed = $inbox->folder('inbox', ['search' => $tag], 25, 0)['rows'];
+        self::assertSame([$reference, 'Other', 'New', '/inbox/' . $reference], [$listed[0]['reference'], $listed[0]['reason'], $listed[0]['status']['label'], $listed[0]['href']]);
+        self::assertSame(0, $inbox->folder('inbox', ['search' => $tag, 'show' => 'answered'], 25, 0)['total']);
+        self::assertSame(0, $inbox->folder('inbox', ['search' => $tag, 'reason' => ContactReason::ORDER], 25, 0)['total'], 'Filtered by reason.');
 
         $admin = $this->fixture->createUser('Contact administrator', 'contact-admin-' . $this->fixture->suffix() . '@example.test');
-        $before = $service->unansweredCount();
-        $service->markAnswered($id, $admin);
-        $service->markAnswered($id, $admin);
-        self::assertSame($before - 1, $service->unansweredCount());
-        self::assertSame([true, 'Answered'], [$service->find($id)['answered'], $service->find($id)['status_label']]);
-        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'contact.message_answered' AND metadata->>'message_id' = :id", ['id' => (string) $id]), 'Answered once, recorded once.');
-        self::assertSame(0, (new ContactMessageRepository($this->db))->deleteBefore(new \DateTimeImmutable('-5 years')), 'A new message outlives the daily clean-up.');
+        $inbox->markAnswered($id, $admin);
+        $inbox->markAnswered($id, $admin);
+        self::assertSame(1, $inbox->folder('inbox', ['search' => $tag, 'show' => 'answered'], 25, 0)['total']);
+        self::assertSame([true, 'Answered'], [$inbox->conversation($id)['answered'] ?? null, $inbox->conversation($id)['status_label'] ?? null]);
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM cattophp_activity WHERE action = 'contact.message_answered' AND details->>'message_id' = :id", ['id' => (string) $id]), 'Answered once, recorded once.');
+        self::assertSame(0, IntegrationContainer::get()->get(\CattoPHP\Inbox\Inbox::class)->cleanUp()['old'], 'A new message outlives the daily clean-up.');
 
-        // Its page and its forms are at its reference, never its row id; the row id or a near miss names nothing (owner, 2026-11-06).
-        $reader = new CurrentUser($admin, Uuid::v4(), 'contact-admin@example.test', 'Contact administrator', ['ADMIN'], ['PLATFORM.PERSON.VIEW', 'PLATFORM.PERSON.MANAGE'], Uuid::v4());
-        $page = InProcessPage::run($reader, ContactMessagesController::class, 'show', ['reference' => $reference]);
-        foreach (['action="/admin/messages/' . $reference . '/unanswered"', $reference] as $shown) self::assertStringContainsString($shown, $page['body']);
-        $reopened = InProcessPage::run($reader, ContactMessagesController::class, 'unanswered', ['reference' => $reference], ['csrf' => $_SESSION['csrf']]);
-        self::assertSame('/admin/messages/' . $reference, $reopened['location']);
+        // Its page and its forms are at its reference in the Inbox, never its row id; the row id or a near miss names nothing (owner, 2026-11-06).
+        $reader = new CurrentUser($admin, Uuid::v4(), 'contact-admin@example.test', 'Contact administrator', ['ADMIN'], ['PLATFORM.INBOX.VIEW', 'PLATFORM.INBOX.MANAGE'], Uuid::v4());
+        $page = InProcessPage::run($reader, InboxController::class, 'conversation', ['reference' => $reference]);
+        foreach (['action="/inbox/' . $reference . '/act"', 'action="/inbox/' . $reference . '/reply"', $reference, 'Mark not answered'] as $shown) self::assertStringContainsString($shown, $page['body']);
+        $reopened = InProcessPage::run($reader, InboxController::class, 'conversationAct', ['reference' => $reference], ['csrf' => $_SESSION['csrf'], 'action' => 'unanswered']);
+        self::assertSame('/inbox/' . $reference, $reopened['location']);
+        self::assertFalse($inbox->conversation($id)['answered'] ?? true);
         foreach ([(string) $id, strtolower($reference), 'MSG-' . str_pad((string) $id, 7, '0', STR_PAD_LEFT)] as $miss) {
             try {
-                InProcessPage::run($reader, ContactMessagesController::class, 'show', ['reference' => $miss]);
+                InProcessPage::run($reader, InboxController::class, 'conversation', ['reference' => $miss]);
                 self::fail($miss . ' names no message.');
             } catch (NotFoundHttpException) {
                 $this->addToAssertionCount(1);
@@ -180,7 +186,12 @@ final class ContactMessageIntegrationTest extends TestCase
 
     private function service(): ContactService
     {
-        return new ContactService(new ContactMessageRepository($this->db), new UserRepository($this->db), $this->mailer,
-            new AuditRepository($this->db), new TransactionManager($this->db));
+        // CattoPHP's Inbox as the site has it, with the test's own domains taken to receive mail (they do not).
+        $container = IntegrationContainer::get();
+        $inbox = new \CattoPHP\Inbox\Inbox($container->get(\CattoPHP\Inbox\InboxStore::class), $container->get(\CattoPHP\Inbox\InboxSettings::class), $container->get(\CattoPHP\Http\FormStamp::class),
+            $container->get(\CattoPHP\Network\NetworkLookup::class), $container->get(\CattoPHP\Network\ReputationLists::class), new class extends \CattoPHP\Signup\MailDomainCheck {
+                public function receivesMail(string $domain): ?bool { return true; }
+            }, $container->get(\CattoPHP\Signup\SignupCountries::class));
+        return new ContactService(new ContactMessageRepository($this->db), new UserRepository($this->db), $this->mailer, new TransactionManager($this->db), $inbox);
     }
 }

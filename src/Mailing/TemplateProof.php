@@ -14,6 +14,9 @@ nothing recorded. It goes the way a message's test goes, through the site's own 
 
 Changelog:
 2026/11/09 SAST
+- Sent through CattoPHP's mailer (CattoPHP Phase 2, step 7b): the sender, the reply-to and a demo site's [DEMO] from
+  its settings, the transport built from the mail server Settings names; this class still checks a real server is set.
+2026/11/09 SAST
 - An account email sample, drawn as account and order emails are.
 2026/10/28 SAST
 - Created.
@@ -26,8 +29,7 @@ namespace CattoLearning\Mailing;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use InvalidArgumentException;
-use Symfony\Component\Mailer\Transport;
-use Symfony\Component\Mime\Address;
+use CattoPHP\Mail\Mailer;
 use Symfony\Component\Mime\Email;
 
 final class TemplateProof
@@ -36,6 +38,7 @@ final class TemplateProof
         private readonly EmailRenderer $renderer,
         private readonly RuntimeSettings $runtime,
         private readonly AuditRepository $audit,
+        private readonly Mailer $mailer,
     ) {
     }
 
@@ -45,10 +48,10 @@ final class TemplateProof
         $email = trim($email);
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) throw new InvalidArgumentException('Enter the address to send the proof to, such as you@example.com.');
         $copy = $this->renderer->sample($template, in_array($sample, ['digest', 'account'], true) ? $sample : 'message', $firstName);
-        $mail = $this->runtime->mailConfiguration();
-        $message = (new Email())->from(new Address((string) $mail['from_address'], (string) $mail['from_name']))->to($email)
+        $this->runtime->mailConfiguration();
+        $message = (new Email())->to($email)
             ->subject('[Proof] ' . $copy['subject'])->html($copy['html'])->text($copy['text']);
-        Transport::fromDsn((string) $mail['dsn'])->send($message);
+        $this->mailer->send($message);
         $this->audit->record($userId, 'mailing.template_proof_sent', ['template_id' => (int) ($template['id'] ?? 0), 'sample' => $sample]);
     }
 }

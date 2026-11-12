@@ -38,11 +38,11 @@ namespace CattoLearning\Http\Symfony;
 
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Course\CourseAddress;
-use CattoLearning\Api\AuthorizationException;
-use CattoLearning\Api\Security\ApiUser;
+use CattoPHP\Api\ApiAccessDenied;
+use CattoPHP\Api\ApiUser;
 use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -100,7 +100,7 @@ final class ApiCourseController
             $body['certificate_enabled'] = true;
         }
 
-        $courseId = $this->courses->createBlank($body, $user->identity->userId);
+        $courseId = $this->courses->createBlank($body, \CattoLearning\Api\ApiPerson::userId($user->identity));
 
         return ApiResponse::data($this->courses->adminCourse($courseId), 201);
     }
@@ -112,7 +112,7 @@ final class ApiCourseController
     {
         $id = $this->courseId($code);
         $this->requireManagement($id, $user);
-        $this->courses->updateCourse($id, ApiRequest::jsonBody($request), $user->identity->userId);
+        $this->courses->updateCourse($id, ApiRequest::jsonBody($request), \CattoLearning\Api\ApiPerson::userId($user->identity));
 
         return ApiResponse::data($this->courses->adminCourse($id));
     }
@@ -125,7 +125,7 @@ final class ApiCourseController
         $id = $this->courseId($code);
         $this->requireManagement($id, $user);
         $body = ApiRequest::jsonBody($request);
-        $this->courses->changeStatus($id, (string) ($body['status'] ?? ''), $user->identity->userId);
+        $this->courses->changeStatus($id, (string) ($body['status'] ?? ''), \CattoLearning\Api\ApiPerson::userId($user->identity));
 
         return ApiResponse::data($this->courses->adminCourse($id));
     }
@@ -150,8 +150,8 @@ final class ApiCourseController
         if ($user->identity->hasPermission('PLATFORM.DASHBOARD.VIEW')) {
             return;
         }
-        if (!$this->courses->userCanManageCourse($courseId, $user->identity->userId)) {
-            throw new AuthorizationException('The authenticated account cannot manage this course.');
+        if (!$this->courses->userCanManageCourse($courseId, \CattoLearning\Api\ApiPerson::userId($user->identity))) {
+            throw new ApiAccessDenied('The authenticated account cannot manage this course.');
         }
     }
 }

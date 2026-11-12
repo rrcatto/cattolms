@@ -27,7 +27,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Symfony;
 
 use CattoLearning\Api\ApiScope;
-use CattoLearning\Api\Security\ApiUser;
+use CattoPHP\Api\ApiUser;
 use CattoLearning\Course\LearningService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -45,7 +45,7 @@ final class ApiLearningController
     #[IsGranted('LEARNING.LIBRARY.VIEW')]
     public function library(#[CurrentUser] ApiUser $user): JsonResponse
     {
-        return ApiResponse::data($this->learning->library($user->identity->userId));
+        return ApiResponse::data($this->learning->library(\CattoLearning\Api\ApiPerson::userId($user->identity)));
     }
 
     #[Route('/api/v1/courses/{slug}/start', name: 'api_learning_start', methods: ['POST'])]
@@ -53,10 +53,10 @@ final class ApiLearningController
     #[IsGranted('LEARNING.COURSE.START')]
     public function start(string $slug, #[CurrentUser] ApiUser $user): JsonResponse
     {
-        $this->learning->start($user->identity->userId, $slug);
+        $this->learning->start(\CattoLearning\Api\ApiPerson::userId($user->identity), $slug);
 
         return ApiResponse::data(
-            $this->learning->courseHome($user->identity->userId, $slug)
+            $this->learning->courseHome(\CattoLearning\Api\ApiPerson::userId($user->identity), $slug)
         );
     }
 }

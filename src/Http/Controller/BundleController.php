@@ -12,7 +12,7 @@ use CattoLearning\Commerce\Application\OrderService;
 use CattoLearning\Commerce\Application\PromotionService;
 use CattoLearning\Course\CourseFavouriteService;
 use CattoLearning\Support\ListView;
-use CattoLearning\Support\Pagination;
+use CattoPHP\Ui\Pagination;
 use RuntimeException;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -79,6 +79,10 @@ final class BundleController extends BaseController
         // What its head tells search engines, AI assistants and the sites it is shared on (owner, 2026-11-06).
         return $this->render('bundle-detail', ['title' => (string) $bundle['title'], 'active_nav' => 'catalogue', 'bundle' => $bundle, 'page_meta' => $this->metadata->bundle($bundle),
             'company_note' => $mayBuy ? '' : OrderService::COMPANY_ACCOUNT, 'promotions' => $promotions,
+            // A Company Administrator buys it for the company as bundle credits (owner, 2026-11-11), one credit one person.
+            'company_buy_href' => !$mayBuy && $bundle['offer_id'] !== null && ($this->currentUser()?->hasPermission('COMPANY.CREDIT.MANAGE') ?? false)
+                ? '/company/credits/buy?bundle=' . (int) $bundle['offer_id'] . '#bundles' : '',
+            'bundle_rule' => \CattoLearning\Commerce\Application\BundleCredits::RULE,
             'can_favourite' => $this->currentUser() !== null, 'favourite_return' => '/bundles/' . (string) $bundle['slug']]);
     }
 

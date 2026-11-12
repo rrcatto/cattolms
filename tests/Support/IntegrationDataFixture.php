@@ -23,6 +23,8 @@ Rows are built by direct insert rather than through the services under test. A f
 behaviour a test is verifying would pass or fail for two unrelated reasons at once.
 
 Changelog:
+2026/11/09 SAST
+- Roles are given among CattoPHP's role holders (CattoPHP Phase 2, step 5).
 2026/10/07 SAST
 - A category goes last among its siblings: positions are unique within a parent.
 2026/09/09 21:40 SAST
@@ -88,9 +90,9 @@ final class IntegrationDataFixture
     public function grantRole(int $userId, string $roleKey): void
     {
         $this->db->executeStatement(
-            'INSERT INTO user_roles (user_id,role_id,created_at)
-             SELECT :user_id, r.id, NOW() FROM roles r WHERE r.role_key = :role_key
-             ON CONFLICT (user_id,role_id) DO NOTHING',
+            'INSERT INTO cattophp_account_roles (account_id, role_key, granted_at)
+             SELECT CAST(:user_id AS TEXT), key, NOW() FROM cattophp_roles WHERE key = :role_key
+             ON CONFLICT DO NOTHING',
             ['user_id' => $userId, 'role_key' => strtoupper($roleKey)]
         );
     }
@@ -274,15 +276,15 @@ final class IntegrationDataFixture
             $this->db->commit();
         }
         foreach (array_unique($this->emails) as $email) {
-            $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email)=:email', ['email' => $email]);
+            $this->db->executeStatement('DELETE FROM cattophp_links WHERE LOWER(email)=:email', ['email' => $email]);
         }
         foreach (array_reverse($this->users) as $id) {
             // What they did goes with them: the owner's Activity page never lists a test's actions by nobody.
-            $this->db->executeStatement('DELETE FROM audit_log WHERE user_id=:id', ['id' => $id]);
-            $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE user_id=:id', ['id' => $id]);
-            $this->db->executeStatement('DELETE FROM auth_sessions WHERE user_id=:id', ['id' => $id]);
+            $this->db->executeStatement('DELETE FROM cattophp_activity WHERE actor_id = CAST(:id AS TEXT)', ['id' => $id]);
+            $this->db->executeStatement('DELETE FROM cattophp_links WHERE account_id = CAST(:id AS TEXT)', ['id' => $id]);
+            $this->db->executeStatement('DELETE FROM cattophp_sessions WHERE account_id = CAST(:id AS TEXT)', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM company_users WHERE user_id=:id', ['id' => $id]);
-            $this->db->executeStatement('DELETE FROM user_roles WHERE user_id=:id', ['id' => $id]);
+            $this->db->executeStatement('DELETE FROM cattophp_account_roles WHERE account_id = CAST(:id AS TEXT)', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM user_emails WHERE user_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM users WHERE id=:id', ['id' => $id]);
         }

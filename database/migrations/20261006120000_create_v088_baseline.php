@@ -15,7 +15,7 @@ Changelog:
 - The description no longer says incremental migrations wait for production: that was never the owner's rule (owner,
   2026-11-08: "there is no rule that says you cannot write an upgrade migration").
 2026/11/07 SAST (one theme)
-- A fresh database's active theme is Saharan Sunset 1.0.8 (saharan-sunset-v1.0.8), the one theme the code now bundles
+- A fresh database's active theme is Saharan Sunset 1.0.9 (saharan-sunset-v1.0.9), the one theme the code now bundles
   and its default (owner, 2026-11-07: the other themes "on ice until further notice").
 2026/11/07 SAST (no row ids in addresses, stage 2)
 - course_structure_nodes.part_name: each part's name in the reader's and the public preview's addresses, unique within
@@ -809,7 +809,7 @@ CREATE TABLE app_options (
     updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO app_options (option_key, option_value) VALUES
-    ('active_theme', 'saharan-sunset-v1.0.8'),
+    ('active_theme', 'saharan-sunset-v1.0.9'),
     ('acl_revision', '1');
 
 CREATE TABLE theme_registry (

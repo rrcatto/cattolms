@@ -8,7 +8,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Mailing' %}{% set ph_title = 'Reports' %}
 	{% set ph_lead = 'What the mailing system sent in a period and what became of it. Each rate is of the emails sent in the period.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set r = report %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'figures'})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: r.period.label, summary: r.period.from == r.period.to ? r.period.from|date('j F Y') : r.period.from|date('j F Y') ~ ' to ' ~ r.period.to|date('j F Y')}) }}
@@ -41,7 +41,7 @@
 			{{ ui('layout.section-head', {heading: 'By kind of email'}) }}
 			{% if r.kinds %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Emails by kind'})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Clicked'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Kind'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Sent'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Opened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Clicked'}} %}</tr>{% endblock %}
 			{% block body %}{% for kind in r.kinds %}<tr><td class="cell-text">{{ kind.label }}</td><td>{{ kind.sent|number_format }}</td><td>{{ kind.opened }}</td><td>{{ kind.clicked }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p class="small">Nothing was sent in this period.</p>{% endif %}
@@ -50,7 +50,7 @@
 			{{ ui('layout.section-head', {heading: 'Links clicked most', summary: 'By the people who clicked them first in this period.'}) }}
 			{% if r.links %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Links clicked most'})} %}
-			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Link'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'In'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'People'}} %}</tr>{% endblock %}
+			{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Link'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'In'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'People'}} %}</tr>{% endblock %}
 			{% block body %}{% for link in r.links %}<tr><td class="cell-text">{{ link.url }}</td><td class="cell-text"><a href="/mailing/messages/{{ link.campaign_id }}">{{ link.campaign }}</a></td><td>{{ link.people }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p class="small">No link was clicked in this period.</p>{% endif %}
@@ -63,7 +63,7 @@
 		{{ ui('layout.section-head', {heading: 'Messages and digests', summary: 'Each that started in this period, newest first. Open one for who got it and every link clicked.'}) }}
 		{% if r.messages %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Messages and digests in the period'})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Kind'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Started'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Email'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Kind'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Started'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Sent'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Opened'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Clicked'}} %}</tr>{% endblock %}
 		{% block body %}{% for m in r.messages %}<tr><td class="cell-text"><a href="/mailing/messages/{{ m.id }}">{{ m.name }}</a></td><td>{{ m.kind_label }}</td><td>{{ m.started_at|date('j M Y') }}</td><td>{{ m.sent }}</td><td>{{ m.opened_rate }}</td><td>{{ m.clicked_rate }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
 		{% else %}<p class="small">No message or digest started in this period.</p>{% endif %}
@@ -73,7 +73,7 @@
 		{{ ui('layout.section-head', {heading: 'Lists', summary: 'The 25 largest, with the people on each now and who joined and left in this period.'}) }}
 		{% if r.lists %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Lists in the period'})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'List'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'On it now'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Joined'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Left'}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'List'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'On it now'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Joined'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Left'}} %}</tr>{% endblock %}
 		{% block body %}{% for list in r.lists %}<tr><td class="cell-text"><a href="/mailing/lists/{{ list.id }}">{{ list.name }}</a></td><td>{{ list.people }}</td><td>{{ list.joined }}</td><td>{{ list.left_count }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
 		{% else %}<p class="small">No lists yet.</p>{% endif %}

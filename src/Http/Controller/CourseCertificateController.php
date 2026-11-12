@@ -32,7 +32,7 @@ use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Certificate\CertificateDesignService;
 use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
 use CattoLearning\Course\CourseService;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -51,7 +51,7 @@ final class CourseCertificateController extends BaseController
         private readonly CertificateDesignRepository $designRecords,
         private readonly CertificateDocumentDataBuilder $data,
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly DocumentPdfRenderer $pdf,
+        private readonly PdfRenderer $pdf,
     ) {
         parent::__construct($auth, $view, $requests);
     }

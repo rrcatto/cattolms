@@ -16,6 +16,8 @@ not offered, while the policy asks them to use it). What each card says after an
 so the card can change in place.
 
 Change log:
+2026/11/12 SAST
+- Telegram is CattoPHP's (CattoPHP Phase 4, step 4): connecting, the reader and its failure are its classes, a person by account id.
 2026/11/05 SAST
 - Created.
 */
@@ -28,9 +30,9 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\TwoStep\PendingSignIn;
 use CattoLearning\Auth\TwoStep\TwoStep;
-use CattoLearning\OwnerMessages\TelegramConnections;
-use CattoLearning\OwnerMessages\TelegramFailed;
-use CattoLearning\OwnerMessages\TelegramInbox;
+use CattoPHP\Telegram\TelegramConnections;
+use CattoPHP\Telegram\TelegramFailed;
+use CattoPHP\Telegram\TelegramInbox;
 use InvalidArgumentException;
 
 class AccountSecurity
@@ -55,11 +57,11 @@ class AccountSecurity
      */
     public function view(CurrentUser $user, string $ask = ''): array
     {
-        $telegram = $this->telegram->view($user->id);
+        $telegram = $this->telegram->view((string) $user->id);
         // While the page waits for Telegram, it reads what the bot was sent (at most once every 2 seconds) and notices.
         if ($telegram['state'] === 'waiting') {
             try {
-                if ($this->inbox->read(true) > 0) $telegram = $this->telegram->view($user->id);
+                if ($this->inbox->read(true) > 0) $telegram = $this->telegram->view((string) $user->id);
             } catch (TelegramFailed) {
             }
         }
@@ -80,12 +82,12 @@ class AccountSecurity
 
     public function connectTelegram(CurrentUser $user): void
     {
-        $this->telegram->start($user->id, $user->primaryEmail);
+        $this->telegram->start((string) $user->id, $user->primaryEmail, \CattoLearning\Support\ClientFingerprint::ipHash());
     }
 
     public function cancelTelegram(CurrentUser $user): void
     {
-        $this->telegram->cancel($user->id);
+        $this->telegram->cancel((string) $user->id);
     }
 
     /** "I have pressed Start", for a page without JavaScript: read what the bot was sent now. */
@@ -95,19 +97,19 @@ class AccountSecurity
             $this->inbox->read();
         } catch (TelegramFailed) {
         }
-        if ($this->telegram->view($user->id)['state'] === 'waiting') $this->keep('telegram', 'info', 'Telegram has not told us yet. Press Start in the chat with the bot, then press I have pressed Start again.');
+        if ($this->telegram->view((string) $user->id)['state'] === 'waiting') $this->keep('telegram', 'info', 'Telegram has not told us yet. Press Start in the chat with the bot, then press I have pressed Start again.');
     }
 
     public function testTelegram(CurrentUser $user): void
     {
-        $this->telegram->test($user->id)
+        $this->telegram->test((string) $user->id)
             ? $this->keep('telegram', 'success', 'Sent. Check your phone.')
             : $this->keep('telegram', 'danger', 'Telegram did not take the message. Open the chat with the bot, press Start, and try again.');
     }
 
     public function disconnectTelegram(CurrentUser $user): void
     {
-        $this->telegram->disconnect($user->id);
+        $this->telegram->disconnect((string) $user->id);
         $this->keep('telegram', 'success', 'Telegram is disconnected. Sign in by email from now on.');
     }
 

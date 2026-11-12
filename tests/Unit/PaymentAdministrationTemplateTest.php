@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Tests\Support\BillingFixture;
-use CattoLearning\View\Twig\PlatformUiExtension;
-use CattoLearning\View\Ui\PlatformUi;
 use PHPUnit\Framework\TestCase;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
@@ -19,8 +17,9 @@ final class PaymentAdministrationTemplateTest extends TestCase
     {
         $files=new FilesystemLoader();
         $files->addPath(dirname(__DIR__,2).'/resources/views','platform');
+        $files->addPath(dirname(__DIR__,2).'/vendor/rrcatto/cattophp/templates','CattoPHP');
         $twig=new Environment(new ChainLoader([new ArrayLoader(['test-layout'=>'{% block page_body %}{% endblock %}']),$files]),['strict_variables'=>true]);
-        $twig->addExtension(new PlatformUiExtension(new PlatformUi()));
+        $twig->addExtension(new \CattoPHP\Twig\UiExtension(\CattoLearning\View\Ui\ProjectComponents::registry()));
         $twig->addExtension(new \CattoLearning\View\Twig\PlatformExtension());
         return $twig;
     }
@@ -34,7 +33,7 @@ final class PaymentAdministrationTemplateTest extends TestCase
                 'reference_label'=>'CL-20261017-0001-U','bought'=>'Course','status_label'=>'Waiting for payment','status_note'=>'R 123.45 due by EFT','status_tone'=>'warning',
                 'purchaser_person'=>['name'=>'Buyer','reference'=>'CL202610170001U','href'=>'/admin/people/CL202610170001U','email'=>'buyer@example.test']]],
             'filters'=>['from'=>'','to'=>'','state'=>'','account'=>'','q'=>'buyer@example.test'],'states'=>\CattoLearning\Commerce\Application\MoneyRecords::ORDER_STATES,'filtered'=>true,
-            'orders_pagination'=>\CattoLearning\Application\PlatformAdministrationService::paginationPayload('orders',\CattoLearning\Support\Pagination::create(1,50,1,50),'/admin/commerce/orders','Orders',['q'=>'buyer@example.test'])]
+            'orders_pagination'=>\CattoLearning\Application\PlatformAdministrationService::paginationPayload('orders',\CattoPHP\Ui\Pagination::create(1,50,1,50),'/admin/commerce/orders','Orders',['q'=>'buyer@example.test'])]
             +\CattoLearning\Application\PlatformAdministrationService::sortViewFor('orders',$sort,'/admin/commerce/orders',['placed'=>'Placed','order'=>'Order','actions'=>''],['placed'],['q'=>'buyer@example.test']));
         self::assertStringContainsString('/admin/commerce/orders/CL-00000012',$list);
         self::assertStringContainsString('method="get"',$list);

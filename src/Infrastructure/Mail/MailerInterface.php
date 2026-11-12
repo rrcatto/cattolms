@@ -98,6 +98,13 @@ interface MailerInterface
     public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void;
 
     /**
+     * A reply written in the Inbox (owner, 2026-11-11), sent as written: its sender, reply-to, Message-ID and the message it
+     * answers already set, its plain text and any HTML and attachments; only the demo marks are added. A generated test
+     * address is delivered as every other email to it is.
+     */
+    public function sendInboxReply(\Symfony\Component\Mime\Email $email): void;
+
+    /**
      * A plain message ADMIN wrote about a transaction that needs attention: the subject and text as
      * written, sent as text and as simple HTML paragraphs.
      */

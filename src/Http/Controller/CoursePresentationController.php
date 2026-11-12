@@ -78,7 +78,7 @@ final class CoursePresentationController extends BaseController
         if ($course['public_preview_query'] !== '') { $node['rendered_html'] = preg_replace('/(href="\/courses\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['current_node_id'] = $nodeId;
         $this->publicView($course, 'item', $nodeId, $isSection ? null : (int) $node['course_item_id']);
-        return $this->render('course-public-preview-item', ['title' => (string) ($isSection ? ($node['section_number'] !== null ? 'Module ' . $node['section_number'] . ': ' : '') . $node['section_title'] : ($node['display_title_override'] ?: $node['item_title'])), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true, 'load_catwalk' => str_contains((string) $node['rendered_html'], 'class="cw-deck"'), 'load_flashcards' => str_contains((string) $node['rendered_html'], 'data-cl-flashcards')]);
+        return $this->render('course-public-preview-item', ['title' => (string) ($isSection ? (($node['label_number'] ?? null) !== null ? 'Module ' . $node['label_number'] . ': ' : '') . $node['section_title'] : ($node['display_title_override'] ?: $node['item_title'])), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true, 'load_catwalk' => str_contains((string) $node['rendered_html'], 'class="cw-deck"'), 'load_flashcards' => str_contains((string) $node['rendered_html'], 'data-cl-flashcards')]);
     }
 
     /** A public part's PDF (owner, 2026-10-28, decision 6A): only what the public preview shows. */

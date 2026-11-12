@@ -9,7 +9,7 @@ Version: 1.1.0
 
 Description:
 What a readiness check suggests after the questions a learner did not get right. Each question names the modules that
-cover it: "u": ["m2"] in a course file (COURSE-SPECIFICATION.md section 11, "the modules to study again after a wrong
+cover it: "u": ["m2"] in a course file (COURSE-SPECIFICATION-v<version>.md section 11, "the modules to study again after a wrong
 answer"), kept as the question's references (assessment_questions.remediation_item_keys) as the importer has kept them
 since v0.5.4. m2 is Module 2 as the course numbers its modules, from 1 or from 0 (courses.first_module_number), the way a
 course file names them (mod-m2) and the way the reader shows them. The suggestion is the module, in course order, with

@@ -57,7 +57,7 @@ if ($action === 'create') {
     echo "Created the mailing fixture.\n";
 } elseif ($action === 'state') {
     $state = $readState();
-    $copy = $db->fetchAssociative('SELECT d.status, d.open_count, d.click_count, d.unsubscribed_at IS NOT NULL AS stopped FROM mailing_deliveries d WHERE d.user_id = :u ORDER BY d.id DESC LIMIT 1', ['u' => $state['learner']['id']]);
+    $copy = $db->fetchAssociative('SELECT d.status, d.open_count, d.click_count, d.unsubscribed_at IS NOT NULL AS stopped FROM cattophp_mailing_copies d WHERE d.account = CAST(:u AS TEXT) ORDER BY d.id DESC LIMIT 1', ['u' => $state['learner']['id']]);
     echo json_encode($copy === false ? null : ['status' => $copy['status'], 'opens' => (int) $copy['open_count'], 'clicks' => (int) $copy['click_count'], 'stopped' => (bool) $copy['stopped']], JSON_THROW_ON_ERROR) . "\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);

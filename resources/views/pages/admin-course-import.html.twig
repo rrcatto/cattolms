@@ -5,7 +5,7 @@
 	{% set ph_kicker = 'Course importer' %}
 	{% set ph_title = 'Import Course' %}
 	{% set ph_lead = 'Both formats are analysed and previewed before PostgreSQL is changed.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
@@ -14,7 +14,7 @@
 					Select course file
 				</h2>
 				<p>
-					Upload a course written as one HTML file, to the course specification (<code>docs/COURSE-SPECIFICATION.md</code> in CattoLMS's code), or a <code>.json</code> course export. Theme JSON is imported separately in Administration → Themes.
+					Upload a course written as one HTML file, to the course specification (<code>docs/COURSE-SPECIFICATION-v…md</code> in CattoLMS's code, its version in its name), or a <code>.json</code> course export. Theme JSON is imported separately in Administration → Themes.
 				</p>
 				<form action="/admin/courses/import" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">

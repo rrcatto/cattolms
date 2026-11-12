@@ -31,13 +31,15 @@ use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Workflow\TransitionService;
-use CattoLearning\Configuration\SecretCipher;
+use CattoPHP\Security\SecretCipher;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Event\EventDispatcher;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository, AuditRepository, AuthSessionRepository, Database, LoginTokenRepository, OptionRepository, RoleRepository, TransactionManager, UserProfileRepository, UserRepository};
 use CattoLearning\Maintenance\RetentionCleanup;
-use CattoLearning\OwnerMessages\{OwnerMessageJob, OwnerMessageRepository, OwnerMessages, OwnerMessageSettings, OwnerMessageSetup, TelegramClient, TelegramFailed};
+use CattoLearning\OwnerMessages\{OwnerMessages, TelegramRepository};
+use CattoPHP\Activity\Actor;
+use CattoPHP\Telegram\{OwnerMessageSender, TelegramBot, TelegramClient, TelegramFailed, TelegramLog, TelegramSetup, TelegramWords};
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture, BundleFixture, CheckIdNumbers, DevelopmentFixture, FakeMailer, IntegrationContainer, PromotionFixture, WalletFixture};
@@ -57,8 +59,8 @@ final class OwnerMessagesIntegrationTest extends TestCase
     private Database $db;
     private DevelopmentFixture $fixture;
     private MockClock $clock;
-    private OwnerMessageSettings $settings;
-    private OwnerMessageRepository $messages;
+    private TelegramBot $settings;
+    private TelegramLog $messages;
     private int $admin;
     private int $owner;
     private int $provider;
@@ -73,13 +75,13 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable());
         $container = IntegrationContainer::get();
-        $this->settings = $container->get(OwnerMessageSettings::class);
-        $this->messages = $container->get(OwnerMessageRepository::class);
-        $this->db->executeStatement('DELETE FROM telegram_messages');
+        $this->settings = $container->get(TelegramBot::class);
+        $this->messages = $container->get(TelegramLog::class);
+        $this->db->executeStatement('DELETE FROM cattophp_telegram_messages');
         $this->admin = $this->fixture->createUser('Messages administrator');
         $this->owner = $this->fixture->createUser('Messages course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Messages provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.messages.example.test');
-        $container->get(OptionRepository::class)->delete(OwnerMessageSettings::ADDRESS_OPTION);
+        $this->db->executeStatement("DELETE FROM cattophp_telegram_state WHERE name = 'address'");
         $this->settings->forget();
         $this->connect();
     }
@@ -92,20 +94,30 @@ final class OwnerMessagesIntegrationTest extends TestCase
 
     private function connect(): void
     {
-        $this->settings->setKey(self::KEY, 'catto_test_bot', $this->admin);
-        $this->settings->setUsername('your_username', $this->admin);
-        $this->settings->setChat('4242', $this->admin);
+        $this->settings->setKey(self::KEY, 'catto_test_bot', $this->actor());
+        $this->settings->setUsername('your_username', $this->actor());
+        $this->settings->setChat('4242', $this->actor());
+    }
+
+    private function actor(): Actor
+    {
+        return new Actor((string) $this->admin, (string) $this->admin);
+    }
+
+    private function words(string $mode = 'live'): TelegramWords
+    {
+        return new TelegramWords(new \CattoPHP\Runtime\SiteMode(null, $mode), new \CattoPHP\Installation\Installation(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)));
     }
 
     /** @return list<string> what is kept to send */
     private function bodies(): array
     {
-        return array_map('strval', $this->db->fetchFirstColumn('SELECT body FROM telegram_messages ORDER BY id'));
+        return array_map('strval', $this->db->fetchFirstColumn('SELECT body FROM cattophp_telegram_messages ORDER BY id'));
     }
 
     private function owners(string $mode = 'live'): OwnerMessages
     {
-        return new OwnerMessages($this->settings, $this->messages, SiteMode::fixed($mode));
+        return new OwnerMessages($this->settings, $this->messages, $this->words($mode), new \CattoLearning\OwnerMessages\TelegramRepository($this->db));
     }
 
     private function auth(FakeMailer $mailer, string $mode, ?OwnerMessages $owner = null): AuthService
@@ -131,10 +143,10 @@ final class OwnerMessagesIntegrationTest extends TestCase
     public function testTheBotsOwnUsernameIsRefusedAndTheKeyIsKept(): void
     {
         // Owner, 2026-11-05: "the one I registered for the bot or my personal one?"
-        $this->settings->setKey('123456789:AAFkeyForThisCheckOnly', 'catto_check_bot', $this->admin);
+        $this->settings->setKey('123456789:AAFkeyForThisCheckOnly', 'catto_check_bot', $this->actor());
         $setup = $this->settingsPage(new MockHttpClient());
         try {
-            $setup->connect(['key' => '', 'username' => '@Catto_Check_Bot'], $this->admin);
+            $setup->connect(['key' => '', 'username' => '@Catto_Check_Bot'], $this->actor());
             self::fail('The bot cannot be the account that gets the messages.');
         } catch (InvalidArgumentException $refused) {
             self::assertStringContainsString('That is the bot', $refused->getMessage());
@@ -175,10 +187,10 @@ final class OwnerMessagesIntegrationTest extends TestCase
 
     public function testUntickedKeepsNoMessage(): void
     {
-        $this->settings->setChoices(false, true, $this->admin);
+        $this->settings->setChoices(['on_register' => false, 'on_sale' => true], $this->actor());
         $this->register('unticked-' . $this->fixture->suffix() . '@' . self::REAL);
         self::assertSame([], $this->bodies(), 'Registrations unticked.');
-        $this->settings->setChoices(true, false, $this->admin);
+        $this->settings->setChoices(['on_register' => true, 'on_sale' => false], $this->actor());
         $this->buy($this->buyer(), $this->course('Course A', 250000));
         self::assertSame([], $this->bodies(), 'Sales unticked.');
     }
@@ -188,7 +200,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $this->settings->forget();
         $this->register('unconnected-' . $this->fixture->suffix() . '@' . self::REAL);
         self::assertSame([], $this->bodies());
-        $this->settings->setKey(self::KEY, 'catto_test_bot', $this->admin);
+        $this->settings->setKey(self::KEY, 'catto_test_bot', $this->actor());
         $this->register('no-chat-' . $this->fixture->suffix() . '@' . self::REAL);
         self::assertSame([], $this->bodies(), 'A key without a chat has nowhere to write.');
     }
@@ -236,7 +248,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $order = $this->place($buyer, $services, $this->course('Planting a Herb Garden', 250000), 'eft');
         $number = 'CL-' . str_pad((string) $order, 8, '0', STR_PAD_LEFT);
         self::assertSame(['New order: Order ' . $number . ', Planting a Herb Garden, R2,500, to be paid by EFT' . $this->site()], $this->bodies(), 'Placed, and not paid: one message.');
-        self::assertSame(['order'], array_map('strval', $this->db->fetchFirstColumn('SELECT kind FROM telegram_messages')));
+        self::assertSame(['order'], array_map('strval', $this->db->fetchFirstColumn('SELECT kind FROM cattophp_telegram_messages')));
         self::assertCount(1, $this->bodies(), 'Nothing more for the same order.');
         $card = $this->buyer();
         $paid = $this->place($card, $services, $this->course('Composting at Home', 120000), 'dummy');
@@ -248,13 +260,13 @@ final class OwnerMessagesIntegrationTest extends TestCase
     public function testNewOrderUntickedOrAnInventedBuyerKeepsNoMessage(): void
     {
         $services = $this->services('live', true);
-        $this->settings->setChoices(true, true, $this->admin, false);
+        $this->settings->setChoices(['on_register' => true, 'on_sale' => true, 'on_order' => false], $this->actor());
         $this->place($this->buyer(), $services, $this->course('Planting a Herb Garden', 250000), 'eft');
         self::assertSame([], $this->bodies(), 'New Order unticked.');
-        $this->settings->setChoices(true, true, $this->admin, true);
+        $this->settings->setChoices(['on_register' => true, 'on_sale' => true, 'on_order' => true], $this->actor());
         $this->place($this->buyer('seeded-' . bin2hex(random_bytes(4)) . '@example.invalid'), $services, $this->course('Composting at Home', 120000), 'eft');
         self::assertSame([], $this->bodies(), 'An address nobody real has.');
-        self::assertTrue($this->settings->saved()['on_order'], 'Ticked again, and kept.');
+        self::assertTrue($this->settings->choice('on_order'), 'Ticked again, and kept.');
     }
 
     /** @param array<string,mixed> $services */
@@ -295,14 +307,16 @@ final class OwnerMessagesIntegrationTest extends TestCase
 
     public function testAFaultKeepingAMessageCannotFailWhatItIsAbout(): void
     {
-        $broken = new class ($this->db) extends OwnerMessageRepository {
+        $db = $this->db;
+        self::assertInstanceOf(\CattoLearning\Infrastructure\Persistence\DbalDatabase::class, $db);
+        $broken = new class ($db->connection()) extends TelegramLog {
             public function record(string $reference, string $kind, string $body): void
             {
                 IntegrationContainer::db()->executeStatement('INSERT INTO no_such_table_here (a) VALUES (1)');
             }
         };
         $email = 'fault-' . bin2hex(random_bytes(4)) . '@' . self::REAL;
-        $this->register($email, 'live', new OwnerMessages($this->settings, $broken, SiteMode::fixed('live')));
+        $this->register($email, 'live', new OwnerMessages($this->settings, $broken, $this->words(), new \CattoLearning\OwnerMessages\TelegramRepository($this->db)));
         self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email = :email', ['email' => $email]), 'The account is made, and the transaction around it still works.');
     }
 
@@ -322,7 +336,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         self::assertSame(['New registration: Thandi Mokoena, South Africa', 'Sale: Order CL-00000002, Course A, R2,500, paid by EFT'], array_map(static fn(array $one): string => $one[1]['text'], $sent));
         self::assertSame('4242', $sent[0][1]['chat_id']);
         self::assertSame('Nothing was waiting.', $job->run(), 'Nothing goes twice.');
-        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NOT NULL AND tries = 1'));
+        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages WHERE sent_at IS NOT NULL AND tries = 1'));
     }
 
     public function testATelegramFailureLeavesTheMessageWaitingAndItGoesNextTime(): void
@@ -339,7 +353,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $summary = $job->run();
         self::assertSame(1, $tried, 'It stops at the first failure, because the rest would fail too.');
         self::assertStringNotContainsString(self::KEY, $summary);
-        $row = $this->db->fetchAssociative("SELECT tries, sent_at, last_error FROM telegram_messages WHERE reference = 'order:1'");
+        $row = $this->db->fetchAssociative("SELECT tries, sent_at, last_error FROM cattophp_telegram_messages WHERE reference = 'order:1'");
         self::assertSame([1, null], [(int) $row['tries'], $row['sent_at']], 'It waits.');
         self::assertStringContainsString('could not be reached', (string) $row['last_error']);
         self::assertStringNotContainsString(self::KEY, (string) $row['last_error'], 'The key is never stored with an error.');
@@ -350,7 +364,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
 
         $this->telegramDown = false;
         self::assertSame('Sent 2 messages.', $job->run());
-        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM telegram_messages WHERE sent_at IS NOT NULL AND last_error IS NULL'));
+        self::assertSame(2, (int) $this->db->fetchOne('SELECT COUNT(*) FROM cattophp_telegram_messages WHERE sent_at IS NOT NULL AND last_error IS NULL'));
         self::assertNull($setup->view()['last_error'], 'Settings stops saying it failed.');
         self::assertNotSame('', $this->messages->status()['last_sent_at']);
     }
@@ -361,9 +375,9 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $this->messages->record('order:new', 'sale', 'Still waiting');
         $this->messages->record('order:sent', 'sale', 'Sent long ago');
         $this->messages->record('order:recent', 'sale', 'Sent lately');
-        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '8 days' WHERE reference = 'order:old'");
-        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '40 days', sent_at = NOW() - INTERVAL '31 days' WHERE reference = 'order:sent'");
-        $this->db->executeStatement("UPDATE telegram_messages SET created_at = NOW() - INTERVAL '10 days', sent_at = NOW() - INTERVAL '9 days' WHERE reference = 'order:recent'");
+        $this->db->executeStatement("UPDATE cattophp_telegram_messages SET created_at = NOW() - INTERVAL '8 days' WHERE reference = 'order:old'");
+        $this->db->executeStatement("UPDATE cattophp_telegram_messages SET created_at = NOW() - INTERVAL '40 days', sent_at = NOW() - INTERVAL '31 days' WHERE reference = 'order:sent'");
+        $this->db->executeStatement("UPDATE cattophp_telegram_messages SET created_at = NOW() - INTERVAL '10 days', sent_at = NOW() - INTERVAL '9 days' WHERE reference = 'order:recent'");
         $this->settings->forget();
         self::assertSame('Not connected to Telegram. Dropped 1 older than 7 days.', $this->job(static fn(): MockResponse => new MockResponse('{"ok":true,"result":{}}'))->run());
         $deleted = IntegrationContainer::get()->get(RetentionCleanup::class)->run();
@@ -380,21 +394,21 @@ final class OwnerMessagesIntegrationTest extends TestCase
         }));
         foreach (['not a key', '123:short'] as $wrong) {
             try {
-                $setup->connect(['key' => $wrong, 'username' => 'your_username'], $this->admin);
+                $setup->connect(['key' => $wrong, 'username' => 'your_username'], $this->actor());
                 self::fail('Accepted: ' . $wrong);
             } catch (InvalidArgumentException $refused) {
                 self::assertStringContainsString('bot key', $refused->getMessage());
             }
         }
         try {
-            $setup->connect(['key' => '', 'username' => 'your_username'], $this->admin);
+            $setup->connect(['key' => '', 'username' => 'your_username'], $this->actor());
             self::fail('Connected with no key.');
         } catch (InvalidArgumentException $refused) {
             self::assertSame('Paste the bot key.', $refused->getMessage());
         }
         $other = '987654321:another-key-telegram-does-not-know';
         try {
-            $setup->connect(['key' => $other, 'username' => 'your_username'], $this->admin);
+            $setup->connect(['key' => $other, 'username' => 'your_username'], $this->actor());
             self::fail('A key Telegram refuses was saved.');
         } catch (TelegramFailed $refused) {
             self::assertStringNotContainsString($other, $refused->getMessage());
@@ -402,21 +416,21 @@ final class OwnerMessagesIntegrationTest extends TestCase
         self::assertFalse($setup->view()['has_key'], 'Nothing was saved.');
         self::assertSame('none', $setup->view()['state']);
 
-        self::assertSame(['connected' => false, 'key_changed' => true], $setup->connect(['key' => self::KEY, 'username' => '@Your_Username'], $this->admin));
-        $stored = (string) IntegrationContainer::get()->get(OptionRepository::class)->find(OwnerMessageSettings::OPTION);
+        self::assertSame(['connected' => false, 'key_changed' => true], $setup->connect(['key' => self::KEY, 'username' => '@Your_Username'], $this->actor()));
+        $stored = (string) $this->db->fetchOne("SELECT value FROM cattophp_telegram_state WHERE name = 'bot'");
         self::assertStringNotContainsString(self::KEY, $stored, 'It is stored encrypted.');
         self::assertSame(self::KEY, IntegrationContainer::get()->get(SecretCipher::class)->decrypt((string) json_decode($stored, true)['key']));
         $view = $setup->view();
         self::assertStringNotContainsString(self::KEY, (string) json_encode($view), 'It is never shown back.');
         self::assertSame(['waiting', true, false, 'site_alerts_bot', 'Your_Username', 'Not connected', 'neutral'], [$view['state'], $view['has_key'], $view['connected'], $view['bot_name'], $view['username'], $view['title'], $view['title_tone']]);
-        self::assertSame(['connected' => false, 'key_changed' => false], $setup->connect(['key' => '', 'username' => 'Your_Username'], $this->admin), 'Leaving it empty keeps the key.');
+        self::assertSame(['connected' => false, 'key_changed' => false], $setup->connect(['key' => '', 'username' => 'Your_Username'], $this->actor()), 'Leaving it empty keeps the key.');
         self::assertSame(self::KEY, $this->settings->key());
     }
 
     public function testATestMessageIsLoggedAndNeverSentAgainAndLeavesTheStatusAlone(): void
     {
         // Owner, 2026-11-05: "a telegram messages sent log, so I can see what messages you sent and I can check if I got them".
-        $this->db->executeStatement('DELETE FROM telegram_messages');
+        $this->db->executeStatement('DELETE FROM cattophp_telegram_messages');
         $sent = 0;
         $setup = $this->settingsPage(new MockHttpClient(function () use (&$sent): MockResponse {
             if ($this->telegramDown) return new MockResponse('{"ok":false,"description":"Forbidden: bot was blocked by the user"}', ['http_code' => 403]);
@@ -430,9 +444,9 @@ final class OwnerMessagesIntegrationTest extends TestCase
             self::fail('Telegram refused it.');
         } catch (TelegramFailed) {
         }
-        self::assertSame(['all' => 2, 'sign_in' => 0, 'connected' => 0, 'registration' => 0, 'order' => 0, 'sale' => 0, 'test' => 2, 'unsent' => 1], $this->messages->logCounts());
-        self::assertCount(2, $this->messages->logPage('test', 25, 0));
-        self::assertCount(1, $this->messages->logPage('unsent', 25, 0));
+        self::assertSame(['all' => 2, 'sign_in' => 0, 'connected' => 0, 'registration' => 0, 'order' => 0, 'sale' => 0, 'test' => 2, 'unsent' => 1], IntegrationContainer::get()->get(TelegramRepository::class)->logCounts());
+        self::assertCount(2, IntegrationContainer::get()->get(TelegramRepository::class)->logPage('test', 25, 0));
+        self::assertCount(1, IntegrationContainer::get()->get(TelegramRepository::class)->logPage('unsent', 25, 0));
         self::assertSame([], $this->messages->waiting(30), 'A failed test goes at once or not at all: the job never sends it.');
         self::assertSame([0, null], [$setup->view()['waiting'], $setup->view()['last_error']], 'And it does not say the connection is failing.');
         self::assertSame('connected', $setup->view()['state']);
@@ -443,16 +457,16 @@ final class OwnerMessagesIntegrationTest extends TestCase
     {
         $setup = $this->settingsPage(new MockHttpClient());
         self::assertTrue($setup->view()['connected']);
-        $setup->saveChoices(true, false, $this->admin);
+        $setup->saveChoices(['on_register' => true, 'on_sale' => false], null, $this->actor());
         self::assertSame([true, false, true], [$setup->view()['on_register'], $setup->view()['on_sale'], $setup->view()['connected']]);
-        $setup->disconnect($this->admin);
+        $setup->disconnect($this->actor());
         self::assertSame([true, false, false, true], [$setup->view()['on_register'], $setup->view()['on_sale'], $setup->view()['connected'], $setup->view()['disconnected']]);
     }
 
     public function testOnlyTheAccountSettingsNamesIsConnectedAndGetsTheTest(): void
     {
         $this->settings->forget();
-        $this->settings->setKey(self::KEY, 'site_alerts_bot', $this->admin);
+        $this->settings->setKey(self::KEY, 'site_alerts_bot', $this->actor());
         $sent = [];
         $setup = $this->settingsPage(new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
             $update = static fn(int $chat, string $username): array => ['update_id' => $chat, 'message' => ['from' => ['id' => $chat, 'username' => $username], 'chat' => ['id' => $chat, 'type' => 'private']]];
@@ -462,20 +476,20 @@ final class OwnerMessagesIntegrationTest extends TestCase
             return new MockResponse('{"ok":true,"result":{}}');
         }), 'demo');
         try {
-            $setup->connect(['key' => '', 'username' => ''], $this->admin);
+            $setup->connect(['key' => '', 'username' => ''], $this->actor());
             self::fail('A chat was found with no account named.');
         } catch (InvalidArgumentException $refused) {
             self::assertStringContainsString('Telegram username', $refused->getMessage());
         }
         foreach (['no spaces here', 'abc', 'far_too_long_to_be_a_telegram_username'] as $wrong) {
             try {
-                $setup->connect(['key' => '', 'username' => $wrong], $this->admin);
+                $setup->connect(['key' => '', 'username' => $wrong], $this->actor());
                 self::fail('Accepted: ' . $wrong);
             } catch (InvalidArgumentException $refused) {
                 self::assertStringContainsString('Telegram username', $refused->getMessage());
             }
         }
-        self::assertFalse($setup->connect(['key' => '', 'username' => '@your_username'], $this->admin)['connected'], 'A stranger who pressed Start connects nobody.');
+        self::assertFalse($setup->connect(['key' => '', 'username' => '@your_username'], $this->actor())['connected'], 'A stranger who pressed Start connects nobody.');
         self::assertSame('your_username', $setup->view()['username'], 'With or without the @.');
         self::assertSame('waiting', $setup->view()['state']);
         try {
@@ -486,36 +500,30 @@ final class OwnerMessagesIntegrationTest extends TestCase
         }
         self::assertFalse($setup->view()['connected'], 'Nothing is connected, and nothing goes to the stranger.');
         $this->pressedStart = true;
-        self::assertTrue($setup->connect(['key' => '', 'username' => 'your_username'], $this->admin)['connected'], 'A matching username connects, whatever its case.');
+        self::assertTrue($setup->connect(['key' => '', 'username' => 'your_username'], $this->actor())['connected'], 'A matching username connects, whatever its case.');
         self::assertSame([true, '4242', 'connected', 'Connected: @site_alerts_bot to @your_username', 'success'], [$setup->view()['connected'], $this->settings->saved()['chat_id'], $setup->view()['state'], $setup->view()['title'], $setup->view()['title_tone']]);
         $setup->sendTest();
         self::assertSame('4242', $sent[0]['chat_id'], 'The named account, never the stranger.');
         self::assertSame('[DEMO] Test message: your messages from this site will arrive here' . $this->site(), $sent[0]['text']);
 
-        $setup->connect(['key' => '', 'username' => 'YOUR_USERNAME'], $this->admin);
+        $setup->connect(['key' => '', 'username' => 'YOUR_USERNAME'], $this->actor());
         self::assertTrue($setup->view()['connected'], 'The same account in other capitals stays connected.');
-        $setup->connect(['key' => '', 'username' => 'another_account'], $this->admin);
+        $setup->connect(['key' => '', 'username' => 'another_account'], $this->actor());
         self::assertFalse($setup->view()['connected'], 'Another account has another chat, so nothing goes to the old one.');
     }
 
     public function testEveryMessageSaysWhichSite(): void
     {
-        $before = $_ENV['APP_DOMAIN'] ?? null;
-        $_ENV['APP_DOMAIN'] = 'example.com';
-        putenv('APP_DOMAIN=example.com');
-        try {
-            self::assertSame('Sale: Order CL-1042, A course, R2,500, paid by EFT (example.com)', $this->owners()->worded('Sale: Order CL-1042, A course, R2,500, paid by EFT'));
-            self::assertSame('[DEMO] New registration: Thandi Mokoena, South Africa (example.com)', $this->owners('demo')->worded('New registration: Thandi Mokoena, South Africa'));
-        } finally {
-            if ($before === null) { unset($_ENV['APP_DOMAIN']); putenv('APP_DOMAIN'); } else { $_ENV['APP_DOMAIN'] = $before; putenv('APP_DOMAIN=' . $before); }
-        }
+        self::assertNotSame('', $this->site(), 'The site has a domain to name.');
+        self::assertSame('Sale: Order CL-1042, A course, R2,500, paid by EFT' . $this->site(), $this->owners()->worded('Sale: Order CL-1042, A course, R2,500, paid by EFT'));
+        self::assertSame('[DEMO] New registration: Thandi Mokoena, South Africa' . $this->site(), $this->owners('demo')->worded('New registration: Thandi Mokoena, South Africa'));
     }
 
     public function testDisconnectingForgetsTheKeyAndTheAccount(): void
     {
         $setup = $this->settingsPage(new MockHttpClient());
         self::assertTrue($setup->view()['connected']);
-        $setup->disconnect($this->admin);
+        $setup->disconnect($this->actor());
         self::assertSame([false, false, ''], [$setup->view()['has_key'], $setup->view()['connected'], $setup->view()['username']]);
         self::assertSame('', $this->settings->key());
     }
@@ -525,7 +533,7 @@ final class OwnerMessagesIntegrationTest extends TestCase
         $service = IntegrationContainer::get()->get(PlatformAdministrationService::class);
         $service->saveOwnerMessageChoices(true, false, $this->admin);
         $service->disconnectOwnerMessages($this->admin);
-        $logged = $this->db->fetchFirstColumn("SELECT CAST(metadata AS TEXT) FROM audit_log WHERE event_key = 'platform.owner_messages_changed' AND user_id = :actor ORDER BY id", ['actor' => $this->admin]);
+        $logged = $this->db->fetchFirstColumn("SELECT CAST(details AS TEXT) FROM cattophp_activity WHERE action = 'platform.owner_messages_changed' AND actor_id = CAST(:actor AS TEXT) ORDER BY id", ['actor' => $this->admin]);
         self::assertCount(2, $logged);
         self::assertStringNotContainsString('stand-in-key', implode(' ', array_map('strval', $logged)));
         self::assertStringContainsString('on_sale', (string) $logged[0]);
@@ -534,19 +542,19 @@ final class OwnerMessagesIntegrationTest extends TestCase
     /** How every message ends: the site it came from. */
     private function site(): string
     {
-        $domain = trim(Env::string('APP_DOMAIN'));
+        $domain = (new \CattoPHP\Installation\Installation(IntegrationContainer::get()->get(\CattoPHP\Settings\Settings::class)))->domain();
 
         return $domain === '' ? '' : ' (' . $domain . ')';
     }
 
-    private function job(callable $telegram): OwnerMessageJob
+    private function job(callable $telegram): OwnerMessageSender
     {
-        return new OwnerMessageJob($this->messages, $this->settings, new TelegramClient(new MockHttpClient($telegram)), $this->clock);
+        return new OwnerMessageSender($this->messages, $this->settings, new TelegramClient(new MockHttpClient($telegram)), $this->clock);
     }
 
-    private function settingsPage(MockHttpClient $http, string $mode = 'live'): OwnerMessageSetup
+    private function settingsPage(MockHttpClient $http, string $mode = 'live'): TelegramSetup
     {
-        return new OwnerMessageSetup($this->settings, $this->messages, $this->owners($mode), new TelegramClient($http));
+        return new TelegramSetup($this->settings, $this->messages, $this->words($mode), new TelegramClient($http), null, OwnerMessages::CHOICES);
     }
 
     private function course(string $title, int $price): int

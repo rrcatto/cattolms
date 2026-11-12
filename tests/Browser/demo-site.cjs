@@ -109,6 +109,26 @@ async function toReview(page, fixture, course, method) {
             await ctx.close();
         });
 
+        // Each payment method shows only what belongs to it (owner, 2026-11-12: "A person selecting Stitch to pay should only see
+        // what is relevant to that payment method"), by the stylesheet alone, so the same with and without JavaScript.
+        for (const [name, browser, js] of [['chromium', chromium, true], ['firefox', firefox, true], ['chromium without JavaScript', chromium, false]]) {
+            await check(`${name}: checkout shows only the chosen payment method's details`, async () => {
+                const {ctx, page} = await open(browser, fixture.learner.token, {js});
+                const options = await toReview(page, fixture, 'a', null);
+                assert.ok(options.length >= 2, 'more than one method to choose between');
+                for (const method of options) {
+                    await page.locator('#payment-method').selectOption(method);
+                    const shown = await page.locator('[data-method-detail]').evaluateAll((all) => all.filter((detail) => getComputedStyle(detail).display !== 'none').map((detail) => detail.dataset.methodDetail));
+                    assert.deepEqual(shown, [method], `with ${method} chosen, only its details show`);
+                }
+                await page.locator('#payment-method').selectOption('eft');
+                assert.equal(await page.locator('#method-token').isVisible(), false, 'the simulated card outcome is hidden for EFT');
+                await page.goto(`${base}/cart`);
+                await submit(page, page.locator('form[action="/cart/remove"] button').first());
+                await ctx.close();
+            });
+        }
+
         await check('chromium without JavaScript: the notice is plain HTML', async () => {
             const {ctx, page} = await open(chromium, fixture.learner.token, {js: false});
             await page.goto(`${base}/courses`);
@@ -119,13 +139,18 @@ async function toReview(page, fixture, course, method) {
         await check('chromium: checkout offers the simulated card, says it is a simulation, and the order and its invoice say so with fake bank details', async () => {
             const {ctx, page} = await open(chromium, fixture.learner.token);
             const options = await toReview(page, fixture, 'b', 'eft');
-            assert.deepEqual(options, ['eft', 'dummy'], 'the simulated card is offered on a demo site, after EFT (Settings > Payment methods order)');
+            // Card is offered too once the owner ticks it (Stitch, 2026-11-11): the simulated card comes after EFT either way.
+            assert.deepEqual(options.filter((method) => method !== 'card'), ['eft', 'dummy'], 'the simulated card is offered on a demo site, after EFT (Settings > Payment methods order)');
             assert.ok((await text(page)).includes(SIMULATION), 'the review says the purchase is a simulation');
-            // Keep me informed (mailing, step 1; owner, 2026-10-26): News and the course bought, both unticked, kept when ticked.
+            // Keep me informed (mailing, step 1; owner, 2026-10-26): News and the course bought, both unticked, kept when ticked. One
+            // box covers the order's courses, "Send me updates about these courses" (owner, 2026-11-11), sent with the order's form.
             const keep = page.locator('.cl-keep-informed');
             assert.equal(await keep.locator('input[name=news]').isChecked(), false, 'News and Updates is not ticked for the buyer');
-            const followBox = keep.locator(`input[name="follow_course[]"][value="${fixture.courses.b.id}"]`);
+            const followBox = keep.locator('input[name=follow_courses]');
             assert.equal(await followBox.isChecked(), false, 'nor is the course bought');
+            assert.equal(clean(await keep.locator('label:has(input[name=follow_courses]) .cl-ui-picture-choice-label').innerText()), 'Send me updates about this course', 'it says what it asks permission for');
+            assert.deepEqual([await followBox.getAttribute('form'), await keep.locator('input[name=news]').getAttribute('form')], ['checkout-place', 'checkout-place'], 'both are sent with the order');
+            assert.equal(await page.locator(`#checkout-place input[name="follow_course[]"][value="${fixture.courses.b.id}"]`).count(), 1, 'the course it covers goes with the order');
             await keep.locator('input[name=news]').check();
             await followBox.check();
             await page.locator('input[name=accept_terms]').check();
@@ -185,36 +210,43 @@ async function toReview(page, fixture, course, method) {
             const before = {};
             for (const field of Object.keys(fields)) before[field] = await admin.page.locator(field).inputValue();
             const own = await admin.page.getByRole('button', {name: 'Back to the standard words'}).count() > 0;
-            for (const [field, words] of Object.entries(fields)) await admin.page.locator(field).fill(words);
-            await submit(admin.page, admin.page.getByRole('button', {name: 'Save demo messages'}));
-            assert.equal(await flash(admin.page), 'The demo messages are saved.');
-            const visitor = await open(chromium, null);
-            await visitor.page.goto(`${base}/courses`);
-            assert.equal(await notice(visitor.page), `${fields['#demo-heading']} ${fields['#demo-notice']}`, 'a visitor reads them, as plain text');
-            await visitor.page.goto(`${base}/login`);
-            await visitor.page.locator('#email').fill(fixture.learner.email);
-            await submit(visitor.page, visitor.page.getByRole('button', {name: 'Email my secure link'}));
-            let message = null;
-            for (let attempt = 0; attempt < 20 && !message; attempt++) {
-                const found = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${fixture.learner.email}"`)}`)).json();
-                const newest = found.messages?.length ? await (await fetch(`${mailpit}/api/v1/message/${found.messages[0].ID}`)).json() : null;
-                if (newest && clean(newest.Text).startsWith(fields['#demo-email-notice'])) message = newest;
-                else await visitor.page.waitForTimeout(500);
-            }
-            assert.ok(message, 'the email opens with the email message');
-            await visitor.ctx.close();
-            const learner = await open(chromium, fixture.learner.token);
-            await learner.page.goto(`${base}/account/orders/${order}`);
-            assert.ok((await text(learner.page)).includes(fields['#demo-simulation']), 'the order says the checkout message');
-            await learner.ctx.close();
-            await admin.page.goto(settings);
-            for (const [field, words] of Object.entries(fields)) assert.equal(await admin.page.locator(field).inputValue(), words, `${field} shows what was saved`);
-            await submit(admin.page, admin.page.getByRole('button', {name: 'Back to the standard words'}));
-            assert.equal(await flash(admin.page), 'The demo messages are back to the standard words.');
-            assert.equal(await admin.page.getByRole('button', {name: 'Back to the standard words'}).count(), 0, 'nothing is left to go back from');
-            if (own) {
-                for (const field of Object.keys(fields)) await admin.page.locator(field).fill(before[field]);
+            // The site's own words come back whatever happens (a step failing here once left the test words on catto.test): the
+            // standard words, then the owner's own if there were any.
+            try {
+                for (const [field, words] of Object.entries(fields)) await admin.page.locator(field).fill(words);
                 await submit(admin.page, admin.page.getByRole('button', {name: 'Save demo messages'}));
+                assert.equal(await flash(admin.page), 'The demo messages are saved.');
+                const visitor = await open(chromium, null);
+                await visitor.page.goto(`${base}/courses`);
+                assert.equal(await notice(visitor.page), `${fields['#demo-heading']} ${fields['#demo-notice']}`, 'a visitor reads them, as plain text');
+                await visitor.page.goto(`${base}/login`);
+                await visitor.page.locator('#email').fill(fixture.learner.email);
+                await submit(visitor.page, visitor.page.getByRole('button', {name: 'Email my secure link'}));
+                let message = null;
+                for (let attempt = 0; attempt < 20 && !message; attempt++) {
+                    const found = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${fixture.learner.email}"`)}`)).json();
+                    const newest = found.messages?.length ? await (await fetch(`${mailpit}/api/v1/message/${found.messages[0].ID}`)).json() : null;
+                    if (newest && clean(newest.Text).startsWith(fields['#demo-email-notice'])) message = newest;
+                    else await visitor.page.waitForTimeout(500);
+                }
+                assert.ok(message, 'the email opens with the email message');
+                await visitor.ctx.close();
+                const learner = await open(chromium, fixture.learner.token);
+                await learner.page.goto(`${base}/account/orders/${order}`);
+                assert.ok((await text(learner.page)).includes(fields['#demo-simulation']), 'the order says the checkout message');
+                await learner.ctx.close();
+                await admin.page.goto(settings);
+                for (const [field, words] of Object.entries(fields)) assert.equal(await admin.page.locator(field).inputValue(), words, `${field} shows what was saved`);
+                await submit(admin.page, admin.page.getByRole('button', {name: 'Back to the standard words'}));
+                assert.equal(await flash(admin.page), 'The demo messages are back to the standard words.');
+                assert.equal(await admin.page.getByRole('button', {name: 'Back to the standard words'}).count(), 0, 'nothing is left to go back from');
+            } finally {
+                await admin.page.goto(settings);
+                if (await admin.page.getByRole('button', {name: 'Back to the standard words'}).count() > 0) await submit(admin.page, admin.page.getByRole('button', {name: 'Back to the standard words'}));
+                if (own) {
+                    for (const field of Object.keys(fields)) await admin.page.locator(field).fill(before[field]);
+                    await submit(admin.page, admin.page.getByRole('button', {name: 'Save demo messages'}));
+                }
             }
             assert.equal(await notice(admin.page), `${HEADING} ${NOTICE}`, 'this site says what it said before');
             await admin.ctx.close();
@@ -224,24 +256,28 @@ async function toReview(page, fixture, course, method) {
             const admin = await open(chromium, fixture.admin_token);
             await admin.page.goto(`${base}/admin/settings?section=site#settings-site`);
             assert.ok((await text(admin.page)).includes('APP_SITE_MODE is not set in .env, so it is a demo site.') || (await text(admin.page)).includes('APP_SITE_MODE in .env sets it.'), 'the page says where the mode comes from');
-            await admin.page.locator('#site-mode').selectOption('live');
-            await submit(admin.page, admin.page.getByRole('button', {name: 'Save site mode'}));
-            assert.equal(await flash(admin.page), 'This site is now live.');
-            const visitor = await open(chromium, null);
-            const response = await visitor.page.goto(`${base}/courses`);
-            assert.equal(await notice(visitor.page), '', 'no demo notice on a live site');
-            assert.notEqual(await robots(visitor.page), 'noindex, nofollow', 'no demo robots rule');
-            assert.notEqual(response.headers()['x-robots-tag'], 'noindex, nofollow', 'no demo robots header');
-            await visitor.ctx.close();
-            const learner = await open(chromium, fixture.learner.token);
-            assert.deepEqual(await toReview(learner.page, fixture, 'a', null), ['eft'], 'a live site offers no simulated card');
-            await learner.page.goto(`${base}/account/orders/${order}`);
-            assert.ok((await text(learner.page)).includes(SIMULATION), 'an order placed on the demo site stays a simulation');
-            await learner.page.goto(`${base}/cart`);
-            await submit(learner.page, learner.page.locator('form[action="/cart/remove"] button').first());
-            await learner.ctx.close();
-            await admin.page.goto(`${base}/admin/settings?section=site#settings-site`);
-            await submit(admin.page, admin.page.getByRole('button', {name: 'Reset site mode to .env'}));
+            // catto.test goes back to following .env whatever happens: a step failing here must never leave it live.
+            try {
+                await admin.page.locator('#site-mode').selectOption('live');
+                await submit(admin.page, admin.page.getByRole('button', {name: 'Save site mode'}));
+                assert.equal(await flash(admin.page), 'This site is now live.');
+                const visitor = await open(chromium, null);
+                const response = await visitor.page.goto(`${base}/courses`);
+                assert.equal(await notice(visitor.page), '', 'no demo notice on a live site');
+                assert.notEqual(await robots(visitor.page), 'noindex, nofollow', 'no demo robots rule');
+                assert.notEqual(response.headers()['x-robots-tag'], 'noindex, nofollow', 'no demo robots header');
+                await visitor.ctx.close();
+                const learner = await open(chromium, fixture.learner.token);
+                assert.deepEqual(await toReview(learner.page, fixture, 'a', null), ['eft'], 'a live site offers no simulated card');
+                await learner.page.goto(`${base}/account/orders/${order}`);
+                assert.ok((await text(learner.page)).includes(SIMULATION), 'an order placed on the demo site stays a simulation');
+                await learner.page.goto(`${base}/cart`);
+                await submit(learner.page, learner.page.locator('form[action="/cart/remove"] button').first());
+                await learner.ctx.close();
+            } finally {
+                await admin.page.goto(`${base}/admin/settings?section=site#settings-site`);
+                await submit(admin.page, admin.page.getByRole('button', {name: 'Reset site mode to .env'}));
+            }
             assert.equal(await flash(admin.page), 'The site mode now follows APP_SITE_MODE in .env.');
             assert.equal(await notice(admin.page), `${HEADING} ${NOTICE}`, 'catto.test is a demo site again');
             await admin.ctx.close();

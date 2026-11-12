@@ -23,7 +23,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Support\Duration;
+use CattoPHP\Foundation\Duration;
 use CattoLearning\Support\Env;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;

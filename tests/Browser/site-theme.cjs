@@ -2,7 +2,7 @@
    sunset", and the other five "on ice until further notice").
    - bundledThemes(): every theme the code ships under themes/, Saharan Sunset alone, for the checks that look through
      the theme preview, which changes nothing on the site.
-   - siteTheme(): the theme the site is drawn in, the bundled default (ThemeManager::DEFAULT_SLUG), for the checks that
+   - siteTheme(): the theme the site is drawn in, the bundled default (View\ProjectTheme::DEFAULT_SLUG, CattoPHP's theme system), for the checks that
      look as a visitor or a learner, who cannot preview a theme. No check switches the active theme: a check that
      finds the site drawn in another theme fails and says so, and the owner's choice is never changed to make it pass. */
 const fs = require('node:fs'), path = require('node:path');
@@ -15,8 +15,8 @@ function bundledThemes() {
 }
 
 function siteTheme() {
-    const found = /DEFAULT_SLUG = '([a-z0-9-]+)'/.exec(fs.readFileSync(path.join(root, 'src/View/ThemeManager.php'), 'utf8'));
-    if (!found) throw new Error('ThemeManager names no default theme (DEFAULT_SLUG).');
+    const found = /DEFAULT_SLUG = '([a-z0-9-]+)'/.exec(fs.readFileSync(path.join(root, 'src/View/ProjectTheme.php'), 'utf8'));
+    if (!found) throw new Error('ProjectTheme names no default theme (DEFAULT_SLUG).');
     return manifest(found[1]);
 }
 

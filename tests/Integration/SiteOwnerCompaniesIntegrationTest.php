@@ -46,7 +46,7 @@ final class SiteOwnerCompaniesIntegrationTest extends TestCase
     {
         $_COOKIE = $this->cookies;
         foreach ($this->domains as $domain) {
-            $this->db->executeStatement('DELETE FROM audit_log WHERE event_key = :e AND metadata->>\'company_id\' IN (SELECT id::text FROM companies WHERE domain = :d)', ['e' => 'company.created', 'd' => $domain]);
+            $this->db->executeStatement('DELETE FROM cattophp_activity WHERE action = :e AND details->>\'company_id\' IN (SELECT id::text FROM companies WHERE domain = :d)', ['e' => 'company.created', 'd' => $domain]);
             // The company with its people: a company never stands without its administrator, even for a moment.
             $this->db->beginTransaction();
             $this->db->executeStatement('DELETE FROM users WHERE id IN (SELECT user_id FROM user_emails WHERE email LIKE :e)', ['e' => '%@' . $domain]);

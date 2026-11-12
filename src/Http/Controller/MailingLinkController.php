@@ -23,6 +23,9 @@ The addresses an email's links lead to (mailing, step 2; owner, 2026-10-26), ser
 - /m/n/{token}: a forwarded copy's "Never email me", for the friend: opening it shows a button.
 
 Changelog:
+2026/11/12 SAST
+- An unsubscribe link and the one-click button stop lists through CattoPHP (CopyOutcomes), and the opening picture, a tracked
+  link and whether a copy has stopped its list are CattoPHP's (CopyLinks; CattoPHP Phase 4, step 9, part 3).
 2026/10/28 SAST
 - The web copy, Forward to a friend and Never email me.
 2026/10/26 SAST
@@ -35,8 +38,8 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Mailing\CampaignRepository;
-use CattoLearning\Mailing\MailingOutcomes;
-use CattoLearning\Mailing\MailingSettings;
+use CattoPHP\Mailing\CopyLinks;
+use CattoPHP\Mailing\CopyOutcomes;
 use CattoLearning\Mailing\SleepingAddresses;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -53,11 +56,10 @@ final class MailingLinkController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly CampaignRepository $campaigns,
-        private readonly MailingOutcomes $outcomes,
-        private readonly MailingSettings $settings,
+        private readonly CopyOutcomes $outcomes,
         private readonly SleepingAddresses $sleeping,
-        private readonly \CattoLearning\Mailing\MailingConsents $consents,
         private readonly \CattoLearning\Mailing\MailingForwards $forwards,
+        private readonly CopyLinks $links,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -82,7 +84,7 @@ final class MailingLinkController extends BaseController
         }
         if ($delivery === null) throw $this->notFound('This unsubscribe link is not known. What you get is under Account, My Subscriptions.');
         // Already stopped (the email app's button, or this page before): it says so rather than asking again.
-        if ($delivery['unsubscribed_at'] !== null && ($delivery['list_id'] === null || $delivery['user_id'] === null || !$this->consents->isSubscribedToList((int) $delivery['user_id'], (int) $delivery['list_id']))) {
+        if ($this->links->stopped($delivery)) {
             return $this->render('mailing-unsubscribe', ['title' => 'Unsubscribed', 'stopped' => true, 'everything' => $delivery['list_id'] === null, 'list_name' => self::listName($delivery), 'token' => (string) $delivery['token']]);
         }
 
@@ -106,8 +108,7 @@ final class MailingLinkController extends BaseController
     #[Route('/m/o/{token}.gif', name: 'mailing_open', requirements: ['token' => '[0-9a-f]{32}'], methods: ['GET'])]
     public function open(): Response
     {
-        $delivery = $this->campaigns->deliveryByToken((string) $this->param('token'));
-        if ($delivery !== null && (bool) $this->settings->rule('track_opens')) $this->campaigns->recordOpen((int) $delivery['id']);
+        $this->links->opened((string) $this->param('token'));
 
         return new Response((string) base64_decode(self::PIXEL, true), 200, ['Content-Type' => 'image/gif', 'Cache-Control' => 'no-store, max-age=0']);
     }
@@ -115,10 +116,8 @@ final class MailingLinkController extends BaseController
     #[Route('/m/c/{token}/{link}', name: 'mailing_click', requirements: ['token' => '[0-9a-f]{32}', 'link' => '\d+'], methods: ['GET'])]
     public function click(): Response
     {
-        $delivery = $this->campaigns->deliveryByToken((string) $this->param('token'));
-        $url = $delivery === null ? null : $this->campaigns->linkUrl((int) $delivery['campaign_id'], (int) $this->param('link'));
-        if ($delivery === null || $url === null) throw $this->notFound('This link is not known.');
-        if ((bool) $this->settings->rule('track_clicks')) $this->campaigns->recordClick((int) $delivery['id'], (int) $this->param('link'));
+        $url = $this->links->clicked((string) $this->param('token'), (int) $this->param('link'));
+        if ($url === null) throw $this->notFound('This link is not known.');
 
         return new RedirectResponse($url, 302, ['Cache-Control' => 'no-store']);
     }

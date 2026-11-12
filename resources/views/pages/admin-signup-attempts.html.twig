@@ -7,7 +7,7 @@
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Sign-up Attempts' %}
 	{% set ph_lead = 'Every registration form sent, with where it came from, its risk and what became of it. Open one to see why.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'The last 30 days', summary: month.all == 1 ? '1 sign-up attempt.' : month.all ~ ' sign-up attempts.'}) }}
 		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}{% block body %}
@@ -36,7 +36,7 @@
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'attempts', pagination: attempts_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-			{% block header %}<tr>{% for sh in sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: attempts_pagination.region, sort_results: attempts_pagination.results} %}{% endfor %}</tr>{% endblock %}
+			{% block header %}<tr>{% for sh in sort_headers %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: sh, sort_region: attempts_pagination.region, sort_results: attempts_pagination.results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}{% for row in rows %}
 				<tr data-attempt-id="{{ row.id }}">
 					<td>{{ row.created_at }}</td>

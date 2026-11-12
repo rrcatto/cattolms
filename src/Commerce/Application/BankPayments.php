@@ -42,7 +42,7 @@ use CattoLearning\Commerce\Domain\OrderNumber;
 use CattoLearning\Commerce\Infrastructure\BankPaymentRepository;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\AccountReference;
+use CattoPHP\Foundation\AccountReference;
 use CattoLearning\Support\Address\OrderAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;

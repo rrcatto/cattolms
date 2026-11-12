@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for user records.
 
 Changelog:
+2026/11/09 SAST
+- A new account's reference starts with the account reference prefix in force, .env's included: the database used
+  only a prefix Settings saved, so COMMERCE_ACCOUNT_PREFIX in .env never reached an account (CattoPHP Phase 2, step 3).
 2026/10/26 SAST
 - replacePrimaryEmail() changes the primary row in place (saving anyone with a secondary address had failed on the
   one-secondary index); emailTaken() and removeSecondaryEmailsAt() for the company domain rule.
@@ -32,15 +35,48 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
+use CattoPHP\Settings\Settings;
 use CattoLearning\Support\Uuid;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use RuntimeException;
 
 final class UserRepository
 {
+    /** @param Settings|null $settings CattoPHP's settings, for the account reference prefix in force */
     public function __construct(
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly ?Settings $settings = null,
     ) {
+    }
+
+    /** The active account a verified email address belongs to, in any case, or null (CattoPHP's sign-in accounts). */
+    public function activeIdForVerifiedEmail(string $email): ?int
+    {
+        $id = $this->db->fetchOne(
+            "SELECT u.id FROM user_emails ue JOIN users u ON u.id = ue.user_id
+             WHERE LOWER(ue.email) = LOWER(:email) AND ue.verified_at IS NOT NULL AND u.status = 'active' LIMIT 1",
+            ['email' => trim($email)]
+        );
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /**
+     * An active account with its primary address and the name the site gives it (first and last names, else the display
+     * name, else the address), or null (CattoPHP's sign-in accounts).
+     *
+     * @return array{id:int,email:string,name:string}|null
+     */
+    public function activeAccount(int $userId): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT u.id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), NULLIF(u.display_name, ''), ue.email) AS name, ue.email
+             FROM users u JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary
+             WHERE u.id = :id AND u.status = 'active'",
+            ['id' => $userId]
+        );
+
+        return $row === false ? null : ['id' => (int) $row['id'], 'email' => (string) $row['email'], 'name' => (string) $row['name']];
     }
 
     /** The status of the account a verified email address belongs to, whatever it is, or null when there is none. */
@@ -117,11 +153,13 @@ final class UserRepository
         // An identity is the root of its own universe: there is no parent row to inherit from,
         // so the caller states it. Everything else in this class derives the token from the user.
         $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO users (public_id, status, created_at, updated_at, last_login_at)
-             VALUES (:public_id, :status, :created_at, :updated_at, NULL)
+            'INSERT INTO users (public_id, account_reference, status, created_at, updated_at, last_login_at)
+             VALUES (:public_id, next_account_reference(CAST(:prefix AS TEXT)), :status, :created_at, :updated_at, NULL)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
+                // What Settings saved wins in the database too; this is the prefix when nothing is saved.
+                'prefix' => $this->settings?->get('COMMERCE_ACCOUNT_PREFIX'),
                 'status' => 'active',
                 'created_at' => $now,
                 'updated_at' => $now,

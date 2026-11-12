@@ -116,6 +116,10 @@ if ($action === 'create') {
         // A draft course, the check's own or one not yet published, has no public preview: ADMIN's preview plays its trailer.
         $draft = $deck['own'] || ($deck['kind'] === 'trailer' && $db->fetchOne('SELECT status FROM courses WHERE id = :id', ['id' => (int) $deck['course_id']]) === 'draft');
         if ($draft && $deck['kind'] === 'trailer') { $deck['url'] .= '?preview=1'; }
+        // A published course's trailer not ticked for the public preview is seen by nobody (the reader leaves trailers out):
+        // the check names it and measures it once it is ticked, when it has never passed.
+        $deck['hidden'] = !$draft && $deck['kind'] === 'trailer'
+            && !(bool) $db->fetchOne('SELECT public_preview FROM course_item_placements WHERE node_id = :node', ['node' => (int) $deck['node']]);
     }
     unset($deck);
 

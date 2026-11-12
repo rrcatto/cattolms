@@ -7,9 +7,9 @@
    It sends one contact message itself, through the Contact page as a visitor does, so the notice to the site is judged,
    and it requires the three kinds of link stage 2 moved: an order (/account/orders/CL-…, from the buyer's emails the
    commerce checks send), a person waiting for approval (/admin/people/CL…, from the notice signup-checks.cjs causes) and
-   a contact message (/admin/messages/MSG-…). Run it after commerce-wallets.cjs (or financial-documents.cjs) and
-   signup-checks.cjs, with CATTO_MAIL_SINCE set to before them. The contact message it sent is removed afterwards
-   (no-row-ids-fixture.php forget-contact). results.json goes to CATTO_BROWSER_OUTPUT. Mailpit: CATTO_MAILPIT_URL. */
+   a contact message (/inbox/MSG-…, its conversation in the Inbox since 2026-11-11). Run it after commerce-wallets.cjs
+   (or financial-documents.cjs) and signup-checks.cjs, with CATTO_MAIL_SINCE set to before them. The contact message it
+   sent is removed afterwards (no-row-ids-fixture.php forget-contact). results.json goes to CATTO_BROWSER_OUTPUT. Mailpit: CATTO_MAILPIT_URL. */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs'), path = require('node:path');
 const {execFileSync} = require('node:child_process');
@@ -22,7 +22,7 @@ const COUNTS = /^(page|.+_page|.+_page_size|page_size|v|insert_index|reviews_sta
 const REQUIRED = [
     {pattern: /^\/account\/orders\/CL-\d{8,}/, what: 'an order, from a buyer\'s email (run commerce-wallets.cjs or financial-documents.cjs first)'},
     {pattern: /^\/admin\/people\/[A-Z]{1,3}\d{12,26}[0-9A-Z](\/|$|#)/, what: 'a person waiting for approval, from the notice to administrators (run signup-checks.cjs first)'},
-    {pattern: /^\/admin\/messages\/MSG-\d{6,}/, what: 'a contact message, from the notice to the site'},
+    {pattern: /^\/inbox\/MSG-\d{6,}/, what: 'a contact message, from the notice to the site'},
 ];
 const php = (args) => execFileSync('podman', ['exec', '-u', 'cattotest', process.env.CATTO_PHP_CONTAINER || 'env_php_1', 'sh', '-lc',
     `cd /home/cattotest/code/current && SHELL_VERBOSITY=-1 php ${args}`], {encoding: 'utf8'});
@@ -53,7 +53,10 @@ async function json(address) {
 /** Sends one message through the Contact page, as a visitor, and returns the sender's address. */
 async function sendContact(browser) {
     const [person] = JSON.parse(php('tests/Browser/signup-checks-fixture.php names 1'));
-    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce'});
+    // As a visitor's own browser: headless Chromium says it is a script, which the Inbox's spam check (2026-11-11) rightly
+    // counts against a message, and with the check's mail-less address (.test) that would file it in Spam, unannounced.
+    const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 900}, reducedMotion: 'reduce',
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'});
     const page = await context.newPage();
     await page.goto(`${base}/contact`, {waitUntil: 'load'});
     await page.locator('input[name=reason][value=other]').check({force: true});

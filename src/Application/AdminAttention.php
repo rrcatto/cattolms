@@ -22,6 +22,7 @@ Kinds, in this order, oldest first within each:
 - review: a course review waiting for moderation (Course Reviews, at that review: Approve or Reject);
 - request: a company learner's course request waiting for a decision (Course Requests, at that request);
 - message: a contact message not yet answered (the message's page: reply, then Mark as answered);
+- price: a published course with no price on sale (its Pricing tab; owner, 2026-11-11);
 - money: TransactionAttention's items (an order paid in part or overpaid, a cancelled order's payment, a refund to
   decide or to pay out, money that paid no order), each on its own page;
 - identity: an identity check Didit's reviewers are deciding (the person's page);
@@ -31,9 +32,11 @@ Kinds, in this order, oldest first within each:
 - draft: a course not yet published (the course's page: publish it or delete it).
 
 Changelog:
+2026/11/12 SAST
+- Site protection is CattoPHP's (CattoPHP Phase 4, step 3): a flagged address comes from its Flags.
 2026/11/07 SAST
 - A person is linked by their account reference (/admin/people/CL2026…, owner 2026-11-06).
-- A contact message opens at its reference (/admin/messages/MSG-000043), never its row id.
+- A contact message opens at its reference in the Inbox (/inbox/MSG-000043), never its row id.
 2026/10/28 SAST
 - A course video that no longer plays (the daily video check, decision 8A).
 2026/10/21 SAST
@@ -66,7 +69,7 @@ final class AdminAttention
     ];
 
     /** Each kind's button icon, in keeping with what its button does (owner, 2026-10-21: every button has an icon). */
-    private const ICONS = ['account' => 'action-approve', 'review' => 'action-approve', 'request' => 'action-approve', 'message' => 'action-reply', 'identity' => 'action-open', 'draft' => 'action-open', 'signin_country' => 'action-view', 'mailing' => 'action-approve'];
+    private const ICONS = ['account' => 'action-approve', 'review' => 'action-approve', 'request' => 'action-approve', 'message' => 'action-reply', 'identity' => 'action-open', 'draft' => 'action-open', 'price' => 'action-edit', 'signin_country' => 'action-view', 'mailing' => 'action-approve'];
 
     /** And each money item's. */
     private const MONEY_ICONS = [
@@ -87,7 +90,7 @@ final class AdminAttention
         private readonly ?\CattoLearning\Auth\Signup\SignInHistory $signIns = null,
         private readonly ?\CattoLearning\Mailing\CampaignRepository $campaigns = null,
         private readonly ?\CattoLearning\Course\CourseVideoCheckRepository $videos = null,
-        private readonly ?\CattoLearning\SiteAnalytics\FlagRepository $siteFlags = null
+        private readonly ?\CattoPHP\Protection\Flags $siteFlags = null
     ) {
     }
 
@@ -107,12 +110,12 @@ final class AdminAttention
             $checks = $this->signups?->forUsers(array_map(static fn(array $person): int => (int) $person['id'], $waiting)) ?? [];
             foreach ($waiting as $person) {
                 $check = $checks[(int) $person['id']] ?? null;
-                $from = $check !== null && $check['country_code'] !== '' ? ' from ' . \CattoLearning\Auth\Signup\SignupCountries::name($check['country_code']) : '';
+                $from = $check !== null && $check['country_code'] !== '' ? ' from ' . \CattoPHP\Signup\SignupCountries::name($check['country_code']) : '';
                 $item = self::item('account', 'Account', self::person($person['id'], $person['name'] ?: $person['email'], $person['account_reference']), true, 'is waiting for approval',
                     'Registered ' . self::date($person['created_at']) . $from . ' with ' . $person['email'] . '. Approve the account to let them sign in, or disable it to keep them out.',
                     PersonAddress::admin((string) $person['account_reference']), 'Approve or disable', $person['created_at']);
                 if ($check !== null) {
-                    $item['risk'] = ['label' => \CattoLearning\Auth\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'], 'tone' => \CattoLearning\Auth\Signup\RiskAssessment::tone($check['band'])];
+                    $item['risk'] = ['label' => \CattoPHP\Signup\RiskAssessment::label($check['band']) . ' ' . $check['score'], 'tone' => \CattoPHP\Signup\RiskAssessment::tone($check['band'])];
                 }
                 $items[] = $item;
             }
@@ -142,13 +145,13 @@ final class AdminAttention
                     '/admin/course/requests?requests_status=pending#request-' . $request['id'], 'Approve or reject', (string) $request['requested_at']);
             }
         }
-        if ($admin->hasPermission('PLATFORM.PERSON.VIEW')) {
+        if ($admin->hasPermission('PLATFORM.INBOX.VIEW')) {
             foreach ($this->records->unansweredMessages() as $message) {
                 // A sender without an account is named without a link.
                 $sender = $message['person_id'] !== null ? self::person($message['person_id'], $message['sender_name'], $message['person_reference'])
                     : ['name' => self::name($message['sender_name']), 'reference' => '', 'href' => ''];
                 $items[] = self::item('message', 'Message', $sender, true, 'sent message ' . $message['reference'] . ': ' . ContactReason::label((string) $message['reason']),
-                    'Received ' . self::date((string) $message['created_at']) . '. Read it, reply by email, then mark it answered.',
+                    'Received ' . self::date((string) $message['created_at']) . '. Read it and reply in the Inbox.',
                     \CattoLearning\Support\Address\RecordAddress::message((string) $message['reference']), 'Read and reply', (string) $message['created_at']);
             }
         }
@@ -171,6 +174,12 @@ final class AdminAttention
                     $video['detail'] . ' Found on ' . self::date($video['failing_since']) . '. Replace the video in its item, or take it out of the course.',
                     \CattoLearning\Support\Address\CourseItemAddress::admin($video['item_name']), 'Open the video', $video['failing_since']);
             }
+            // A published course nobody can buy, its prices ended or never set (owner, 2026-11-11).
+            foreach ($this->records->coursesWithoutAPrice() as $course) {
+                $items[] = self::item('price', 'No price', null, false, $course['title'] . ' has no price on sale',
+                    ($course['ended'] !== null ? 'Its last price ended on ' . self::date($course['ended']) . '. ' : '') . 'It stays published, but nobody can buy it until it has a price on sale.',
+                    \CattoLearning\Course\CourseAddress::admin($course['code'], '?tab=pricing'), 'Set a price', $course['updated_at']);
+            }
             foreach ($this->records->draftCourses() as $course) {
                 $items[] = self::item('draft', 'Draft course', null, false, $course['title'] . ' is not published',
                     'Nobody can see or buy it. Publish it when it is ready, or delete it.',
@@ -180,7 +189,7 @@ final class AdminAttention
         // An address the site flagged and the owner has not decided (site analytics, owner 2026-11-04).
         if ($admin->hasPermission('PLATFORM.SITEANALYTICS.VIEW')) {
             foreach ($this->siteFlags?->waiting() ?? [] as $flag) {
-                $why = \CattoLearning\SiteAnalytics\FlagRepository::why($flag)[0]['words'] ?? '';
+                $why = \CattoPHP\Protection\Flags::why($flag)[0]['words'] ?? '';
                 $items[] = self::item('site_flag', 'Flagged address', null, false, $flag['subject'] . ' behaves like a bad actor',
                     $why . ' Lock it out, or mark it not a problem.', \CattoLearning\SiteAnalytics\SiteAnalyticsWords::addressHref((string) $flag['subject']), 'Open the address', (string) $flag['last_flagged_at']);
             }
@@ -195,7 +204,7 @@ final class AdminAttention
                     '/mailing/messages/' . $campaign['id'] . '#send', $approval ? 'Approve or cancel' : 'Resume or cancel', (string) $campaign['updated_at']);
             }
         }
-        $order = array_flip(['account', 'signin_country', 'site_flag', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'video', 'draft']);
+        $order = array_flip(['account', 'signin_country', 'site_flag', 'review', 'request', 'message', 'money', 'mailing', 'identity', 'price', 'video', 'draft']);
         usort($items, static fn(array $a, array $b): int => [$order[$a['kind']], $a['at']] <=> [$order[$b['kind']], $b['at']]);
         return $items;
     }

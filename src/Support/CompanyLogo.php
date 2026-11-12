@@ -24,7 +24,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Support;
 
-use CattoLearning\View\Artwork\UploadedSvg;
+use CattoPHP\Ui\UploadedSvg;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -55,7 +55,7 @@ final class CompanyLogo
         }
         if (preg_match('/^\s*(?:\xEF\xBB\xBF)?\s*(?:<\?xml[^>]*>\s*)?(?:<!--.*?-->\s*)*(?:<!DOCTYPE[^>]*>\s*)?<svg[\s>]/is', $bytes) === 1) {
             try {
-                $svg = UploadedSvg::validate($bytes, UploadedSvg::LOGO_BYTES, 'logo');
+                $svg = UploadedSvg::validate($bytes, UploadedSvg::PICTURE_BYTES, 'logo');
             } catch (InvalidArgumentException $refused) {
                 throw new RuntimeException($refused->getMessage(), 0, $refused);
             }

@@ -17,7 +17,8 @@ final class CompanyCreditFulfilment
         private readonly CommerceRepository $records,
         private readonly AdministrationRepository $administration,
         private readonly CourseRepository $courses,
-        private readonly ClockInterface $clock
+        private readonly ClockInterface $clock,
+        private readonly ?\CattoLearning\Commerce\Infrastructure\BundleCreditRepository $bundleCredits = null
     ) {}
 
     /**
@@ -49,6 +50,13 @@ final class CompanyCreditFulfilment
         $now = $this->clock->now()->format(DATE_ATOM);
         $creditByItem = [];
         foreach ($items as $item) {
+            // A bundle credit (owner, 2026-11-11): one credit row for the line, the bundle and its courses as sold.
+            if ($item['product_type'] === 'bundle_credit' && (int)$item['company_id'] === $companyId && $this->bundleCredits !== null) {
+                $snapshot = is_array($item['snapshot'] ?? null) ? $item['snapshot'] : (json_decode((string) ($item['snapshot'] ?? '{}'), true) ?: []);
+                $creditId = $this->bundleCredits->createPurchased((int)$item['id'], $companyId, $snapshot + ['bundle_id'=>(int)$item['bundle_id'],'bundle_offer_id'=>(int)$item['bundle_offer_id'],'quantity'=>(int)$item['quantity'],'access_period_seconds'=>(int)$item['access_period_seconds']], (int)$order['purchaser_user_id'], $now);
+                $this->records->audit((int)$order['id'],null,'bundle_credit.created',['order_item_id'=>$item['id'],'bundle_credit_id'=>$creditId,'quantity'=>$item['quantity']],$now);
+                continue;
+            }
             if ($item['product_type'] !== 'company_credit' || (int)$item['company_id'] !== $companyId) {
                 throw new RuntimeException('A company order item has the wrong beneficiary.');
             }

@@ -1,6 +1,6 @@
 # Installing CattoLMS
 
-**LMS:** 1.1.2 · **Updated:** 2026-11-08
+**LMS:** 1.2.0 · **Updated:** 2026-11-12
 
 Keep this guide to what the installer does now, and under 150,000 characters: when something here stops being true, change it or take it out. The Git history keeps every earlier version.
 
@@ -47,7 +47,7 @@ The installer asks two things:
 
 It then does the following:
 
-1. Copies the chosen version from GitHub to `/usr/local/lib/php/cattolms/<version>`, owned by root, and installs its Composer packages there. A directory from before the rename, `/usr/local/lib/php/catto-learning`, is renamed `cattolms`.
+1. Copies the chosen version from GitHub to `/usr/local/lib/php/cattolms/<version>`, owned by root, and installs its Composer packages there, CattoPHP among them, whose install copies CattoPHP's styles and scripts into the release's `public_html/cattophp/`. A directory from before the rename, `/usr/local/lib/php/catto-learning`, is renamed `cattolms`.
 2. Writes the settings to `/home/<username>/.env` (mode 640). An existing `.env` is kept as `.env.before-<version>`, and its values are offered as the defaults. How the program runs (`APP_ENV`) is never changed by an install: an existing site keeps its value, and a new site starts as `development`, with debugging, which follows it. Changing a site to `production` is its owner's decision, made by editing `.env`.
 3. Prepares the database named in `.env`:
    - creates it, when PostgreSQL runs on this server and it is missing;
@@ -61,7 +61,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 1.1.2` | Install this version. The default is the newest release. |
+| `--version 1.2.0` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -93,8 +93,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  1.1.2/                    the code of each installed version (root)
-  current -> 1.1.2          the version the site runs
+  1.2.0/                    the code of each installed version (root)
+  current -> 1.2.0          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

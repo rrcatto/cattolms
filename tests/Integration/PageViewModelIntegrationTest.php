@@ -33,7 +33,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
-use CattoLearning\View\ThemeManager;
+use CattoPHP\Theme\ThemeManager;
 use CattoLearning\View\ThemeRenderer;
 use PHPUnit\Framework\TestCase;
 

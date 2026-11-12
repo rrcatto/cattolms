@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course administration' %}{% set ph_kicker = 'Structure, presentation and availability' %}{% set ph_title = course.title ~ ' · Course Content' %}{% set ph_lead = 'Course Items are reusable. These rows hold only this course’s structure, display overrides, public preview setting, assessment role and relative availability. Every move is saved at once.' %}{% include '@platform/partials/page-head.html.twig' %}
-{{ importmap() }}
+{% set ph_back_href = course_admin_url(course) %}{% set ph_back_label = 'Course administration' %}{% set ph_kicker = 'Structure, presentation and availability' %}{% set ph_title = course.title ~ ' · Course Content' %}{% set ph_lead = 'Course Items are reusable. These rows hold only this course’s structure, display overrides, public preview setting, assessment role and relative availability. Every move is saved at once.' %}{% include '@CattoPHP/page/head.html.twig' %}
+{{ importmap('app', {nonce: csp_nonce()}) }}
 <section class="cl-page-section">
 {% embed ui_template('action.group') with {props:ui_props('action.group',{})} %}{% block body %}{{ ui('action.link',{label:'Preview as learner',href:course_admin_url(course, '/preview'), icon: 'action-preview'}) }}{{ ui('action.link',{label:'Preview public course',href:'/courses/' ~ course.slug ~ '/preview?preview=1', icon: 'action-preview'}) }}{% endblock %}{% endembed %}
 {# A course of the older shape (one lesson per module) can be arranged into module sections in one step (owner, 2026-10-28). #}

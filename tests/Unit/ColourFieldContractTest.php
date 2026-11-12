@@ -41,7 +41,7 @@ final class ColourFieldContractTest extends TestCase
         $field = (string) file_get_contents($root . '/resources/views/partials/hex-colour-field.html.twig');
         self::assertStringContainsString('data-hex-colour', $field);
         self::assertStringContainsString('cl-hex-colour-swatch', $field);
-        self::assertStringContainsString("input[data-hex-colour]", (string) file_get_contents($root . '/public_html/js/platform-overrides.js'), 'The swatch follows the code as it is typed.');
+        self::assertStringContainsString("input[data-hex-colour]", (string) (file_get_contents($root . '/vendor/rrcatto/cattophp/public/js/cattophp.js') . file_get_contents($root . '/public_html/js/platform-overrides.js')), 'The swatch follows the code as it is typed.');
         foreach (['admin-financial-documents', 'admin-certificate-design', 'mailing-template'] as $page) {
             self::assertStringContainsString('partials/hex-colour-field.html.twig', (string) file_get_contents($root . '/resources/views/pages/' . $page . '.html.twig'), $page);
         }

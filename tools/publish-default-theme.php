@@ -23,7 +23,7 @@ use CattoLearning\Application\CliBootstrap;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $boot = CliBootstrap::boot();
-$themes = $boot['container']->get(\CattoLearning\View\ThemeManager::class);
+$themes = $boot['container']->get(\CattoPHP\Theme\ThemeManager::class);
 $key = $themes->defaultThemeKey();
 $themes->publish($key);
 

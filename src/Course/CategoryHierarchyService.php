@@ -35,8 +35,8 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\TreeArrangement;
-use CattoLearning\Support\TreeMoveRefused;
+use CattoPHP\Ui\TreeArrangement;
+use CattoPHP\Ui\TreeMoveRefused;
 use InvalidArgumentException;
 
 final class CategoryHierarchyService

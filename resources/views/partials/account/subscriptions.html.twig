@@ -36,7 +36,7 @@
 	{{ ui('layout.section-head', {heading: 'What you follow', summary: 'You get the updates about what you follow: a new course in a category or tag, and news about a course. Follow more on any course, category or tag page.'}) }}
 	{% if mailing.follows %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Following'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Type'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Since'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Following'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Type'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Since'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
 		{% block body %}{% for follow in mailing.follows %}<tr>
 			<td class="cell-text"><a href="{{ follow.href }}">{{ follow.name }}</a></td>
 			<td>{{ follow.kind_label }}</td>
@@ -73,7 +73,7 @@
 	{{ ui('layout.section-head', {heading: 'Emails we sent you', summary: 'Each one as it was sent, in case you missed it. The latest 30.'}) }}
 	{% if sent %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Emails we sent you'})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Date'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'Subject'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
+		{% block header %}<tr>{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Date'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'Subject'}} %}{% include '@CattoPHP/ui/data/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: ''}} %}</tr>{% endblock %}
 		{% block body %}{% for copy in sent %}<tr>
 			<td>{{ copy.handed_at|date('j M Y') }}</td>
 			<td class="cell-text">{{ copy.subject }}</td>

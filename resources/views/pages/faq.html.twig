@@ -11,7 +11,7 @@
 	{% set ph_title = 'Frequently asked questions' %}
 	{% set ph_lead = 'Short answers about buying, paying, access, grading, certificates and refunds. Choose a question to see its answer.' %}
 	{% set ph_hero %}{% include '@platform/partials/artwork/faq-hero.html.twig' %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' %}
+	{% include '@CattoPHP/page/head.html.twig' %}
 	{% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
 	{% set icons = {
 		buying: '<svg ' ~ icon_attributes ~ '><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h7.6a1.5 1.5 0 0 0 1.4-1l1.9-6.3H6.2"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>',

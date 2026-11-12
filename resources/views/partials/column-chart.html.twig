@@ -9,7 +9,7 @@
 	<ol class="cl-column-chart-columns">
 		{% for cc_column in cc_columns %}
 			<li class="cl-column-chart-column">
-				{% if cc_column.href %}<a class="cl-column-chart-bar" href="{{ cc_column.href }}" style="height:{{ cc_column.share }}%" title="{{ cc_column.title }}" aria-label="{{ cc_column.title }}"></a>{% else %}<span class="cl-column-chart-bar" title="{{ cc_column.title }}"><span class="visually-hidden">{{ cc_column.title }}</span></span>{% endif %}
+				{% if cc_column.href %}<a class="cl-column-chart-bar {{ cc_column.share|share }}" href="{{ cc_column.href }}" title="{{ cc_column.title }}" aria-label="{{ cc_column.title }}"></a>{% else %}<span class="cl-column-chart-bar" title="{{ cc_column.title }}"><span class="visually-hidden">{{ cc_column.title }}</span></span>{% endif %}
 				{% if cc_column.labelled %}<span class="cl-column-chart-label" aria-hidden="true">{{ cc_column.label }}</span>{% endif %}
 			</li>
 		{% endfor %}

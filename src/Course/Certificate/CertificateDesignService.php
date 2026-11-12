@@ -37,13 +37,13 @@ declare(strict_types=1);
 namespace CattoLearning\Course\Certificate;
 
 use CattoLearning\Document\DocumentAssetRepository;
-use CattoLearning\Document\DocumentPdfRenderer;
+use CattoPHP\Document\PdfRenderer;
 use CattoLearning\Document\DocumentSampleData;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Configuration\SiteLogo;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\Document\RenderedDocument;
-use CattoLearning\Document\TemplateValidationException;
+use CattoPHP\Document\RenderedDocument;
+use CattoPHP\Document\TemplateValidationException;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\ImageProcessing;
@@ -61,7 +61,7 @@ final class CertificateDesignService
         private readonly CertificateDesignCompiler $compiler,
         private readonly DocumentAssetRepository $assets,
         private readonly DocumentTemplateRenderer $renderer,
-        private readonly DocumentPdfRenderer $pdf,
+        private readonly PdfRenderer $pdf,
         private readonly TransactionManager $transactions,
         private readonly AuditRepository $audit,
         ?\Closure $isUploadedFile = null,
@@ -309,7 +309,7 @@ final class CertificateDesignService
      * The design's template, with an installed look's background stored as a document image so the
      * renderer can embed it.
      *
-     * @return array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int,signature_room_mm:?float}
+     * @return array{html:string,css:string,settings:\CattoPHP\Document\PageSettings,box_height_mm:int,signature_room_mm:?float}
      */
     private function compile(CertificateDesign $design): array
     {

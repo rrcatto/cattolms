@@ -14,6 +14,9 @@ their IP address and country, and every sign-in of the last week from a country 
 before, until the administrator marks it as seen (user.signin_country_seen).
 
 Changelog:
+2026/11/09 SAST
+- The activity log is CattoPHP's (CattoPHP Phase 2, step 4): cattophp_activity, its person the actor (account_person()
+  turns the actor back into a person's number), action, details and happened_at for event_key, metadata and created_at.
 2026/10/26 SAST
 - Created.
 */
@@ -33,9 +36,9 @@ final class SignInHistoryRepository
     {
         return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'at' => (string) $row['at'], 'ip' => (string) $row['ip'],
             'country' => (string) $row['country'], 'seen' => (bool) $row['seen']], $this->db->fetchAllAssociative(
-            "SELECT l.id, to_char(l.created_at, 'YYYY-MM-DD HH24:MI') AS at, COALESCE(host(l.ip_address), '') AS ip, COALESCE(l.metadata->>'country', '') AS country,
-                    EXISTS (SELECT 1 FROM audit_log s WHERE s.event_key = 'user.signin_country_seen' AND s.metadata->>'login_id' = l.id::text) AS seen
-             FROM audit_log l WHERE l.user_id = :user AND l.event_key = 'auth.login' ORDER BY l.created_at DESC, l.id DESC LIMIT :limit",
+            "SELECT l.id, to_char(l.happened_at, 'YYYY-MM-DD HH24:MI') AS at, COALESCE(l.ip_address, '') AS ip, COALESCE(l.details->>'country', '') AS country,
+                    EXISTS (SELECT 1 FROM cattophp_activity s WHERE s.action = 'user.signin_country_seen' AND s.details->>'login_id' = l.id::text) AS seen
+             FROM cattophp_activity l WHERE l.actor_id = CAST(:user AS TEXT) AND l.action = 'auth.login' ORDER BY l.happened_at DESC, l.id DESC LIMIT :limit",
             ['user' => $userId, 'limit' => max(1, $limit)]
         ));
     }
@@ -44,8 +47,8 @@ final class SignInHistoryRepository
     public function countriesBefore(int $userId, int $loginId): array
     {
         return array_map('strval', $this->db->fetchFirstColumn(
-            "SELECT DISTINCT metadata->>'country' FROM audit_log
-             WHERE user_id = :user AND event_key = 'auth.login' AND id < :login AND COALESCE(metadata->>'country', '') <> ''",
+            "SELECT DISTINCT details->>'country' FROM cattophp_activity
+             WHERE actor_id = CAST(:user AS TEXT) AND action = 'auth.login' AND id < :login AND COALESCE(details->>'country', '') <> ''",
             ['user' => $userId, 'login' => $loginId]
         ));
     }
@@ -59,21 +62,21 @@ final class SignInHistoryRepository
     public function newCountries(): array
     {
         return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'user_id' => (int) $row['user_id']] + array_map('strval', $row), $this->db->fetchAllAssociative(
-            "SELECT l.id, l.user_id, to_char(l.created_at, 'YYYY-MM-DD HH24:MI') AS at, COALESCE(host(l.ip_address), '') AS ip, l.metadata->>'country' AS country,
+            "SELECT l.id, account_person(l.actor_id) AS user_id, to_char(l.happened_at, 'YYYY-MM-DD HH24:MI') AS at, COALESCE(l.ip_address, '') AS ip, l.details->>'country' AS country,
                     COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, '') AS name,
                     COALESCE((SELECT e.email FROM user_emails e WHERE e.user_id = u.id AND e.is_primary LIMIT 1), '') AS email, COALESCE(u.account_reference, '') AS account_reference
-             FROM audit_log l JOIN users u ON u.id = l.user_id
-             WHERE l.event_key = 'auth.login' AND l.created_at > NOW() - INTERVAL '7 days' AND COALESCE(l.metadata->>'country', '') <> ''
-               AND EXISTS (SELECT 1 FROM audit_log e WHERE e.user_id = l.user_id AND e.event_key = 'auth.login' AND e.id < l.id AND COALESCE(e.metadata->>'country', '') <> '')
-               AND NOT EXISTS (SELECT 1 FROM audit_log e WHERE e.user_id = l.user_id AND e.event_key = 'auth.login' AND e.id < l.id AND e.metadata->>'country' = l.metadata->>'country')
-               AND NOT EXISTS (SELECT 1 FROM audit_log s WHERE s.event_key = 'user.signin_country_seen' AND s.metadata->>'login_id' = l.id::text)
-             ORDER BY l.created_at DESC LIMIT 50"
+             FROM cattophp_activity l JOIN users u ON u.id = account_person(l.actor_id)
+             WHERE l.action = 'auth.login' AND l.happened_at > NOW() - INTERVAL '7 days' AND COALESCE(l.details->>'country', '') <> ''
+               AND EXISTS (SELECT 1 FROM cattophp_activity e WHERE e.actor_id = l.actor_id AND e.action = 'auth.login' AND e.id < l.id AND COALESCE(e.details->>'country', '') <> '')
+               AND NOT EXISTS (SELECT 1 FROM cattophp_activity e WHERE e.actor_id = l.actor_id AND e.action = 'auth.login' AND e.id < l.id AND e.details->>'country' = l.details->>'country')
+               AND NOT EXISTS (SELECT 1 FROM cattophp_activity s WHERE s.action = 'user.signin_country_seen' AND s.details->>'login_id' = l.id::text)
+             ORDER BY l.happened_at DESC LIMIT 50"
         ));
     }
 
     /** Whether a sign-in belongs to the person (before it is marked as seen). */
     public function belongsTo(int $loginId, int $userId): bool
     {
-        return (bool) $this->db->fetchOne("SELECT 1 FROM audit_log WHERE id = :id AND user_id = :user AND event_key = 'auth.login'", ['id' => $loginId, 'user' => $userId]);
+        return (bool) $this->db->fetchOne("SELECT 1 FROM cattophp_activity WHERE id = :id AND actor_id = CAST(:user AS TEXT) AND action = 'auth.login'", ['id' => $loginId, 'user' => $userId]);
     }
 }
